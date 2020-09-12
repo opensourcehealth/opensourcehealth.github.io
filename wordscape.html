@@ -70,6 +70,21 @@ function getValueMap(line) {
 	return valueMap
 }
 
+function getXYSubtraction(xyA, xyB) {
+	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
+}
+
+function incrementXY(xy, xyAddition) {
+	xy[0] += xyAddition[0]
+	xy[1] += xyAddition[1]
+	return xy
+}
+function multiplyXYByScalar(xy, scalarMultiplier) {
+	xy[0] *= scalarMultiplier
+	xy[1] *= scalarMultiplier
+	return xy
+}
+
 function setWordArea() {
 	var query = document.URL
 	indexOfQuestionMark = query.indexOf('?')
@@ -84,8 +99,9 @@ function setWordArea() {
 }
 
 function update() {
-	var wordString = updateSVGArea()
-	document.getElementById('paragraphText').innerHTML = wordString
+	var svgString = updateSVGArea()
+	document.getElementById('paragraphText').innerHTML = svgString
+	var wordString = document.getElementById('wordArea').value
 	document.getElementById('queryLink').href = '?' + wordString.replace('>\n', '>')
 	gNumberOfupdates += 1
 	if (gNumberOfupdates > 0) {
@@ -110,21 +126,6 @@ function updateSVGArea() {
 	var svgString = lines.join('\n')
 	document.getElementById('svgArea').value = svgString
 	return svgString
-}
-
-function getXYSubtraction(xyA, xyB) {
-	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
-}
-
-function incrementXY(xy, xyAddition) {
-	xy[0] += xyAddition[0]
-	xy[1] += xyAddition[1]
-	return xy
-}
-function multiplyXYByScalar(xy, scalarMultiplier) {
-	xy[0] *= scalarMultiplier
-	xy[1] *= scalarMultiplier
-	return xy
 }
 
 function verticalHole(line) {
