@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/></head>
+<body>
+<p id="paragraphText"></p>
+<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a id="queryLink" href="index.html">Original Link</a><br>
+<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<h3>SVG Text</h3>
+<textarea id="svgArea" rows="40" cols="120"></textarea><br>
+<script>
+//License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
+var gBracketTable = {
+	'&lt;':'<',
+	'&gt;':'>'}
+var gEscapeTable = {
+	'%20':' ',
+	'%24':'$',
+	'%26':'&',
+	'%60':'`',
+	'%3A':':',
+	'%3C':'<',
+	'%3E':'>\n',
+	'%5B':'[',
+	'%5D':']',
+	'%7B':'{',
+	'%7D':'}',
+	'%22':'"',
+	'%2B':'+',
+	'%23':'#',
+	'%25':'%',
+	'%40':'@',
+	'%2F':'/',
+	'%3B':';',
+	'%3D':'=',
+	'%3F':'?',
+	'%5C':'\\',
+	'%5E':'^',
+	'%7C':'|',
+	'%7E':'~',
+	'%27':'‘',
+	'%2C':','}
+var gQuoteEqualTable = {
+	'"':' ',
+	'\'':' ',
+	'=':' = '}
+var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
+var gQuoteEqualExpression = new RegExp(Object.keys(gQuoteEqualTable).join("|"), "gi")
+var gNumberOfupdates = -1
+
+function getFloatValue(defaultValue, key, valueMap) {
+	if (valueMap.has(key)) {
+		return parseFloat(valueMap.get(key))
+	}
+	else {
+		return defaultValue
+	}
+}
+
+function getValueMap(line) {
+	var valueMap = new Map()
+	words = line.replace(gQuoteEqualExpression, function(find) {return gQuoteEqualTable[find]}).split(' ')
+	words = words.filter(function(word) {return word.length>0});
+	for (wordIndex = 1; wordIndex < words.length; wordIndex++) {
+		word = words[wordIndex]
+		if (word == '=') {
+			valueMap.set(words[wordIndex - 1].toLowerCase(), words[wordIndex + 1])
+		}
+	}
+	return valueMap
+}
+
+function setWordArea() {
+	var query = document.URL
+	indexOfQuestionMark = query.indexOf('?')
+	if (indexOfQuestionMark < 0) {
+		query = ''
+	}
+	else {
+		query = query.slice(indexOfQuestionMark + 1)
+	}
+	var escapeExpression =	new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
+	document.getElementById('wordArea').value = query.replace(escapeExpression, function(find) {return gEscapeTable[find]})
+}
+
+function update() {
+	var wordString = updateSVGArea()
+	document.getElementById('paragraphText').innerHTML = wordString
+	document.getElementById('queryLink').href = '?' + wordString.replace('>\n', '>')
+	gNumberOfupdates += 1
+	if (gNumberOfupdates > 0) {
+		document.getElementById('queryLink').innerHTML = 'Updated Link'
+	}
+}
+
+function updateSVGArea() {
+	var wordString = document.getElementById('wordArea').value
+	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
+	var lines = wordString.split('\n')
+	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		line = lines[lineIndex]
+		indexOfSpace = line.indexOf(' ')
+		if (indexOfSpace > 0) {
+			startWord = line.slice(1, indexOfSpace).toLowerCase()
+			if (commandMap.has(startWord)) {
+				lines[lineIndex] = commandMap.get(startWord)(line)
+			}
+		}
+	}
+	var svgString = lines.join('\n')
+	document.getElementById('svgArea').value = svgString
+	return svgString
+}
+
+function getXYSubtraction(xyA, xyB) {
+	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
+}
+
+function incrementXY(xy, xyAddition) {
+	xy[0] += xyAddition[0]
+	xy[1] += xyAddition[1]
+	return xy
+}
+function multiplyXYByScalar(xy, scalarMultiplier) {
+	xy[0] *= scalarMultiplier
+	xy[1] *= scalarMultiplier
+	return xy
+}
+
+function verticalHole(line) {
+	valueMap = getValueMap(line)
+	angle = Math.PI / 6.0
+	cx = getFloatValue(0.0, 'cx', valueMap)
+	cy = getFloatValue(0.0, 'cy', valueMap)
+	points = []
+	radius = getFloatValue(1.0, 'r', valueMap)
+	sag = getFloatValue(1.0, 'sag', valueMap)
+	sides = getFloatValue(12.0, 'sides', valueMap)
+	beginAngle = Math.PI / 2.0 - angle
+	endAngle = 1.5 * Math.PI + angle
+	maximumIncrement = 2.0 * Math.PI / sides
+	deltaAngle = endAngle - beginAngle
+	arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * angle)
+	angleIncrement = deltaAngle / arcSides
+	halfAngleIncrement = 0.5 * angleIncrement
+	beginAngle -= halfAngleIncrement
+	endAngle += halfAngleIncrement + 0.001 * angle
+	outerRadius = radius / Math.cos(0.5 * angleIncrement)
+	for (pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
+		x = cx + Math.sin(pointAngle) * outerRadius
+		y = cy + Math.cos(pointAngle) * outerRadius
+		points.push([x, y])
+	}
+	topY = cy + radius + sag
+	deltaBegin = getXYSubtraction(points[0], points[1])
+	incrementMultiplier = (topY - points[1][1]) / deltaBegin[1] - 1.0
+	multiplyXYByScalar(deltaBegin, incrementMultiplier)
+	incrementXY(points[0], deltaBegin)
+	lastPoint = points[points.length - 1]
+	lastPoint[0] -= deltaBegin[0]
+	lastPoint[1] += deltaBegin[1]
+	for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		point = points[pointIndex]
+		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
+	}
+	return '<polygon points="' + points.join(' ') + '" />'
+}
+
+var commandMap = new Map()
+commandMap.set('verticalhole', verticalHole)
+
+setWordArea()
+update()
+</script>
+</body>
+</html>
