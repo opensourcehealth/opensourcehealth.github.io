@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"/></head>
+<head>
+	<meta charset="utf-8"/>
+	<title>Wordscape</title>
+</head>
 <body>
 <p id="paragraphText"></p>
 <button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -45,6 +48,7 @@ var gQuoteEqualTable = {
 	'\'':' ',
 	'=':' = '}
 var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
+var gEscapeExpression =	new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
 var gQuoteEqualExpression = new RegExp(Object.keys(gQuoteEqualTable).join("|"), "gi")
 var gNumberOfupdates = -1
 
@@ -74,17 +78,6 @@ function getXYSubtraction(xyA, xyB) {
 	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
 }
 
-function incrementXY(xy, xyAddition) {
-	xy[0] += xyAddition[0]
-	xy[1] += xyAddition[1]
-	return xy
-}
-function multiplyXYByScalar(xy, scalarMultiplier) {
-	xy[0] *= scalarMultiplier
-	xy[1] *= scalarMultiplier
-	return xy
-}
-
 function setWordArea() {
 	var query = document.URL
 	indexOfQuestionMark = query.indexOf('?')
@@ -94,8 +87,7 @@ function setWordArea() {
 	else {
 		query = query.slice(indexOfQuestionMark + 1)
 	}
-	var escapeExpression =	new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
-	document.getElementById('wordArea').value = query.replace(escapeExpression, function(find) {return gEscapeTable[find]})
+	document.getElementById('wordArea').value = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
 }
 
 function update() {
@@ -130,12 +122,12 @@ function updateSVGArea() {
 
 function verticalHole(line) {
 	valueMap = getValueMap(line)
-	angle = Math.PI / 6.0
+	angle = getFloatValue(35.0, 'angle', valueMap) * Math.PI / 180.0
 	cx = getFloatValue(0.0, 'cx', valueMap)
 	cy = getFloatValue(0.0, 'cy', valueMap)
 	points = []
 	radius = getFloatValue(1.0, 'r', valueMap)
-	sag = getFloatValue(1.0, 'sag', valueMap)
+	sagAngle = getFloatValue(30.0, 'sagangle', valueMap) * Math.PI / 180.0
 	sides = getFloatValue(12.0, 'sides', valueMap)
 	beginAngle = Math.PI / 2.0 - angle
 	endAngle = 1.5 * Math.PI + angle
@@ -152,14 +144,18 @@ function verticalHole(line) {
 		y = cy + Math.cos(pointAngle) * outerRadius
 		points.push([x, y])
 	}
-	topY = cy + radius + sag
+	topY = cy + radius
 	deltaBegin = getXYSubtraction(points[0], points[1])
-	incrementMultiplier = (topY - points[1][1]) / deltaBegin[1] - 1.0
-	multiplyXYByScalar(deltaBegin, incrementMultiplier)
-	incrementXY(points[0], deltaBegin)
-	lastPoint = points[points.length - 1]
-	lastPoint[0] -= deltaBegin[0]
-	lastPoint[1] += deltaBegin[1]
+	sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
+	segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
+	approachRunOverRise = sagRunOverRise - segmentRunOverRise
+	topMinusSegment = topY - points[0][1]
+	topX = topMinusSegment * segmentRunOverRise + points[0][0]
+	aboveMinusTopY = (topX - cx) / approachRunOverRise
+	sagDeltaX = aboveMinusTopY * sagRunOverRise
+	aboveY = topY + aboveMinusTopY
+	points[0] = [cx + sagDeltaX, aboveY]
+	points[points.length - 1] = [cx - sagDeltaX, aboveY]
 	for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
 		point = points[pointIndex]
 		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
