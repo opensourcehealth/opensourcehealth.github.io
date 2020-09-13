@@ -110,8 +110,8 @@ function updateSVGArea() {
 		indexOfSpace = line.indexOf(' ')
 		if (indexOfSpace > 0) {
 			startWord = line.slice(1, indexOfSpace).toLowerCase()
-			if (commandMap.has(startWord)) {
-				lines[lineIndex] = commandMap.get(startWord)(line)
+			if (gTagMap.has(startWord)) {
+				lines[lineIndex] = gTagMap.get(startWord)(line)
 			}
 		}
 	}
@@ -122,7 +122,7 @@ function updateSVGArea() {
 
 function verticalHole(line) {
 	valueMap = getValueMap(line)
-	angle = getFloatValue(35.0, 'angle', valueMap) * Math.PI / 180.0
+	angle = getFloatValue(40.0, 'angle', valueMap) * Math.PI / 180.0
 	cx = getFloatValue(0.0, 'cx', valueMap)
 	cy = getFloatValue(0.0, 'cy', valueMap)
 	points = []
@@ -163,8 +163,8 @@ function verticalHole(line) {
 	return '<polygon points="' + points.join(' ') + '" />'
 }
 
-var commandMap = new Map()
-commandMap.set('verticalhole', verticalHole)
+var gTagMap = new Map()
+gTagMap.set('verticalhole', verticalHole)
 
 setWordArea()
 update()
