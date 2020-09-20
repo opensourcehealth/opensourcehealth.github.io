@@ -13,18 +13,51 @@
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
-//rotate, skew, etc.., mirror line y and vector
+//add children to bounding box
+//view transform3D
+//extrude(true) pillar(transform, [polygon], polyheight)
+//mesh stl=id
+//add circles and rect to bounding box
+//hidden lines
+//extrusion(layers=[(transform, [polygon], layers, closedTop)], closed) polygon can be indexed x,y,index
+//slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
+//combination id=a+b-c*d/e ** on vertex transform3D extrusionPath(polyline, polygon, polyplane, polyheight)
+//mirror line y and vector, polyrect
+//setLocal, setGlobal, if switch case else, for
+//codeStyle indentation start increment type groupDelimeter, switch [] to {}
+//matrix2D, transform3D basis
+//document.getElementById("wordArea").onkeydown = function(evt) {(evt) ? evt : window.event if (evt.keyCode == 13) {alert("e");}}
+//textArea.value.slice(0, textArea.selectionStart).split('\n').length - 1
+/*
+lastKeyDownCode = null
+areaKeyDown = function(evt) {
+    (evt) ? evt : window.event
+    lastKeyDownCode = evt.keyCode
+}
+
+areaInput = function(evt) {
+    if (lastKeyDownCode == 13) {
+    lines=wordArea.value.split("\n")
+    lines[getLineNumber(wordArea)] = '    '
+   wordArea.value = lines.join('\n')
+    }
+}
+wordArea.onkeydown = areaKeyDown
+wordArea.oninput = areaInput
+*/
 var gBracketTable = {
 	'&lt;':'<',
 	'&gt;':'>'}
 var gEscapeTable = {
+	'%0A':'\n',
+	'%0D':'\r',
 	'%20':' ',
 	'%24':'$',
 	'%26':'&',
 	'%60':'`',
 	'%3A':':',
 	'%3C':'<',
-	'%3E':'>\n',
+	'%3E':'>',
 	'%5B':'[',
 	'%5D':']',
 	'%7B':'{',
@@ -50,18 +83,7 @@ var gNumberOfUpdates = -1
 
 function addSliceToWords(lineSlice, strippedWords) {
 	if (lineSlice.indexOf('=') != -1) {
-		if (lineSlice.endsWith('>')) {
-			if (lineSlice.endsWith('/>')) {
-				if (!lineSlice.endsWith(' />')) {
-					lineSlice = lineSlice.slice(0, lineSlice.length - 2) + ' />'
-				}
-			}
-			else {
-				if (!lineSlice.endsWith(' >')) {
-					lineSlice = lineSlice.slice(0, lineSlice.length - 1) + ' >'
-				}
-			}
-		}
+		lineSlice = getLineWithEndspace(['/>', '>', '[', '{'], lineSlice)
 	}
 	snippets = lineSlice.replace(/=/g, ' = ').split(' ').filter(lengthCheck)
 	for (snippet of snippets) {
@@ -69,77 +91,173 @@ function addSliceToWords(lineSlice, strippedWords) {
 	}
 }
 
-function getAttributeLineSetMap(attributeMap, tag) {
-	attributeMap.set('_tag_', tag)
-	firstWord = '<' + tag
-	attributeWords = [firstWord]
-	for (entry of attributeMap) {
-		key = entry[0]
-		if (key != '_tag_') {
-			value = entry[1]
-			quoteString = '"'
-			if (value.indexOf('"') != -1) {
-				quoteString = '\''
-			}
-			attributeWords.push(key + '=' + quoteString + value + quoteString)
+function addToCapitalizationMap(capitalizedWordString) {
+	capitalizedWords = capitalizedWordString.split(' ').filter(lengthCheck)
+	for (capitalizedWord of capitalizedWords) {
+		wordLower = capitalizedWord.toLowerCase()
+		if (capitalizedWord != wordLower) {
+			gCapitalizationMap.set(wordLower, capitalizedWord)
 		}
 	}
-	attributeLine = attributeWords.join(' ')
-	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
-		return attributeLine + '>'
-	}
-	return attributeLine + ' >'
 }
 
-function getAttributeMap(line) {
-	var attributeMap = new Map()
-	var strippedWords = getStrippedWords(line)
-	if (strippedWords.length > 0) {
-		tag = strippedWords[0].slice(1).toLowerCase()
-		if (tag.length > 0) {
-			if (tag[0] == '/') {
-				if (tag.length > 2) {
-					attributeMap.set('_endTag_', tag.slice(1, -1))
-				}
+function deleteKeys(keyString, mapToRemoveFrom) {
+	keys = keyString.split(' ')
+	for (key of keys) {
+		mapToRemoveFrom.delete(key)
+	}
+}
+
+function getAddition(additionString) {
+	var multiplier = 1.0
+	var totalValue = 0.0
+	var values = additionString.replace(/-/g, ' - ').split('+').join(' + ').split(' ').filter(lengthCheck)
+	for (value of values) {
+		if (value == '-') {
+			multiplier = -1.0
+		}
+		else {
+			if (value == '+') {
+				multiplier = 1.0
 			}
 			else {
-				attributeMap.set('_tag_', tag)
+				totalValue += parseFloat(value) * multiplier
 			}
 		}
 	}
-	for (wordIndex = 1; wordIndex < strippedWords.length; wordIndex++) {
-		if (strippedWords[wordIndex] == '=') {
-			attributeMap.set(strippedWords[wordIndex - 1].toLowerCase(), strippedWords[wordIndex + 1])
-		}
-	}
-	return attributeMap
+	return totalValue
 }
 
 function getBracketedEntry(bracketString) {
-	indexOfBeginBracket = bracketString.indexOf('(')
-	if (indexOfBeginBracket == -1) {
+	entry = bracketString.split(')')
+	if (entry.length < 2) {
 		return ['']
 	}
-	indexOfEndBracket = bracketString.indexOf(')')
-	if (indexOfEndBracket == -1) {
+	entry = entry[0].split('(')
+	if (entry.length < 2) {
 		return ['']
 	}
-	key = bracketString.slice(0, indexOfBeginBracket).replace(/ /g, '').toLowerCase()
-	value = bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)
-	return [key, value]
+	return [entry[0].replace(/ /g, ''), entry[1]]
+}
+
+function getCapitalizedKey(key) {
+	if (gCapitalizationMap.has(key.toLowerCase())) {
+		return gCapitalizationMap.get(key.toLowerCase())
+	}
+	return key
 }
 
 function getFloats(commaSeparated) {
 	return commaSeparated.replace(/,/g, ' ').split(' ').filter(lengthCheck).map(parseFloat)
 }
 
-function getFloatValue(attributeMap, defaultValue, key) {
-	if (attributeMap.has(key)) {
-		return parseFloat(attributeMap.get(key))
+function getFloatValue(defaultValue, key, statement) {
+	if (statement.attributeMap.has(key)) {
+		return parseFloat(statement.attributeMap.get(key))
 	}
-	else {
-		return defaultValue
+	parentKey = statement.tag + '.' + key
+	var parent = statement.parent
+	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
+		if (parent == null) {
+			whileIndex += 987654321
+		}
+		else {
+			parentAttributeMap = parent.attributeMap
+			if (parentAttributeMap.has(parentKey)) {
+				return parseFloat(parentAttributeMap.get(parentKey))
+			}
+			parent = parent.parent
+		}
 	}
+	return defaultValue
+}
+
+function getFunctionMapCapitalize(alternatingEntries) {
+	var functionMap = new Map()
+	for (alternatingIndex = 0; alternatingIndex < alternatingEntries.length; alternatingIndex += 2) {
+		key = alternatingEntries[alternatingIndex]
+		keyLower = key.toLowerCase()
+		if (key != keyLower) {
+			gCapitalizationMap.set(keyLower, key)
+		}
+		nextIndex = alternatingIndex + 1
+		value = alternatingEntries[nextIndex]
+		functionMap.set(key, value)
+	}
+	return functionMap
+}
+
+function getIDReplaced(bracketString, increment, replacementMap) {
+	if (bracketString.indexOf(']') == -1) {
+		return bracketString
+	}
+	var splitBracketStrings = bracketString.split(']')
+	var replacedStrings = []
+	for (splitBracketString of splitBracketStrings) {
+		if (splitBracketString.length > 1) {
+			var tokens = splitBracketString.split('[')
+			if (tokens[0].length > 0) {
+				replacedStrings.push(tokens[0])
+			}
+			var lastToken = tokens[tokens.length - 1].replace(/ /g, '')
+			if (replacementMap.has(lastToken)) {
+				value = parseFloat(replacementMap.get(lastToken)) + increment
+				replacedStrings.push(value)
+			}
+			else {
+				console.log('Error in getIDReplaced, could not find id:' + lastToken)
+				console.log('Search string is:' + bracketString)
+			}
+		}
+	}
+	return replacedStrings.join('')
+}
+
+function getLineByStatement(statement) {
+	if (statement.tag == null) {
+		if (statement.nestingIncrement == -1) {
+			if (statement.openingStatement == null) {
+				return '</g>'
+			}
+			else {
+				return '</' + statement.openingStatement.tag + '>'
+			}
+		}
+		else {
+			return ''
+		}
+	}
+	firstWord = '<' + statement.tag
+	attributeWords = [firstWord]
+	for (entry of statement.attributeMap) {
+		value = entry[1]
+		quoteString = '"'
+		if (value.indexOf('"') != -1) {
+			quoteString = '\''
+		}
+		attributeWords.push(entry[0] + '=' + quoteString + value + quoteString)
+	}
+	attributeLine = attributeWords.join(' ')
+	lineClosing = '>'
+	if (statement.nestingIncrement == 0) {
+		lineClosing = '/>'
+	}
+	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
+		return attributeLine + lineClosing
+	}
+	return attributeLine + ' ' + lineClosing
+}
+
+function getLineWithEndspace(endWords, line) {
+	for (endWord of endWords) {
+		if (line.endsWith(endWord)) {
+			spaceThenEndWord = ' ' + endWord
+			if (!line.endsWith(spaceThenEndWord)) {
+				return line.slice(0, line.length - endWord.length) + spaceThenEndWord
+			}
+		}
+	}
+	return line
 }
 
 function getMultiplied2By3Matrix(matrixA, matrixB) {
@@ -207,6 +325,75 @@ function getPolygonPoints(attributeMap) {
 	return points
 }
 
+function getStatement(line) {
+	var attributeMap = new Map()
+	var nestingIncrement = 0
+	var strippedWords = getStrippedWords(line)
+	var lastIndex = strippedWords.length - 1
+	var tag = null
+	if (strippedWords.length > 0) {
+		firstWord = strippedWords[0]
+		if (firstWord.startsWith('</') || firstWord == ']' || firstWord == '}') {
+			nestingIncrement = -1
+		}
+		else {
+			if (firstWord.startsWith('<')) {
+				firstWord = firstWord.slice(1)
+			}
+			if (firstWord.length > 0) {
+				tag = getCapitalizedKey(firstWord)
+			}
+		}
+		if (strippedWords.length > 1) {
+			var lastWord = strippedWords[lastIndex]
+			if (lastWord == '>' || lastWord == '[' || lastWord == '{') {
+				nestingIncrement = 1
+			}
+			if (lastWord.endsWith('>') || lastWord == '[' || lastWord == '{') {
+				lastIndex -= 1
+			}
+		}
+	}
+	var key = null
+	var values = null
+	// length = 6
+	// last = 4
+	// 0 1 2 3 4 5
+	// m k = v v e
+	for (wordIndex = 2; wordIndex < lastIndex + 1; wordIndex++) {
+		var word = strippedWords[wordIndex]
+		if (word == '=') {
+			if (key != null) {
+				attributeMap.set(key, values.slice(0, -1).join(' '))
+			}
+			key = strippedWords[wordIndex - 1]
+			keyStrings = key.split('.')
+			if (keyStrings.length == 2) {
+				keyStrings[0] = getCapitalizedKey(keyStrings[0])
+				keyStrings[1] = getCapitalizedKey(keyStrings[1])
+				key = keyStrings.join('.')
+			}
+			values = []
+		}
+		else {
+			if (values != null) {
+				values.push(word)
+			}
+		}
+	}
+	if (key != null) {
+		attributeMap.set(key, values.join(' '))
+	}
+	var statement = {
+	attributeMap:attributeMap,
+	children:[],
+	nestingIncrement:nestingIncrement,
+	openingStatement:null,
+	parent:null,
+	tag:tag}
+	return statement
+}
+
 function getStrippedWords(line) {
 	var quoteSymbols = ['"', '\'']
 	var searchIndexes = [-1,-1]
@@ -248,66 +435,61 @@ function getXYSubtraction(xyA, xyB) {
 	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
 }
 
-function group(attributeMap, attributeMaps, commandMap, lineIndex) {
+function group(family, statement) {
+	var attributeMap = statement.attributeMap
 	var height = -Number.MAX_VALUE
+	var nesting = 0
 	var width = -Number.MAX_VALUE
-	var translateX = 0
-	for (mapIndex = lineIndex + 1; mapIndex < attributeMaps.length; mapIndex++) {
-		nextMap = attributeMaps[mapIndex]
-		var points = getPolygonPoints(nextMap)
+	var border = 0
+	for (child of statement.children) {
+		var points = getPolygonPoints(child.attributeMap)
 		for (point of points) {
 			height = Math.max(height, point[1])
 			width = Math.max(width, point[0])
 		}
-		if (nextMap.has('_endTag_')) {
-			if (nextMap.get('_endTag_') == 'g') {
-				mapIndex = attributeMaps.length + 987
-			}
-		}
 	}
 	if (attributeMap.has('transform')) {
-		var transform = attributeMap.get('transform').toLowerCase()
-		if (commandMap.has('group')) {
-			commandValues = commandMap.get('group')
-			first = commandValues[0]
-			firstWidthPlus = first.width + first.translateX + first.translateX
-			previous = commandValues[commandValues.length - 1]
-			previousWidthPlus = previous.width + previous.translateX + previous.translateX
-			heightPlusPreviousString = (previous.height + height + 10).toFixed(0)
-			transform = transform.replace('heightplusprevious', heightPlusPreviousString)
-			heightPreviousString = (previous.height + 10).toFixed(0)
-			transform = transform.replace('heightprevious', heightPreviousString)
-			widthPlusPreviousString = (previousWidthPlus + width).toFixed(0)
-			transform = transform.replace('widthplusprevious', widthPlusPreviousString)
-			widthPreviousString = previousWidthPlus.toFixed(0)
-			transform = transform.replace('widthprevious', widthPreviousString)
-			heightPlusFirstString = (first.height + height + 10).toFixed(0)
-			transform = transform.replace('heightplusfirst', heightPlusFirstString)
-			heightFirstString = (first.height + 10).toFixed(0)
-			transform = transform.replace('heightfirst', heightFirstString)
-			widthPlusFirstString = (firstWidthPlus + width).toFixed(0)
-			transform = transform.replace('widthplusfirst', widthPlusFirstString)
-			widthFirstString = firstWidthPlus.toFixed(0)
-			transform = transform.replace('widthfirst', widthFirstString)
-		}
-		heightString = (height + 1).toFixed(0)
-		transform = transform.replace('height', heightString)
-		widthString = (width + 1).toFixed(0)
-		transform = transform.replace('width', widthString)
-		attributeMap.set('transform', transform)
+		var transform = attributeMap.get('transform')
 		var entry = getBracketedEntry(transform)
 		if (entry[0] == 'translate') {
-			translateX = parseFloat(getFloats(entry[1])[0])
+			commaSeparated = entry[1].split(',')
+			var xString = commaSeparated[0]
+			xString = xString.replace('width', (width + 1).toFixed(0))
+			var groupStorage = null
+			if (family.storageMap.has('group')) {
+				groupStorage = family.storageMap.get('group')
+				xString = xString.replace('border', groupStorage.border.toString())
+				xString = getIDReplaced(xString, groupStorage.border + groupStorage.border, groupStorage.widthMap)
+			}
+			var addition = getAddition(xString)
+			if (groupStorage == null) {
+				border = addition
+			}
+			xString = addition.toFixed(0)
+			if (commaSeparated.length > 1) {
+				yString = commaSeparated[1].replace('height', (height + 1).toFixed(0))
+				if (groupStorage != null) {
+					yString = getIDReplaced(yString, groupStorage.border, groupStorage.heightMap)
+				}
+				xString = xString + ',' + getAddition(yString).toFixed(0)
+			}
+			attributeMap.set('transform', 'translate(' + xString + ')')
 		}
 	}
-	commandValue = {height:height, translateX:translateX, width:width}
-	commandValues = [commandValue]
-	if (commandMap.has('group')) {
-		commandValues = commandMap.get('group')
-		commandValues.push(commandValue)
+	groupStorage = null
+	if (family.storageMap.has('group')) {
+		groupStorage = family.storageMap.get('group')
 	}
-	commandMap.set('group', commandValues)
-	return getAttributeLineSetMap(attributeMap, 'g')
+	else {
+		groupStorage = {border:border, heightMap:new Map(), widthMap:new Map()}
+		family.storageMap.set('group', groupStorage)
+	}
+	if (attributeMap.has('id')) {
+		var id = attributeMap.get('id')
+		groupStorage.heightMap.set(id, height)
+		groupStorage.widthMap.set(id, width)
+	}
+	statement.tag = 'g'
 }
 
 function lengthCheck(word) {
@@ -318,24 +500,25 @@ function matrix(floats) {
 	return floats
 }
 
-function mirror(attributeMap, attributeMaps, commandMap, lineIndex) {
+function mirror(family, statement) {
+	var attributeMap = statement.attributeMap
 	points = getPolygonPoints(attributeMap)
-	angle = getFloatValue(attributeMap, 0.0, 'angle') * Math.PI / 180.0
-	x = getFloatValue(attributeMap, 0.0, 'x')
-	y = getFloatValue(attributeMap, 0.0, 'y')
+	angle = getFloatValue(0.0, 'angle', statement) * Math.PI / 180.0
+	x = getFloatValue(0.0, 'x', statement)
+	y = getFloatValue(0.0, 'y', statement)
 	mirrorFromX = x + x
 	for (pointIndex = points.length - 1; pointIndex > -1; pointIndex--) {
 		point = points[pointIndex]
 		mirrorPoint = [mirrorFromX - point[0], point[1]]
 		points.push(mirrorPoint)
 	}
-	return '<polygon points="' + points.join(' ') + '"/>'
+	deleteKeys('angle x y', attributeMap)
+	attributeMap.set('points', points.join(' '))
+	statement.tag = 'polygon'
 }
 
-function outline(attributeMap, attributeMaps, commandMap, lineIndex) {
-	if (!attributeMap.has('style')) {
-		attributeMap.set('style', 'fill:none;stroke:rgb(0,0,0);stroke-width:1')
-	}
+function outline(family, statement) {
+	var attributeMap = statement.attributeMap
 	if (attributeMap.has('flip')) {
 		flipScale = [1.0, 1.0]
 		floats = getFloats(attributeMap.get('flip'))
@@ -349,7 +532,36 @@ function outline(attributeMap, attributeMaps, commandMap, lineIndex) {
 		scaleString = 'scale(' + flipScale[0] + ',' + flipScale[1] + ')'
 		attributeMap.set('transform', scaleString)
 	}
-	return getAttributeLineSetMap(attributeMap, 'g')
+	var styleMap = new Map([
+		['fill', 'none'],
+		['stroke', 'rgb(0,0,0)'],
+		['stroke-width', '1']])
+	if (attributeMap.has('style')) {
+		styles = attributeMap.get('style').replace(/ /g, '').split(';')
+		for (style of styles) {
+			var entry = style.split(':')
+			styleMap.set(entry[0], entry[1])
+		}
+	}
+	styles = []
+	for (entry of styleMap) {
+		styles.push(entry[0] + ':' + entry[1])
+	}
+	attributeMap.set('style', styles.join(';'))
+	titleStrings = []
+	if (attributeMap.has('project')) {
+		titleStrings.push(attributeMap.get('project'))
+	}
+	if (attributeMap.has('id')) {
+		titleStrings.push(attributeMap.get('id'))
+	}
+	if (attributeMap.has('date')) {
+		titleStrings.push(attributeMap.get('date'))
+	}
+	titleStrings.push('Wordscape')
+	document.title = titleStrings.join(' - ')
+	attributeMap.delete('flip')
+	statement.tag = 'g'
 }
 
 function rotate(floats) {
@@ -395,24 +607,20 @@ function scale(floats) {
 	return latestMatrix
 }
 
-function setMatrix(attributeMap, matrixTags, matrix) {
+function setMatrix(statement, matrixTags, matrix, nesting) {
 	if (matrixTags.length > 0) {
-		if (attributeMap.has('_endTag_')) {
-			endTag = attributeMap.get('_endTag_')
-			if (endTag == matrixTags[matrixTags.length - 1].tag) {
-				matrixTags.pop()
-				return
-			}
+		if (nesting < matrixTags[matrixTags.length - 1].nesting) {
+			matrixTags.pop()
+			return
 		}
 	}
-	if (!attributeMap.has('_tag_')) {
+	if (statement.tag == null) {
 		return
 	}
-	tag = attributeMap.get('_tag_')
-	if (!attributeMap.has('transform')) {
+	if (!statement.attributeMap.has('transform')) {
 		return
 	}
-	entry = getBracketedEntry(attributeMap.get('transform'))
+	entry = getBracketedEntry(statement.attributeMap.get('transform'))
 	if (entry.length < 2) {
 		return
 	}
@@ -421,7 +629,7 @@ function setMatrix(attributeMap, matrixTags, matrix) {
 		return
 	}
 	var latestMatrix = gTransformMap.get(transformType)(getFloats(entry[1]))
-	var matrixTag = {matrix:latestMatrix, tag:tag}
+	var matrixTag = {matrix:latestMatrix, nesting:nesting, tag:statement.tag}
 	matrixTags.push(matrixTag)
 	if (matrixTags.length > 1) {
 		for (index = matrixTags.length - 2; index > -1; index--) {
@@ -431,7 +639,15 @@ function setMatrix(attributeMap, matrixTags, matrix) {
 	for (matrixIndex = 0; matrixIndex < 6; matrixIndex++) {
 		matrix[matrixIndex] = latestMatrix[matrixIndex]
 	}
-//console.log( 'latestMatrix '  + latestMatrix)
+}
+
+function setNumberOfRows(id, lines) {
+	var numberOfRows = 1
+	var oneOverColumns = 1.0 / document.getElementById(id).cols
+	for (line of lines) {
+		numberOfRows += Math.ceil(oneOverColumns * (line.length + 1))
+	}
+	document.getElementById(id).rows = numberOfRows
 }
 
 function setWordArea() {
@@ -443,7 +659,12 @@ function setWordArea() {
 	else {
 		query = query.slice(indexOfQuestionMark + 1)
 	}
-	document.getElementById('wordArea').value = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
+	query = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
+	indexOfNewline = query.indexOf('\n')
+	if (indexOfNewline < 0) {
+		query = query.replace(/></g, '>\n<')
+	}
+	document.getElementById('wordArea').value = query
 }
 
 function skewX(floats) {
@@ -451,13 +672,12 @@ function skewX(floats) {
 		return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 	}
 	var rotation = floats[0] * Math.PI / 180.0
-	var tanAngle = Math.tan(rotation)
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
 //	1 tan
 //	0 1
-	return [1.0, 0.0, tanAngle, 1.0, 0.0, 0.0]
+	return [1.0, 0.0, Math.tan(rotation), 1.0, 0.0, 0.0]
 }
 
 function skewY(floats) {
@@ -465,20 +685,20 @@ function skewY(floats) {
 		return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 	}
 	var rotation = floats[0] * Math.PI / 180.0
-	var tanAngle = Math.tan(rotation)
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
 //	1 0
 //	tan 1
-//console.log( 'skewY '  + [1.0, 0.0, tanAngle, 1.0, 0.0, 0.0])
-	return [1.0, tanAngle, 0.0, 1.0, 0.0, 0.0]
+	return [1.0, Math.tan(rotation), 0.0, 1.0, 0.0, 0.0]
 }
 
 function transformPoint(point, matrix) {
 	originalX = point[0]
-	point[0] = point[0] * matrix[0] + point[1] * matrix[1] + matrix[4]
-	point[1] = point[1] * matrix[3] + originalX * matrix[2] + matrix[5]
+//	a c e		0 2 4
+//	b d f		1 3 5
+	point[0] = point[0] * matrix[0] + point[1] * matrix[2] + matrix[4]
+	point[1] = originalX * matrix[1] + point[1] * matrix[3] + matrix[5]
 }
 
 function translate(floats) {
@@ -497,90 +717,151 @@ function update() {
 	var svgString = updateSVGArea()
 	document.getElementById('paragraphText').innerHTML = svgString
 	var wordString = document.getElementById('wordArea').value
-	document.getElementById('queryLink').href = '?' + wordString.replace(/>\n/g, '>')
+	document.getElementById('queryLink').href = '?' + wordString.replace(/\n/g, '%0A')
 	gNumberOfUpdates += 1
 	if (gNumberOfUpdates > 0) {
-		document.getElementById('queryLink').innerHTML = 'Updated Link'
+		document.getElementById('queryLink').innerHTML = 'Link Update ' + gNumberOfUpdates.toString()
 	}
 }
 
 function updateSVGArea() {
-	var commandMap = new Map()
+	var svgStatement = null
+	var family = {idMap:new Map(), parents:[], statements:[], storageMap:new Map()}
 	var wordString = document.getElementById('wordArea').value
 	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
-	var attributeMaps = []
-	var convertedMaps = []
-	var hasSvg = false
-	var lines = wordString.split('\n')
-	for (lineIndex = lines.length - 1; lineIndex > -1; lineIndex--) {
-		line = lines[lineIndex]
-		if (line.length < 3) {
-			lines.splice(lineIndex, 1)
+	var splitWord = '\n'
+	if (wordString.indexOf('\r\n') > -1) {
+		splitWord = '\r\n'
+	}
+	var lines = wordString.split(splitWord)
+	for (line of lines) {
+		var statement = getStatement(line)
+		if (family.parents.length > 0) {
+			statement.parent = family.parents[family.parents.length - 1]
+			statement.parent.children.push(statement)
+			if (statement.tag != null) {
+				var idString = statement.tag
+				if (statement.attributeMap.has('id')) {
+					idString = statement.attributeMap.get('id')
+				}
+				else {
+					subIdentifiers = []
+					var keys = 'cx cy x y r'.split(' ')
+					for (key of keys) {
+						if (statement.attributeMap.has(key)) {
+							subIdentifiers.push(key + statement.attributeMap.get(key))
+						}
+					}
+					if (statement.attributeMap.has('points')) {
+						pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
+						subIdentifiers.push(pointStrings.join('-'))
+					}
+					var parentMap = statement.parent.attributeMap
+					if (parentMap.has('id')) {
+						idString += '-' + parentMap.get('id')
+					}
+					subIdentifiers.reverse()
+					var suffix = ''
+					for (whileIndex = 1; whileIndex < 98765; whileIndex++) {
+						check = idString + suffix
+						if (family.idMap.has(check)) {
+							if (subIdentifiers.length > 0) {
+								idString = idString + '-' + subIdentifiers[subIdentifiers.length - 1]
+								subIdentifiers.pop()
+							}
+							else {
+								suffix = '-' + whileIndex.toString()
+							}
+						}
+						else {
+							idString = check
+							whileIndex += 987654321
+						}
+					}
+					statement.attributeMap.set('id', idString)
+				}
+				family.idMap.set(idString, statement)
+			}
+		}
+		if (statement.nestingIncrement == 1) {
+			family.parents.push(statement)
+		}
+		else {
+			if (statement.nestingIncrement == -1) {
+				statement.openingStatement = family.parents[family.parents.length - 1]
+				family.parents.pop()
+			}
+		}
+		if (gTagMap.has(statement.tag)) {
+			gTagMap.get(statement.tag)(family, statement)
+		}
+		if (svgStatement == null) {
+			if (statement.tag == 'svg') {
+				svgStatement = statement
+			}
+		}
+		family.statements.push(statement)
+	}
+	for (statement of family.statements) {
+		if (gFollowingMap.has(statement.tag)) {
+			gFollowingMap.get(statement.tag)(family, statement)
 		}
 	}
-	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		line = lines[lineIndex]
-		attributeMap = getAttributeMap(line)
-		attributeMaps.push(attributeMap)
-		firstWord = null
-		if (attributeMap.has('_tag_')) {
-			tag = attributeMap.get('_tag_')
-			if (gTagMap.has(tag)) {
-				line = gTagMap.get(tag)(attributeMap, attributeMaps, commandMap, lineIndex)
-				lines[lineIndex] = line
-			}
-			if (tag == 'svg') {
-				hasSvg = true
-			}
-		}
-		convertedMap = getAttributeMap(line)
-		convertedMaps.push(convertedMap)
-	}
-	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		convertedMap = convertedMaps[lineIndex]
-		if (convertedMap.has('_tag_')) {
-			tag = convertedMap.get('_tag_')
-			if (gFollowingMap.has(tag)) {
-				line = gFollowingMap.get(tag)(convertedMap, convertedMaps, commandMap, lineIndex)
-				lines[lineIndex] = line
-			}
+	var height = 0.0
+	var lineThickness = 10
+	var width = 0.0
+	var matrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+	var matrixTags = []
+	var nesting = 0
+	for (statement of family.statements) {
+		nesting += statement.nestingIncrement
+		setMatrix(statement, matrixTags, matrix, nesting)
+		if (statement.tag == 'polygon') {
+			boundingBox = getPolygonBoundingBox(statement.attributeMap, matrix)
+			height = Math.max(height, boundingBox[3])
+			width = Math.max(width, boundingBox[2])
 		}
 	}
-	if (!hasSvg) {
-		var height = 0.0
-		var lineThickness = 10
-		var width = 0.0
-		var matrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
-		var matrixTags = []
-		for (convertedMap of convertedMaps) {
-			setMatrix(convertedMap, matrixTags, matrix)
-			tag = convertedMap.get('_tag_')
-			if (tag == 'polygon') {
-				boundingBox = getPolygonBoundingBox(convertedMap, matrix)
-				height = Math.max(height, boundingBox[3])
-				width = Math.max(width, boundingBox[2])
-			}
-		}
-		height += lineThickness
-		width += lineThickness
-		svgLine = '<svg height="' + height.toFixed() + '" width="' + width.toFixed() + '" xmlns="http://www.w3.org/2000/svg">'
-		lines.splice(0, 0, svgLine)
-		lines.push('</svg>')
+	height += lineThickness
+	width += lineThickness
+	if (svgStatement == null) {
+		svgStatement = getStatement('<svg >')
+		family.statements.splice(0, 0, svgStatement)
+		family.statements.push(getStatement('</svg>'))
 	}
-	var svgString = lines.join('\n')
-	document.getElementById('svgArea').rows = lines.length + 2
+	if (!svgStatement.attributeMap.has('height')) {
+		svgStatement.attributeMap.set('height', height.toFixed())
+	}
+	if (!svgStatement.attributeMap.has('width')) {
+		svgStatement.attributeMap.set('width', width.toFixed())
+	}
+	if (!svgStatement.attributeMap.has('xmlns')) {
+		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
+	}
+	var svgLines = []
+	for (statement of family.statements) {
+		svgLines.push(getLineByStatement(statement))
+	}
+	joinWord = '\n'
+	if (navigator.appVersion.indexOf("Win") > -1) {
+		joinWord = '\r\n'
+	}
+	var svgString = svgLines.join(joinWord)
+	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('svgArea', svgLines)
 	document.getElementById('svgArea').value = svgString
 	return svgString
 }
 
-function verticalHole(attributeMap, attributeMaps, commandMap, lineIndex) {
-	angle = getFloatValue(attributeMap, 40.0, 'angle') * Math.PI / 180.0
-	cx = getFloatValue(attributeMap, 0.0, 'cx')
-	cy = getFloatValue(attributeMap, 0.0, 'cy')
+function verticalHole(family, statement) {
+	var attributeMap = statement.attributeMap
+	angle = getFloatValue(40.0, 'angle', statement) * Math.PI / 180.0
+	cx = getFloatValue(0.0, 'cx', statement)
+	cy = getFloatValue(0.0, 'cy', statement)
+	radius = getFloatValue(1.0, 'r', statement)
+	sagAngle = getFloatValue(15.0, 'sagAngle', statement) * Math.PI / 180.0
+	sides = getFloatValue(24.0, 'sides', statement)
 	points = []
-	radius = getFloatValue(attributeMap, 1.0, 'r')
-	sagAngle = getFloatValue(attributeMap, 15.0, 'sagAngle') * Math.PI / 180.0
-	sides = getFloatValue(attributeMap, 24.0, 'sides')
 	beginAngle = Math.PI / 2.0 - angle
 	endAngle = 1.5 * Math.PI + angle
 	maximumIncrement = 2.0 * Math.PI / sides
@@ -612,22 +893,22 @@ function verticalHole(attributeMap, attributeMaps, commandMap, lineIndex) {
 		point = points[pointIndex]
 		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
 	}
-	return '<polygon points="' + points.join(' ') + '"/>'
+	deleteKeys('angle cx cy r sagAngle sides', attributeMap)
+	attributeMap.set('points', points.join(' '))
+	statement.tag = 'polygon'
 }
 
-var gFollowingMap = new Map([
-	['group', group]])
-var gTagMap = new Map([
-	['mirror', mirror],
-	['outline', outline],
-	['verticalhole', verticalHole]])
+var gCapitalizationMap = new Map()
+var gFollowingMap = getFunctionMapCapitalize(['group', group])
+var gTagMap = getFunctionMapCapitalize(['mirror', mirror, 'outline', outline, 'verticalHole', verticalHole])
 var gTransformMap = new Map([
 	['matrix', matrix],
 	['rotate', rotate],
 	['scale', scale],
-	['skewx', skewX],
-	['skewy', skewY],
+	['skewX', skewX],
+	['skewY', skewY],
 	['translate', translate]])
+addToCapitalizationMap('sagAngle')
 setWordArea()
 update()
 </script>
