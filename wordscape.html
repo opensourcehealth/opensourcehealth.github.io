@@ -13,19 +13,20 @@
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
-//add children to bounding box
+//2D and 3D, process
 //view transform3D
 //extrude(true) pillar(transform, [polygon], polyheight)
 //mesh stl=id
+//codeStyle indentation start increment type groupDelimeter, switch [] to {}
 //add circles and rect to bounding box
+//set descendants depth with statement
 //hidden lines
 //extrusion(layers=[(transform, [polygon], layers, closedTop)], closed) polygon can be indexed x,y,index
 //slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
 //combination id=a+b-c*d/e ** on vertex transform3D extrusionPath(polyline, polygon, polyplane, polyheight)
 //mirror line y and vector, polyrect
 //setLocal, setGlobal, if switch case else, for
-//codeStyle indentation start increment type groupDelimeter, switch [] to {}
-//matrix2D, transform3D basis
+//transform3D basis
 //document.getElementById("wordArea").onkeydown = function(evt) {(evt) ? evt : window.event if (evt.keyCode == 13) {alert("e");}}
 //textArea.value.slice(0, textArea.selectionStart).split('\n').length - 1
 /*
@@ -45,6 +46,7 @@ areaInput = function(evt) {
 wordArea.onkeydown = areaKeyDown
 wordArea.oninput = areaInput
 */
+var gAlertSet = new Set()
 var gBracketTable = {
 	'&lt;':'<',
 	'&gt;':'>'}
@@ -101,11 +103,35 @@ function addToCapitalizationMap(capitalizedWordString) {
 	}
 }
 
+function addToDescendants(descendants, statement) {
+	var lengthLimit = 10000000
+	if (descendants.length >= lengthLimit) {
+		var warningText = 'Recursion limit of\ndescendants reached, no further statements will be processed.'
+		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
+		warning(warningText, warningVariables)
+		return
+	}
+	for (child of statement.children) {
+		descendants.push(child)
+		addToDescendants(descendants, child)
+	}
+}
+
 function deleteKeys(keyString, mapToRemoveFrom) {
 	keys = keyString.split(' ')
 	for (key of keys) {
 		mapToRemoveFrom.delete(key)
 	}
+}
+
+function get2DUnitMatrix() {
+	// a c e		0 2 4
+	// b d f		1 3 5
+	// 0 0 1		    +
+	//
+	// 1 0 0
+	// 0 1 0
+	return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 }
 
 function getAddition(additionString) {
@@ -128,6 +154,13 @@ function getAddition(additionString) {
 	return totalValue
 }
 
+function getBoundingBox(caller, statement) {
+	if (statement.tag == 'polygon') {
+		return getPolygonBoundingBox(caller, statement)
+	}
+	return null
+}
+
 function getBracketedEntry(bracketString) {
 	entry = bracketString.split(')')
 	if (entry.length < 2) {
@@ -145,6 +178,12 @@ function getCapitalizedKey(key) {
 		return gCapitalizationMap.get(key.toLowerCase())
 	}
 	return key
+}
+
+function getDescendants(statement) {
+	var descendants = []
+	addToDescendants(descendants, statement)
+	return descendants
 }
 
 function getFloats(commaSeparated) {
@@ -187,6 +226,24 @@ function getFunctionMapCapitalize(alternatingEntries) {
 	return functionMap
 }
 
+function getGroupBoundingBox(caller, statement) {
+	var boundingBox = null
+	descendants = getDescendants(statement)
+	for (child of descendants) {
+		var childBox = null
+		if (child.tag != null) {
+			childBox = getBoundingBox(caller, child)
+		}
+		if (childBox != null) {
+			if (boundingBox == null) {
+				boundingBox = [[Number.MAX_VALUE, Number.MAX_VALUE], [-Number.MAX_VALUE, -Number.MAX_VALUE]]
+			}
+			widenBoundingBox(boundingBox, childBox[0], childBox[1])
+		}
+	}
+	return boundingBox
+}
+
 function getIDReplaced(bracketString, increment, replacementMap) {
 	if (bracketString.indexOf(']') == -1) {
 		return bracketString
@@ -205,8 +262,9 @@ function getIDReplaced(bracketString, increment, replacementMap) {
 				replacedStrings.push(value)
 			}
 			else {
-				console.log('Error in getIDReplaced, could not find id:' + lastToken)
-				console.log('Search string is:' + bracketString)
+				warningText = 'Error in getIDReplaced, could not find id:\nin search string:'
+				warningVariables = [lastToken, bracketString]
+				warning(warningText, warningVariables)
 			}
 		}
 	}
@@ -260,7 +318,22 @@ function getLineWithEndspace(endWords, line) {
 	return line
 }
 
-function getMultiplied2By3Matrix(matrixA, matrixB) {
+function getMatrix(attributeMap) {
+	if (!attributeMap.has('transform')) {
+		return null
+	}
+	entry = getBracketedEntry(attributeMap.get('transform'))
+	if (entry.length < 2) {
+		return null
+	}
+	transformType = entry[0]
+	if (!gTransformMap.has(transformType)) {
+		return null
+	}
+	return gTransformMap.get(transformType)(getFloats(entry[1]))
+}
+
+function getMultiplied2DMatrix(matrixA, matrixB) {
 	// a c e		0 2 4
 	// b d f		1 3 5
 	// 0 0 1		    +
@@ -280,15 +353,16 @@ function getMultiplied2By3Matrix(matrixA, matrixB) {
 	return [a, b, c, d, e, f]
 }
 
-function getPolygonBoundingBox(attributeMap, matrix) {
-	var boundingBox = [Number.MAX_VALUE, Number.MAX_VALUE, -Number.MAX_VALUE, -Number.MAX_VALUE]
-	var points = getPolygonPoints(attributeMap)
+function getPolygonBoundingBox(caller, statement) {
+	var points = getPolygonPoints(statement.attributeMap)
+	if (points.length == 0) {
+		return null
+	}
+	var boundingBox = [[Number.MAX_VALUE, Number.MAX_VALUE], [-Number.MAX_VALUE, -Number.MAX_VALUE]]
+	var transformedMatrix = getTransformedMatrix(caller, statement)
 	for (point of points) {
-		transformPoint(point, matrix)
-		boundingBox[0] = Math.min(boundingBox[0], point[0])
-		boundingBox[1] = Math.min(boundingBox[1], point[1])
-		boundingBox[2] = Math.max(boundingBox[2], point[0])
-		boundingBox[3] = Math.max(boundingBox[3], point[1])
+		transformPoint(point, transformedMatrix)
+		widenBoundingBox(boundingBox, point, point)
 	}
 	return boundingBox
 }
@@ -431,23 +505,41 @@ function getStrippedWords(line) {
 	}
 }
 
+function getTransformedMatrix(caller, statement) {
+	var transformedMatrix = getMatrix(statement.attributeMap)
+	for (downIndex = 0; downIndex < 9876; downIndex++) {
+		statement = statement.parent
+		if (statement == null || statement == caller) {
+			if (transformedMatrix == null) {
+				return get2DUnitMatrix()
+			}
+			else {
+				return transformedMatrix
+			}
+		}
+		statementMatrix = getMatrix(statement.attributeMap)
+		if (statementMatrix != null) {
+			if (transformedMatrix == null) {
+				transformedMatrix = statementMatrix
+			}
+			else {
+				transformedMatrix = getMultiplied2DMatrix(statementMatrix, transformedMatrix)
+			}
+		}
+	}
+	return transformedMatrix
+}
+
 function getXYSubtraction(xyA, xyB) {
 	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
 }
 
 function group(family, statement) {
 	var attributeMap = statement.attributeMap
-	var height = -Number.MAX_VALUE
-	var nesting = 0
-	var width = -Number.MAX_VALUE
+	var boundingBox = getGroupBoundingBox(statement, statement)
+	var height = boundingBox[1][1]
+	var width = boundingBox[1][0]
 	var border = 0
-	for (child of statement.children) {
-		var points = getPolygonPoints(child.attributeMap)
-		for (point of points) {
-			height = Math.max(height, point[1])
-			width = Math.max(width, point[0])
-		}
-	}
 	if (attributeMap.has('transform')) {
 		var transform = attributeMap.get('transform')
 		var entry = getBracketedEntry(transform)
@@ -566,7 +658,7 @@ function outline(family, statement) {
 
 function rotate(floats) {
 	if (floats.length == 0) {
-		return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+		return get2DUnitMatrix()
 	}
 	rotation = floats[0] * Math.PI / 180.0
 	cosAngle = Math.cos(rotation)
@@ -588,12 +680,12 @@ function rotate(floats) {
 	if (floats.length > 2) {
 		y = floats[2]
 	}
-	latestMatrix = getMultiplied2By3Matrix(latestMatrix, [1.0, 0.0, 0.0, 1.0, -x, -y])
-	return getMultiplied2By3Matrix([1.0, 0.0, 0.0, 1.0, x, y], latestMatrix)
+	latestMatrix = getMultiplied2DMatrix(latestMatrix, [1.0, 0.0, 0.0, 1.0, -x, -y])
+	return getMultiplied2DMatrix([1.0, 0.0, 0.0, 1.0, x, y], latestMatrix)
 }
 
 function scale(floats) {
-	var latestMatrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+	var latestMatrix = get2DUnitMatrix()
 	if (floats.length == 0) {
 		return latestMatrix
 	}
@@ -605,40 +697,6 @@ function scale(floats) {
 		latestMatrix[3] = latestMatrix[0]
 	}
 	return latestMatrix
-}
-
-function setMatrix(statement, matrixTags, matrix, nesting) {
-	if (matrixTags.length > 0) {
-		if (nesting < matrixTags[matrixTags.length - 1].nesting) {
-			matrixTags.pop()
-			return
-		}
-	}
-	if (statement.tag == null) {
-		return
-	}
-	if (!statement.attributeMap.has('transform')) {
-		return
-	}
-	entry = getBracketedEntry(statement.attributeMap.get('transform'))
-	if (entry.length < 2) {
-		return
-	}
-	transformType = entry[0]
-	if (!gTransformMap.has(transformType)) {
-		return
-	}
-	var latestMatrix = gTransformMap.get(transformType)(getFloats(entry[1]))
-	var matrixTag = {matrix:latestMatrix, nesting:nesting, tag:statement.tag}
-	matrixTags.push(matrixTag)
-	if (matrixTags.length > 1) {
-		for (index = matrixTags.length - 2; index > -1; index--) {
-			latestMatrix = getMultiplied2By3Matrix(matrixTags[index].matrix, latestMatrix)
-		}
-	}
-	for (matrixIndex = 0; matrixIndex < 6; matrixIndex++) {
-		matrix[matrixIndex] = latestMatrix[matrixIndex]
-	}
 }
 
 function setNumberOfRows(id, lines) {
@@ -669,7 +727,7 @@ function setWordArea() {
 
 function skewX(floats) {
 	if (floats.length == 0) {
-		return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+		return get2DUnitMatrix()
 	}
 	var rotation = floats[0] * Math.PI / 180.0
 //	a c e		0 2 4
@@ -682,7 +740,7 @@ function skewX(floats) {
 
 function skewY(floats) {
 	if (floats.length == 0) {
-		return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+		return get2DUnitMatrix()
 	}
 	var rotation = floats[0] * Math.PI / 180.0
 //	a c e		0 2 4
@@ -702,7 +760,7 @@ function transformPoint(point, matrix) {
 }
 
 function translate(floats) {
-	var latestMatrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+	var latestMatrix = get2DUnitMatrix()
 	if (floats.length == 0) {
 		return latestMatrix
 	}
@@ -725,8 +783,10 @@ function update() {
 }
 
 function updateSVGArea() {
+	var documentRoot = getStatement('documentRoot {')
+	var lastParent = documentRoot
 	var svgStatement = null
-	var family = {idMap:new Map(), parents:[], statements:[], storageMap:new Map()}
+	var family = {idMap:new Map(), storageMap:new Map()}
 	var wordString = document.getElementById('wordArea').value
 	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
 	var splitWord = '\n'
@@ -734,62 +794,67 @@ function updateSVGArea() {
 		splitWord = '\r\n'
 	}
 	var lines = wordString.split(splitWord)
-	for (line of lines) {
+	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		line = lines[lineIndex]
 		var statement = getStatement(line)
-		if (family.parents.length > 0) {
-			statement.parent = family.parents[family.parents.length - 1]
-			statement.parent.children.push(statement)
-			if (statement.tag != null) {
-				var idString = statement.tag
-				if (statement.attributeMap.has('id')) {
-					idString = statement.attributeMap.get('id')
+		statement.parent = lastParent
+		statement.parent.children.push(statement)
+		if (statement.tag != null) {
+			var idString = statement.tag
+			if (statement.attributeMap.has('id')) {
+				idString = statement.attributeMap.get('id')
+			}
+			else {
+				subIdentifiers = []
+				var keys = 'cx cy x y r'.split(' ')
+				for (key of keys) {
+					if (statement.attributeMap.has(key)) {
+						subIdentifiers.push(key + statement.attributeMap.get(key))
+					}
 				}
-				else {
-					subIdentifiers = []
-					var keys = 'cx cy x y r'.split(' ')
-					for (key of keys) {
-						if (statement.attributeMap.has(key)) {
-							subIdentifiers.push(key + statement.attributeMap.get(key))
-						}
-					}
-					if (statement.attributeMap.has('points')) {
-						pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
-						subIdentifiers.push(pointStrings.join('-'))
-					}
-					var parentMap = statement.parent.attributeMap
-					if (parentMap.has('id')) {
-						idString += '-' + parentMap.get('id')
-					}
-					subIdentifiers.reverse()
-					var suffix = ''
-					for (whileIndex = 1; whileIndex < 98765; whileIndex++) {
-						check = idString + suffix
-						if (family.idMap.has(check)) {
-							if (subIdentifiers.length > 0) {
-								idString = idString + '-' + subIdentifiers[subIdentifiers.length - 1]
-								subIdentifiers.pop()
-							}
-							else {
-								suffix = '-' + whileIndex.toString()
-							}
+				if (statement.attributeMap.has('points')) {
+					pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
+					subIdentifiers.push(pointStrings.join('-'))
+				}
+				var parentMap = statement.parent.attributeMap
+				if (parentMap.has('id')) {
+					idString += '-' + parentMap.get('id')
+				}
+				subIdentifiers.reverse()
+				var suffix = ''
+				for (whileIndex = 1; whileIndex < 98765; whileIndex++) {
+					check = idString + suffix
+					if (family.idMap.has(check)) {
+						if (subIdentifiers.length > 0) {
+							idString = idString + '-' + subIdentifiers[subIdentifiers.length - 1]
+							subIdentifiers.pop()
 						}
 						else {
-							idString = check
-							whileIndex += 987654321
+							suffix = '-' + whileIndex.toString()
 						}
 					}
-					statement.attributeMap.set('id', idString)
+					else {
+						idString = check
+						whileIndex += 987654321
+					}
 				}
-				family.idMap.set(idString, statement)
+				statement.attributeMap.set('id', idString)
 			}
+			family.idMap.set(idString, statement)
 		}
 		if (statement.nestingIncrement == 1) {
-			family.parents.push(statement)
+			lastParent = statement
 		}
 		else {
 			if (statement.nestingIncrement == -1) {
-				statement.openingStatement = family.parents[family.parents.length - 1]
-				family.parents.pop()
+				if (lastParent.parent == null) {
+					lastParent.children.pop(statement)
+					warning('Warning, text has too many closing brackets, at lineIndex:', [lineIndex, lastParent, statement])
+				}
+				else {
+					lastParent = lastParent.parent
+					statement.openingStatement = statement.parent
+				}
 			}
 		}
 		if (gTagMap.has(statement.tag)) {
@@ -800,35 +865,37 @@ function updateSVGArea() {
 				svgStatement = statement
 			}
 		}
-		family.statements.push(statement)
 	}
-	for (statement of family.statements) {
+	for (childIndex = documentRoot.children.length -1; childIndex > -1; childIndex--) {
+		child = documentRoot.children[childIndex]
+		if (child.tag == null && child.openingStatement == null) {
+			documentRoot.children.splice(childIndex, 1)
+		}
+	}
+	var descendants = [documentRoot]
+	addToDescendants(descendants, documentRoot)
+	for (statement of descendants) {
 		if (gFollowingMap.has(statement.tag)) {
 			gFollowingMap.get(statement.tag)(family, statement)
 		}
 	}
-	var height = 0.0
-	var lineThickness = 10
-	var width = 0.0
-	var matrix = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
-	var matrixTags = []
-	var nesting = 0
-	for (statement of family.statements) {
-		nesting += statement.nestingIncrement
-		setMatrix(statement, matrixTags, matrix, nesting)
-		if (statement.tag == 'polygon') {
-			boundingBox = getPolygonBoundingBox(statement.attributeMap, matrix)
-			height = Math.max(height, boundingBox[3])
-			width = Math.max(width, boundingBox[2])
-		}
-	}
-	height += lineThickness
-	width += lineThickness
 	if (svgStatement == null) {
-		svgStatement = getStatement('<svg >')
-		family.statements.splice(0, 0, svgStatement)
-		family.statements.push(getStatement('</svg>'))
+		svgStatement = documentRoot
+		svgStatement.tag = 'svg'
+		svgEnd = getStatement('</svg>')
+		svgStatement.children.push(svgEnd)
+		svgEnd.openingStatement = svgStatement
 	}
+	else {
+		documentRoot = null
+		svgStatement.parent = null
+	}
+	descendants = [svgStatement]
+	addToDescendants(descendants, svgStatement)
+	var lineThickness = 10
+	var boundingBox = getGroupBoundingBox(null, svgStatement)
+	height = boundingBox[1][1] + lineThickness
+	width = boundingBox[1][0] + lineThickness
 	if (!svgStatement.attributeMap.has('height')) {
 		svgStatement.attributeMap.set('height', height.toFixed())
 	}
@@ -839,7 +906,7 @@ function updateSVGArea() {
 		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
 	}
 	var svgLines = []
-	for (statement of family.statements) {
+	for (statement of descendants) {
 		svgLines.push(getLineByStatement(statement))
 	}
 	joinWord = '\n'
@@ -896,6 +963,36 @@ function verticalHole(family, statement) {
 	deleteKeys('angle cx cy r sagAngle sides', attributeMap)
 	attributeMap.set('points', points.join(' '))
 	statement.tag = 'polygon'
+}
+
+function warning(text, variables) {
+	var textLines = text.split('\n')
+	var maximumLength = Math.max(textLines.length, variables.length)
+	for (itemIndex = 0; itemIndex < maximumLength; itemIndex++) {
+		if (itemIndex < textLines.length) {
+			console.log(textLines[itemIndex])
+		}
+		if (itemIndex < variables.length) {
+			console.log(variables[itemIndex])
+		}
+	}
+	if (gAlertSet.has(text)) {
+		return
+	}
+	gAlertSet.add(text)
+	var alertText = text
+	for (variable of variables) {
+		text += '\n' + variable
+	}
+	text += '\n\nFurther warnings about this will be sent to the debugging console only.'
+	alert(text)
+}
+
+function widenBoundingBox(boundingBox, minimumPoint, maximumPoint) {
+	boundingBox[0][0] = Math.min(boundingBox[0][0], minimumPoint[0])
+	boundingBox[0][1] = Math.min(boundingBox[0][1], minimumPoint[1])
+	boundingBox[1][0] = Math.max(boundingBox[1][0], maximumPoint[0])
+	boundingBox[1][1] = Math.max(boundingBox[1][1], maximumPoint[1])
 }
 
 var gCapitalizationMap = new Map()
