@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8"/>
+	<title>Javascript Test</title>
+</head>
+<body>
+<p id="paragraphText"></p>
+<p id="documentTitle"></p>
+<p id="documentText"></p>
+<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
+<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
+<a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
+<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<h3>Evaluation Text</h3>
+<textarea id="evaluationArea" rows="40" cols="120"></textarea><br>
+<script src="codec.js"></script>
+<script>
+//License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
+
+function update() {
+	eval(updateEvaluationArea())
+	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
+}
+
+function updateEvaluationArea() {
+	var documentLine = null
+	var lines = getBracketReplacedLines('wordArea')
+	var evaluate = false
+	var evaluationLines = []
+	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		line = lines[lineIndex]
+		if (line.endsWith('\</script\>')) {
+			evaluate = false
+		}
+		if (evaluate) {
+			evaluationLines.push(line)
+		}
+		if (line.startsWith('<script')) {
+			evaluate = true
+		}
+	}
+	joinWord = '\n'
+	if (navigator.appVersion.indexOf("Win") > -1) {
+		joinWord = '\r\n'
+	}
+	for (evaluationIndex = 0; evaluationIndex < evaluationLines.length; evaluationIndex++) {
+		evaluationLine = evaluationLines[evaluationIndex].trim()
+		begin = evaluationLine.indexOf('(')
+		end = evaluationLine.lastIndexOf(')')
+		if (evaluationLine.startsWith('document.write') && begin != -1 && end != -1 && end > begin) {
+			documentArgument = evaluationLine.slice(begin + 1, end)
+			documentArgument = '(' + documentArgument + ')'
+			if (evaluationLine.startsWith('document.writeln')) {
+				documentArgument = documentArgument + " + ('<br>')"
+			}
+			if (documentLine == null) {
+				documentLine = 'var documentLines = [' + documentArgument + ']'
+			}
+			else {
+				documentLine = 'documentLines.push(' + documentArgument +')'
+			}
+			evaluationLines[evaluationIndex] = documentLine
+		}
+	}
+	if (documentLine != null) {
+		document.getElementById('documentTitle').innerHTML = 'Document Text'
+		evaluationLines.push("document.getElementById('documentText').innerHTML = documentLines.join('')")
+	}
+	else {
+		document.getElementById('documentTitle').innerHTML = ''
+		document.getElementById('documentText').innerHTML = ''
+	}
+	var evaluationString = evaluationLines.join(joinWord)
+	var javascriptString = lines.join(joinWord)
+	document.getElementById('paragraphText').innerHTML = javascriptString
+	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('evaluationArea', evaluationLines)
+	document.getElementById('evaluationArea').value = evaluationString
+	return evaluationString
+}
+
+setTextArea('wordArea')
+update()
+</script>
+</body>
+</html>
