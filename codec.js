@@ -40,11 +40,7 @@ var gQueryMap = new Map()
 function getBracketReplacedLines(textAreaID) {
 	var wordString = document.getElementById(textAreaID).value
 	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
-	var splitWord = '\n'
-	if (wordString.indexOf('\r\n') > -1) {
-		splitWord = '\r\n'
-	}
-	return wordString.split(splitWord)
+	return wordString.split(getEndOfLine(wordString))
 }
 
 function querySelectChanged() {
