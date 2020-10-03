@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8"/>
-	<title>Javascript Test</title>
+	<title>Javascript Evaluator</title>
 </head>
 <body>
 <p id="paragraphText"></p>
@@ -16,6 +16,7 @@
 <h3>Evaluation Text</h3>
 <textarea id="evaluationArea" rows="40" cols="120"></textarea><br>
 <script src="codec.js"></script>
+<script src="parseword.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
@@ -41,10 +42,7 @@ function updateEvaluationArea() {
 			evaluate = true
 		}
 	}
-	joinWord = '\n'
-	if (navigator.appVersion.indexOf("Win") > -1) {
-		joinWord = '\r\n'
-	}
+	var joinWord = getJoinWord()
 	for (evaluationIndex = 0; evaluationIndex < evaluationLines.length; evaluationIndex++) {
 		evaluationLine = evaluationLines[evaluationIndex].trim()
 		begin = evaluationLine.indexOf('(')
