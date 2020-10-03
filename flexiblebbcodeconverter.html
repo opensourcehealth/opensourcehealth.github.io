@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8"/>
+	<meta name="description" content="open source flexible bulletin board (bb) code converter"/>
+	<title>Flexible BB Code Converter</title>
+</head>
+<body>
+<h3>Convert Code</h3>
+<button type="button" onclick="convertToHTML()">BB Code to HTML</button>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<button type="button" onclick="convertToBBCode()">HTML to BB Code</button><br>
+<textarea id="codeArea" rows="15" cols="120"></textarea><br>
+<h3>Developer Area</h3>
+<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
+<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
+<a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
+<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<h3>Converters</h3>
+<textarea id="converterArea" rows="40" cols="120"></textarea><br>
+<script src="codec.js"></script>
+<script src="help.js"></script>
+<script src="parseword.js"></script>
+<script>
+//License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
+//https://en.wikipedia.org/wiki/BBCode
+//for all keys
+//[b] bbTag='b' bbInner=false bbKey=false suffix=null htmlTag='b' htmlInner=false htmlKey=false property=null addition=null suffix=null
+//[url=] bbTag='url' bbInner=false bbKey=true suffix=null htmlTag='a' htmlInner=false htmlKey='href' property=null addition=null suffix=null
+//[url] bbTag='url' bbInner=true bbKey=false suffix=null htmlTag='a' htmlInner=true htmlKey='href' property=null addition=null suffix=null
+
+gConverterMaps = []
+
+function convertToBBCode() {
+	codeText = document.getElementById('codeArea').value
+	for (converterMap of gConverterMaps) {
+		codeText = getConvertedToBBCode(converterMap, codeText)
+	}
+	document.getElementById('codeArea').value = codeText
+}
+
+function convertToHTML() {
+	codeText = document.getElementById('codeArea').value
+	for (converterMap of gConverterMaps) {
+		codeText = getConvertedToHTML(converterMap, codeText)
+	}
+	document.getElementById('codeArea').value = codeText
+}
+
+function getConvertedToBBCode(converterMap, codeText) {
+	if (!converterMap.has('bbTag') || !converterMap.has('htmlTag')) {
+		return codeText
+	}
+	var bbTag = converterMap.get('bbTag')
+	var bbEndTag = '[/' + bbTag
+	var htmlTag = converterMap.get('htmlTag')
+	var htmlEndTag = '</' + htmlTag
+	var htmlTag = '<' + htmlTag
+	bbTag = '[' + bbTag
+	if (codeText.indexOf(htmlTag) == -1 || codeText.indexOf(htmlEndTag) == -1) {
+		return codeText
+	}
+	codeText = codeText.split('<p>').join('').split('</p>').join('')
+	var codeTokens = codeText.split(htmlTag)
+	var convertedTokens = []
+	for (codeToken of codeTokens) {
+		var convertedToken = codeToken
+		indexOfHTMLEndTag = codeToken.indexOf(htmlEndTag)
+		if (indexOfHTMLEndTag != -1) {
+			convertedToken = getReplacedByTag('>', ']', indexOfHTMLEndTag, codeToken, htmlEndTag, bbEndTag)
+			if (converterMap.has('bbKey') && converterMap.has('htmlKey')) {
+				convertedToken = convertedToken.replace(' ' + converterMap.get('htmlKey'), '')
+				convertedToken = convertedToken.replace('"', '')
+				convertedToken = convertedToken.replace('"', '')
+			}
+		}
+		convertedTokens.push(convertedToken)
+	}
+	return convertedTokens.join(bbTag)
+}
+//[b]h[/b][url=y]h[/url]
+function getConvertedToHTML(converterMap, codeText) {
+	if (!converterMap.has('bbTag') || !converterMap.has('htmlTag')) {
+		return codeText
+	}
+	var bbTag = converterMap.get('bbTag')
+	var bbEndTag = '[/' + bbTag
+	var htmlTag = converterMap.get('htmlTag')
+	var htmlEndTag = '</' + htmlTag
+	var htmlTag = '<' + htmlTag
+	bbTag = '[' + bbTag
+	if (converterMap.has('bbEndTag')) {
+		bbEndTag = converterMap.get('bbEndTag')
+	}
+	if (codeText.indexOf(bbTag) == -1 || codeText.indexOf(bbEndTag) == -1) {
+		return codeText
+	}
+	var splitWord = getEndOfLine(codeText)
+	var paragraphs = codeText.split(splitWord).filter(lengthCheck)
+	codeText = '<p>' + paragraphs.join('</p>' + splitWord + splitWord + '<p>') + '</p>'
+	var codeTokens = codeText.split(bbTag)
+	var convertedTokens = []
+	if (!converterMap.has('bbInner') && !converterMap.has('bbKey')) {
+		for (codeToken of codeTokens) {
+			var convertedToken = codeToken
+			indexOfBBEndTag = codeToken.indexOf(bbEndTag)
+			if (indexOfBBEndTag == -1 && codeToken.length > 0) {
+				warningString = 'The tag:\nis unbalanced, so the html will be incorrect.'
+				warningString += ' The bbcode tags must be balanced before being converted.'
+				warning(warningString, [bbEndTag, codeToken])
+			}
+			else {
+				convertedToken = getReplacedByTag(']', '>', indexOfBBEndTag, codeToken, bbEndTag, htmlEndTag)
+			}
+			convertedTokens.push(convertedToken)
+		}
+		return convertedTokens.join(htmlTag)
+	}
+	if (!converterMap.has('bbInner') && converterMap.has('bbKey') && converterMap.has('htmlKey')) {
+		for (codeToken of codeTokens) {
+			var convertedToken = codeToken
+			indexOfBBEndTag = codeToken.indexOf(bbEndTag)
+			if (indexOfBBEndTag != -1) {
+				indexOfEqual = codeToken.indexOf('=')
+				indexOfBeginBracket = codeToken.indexOf(']')
+				if (indexOfEqual != -1 && indexOfBeginBracket != -1 && indexOfEqual < indexOfBeginBracket) {
+					convertedToken = getReplacedByTag(']', '>', indexOfBBEndTag, convertedToken, bbEndTag, htmlEndTag)
+					indexOfEqual = convertedToken.indexOf('=')
+					convertedToken = getSplicedString(convertedToken, indexOfEqual, 0, ' ' + converterMap.get('htmlKey'))
+					convertedToken = convertedToken.replace('=', '="')
+					convertedToken = convertedToken.replace('>', '">')
+				}
+				else {
+					warningString = 'The tag:\nis unbalanced, so the html will be incorrect.'
+					warningString += ' The bbcode tags must be balanced before being converted.'
+					warning(warningString, [bbEndTag, codeToken])
+				}
+			}
+			convertedTokens.push(convertedToken)
+		}
+		return convertedTokens.join(htmlTag)
+	}
+	return codeText
+}
+
+function getLineFromMap(attributeMap) {
+	entryStrings = []
+	for (entry of attributeMap) {
+		entryStrings.push(entry[0] + ' = ' + entry[1])
+	}
+	return entryStrings.join('  ')
+}
+
+function getReplacedByTag(characterSearch, characterReplacement, endIndex, replaced, tagSearch, tagReplacement) {
+	indexOfEndTagRight = replaced.indexOf(characterSearch, endIndex)
+	if (indexOfEndTagRight != -1) {
+		replaced = getSplicedString(replaced, indexOfEndTagRight, 1, characterReplacement)
+	}
+	indexOfTagRight = replaced.indexOf(characterSearch)
+	if (indexOfTagRight != -1) {
+		replaced = getSplicedString(replaced, indexOfTagRight, 1, characterReplacement)
+	}
+	return replaced.replace(tagSearch, tagReplacement)
+}
+
+function update() {
+	updateConverterArea()
+	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
+}
+
+function updateConverterArea() {
+	gConverterMaps = []
+	var documentLine = null
+	var lines = getBracketReplacedLines('wordArea')
+	var converterLines = []
+	for (line of lines) {
+		var tokens = line.trim().replace(/=/g, ' = ').split(' ').filter(lengthCheck)
+		var attributeMap = new Map(getAttributes(tokens))
+		gConverterMaps.push(attributeMap)
+		converterLines.push(getLineFromMap(attributeMap))
+	}
+	var converterString = converterLines.join(getJoinWord())
+	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('converterArea', converterLines)
+	document.getElementById('converterArea').value = converterString
+	return converterString
+}
+
+setTextArea('wordArea')
+update()
+</script>
+</body>
+</html>
