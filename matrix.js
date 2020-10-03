@@ -1,14 +1,20 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function compareIntersections(a, b) {
-	if (a[0] == b[0]) {
-		return a[1] - b[1]
-	}
-	return a[0] - b[0]
+const gXYRotationBasis = [0, 1]
+const gYZRotationBasis = [1, 2]
+const gXZRotationBasis = [0, 2]
+
+function addXY(xy, xyAddition) {
+	xy[0] += xyAddition[0]
+	xy[1] += xyAddition[1]
+	return xy
 }
 
-function compareNumbers(a, b) {
-	return a - b
+function addXYZ(xyz, xyzAddition) {
+	xyz[0] += xyzAddition[0]
+	xyz[1] += xyzAddition[1]
+	xyz[2] += xyzAddition[2]
+	return xyz
 }
 
 function divideXYZByScalar(xyz, scalarDivisor) {
@@ -514,10 +520,6 @@ function getXYZByKey(key) {
 	return [parseFloat(parameters[0]), parseFloat(parameters[1]), parseFloat(parameters[2])]
 }
 
-function getXYZCopy(xyz) {
-	return [xyz[0], xyz[1], xyz[2]]
-}
-
 function getXYZLength(xyz) {
 	return Math.sqrt(getXYZLengthSquared(xyz))
 }
@@ -530,21 +532,14 @@ function getXYZMultiplication(xyzA, xyzB) {
 	return [xyzA[0] * xyzB[0], xyzA[1] * xyzB[1], xyzA[2] * xyzB[2]];
 }
 
+function getXYZRotationByBasis(rotationBasis, xyz, xyRotator) {
+	var basis0 = rotationBasis[0]
+	var basis1 = rotationBasis[1]
+	return [xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1], xyz[basis0] * xyRotator[1] + xyz[basis1] * xyRotator[0]]
+}
+
 function getXYZSubtraction(xyzA, xyzB) {
 	return [xyzA[0] - xyzB[0], xyzA[1] - xyzB[1], xyzA[2] - xyzB[2]];
-}
-
-function incrementXY(xy, xyAddition) {
-	xy[0] += xyAddition[0]
-	xy[1] += xyAddition[1]
-	return xy
-}
-
-function incrementXYZ(xyz, xyzAddition) {
-	xyz[0] += xyzAddition[0]
-	xyz[1] += xyzAddition[1]
-	xyz[2] += xyzAddition[2]
-	return xyz
 }
 
 function multiplyXYByScalar(xy, scalarMultiplier) {
@@ -573,6 +568,14 @@ function normalizeXYZ(xyz) {
 		divideXYZByScalar(xyz, xyzLength)
 	}
 	return xyz
+}
+
+function rotateXYZByBasis(rotationBasis, xyz, xyRotator) {
+	var basis0 = rotationBasis[0]
+	var basis1 = rotationBasis[1]
+	var xyzBasis0 = xyz[basis0]
+	xyz[basis0] = xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1]
+	xyz[basis1] = xyzBasis0 * xyRotator[1] + xyz[basis1] * xyRotator[0]
 }
 
 function transform2DPoint(point, matrix) {
