@@ -17,10 +17,15 @@ function warning(text, variables) {
 		return
 	}
 	gAlertSet.add(text)
-	var alertText = text
-	for (variable of variables) {
-		text += '\n' + variable
+	var alertText = ''
+	for (itemIndex = 0; itemIndex < maximumLength; itemIndex++) {
+		if (itemIndex < textLines.length) {
+			alertText += textLines[itemIndex] + '\n'
+		}
+		if (itemIndex < variables.length) {
+			alertText += variables[itemIndex] + '\n'
+		}
 	}
-	text += '\n\nFurther warnings about this will be sent to the debugging console only.'
-	alert(text)
+	alertText += '\nFurther warnings about this will be sent to the debugging console only.'
+	alert(alertText)
 }
