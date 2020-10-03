@@ -11,28 +11,39 @@
 <button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
 <a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
 <textarea id="wordArea" rows="20" cols="120"></textarea><br>
-<h3>SVG Text</h3>
+<br>
+<h3>SVG</h3>
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
+<br>
+<h3>Mesh</h3>
+<textarea id="meshArea" rows="10" cols="120"></textarea><br>
 <script src="codec.js"></script>
 <script src="help.js"></script>
+<script src="maparray.js"></script>
 <script src="matrix.js"></script>
+<script src="parseword.js"></script>
+<script src="polyhedron.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
-//view transform3D
-//test basis, pillar orientation
-//triangleMesh stl=id
-//move matrix functions out of mesh
+//test basis, analysis statement, join option in pillar
+//verticalHole should be widdershins, then reversed when making a mesh
+//analyze option
+//attach polygons in pillar if inside one another
 //codeStyle indentation start increment type groupDelimeter
+//change exterior to lattice
 //add circles and rect to bounding box
+//parsenumber
+//view transform3D
 //set descendants depth with statement
 //hidden lines
-//replace getXYZCopy with slice(0)
 //extrusion layers=[{transform, [polygon]}], closed
-//sculpture mosaics=[{transform,[surfaces]}], closed surface={indegons, bottom, top} indegon can be indexed x,y,z;index,id,polygonIndex
+//move polyhedron functions out of mesh and convert mesh to meshtest
+//sculpture mosaics=[{transform,[surfacets]}], closed surfacet={indegons, bottom, top} indegon can be indexed x,y,z;index,id,polygonIndex
 //slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
 //test transform3D
 //combination id=a+b-c#d!#e*f/g ** h on vertex
 //transform3D extrusionPath(polyline, polygon, polyplane, polyheight)
+//maybe outputTriangleMesh stl=id, nextID..
 //mirror line y and vector, polyrect
 //setLocal, setGlobal, if switch case else, for
 //document.getElementById("wordArea").onkeydown = function(evt) {(evt) ? evt : window.event if (evt.keyCode == 13) {alert("e");}}
@@ -91,14 +102,16 @@ function addToDescendants(descendants, statement) {
 	}
 }
 
-function addToFaces(faces, isTriangular, polygonFace) {
-	if (!isTriangular || polygonFace.length < 4) {
-		faces.push(polygonFace)
+function addToMeshArea(meshString) {
+	if (meshString == null) {
 		return
 	}
-	for (faceIndex = 1; faceIndex < polygonFace.length - 1; faceIndex++) {
-		faces.push([polygonFace[0], polygonFace[faceIndex], polygonFace[faceIndex + 1]])
+	var meshArea = document.getElementById('meshArea')
+	if (meshArea.value == '') {
+		meshArea.value = meshString
+		return
 	}
+	meshArea.value = meshArea.value + '\n' + meshString
 }
 
 function get2DMatrix(attributeMap) {
@@ -373,51 +386,6 @@ function getLineWithEndspace(endWords, line) {
 	return line
 }
 
-function getPillarPolygonMeshes(isTriangular, polygons, polyheight, transform3D) {// unfinished, orientation has not been tested
-	if (polygons.length == 0 || polyheight.length == 0) {
-		return []
-	}
-	var meshes = []
-	for (polygon of polygons) {
-		var faces = []
-		var points = []
-		if (polygon.length > 0) {
-			numberOfParameters = polygon[0].length
-			for (heightIndex = 0; heightIndex < polyheight.length; heightIndex += 2) {
-				var pointIndexStart = points.length
-				var height = polyheight[heightIndex]
-				if (numberOfParameters == 2) {
-					var polygonFace = []
-					for (vertex of polygon) {
-						polygonFace.push(points.length)
-						points.push([vertex[0], vertex[1], height])
-					}
-					addToFaces(faces, isTriangular, polygonFace)
-					polygonFace = []
-					height = polyheight[heightIndex + 1]
-					for (vertex of polygon) {
-						polygonFace.push(points.length)
-						points.push([vertex[0], vertex[1], height])
-					}
-					polygonFace.reverse()
-					addToFaces(faces, isTriangular, polygonFace)
-				}
-				for (vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-					var bottomLeftIndex = pointIndexStart + vertexIndex
-					var bottomRightIndex = pointIndexStart + (vertexIndex + 1) % polygon.length
-					var topLeftIndex = bottomLeftIndex + polygon.length
-					var topRightIndex = bottomRightIndex + polygon.length
-					var polygonFace = [bottomLeftIndex, bottomRightIndex, topLeftIndex, topRightIndex]
-					addToFaces(faces, isTriangular, polygonFace)
-					pointIndexStart++
-				}
-			}
-		}
-		meshes.push({faces:faces, points:points})
-	}
-	return meshes
-}
-
 function getPolygonBoundingBox(caller, statement) {
 	var points = getPolygonPoints(statement.attributeMap)
 	if (points == null) {
@@ -492,39 +460,23 @@ function getStatement(line) {
 		}
 	}
 	if (tag != null) {
-		attributeMap = new Map()
 		children = []
-		var key = null
-		var values = null
-		// length = 6
-		// last = 4
-		// 0 1 2 3 4 5
-		// m k = v v e
-		for (wordIndex = 2; wordIndex < lastIndex + 1; wordIndex++) {
-			var word = strippedWords[wordIndex]
-			if (word == '=') {
-				if (key != null) {
-					attributeMap.set(key, values.slice(0, -1).join(' '))
-				}
-				key = strippedWords[wordIndex - 1]
-				keyStrings = key.split('.')
-				if (keyStrings.length == 2) {
-					keyStrings[0] = getCapitalizedKey(keyStrings[0])
-					keyStrings[1] = getCapitalizedKey(keyStrings[1])
-					key = keyStrings.join('.')
-				}
-				values = []
-			}
-			else {
-				if (values != null) {
-					values.push(word)
-				}
-			}
+	}
+	var attributes = getAttributes(strippedWords.slice(1, lastIndex + 1))
+	for (attribute of attributes) {
+		keyStrings = attribute[0].split('.')
+		if (keyStrings.length == 1) {
+			attribute[0] = getCapitalizedKey(attribute[0])
 		}
-		if (key != null) {
-			attributeMap.set(key, values.join(' '))
+		else {
+			if (keyStrings.length == 2) {
+				keyStrings[0] = getCapitalizedKey(keyStrings[0])
+				keyStrings[1] = getCapitalizedKey(keyStrings[1])
+				attribute[0] = keyStrings.join('.')
+			}
 		}
 	}
+	var attributeMap = new Map(attributes)
 	var statement = {
 	attributeMap:attributeMap,
 	children:children,
@@ -609,10 +561,6 @@ function getTransformed2DMatrix(caller, statement) {
 		}
 	}
 	return transformedMatrix
-}
-
-function lengthCheck(word) {
-	return word.length > 0
 }
 
 function processDescendants(registry, rootStatement, tagMap) {
@@ -755,6 +703,21 @@ function processPillar(registry, statement) {
 	}
 	polyheight = getFloats(attributeMap.get('polyheight'))
 	var pillar = new Pillar(polygons, polyheight, null)
+	if (attributeMap.has('outputTriangleMesh')) {
+		if (attributeMap.get('outputTriangleMesh') == 'stl') {
+			addToMeshArea(getTriangleMeshString('stl', attributeMap.get('id'), pillar.getTriangleMesh()))
+		}
+	}
+	if (attributeMap.has('analysis')) {
+		if (attributeMap.get('analysis') == 'triangle') {
+			console.log(getMeshAnalysis(pillar.getTriangleMesh()))
+		}
+		else {
+			if (attributeMap.get('analysis') == 'polygon') {
+				console.log(getMeshAnalysis(pillar.getPolygonMesh()))
+			}
+		}
+	}
 }
 
 function processVerticalHole(registry, statement) {
@@ -802,6 +765,7 @@ function processVerticalHole(registry, statement) {
 }
 
 function update() {
+	document.getElementById('meshArea').value = ''
 	var svgString = updateSVGArea()
 	document.getElementById('paragraphText').innerHTML = svgString
 	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
@@ -932,10 +896,7 @@ function updateSVGArea() {
 	for (statement of descendants) {
 		svgLines.push(getLineByStatement('svg', statement))
 	}
-	joinWord = '\n'
-	if (navigator.appVersion.indexOf("Win") > -1) {
-		joinWord = '\r\n'
-	}
+	var joinWord = getJoinWord()
 	var svgString = svgLines.join(joinWord)
 	setNumberOfRows('wordArea', lines)
 	setNumberOfRows('svgArea', svgLines)
@@ -947,8 +908,8 @@ function Pillar(polygons, polyheight, transform3D) {
 	this.polyheight = polyheight
 	this.polygons = polygons
 	this.transform3D = transform3D
-	this.getPolygonMeshes = function() {return getPillarPolygonMeshes(false, this.polygons, this.polyheight, this.transform3D)}
-	this.getTriangleMeshes = function() {return getPillarPolygonMeshes(true, this.polygons, this.polyheight, this.transform3D)}
+	this.getPolygonMesh = function() {return getPillarMesh(false, this.polygons, this.polyheight, this.transform3D)}
+	this.getTriangleMesh = function() {return getPillarMesh(true, this.polygons, this.polyheight, this.transform3D)}
 }
 
 var gCapitalizationMap = new Map()
