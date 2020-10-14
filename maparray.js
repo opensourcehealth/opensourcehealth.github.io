@@ -8,6 +8,12 @@ function addArrayElementToMap(element, key, mapToAddTo) {
 	mapToAddTo.set(key, [element])
 }
 
+function addElementsToSet(elements, setToAddTo) {
+	for (element of elements) {
+		setToAddTo.add(element)
+	}
+}
+
 function compareIntersections(a, b) {
 	if (a[0] == b[0]) {
 		return a[1] - b[1]
@@ -19,10 +25,20 @@ function compareNumbers(a, b) {
 	return a - b
 }
 
-function getListsCopy(lists) {
-	listsCopy = lists.slice(0)
-	for (var listIndex = 0; listIndex < listsCopy.length; listIndex++) {
-		listsCopy[listIndex] = listsCopy[listIndex].slice(0)
+function getArraysCopy(arrays) {
+	arraysCopy = new Array(arrays.length)
+	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+		arraysCopy[arrayIndex] = arrays[arrayIndex].slice(0)
 	}
-	return listsCopy
+	return arraysCopy
+}
+
+function pushArray(elements, others) {
+	var elementsLength = elements.length
+	var othersLength = others.length
+	elements.length = elementsLength + othersLength
+	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
+		elements[elementsLength] = others[otherIndex]
+		elementsLength++
+	}
 }
