@@ -66,10 +66,11 @@ function convertPointStringsToPointLists(pointStrings) {
 }
 
 function getClosedPolygonKey(beginIndex, polygonKey) {
-	closedPolygon = []
-	polygon = polygonKey.split(';')
-	for (keyIndex = 0; keyIndex < polygon.length + 1; keyIndex++) {
-		closedPolygon.push(polygon[(beginIndex + keyIndex) % polygon.length])
+	var polygonLengthPlus = polygonKey.length + 1
+	var closedPolygon = new Array(polygonLengthPlus)
+	var polygon = polygonKey.split(';')
+	for (keyIndex = 0; keyIndex < polygonLengthPlus; keyIndex++) {
+		closedPolygon[keyIndex] = polygonKey[(beginIndex + keyIndex) % polygonKey.length]
 	}
 	return closedPolygon.join(';')
 }
@@ -191,9 +192,7 @@ function getIntersectionPairsMap(xyPolygons) {
 
 function getJoinedCoplanarPolygonKeys(pointMap, polygonKeys) {
 	var arcMap = new Map()
-	var lines = []
 	var polygonKeyLinkMap = new Map()
-//	uniquePolygonKeys = polygonKeys
 	for (polygonKey of polygonKeys) {
 		polygon = polygonKey.split(';')
 		normalVector = getNormalVector(pointMap, polygonKey)
@@ -202,7 +201,6 @@ function getJoinedCoplanarPolygonKeys(pointMap, polygonKeys) {
 			var key2 = polygon[(keyIndex + 2) % polygon.length]
 			var arc = [polygon[keyIndex], key1, key2, polygon[(keyIndex + 3) % polygon.length], normalVector, polygonKey]
 			arcMap.set(key1 + ';' + key2, arc)
-			lines.push(arc)
 		}
 	}
 	for (arc of arcMap.values()) {
@@ -238,7 +236,7 @@ function getJoinedCoplanarPolygonKeys(pointMap, polygonKeys) {
 			}
 		}
 	}
-	joinedPolygonKeyMap = new Map()
+	var joinedPolygonKeyMap = new Map()
 	for (arc of arcMap.values()) {
 		if (arc != null) {
 			polygon = []
@@ -253,7 +251,7 @@ function getJoinedCoplanarPolygonKeys(pointMap, polygonKeys) {
 			addArrayElementToMap(polygonKey, polygonKeyHead, joinedPolygonKeyMap)
 		}
 	}
-	joinedPolygonKeys = []
+	var joinedPolygonKeys = []
 	for (polygonKeys of joinedPolygonKeyMap.values()) {
 		joinedPolygonKeys.push(getConnectedPolygonKey(pointMap, polygonKeys))
 	}
@@ -332,22 +330,22 @@ function getPointStringConvertedToPoints(pointString) {
 }
 
 function getPolygonDistances(pointMap, polygonKeys) {
-	distances = []
 	firstPolygon = polygonKeys[0].split(';')
+	var distances = new Array(firstPolygon.length)
 	for (firstKeyIndex = 0; firstKeyIndex < firstPolygon.length; firstKeyIndex++) {
 		firstPoint = pointMap.get(firstPolygon[firstKeyIndex])
 		polygons = []
 		for (polygonIndex = 1; polygonIndex < polygonKeys.length; polygonIndex++) {
-			otherPolygon = polygonKeys[polygonIndex].split(';')
-			polygon = []
+			var otherPolygon = polygonKeys[polygonIndex].split(';')
+			var polygon = new Array(otherPolygon.length)
 			for (otherKeyIndex = 0; otherKeyIndex < otherPolygon.length; otherKeyIndex++) {
 				otherPoint = pointMap.get(otherPolygon[otherKeyIndex])
 				difference = getXYZSubtraction(firstPoint, otherPoint)
-				polygon.push(getXYZLengthSquared(difference))
+				polygon[otherKeyIndex] = getXYZLengthSquared(difference)
 			}
 			polygons.push(polygon)
 		}
-		distances.push(polygons)
+		distances[firstKeyIndex] = polygons
 	}
 	return distances
 }
@@ -384,9 +382,9 @@ function getPolygonRotatedToBottom(polygon) {
 function getXYZByXY(xyPolygons, z) {
 	commaZString = ',' + z.toString()
 	commaZStringSemicolon = commaZString + ';'
-	polygonKeys = []
+	var polygonKeys = new Array(xyPolygons.length)
 	for (polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
-		polygonKeys.push(xyPolygons[polygonIndex].join(commaZStringSemicolon) + commaZString)
+		polygonKeys[polygonIndex] = xyPolygons[polygonIndex].join(commaZStringSemicolon) + commaZString
 	}
 	return polygonKeys
 }
