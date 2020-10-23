@@ -17,6 +17,12 @@ function addXYZ(xyz, xyzAddition) {
 	return xyz
 }
 
+function divideXYByScalar(xy, scalarDivisor) {
+	xy[0] /= scalarDivisor
+	xy[1] /= scalarDivisor
+	return xy
+}
+
 function divideXYZByScalar(xyz, scalarDivisor) {
 	xyz[0] /= scalarDivisor
 	xyz[1] /= scalarDivisor
@@ -120,6 +126,23 @@ function get2DUnitMatrix() {
 //	1 0 0
 //	0 1 0
 	return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+}
+
+function get3DMatrixRotatedByXY(xyRotator) {
+	var latestMatrix = get3DUnitMatrix()
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+//
+//	cos		-sin	0 
+//	sin		cos		0	
+//	0		0		1	
+	latestMatrix[0] = xyRotator[0]
+	latestMatrix[1] = xyRotator[1]
+	latestMatrix[4] = -xyRotator[1]
+	latestMatrix[5] = xyRotator[0]
+	return latestMatrix
 }
 
 function get3DTransformByBasis(floats) {
@@ -292,8 +315,8 @@ function get3DTransformByRotateZ(floats) {
 //	0		0		1	
 	latestMatrix[0] = cosAngle
 	latestMatrix[1] = -sinAngle
-	latestMatrix[5] = sinAngle
-	latestMatrix[6] = cosAngle
+	latestMatrix[4] = sinAngle
+	latestMatrix[5] = cosAngle
 	return latestMatrix
 }
 
@@ -503,6 +526,36 @@ function getRGB(i) {
 	return [Math.floor(255.0 * ((i * 0.617) % 1.0)), Math.floor(255.0 * ((i * 0.733) % 1.0)), Math.floor(255.0 * ((i * 0.317) % 1.0))]
 }
 
+function getXYAddition(xyA, xyB) {
+	return [xyA[0] + xyB[0], xyA[1] + xyB[1]]
+}
+
+function getXYAlong(along, xyA, xyB) {
+	return addXY(multiplyXYByScalar(getXYSubtraction(xyB, xyA), along), xyA)
+}
+
+function getXYBy3DMatrix(point, matrix) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	var x = point[0] * matrix[0] + point[1] * matrix[4] + point[2] * matrix[8] + matrix[12]
+	var y = point[0] * matrix[1] + point[1] * matrix[5] + point[2] * matrix[9] + matrix[13]
+	return [x, y]
+}
+
+function getXYLength(xy) {
+	return Math.sqrt(getXYLengthSquared(xy))
+}
+
+function getXYLengthSquared(xy) {
+	return xy[0] * xy[0] + xy[1] * xy[1]
+}
+
+function getXYPolar(angle, radius) {
+	return [radius * Math.cos(angle), radius * Math.sin(angle)]
+}
+
 function getXYRotation(xy, xyRotator) {
 	return [xy[0] * xyRotator[0] - xy[1] * xyRotator[1], xy[0] * xyRotator[1] + xy[1] * xyRotator[0]]
 }
@@ -513,6 +566,17 @@ function getXYSubtraction(xyA, xyB) {
 
 function getXYZAddition(xyzA, xyzB) {
 	return [xyzA[0] + xyzB[0], xyzA[1] + xyzB[1], xyzA[2] + xyzB[2]];
+}
+
+function getXYZBy3DMatrix(point, matrix) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	var x = point[0] * matrix[0] + point[1] * matrix[4] + point[2] * matrix[8] + matrix[12]
+	var y = point[0] * matrix[1] + point[1] * matrix[5] + point[2] * matrix[9] + matrix[13]
+	var z = point[0] * matrix[2] + point[1] * matrix[6] + point[2] * matrix[10] + matrix[14]
+	return [x, y, z]
 }
 
 function getXYZByKey(key) {
@@ -532,11 +596,12 @@ function getXYZMultiplication(xyzA, xyzB) {
 	return [xyzA[0] * xyzB[0], xyzA[1] * xyzB[1], xyzA[2] * xyzB[2]];
 }
 
-function getXYZRotationByBasis(rotationBasis, xyz, xyRotator) {
-	var basis0 = rotationBasis[0]
-	var basis1 = rotationBasis[1]
-	return [xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1], xyz[basis0] * xyRotator[1] + xyz[basis1] * xyRotator[0]]
-}
+//function getXYZRotationByBasis(rotationBasis, xyz, xyRotator) {
+//rotateXYZByBasis is probably better
+//	var basis0 = rotationBasis[0]
+//	var basis1 = rotationBasis[1]
+//	return [xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1], xyz[basis0] * xyRotator[1] + xyz[basis1] * xyRotator[0]]
+//}
 
 function getXYZSubtraction(xyzA, xyzB) {
 	return [xyzA[0] - xyzB[0], xyzA[1] - xyzB[1], xyzA[2] - xyzB[2]];
@@ -562,6 +627,14 @@ function multiplyXYZ(xyz, xyzMultiplier) {
 	return xyz
 }
 
+function normalizeXY(xy) {
+	xyLength = getXYLength(xy)
+	if (xyLength > 0.0) {
+		divideXYByScalar(xy, xyLength)
+	}
+	return xy
+}
+
 function normalizeXYZ(xyz) {
 	xyzLength = getXYZLength(xyz)
 	if (xyzLength > 0.0) {
@@ -578,6 +651,18 @@ function rotateXYZByBasis(rotationBasis, xyz, xyRotator) {
 	xyz[basis1] = xyzBasis0 * xyRotator[1] + xyz[basis1] * xyRotator[0]
 }
 
+function subtractXY(xyA, xyB) {
+	xyA[0] -= xyB[0]
+	xyA[1] -= xyB[1]
+	return xyA
+}
+
+function subtractXYZ(xyzA, xyzB) {
+	xyzA[0] -= xyzB[0]
+	xyzA[1] -= xyzB[1]
+	return xyzA
+}
+
 function transform2DPoint(point, matrix) {
 	originalX = point[0]
 //	a c e		0 2 4
@@ -586,11 +671,11 @@ function transform2DPoint(point, matrix) {
 	point[1] = originalX * matrix[1] + point[1] * matrix[3] + matrix[5]
 }
 
-function widenBoundingBox(boundingBox, minimumPoint, maximumPoint) {
-	boundingBox[0][0] = Math.min(boundingBox[0][0], minimumPoint[0])
-	boundingBox[0][1] = Math.min(boundingBox[0][1], minimumPoint[1])
-	boundingBox[1][0] = Math.max(boundingBox[1][0], maximumPoint[0])
-	boundingBox[1][1] = Math.max(boundingBox[1][1], maximumPoint[1])
+function widenBoundingBox(boundingBox, point) {
+	for (var parameterIndex = 0; parameterIndex < point.length; parameterIndex++) {
+		boundingBox[0][parameterIndex] = Math.min(boundingBox[0][parameterIndex], point[parameterIndex])
+		boundingBox[1][parameterIndex] = Math.max(boundingBox[1][parameterIndex], point[parameterIndex])
+	}
 }
 
 var g2DTransformMap = new Map([
