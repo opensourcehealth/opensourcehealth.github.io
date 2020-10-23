@@ -14,11 +14,25 @@ function addElementsToSet(elements, setToAddTo) {
 	}
 }
 
+function compareArrayDescending(a, b) {
+	var minimumLength = Math.min(a.length, b.length)
+	for (var elementIndex = 0; elementIndex < minimumLength; elementIndex++) {
+		if (a[0][elementIndex] != b[0][elementIndex]) {
+			return b[0][elementIndex] - a[0][elementIndex]
+		}
+	}
+	return 0
+}
+
 function compareIntersections(a, b) {
 	if (a[0] == b[0]) {
 		return a[1] - b[1]
 	}
 	return a[0] - b[0]
+}
+
+function compareNumberDescending(a, b) {
+	return b - a
 }
 
 function compareNumbers(a, b) {
