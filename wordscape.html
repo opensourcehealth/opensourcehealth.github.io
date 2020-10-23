@@ -5,11 +5,16 @@
 	<title>Wordscape</title>
 </head>
 <body>
-<p id="paragraphText"></p>
+<table>
+<tr>
+<th><p id="paragraphText"></p></th><th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
+</tr>
+</table>
 <button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
 <button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
-<a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
+<a hidden="true" id="queryLink" href="index.html">Original Link</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select hidden="true" id="viewSelect" onchange ="viewSelectChanged()"></select><br>
 <textarea id="wordArea" rows="20" cols="120"></textarea><br>
 <br>
 <h3>SVG</h3>
@@ -17,6 +22,7 @@
 <br>
 <h3>Mesh</h3>
 <textarea id="meshArea" rows="10" cols="120"></textarea><br>
+<br>
 <script src="codec.js"></script>
 <script src="help.js"></script>
 <script src="maparray.js"></script>
@@ -24,16 +30,16 @@
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
 <script src="polyhedron.js"></script>
+<script src="viewer.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
-//wireframe
 //move polyhedron and exterior functions out of mesh and convert mesh to meshtest
 //change exterior to exteriorXYZ and exteriorXY
 //subtraction xy then subtraction xyz then addition then intersection then exclusive intersection
 //layers=[{transform, [polygon]}], closed, plane
 //test basis, transform in pillar
-//attach polygons in pillar if inside one another
+//attach polygons in pillar/extrusion if inside one another
 //verticalHole should be widdershins, all widdershins should be reversed when making a mesh when on outside
 //analyze volume and surface area
 //view transform3D
@@ -45,13 +51,17 @@
 //add circles and rect to bounding box
 //check backslash quote in quoteSeparated
 //codeStyle indentation start increment type groupDelimeter
+//wireframe/solid choice, instructions, 3D direction display, settings, wait, animation, separate polygons option
 //set descendants depth with statement
 //extrusion sort closest before splicing if they are both on same edge arrowindexsetmap only needed with thin shapes
 //transform3D extrusionPath(polyline, polygon, polyplane, zList)
 //maybe outputTriangleMesh stl=id, nextID..
 //mirror line y and vector, polyrect
 //setLocal, setGlobal, if switch case else, for
-//outset, venturi, tile, shell, unlimited, terrain, road
+//outset, shell, tile, venturi, helix, unlimited, terrain, road
+//gear/wheel, wing, propeller, pipe/pail, pulley/cable, chair/shelf, gores?, lattice?, haxagonal extrusion
+//humanoid, quadruped, door/window, lamp/chandelier, gemstone, press, arch, column, pontoon, box, shoe/hat, ribs/umbrella, house
+//wrench/screwdriver, alteration machine
 //document.getElementById("wordArea").onkeydown = function(evt) {(evt) ? evt : window.event if (evt.keyCode == 13) {alert("e");}}
 //textArea.value.slice(0, textArea.selectionStart).split('\n').length - 1
 //deprecated ~ for replace, [ for group ending, [] for id, flip
@@ -110,7 +120,7 @@ function addToMeshArea(meshString) {
 	meshArea.value = meshArea.value + '\n' + meshString
 }
 
-function analyzeOutputMesh(attributeMap, meshGenerator) {
+function analyzeOutputMesh(attributeMap, meshGenerator, registry) {
 	if (attributeMap.has('outputTriangleMesh')) {
 		if (attributeMap.get('outputTriangleMesh') == 'stl') {
 			addToMeshArea(getTriangleMeshString('stl', attributeMap.get('id'), meshGenerator.getTriangleMesh()))
@@ -134,13 +144,9 @@ function analyzeOutputMesh(attributeMap, meshGenerator) {
 			statement.children.splice(-1, 0, analysisStatement)
 		}
 	}
-}
-
-function getBoundingBox(caller, statement) {
-	if (statement.tag == 'polygon') {
-		return getPolygonBoundingBox(caller, statement)
+	if (attributeMap.has('view')) {
+		meshViewer.addMesh(attributeMap.get('id'), null, meshGenerator.getPolygonMesh())
 	}
-	return null
 }
 
 function getBracketedEntry(bracketString) {
@@ -182,18 +188,9 @@ function getFunctionMapCapitalize(alternatingEntries) {
 
 function getGroupBoundingBox(caller, statement) {
 	var boundingBox = null
-	descendants = getDescendants(statement)
+	var descendants = getDescendants(statement)
 	for (child of descendants) {
-		var childBox = null
-		if (child.tag != null) {
-			childBox = getBoundingBox(caller, child)
-		}
-		if (childBox != null) {
-			if (boundingBox == null) {
-				boundingBox = [[Number.MAX_VALUE, Number.MAX_VALUE], [-Number.MAX_VALUE, -Number.MAX_VALUE]]
-			}
-			widenBoundingBox(boundingBox, childBox[0], childBox[1])
-		}
+		boundingBox = widenStatementBoundingBox(boundingBox, caller, child)
 	}
 	return boundingBox
 }
@@ -312,20 +309,6 @@ function getLineByStatement(passthrough, statement) {
 	return attributeLine + ' ' + lineClosing
 }
 
-function getPolygonBoundingBox(caller, statement) {
-	var points = getPolygonPoints(statement.attributeMap)
-	if (points == null) {
-		return null
-	}
-	var boundingBox = [[Number.MAX_VALUE, Number.MAX_VALUE], [-Number.MAX_VALUE, -Number.MAX_VALUE]]
-	var transformedMatrix = getTransformed2DMatrix(caller, statement)
-	for (point of points) {
-		transform2DPoint(point, transformedMatrix)
-		widenBoundingBox(boundingBox, point, point)
-	}
-	return boundingBox
-}
-
 function getPolygonPoints(attributeMap) {
 	if (attributeMap == null) {
 		return null
@@ -333,24 +316,32 @@ function getPolygonPoints(attributeMap) {
 	if (!attributeMap.has('points')) {
 		return null
 	}
-	lastPoint = [0.0, 0.0]
-	points = []
-	pointWords = attributeMap.get('points').replace(/~/g, '*').split('&').join('*,*,*').replace(/,/g, ' ').split(' ').filter(lengthCheck)
-	for (pointIndex = 0; pointIndex < pointWords.length; pointIndex += 2) {
-		point = lastPoint.slice(0)
-		if (pointIndex + 1 < pointWords.length) {
-			for (parameterIndex = 0; parameterIndex < 2; parameterIndex++) {
-				parameter = pointWords[pointIndex + parameterIndex]
-				if (parameter != '*') {
-					point[parameterIndex] = parseFloat(parameter)
-				}
-			}
-			points.push(point)
-			lastPoint = point
+	var point = [0.0, 0.0]
+	var pointIndex = 0
+	var pointWords = attributeMap.get('points').replace(/~/g, '*').split('&').join('*,*').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+	if (pointWords.length % 2 == 1) {
+		warningString = 'Warning, points have an odd number of parameters: \n in the statement with the attributes:'
+		var entries = []
+		for (entry of attributeMap) {
+			entries.push(entry)
 		}
+		warning(warningString, [pointWords, entries])
+		pointWords.pop()
 	}
+	var points = new Array(pointWords.length / 2)
 	if (points.length == 0) {
 		return null
+	}
+	for (pointWordIndex = 0; pointWordIndex < pointWords.length; pointWordIndex += 2) {
+		for (parameterIndex = 0; parameterIndex < 2; parameterIndex++) {
+			var parameter = pointWords[pointWordIndex + parameterIndex]
+			if (parameter != '*') {
+				point[parameterIndex] = parseFloat(parameter)
+			}
+		}
+		points[pointIndex] = point
+		point = point.slice(0)
+		pointIndex += 1
 	}
 	return points
 }
@@ -485,7 +476,7 @@ function processExtrusion(registry, statement) {
 		}
 	}
 	var extrusion = new Extrusion(isJoined, layers, null, zList)
-	analyzeOutputMesh(attributeMap, extrusion)
+	analyzeOutputMesh(attributeMap, extrusion, registry)
 }
 
 function processGroup(registry, statement) {
@@ -530,7 +521,8 @@ function processGroup(registry, statement) {
 		groupStorage = registry.storageMap.get('group')
 	}
 	else {
-		groupStorage = {border:border, heightMap:new Map(), widthMap:new Map()}
+		var scaledBorder = border * getTransformed2DMatrix(null, statement)[0]
+		groupStorage = {border:border, heightMap:new Map(), scaledBorder:scaledBorder, widthMap:new Map()}
 		registry.storageMap.set('group', groupStorage)
 	}
 	if (attributeMap.has('id')) {
@@ -618,7 +610,7 @@ function processPillar(registry, statement) {
 		}
 	}
 	var pillar = new Pillar(isSeparate, polygons, null, zList)
-	analyzeOutputMesh(attributeMap, pillar)
+	analyzeOutputMesh(attributeMap, pillar, registry)
 }
 
 function processVerticalHole(registry, statement) {
@@ -676,6 +668,7 @@ function updateSVGArea() {
 	var documentRoot = getStatement('documentRoot {')
 	var lastParent = documentRoot
 	var lines = getBracketReplacedLines('wordArea')
+	meshViewer.initialize('viewerCanvas', 'viewSelect')
 	var registry = {defaultMap:new Map(), idMap:new Map(), storageMap:new Map()}
 	var svgStatement = null
 	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -783,10 +776,17 @@ function updateSVGArea() {
 	addToDescendants(descendants, svgStatement)
 	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, svgStatement)
-	height = boundingBox[1][1] + lineThickness
-	width = boundingBox[1][0] + lineThickness
+	var height = boundingBox[1][1] + lineThickness
+	var padding = 5
+	var width = boundingBox[1][0] + lineThickness
+	if (registry.storageMap.has('group')) {
+		width += registry.storageMap.get('group').scaledBorder
+	}
 	if (!svgStatement.attributeMap.has('height')) {
 		svgStatement.attributeMap.set('height', height.toFixed())
+	}
+	if (!svgStatement.attributeMap.has('style')) {
+		svgStatement.attributeMap.set('style', 'border:1px solid black;padding:' + padding.toString() + 'px')
 	}
 	if (!svgStatement.attributeMap.has('width')) {
 		svgStatement.attributeMap.set('width', width.toFixed())
@@ -814,7 +814,33 @@ function updateSVGArea() {
 	setNumberOfRows('wordArea', lines)
 	setNumberOfRows('svgArea', svgLines)
 	document.getElementById('svgArea').value = svgString
+	meshViewer.start(height + padding + padding)
 	return svgString
+}
+
+function widenPolygonBoundingBox(boundingBox, caller, statement) {
+	var points = getPolygonPoints(statement.attributeMap)
+	if (points == null) {
+		return boundingBox
+	}
+	var transformedMatrix = getTransformed2DMatrix(caller, statement)
+	for (point of points) {
+		transform2DPoint(point, transformedMatrix)
+		if (boundingBox == null) {
+			boundingBox = [point.slice(0), point.slice(0)]
+		}
+		else {
+			widenBoundingBox(boundingBox, point)
+		}
+	}
+	return boundingBox
+}
+
+function widenStatementBoundingBox(boundingBox, caller, statement) {
+	if (statement.tag == 'polygon') {
+		return widenPolygonBoundingBox(boundingBox, caller, statement)
+	}
+	return boundingBox
 }
 
 function Extrusion(isJoined, layers, transform3D) {
