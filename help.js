@@ -29,3 +29,19 @@ function warning(text, variables) {
 	alertText += '\nFurther warnings about this will be sent to the debugging console only.'
 	alert(alertText)
 }
+
+function warningByList(warnings) {
+	if (warnings.length == 0) {
+		return
+	}
+	var firstString = warnings[0]
+	for (warning of warnings) {
+		console.log(warning)
+	}
+	if (gAlertSet.has(firstString)) {
+		return
+	}
+	gAlertSet.add(firstString)
+	warnings.push('Further warnings about this will be sent to the debugging console only.')
+	alert(warnings.join('\n'))
+}
