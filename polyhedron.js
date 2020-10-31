@@ -84,6 +84,13 @@ function addPolygon3DsToMesh(facets, isTriangular, points, polygon3Ds) {
 	}
 }
 
+function addToArrowsMap(arrowsMap, edges) {
+	var arrow = {beginKey:edges[0], endKey:edges[1]}
+	addArrayElementToMap(arrow, arrow.beginKey, arrowsMap)
+	arrow = {beginKey:arrow.endKey, endKey:arrow.beginKey}
+	addArrayElementToMap(arrow, arrow.beginKey, arrowsMap)
+}
+
 function addToFacets(arrowIndexSetMap, facets, pointIndexes, points, polygonFacet) {
 	linkFacetVertexes(pointIndexes, polygonFacet)
 	var differentFacet = []
@@ -130,14 +137,6 @@ function addToFacets(arrowIndexSetMap, facets, pointIndexes, points, polygonFace
 	}
 }
 
-function addToLineKeysMap(edges, lineKeysMap) {
-	edges.sort()
-	var lineKey = edges[0] + '#' + edges[1]
-	for (edge of edges) {
-		addArrayElementToMap(lineKey, edge, lineKeysMap)
-	}
-}
-
 function addToPillarMesh(facets, isTriangular, points, polygon3D, zList) {
 	var polygon3Ds = new Array(zList.length)
 	for (var zIndex = 0; zIndex < zList.length; zIndex++) {
@@ -163,9 +162,29 @@ function getEdgesByFacet(facet, z, zList) {
 	var edges = []
 	for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 		var vertexIndexNext = (vertexIndex + 1) % facet.length
-		if ((zList[vertexIndex] < z) != (zList[vertexIndexNext] < z)) {
-			edges.push(getEdgeKey(facet[vertexIndex].toString(), facet[vertexIndexNext].toString()))
+		var zVertex = zList[vertexIndex]
+		var zNext = zList[vertexIndexNext]
+		if (zVertex != z || zNext != z) {
+			if (zVertex == z) {
+				edges.push(facet[vertexIndex].toString())
+			}
+			else {
+				if (zNext == z) {
+					edges.push(facet[vertexIndexNext].toString())
+				}
+				else {
+					if ((zVertex < z) != (zNext < z)) {
+						edges.push(getEdgeKey(facet[vertexIndex].toString(), facet[vertexIndexNext].toString()))
+					}
+				}
+			}
 		}
+	}
+	if (edges.length < 2) {
+		return null
+	}
+	if (edges[0] == edges[1]) {
+		return null
 	}
 	return edges
 }
@@ -259,6 +278,76 @@ function getIsFacetPointingOutside(facet, mesh) {
 	return numberOfIntersectionsToLeft != 0 && numberOfIntersectionsToLeft % 2 == 0
 }
 
+function getJoinedCoplanarMesh(mesh) {
+	var facets = mesh.facets
+	var facetsMap = new Map()
+	var linkMap = new Map()
+	var normals = new Array(facets.length)
+	var points = mesh.points
+	for (facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		normals[facetIndex] = getNormalByFacet(facets[facetIndex], points)
+	}
+	for (facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		var facet = facets[facetIndex]
+		for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			var nextIndex = (vertexIndex + 1) % facet.length
+			var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
+			addArrayElementToMap(facetIndex, edgeKey, facetsMap)
+		}
+	}
+	for (key of facetsMap.keys()) {
+		var facetIndexes = facetsMap.get(key)
+		if (facetIndexes.length == 2) {
+			if (getXYZLengthSquared(getXYZSubtraction(normals[facetIndexes[0]], normals[facetIndexes[1]])) > 0.0001) {
+				facetsMap.set(key, null)
+			}
+		}
+		else {
+			facetsMap.set(key, null)
+		}
+	}
+	var facetIndexSet = new Set()
+	for (facet of facets) {
+		facetIndexSet.clear()
+		for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			var nextIndex = (vertexIndex + 1) % facet.length
+			var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
+			var facetIndexes = facetsMap.get(edgeKey)
+			if (facetIndexes != null) {
+				addElementsToSet(facetIndexes, facetIndexSet)
+			}
+		}
+		var greatestFacetIndex = -1
+		for (facetIndex of facetIndexSet) {
+			var linkFacetIndex = null
+			if (linkMap.has(facetIndex)) {
+				linkFacetIndex = linkMap.get(facetIndex)
+			}
+			if (linkFacetIndex == null) {
+				linkFacetIndex = facetIndex
+			}
+			greatestFacetIndex = Math.max(greatestFacetIndex, linkFacetIndex)
+		}
+		for (facetIndex of facetIndexSet) {
+			if (facetIndex != greatestFacetIndex) {
+				linkMap.set(facetIndex, greatestFacetIndex)
+			}
+		}
+	}
+	var joinedMap = getJoinedMap(facets.length, linkMap)
+	var joinedFacets = new Array(joinedMap.size)
+	var joinedIndex = 0
+	for (joined of joinedMap.values()) {
+		var polygonKeyArrays = new Array(joined.length)
+		for (var facetIndexIndex = 0; facetIndexIndex < joined.length; facetIndexIndex++) {
+			polygonKeyArrays[facetIndexIndex] = facets[joined[facetIndexIndex]]
+		}
+		joinedFacets[joinedIndex] = getConnectedPolygon(getJoinedPolygonKeyArrays(polygonKeyArrays))
+		joinedIndex++
+	}
+	return {facets:joinedFacets, points:points}
+}
+
 function getLargeFacet(mesh) {
 	var largeFacet = null
 	var greatestMinimumLengthSquared = -1
@@ -290,7 +379,6 @@ function getMeshAnalysis(mesh) {
 	var greatestFacetVertexes = -1
 	var moreThanDoubleEdges = []
 	var numberOfEdges = 0
-	var numberOfShapes = 0
 	var unidirectionalEdges = []
 	var numberOfUnidirectionalEdges = 0
 	for (facetIndex = 0; facetIndex < mesh.facets.length; facetIndex++) {
@@ -305,7 +393,6 @@ function getMeshAnalysis(mesh) {
 			addArrayElementToMap(arrow, edgeKey, arrowsMap)
 			addArrayElementToMap(facetIndex, edgeKey, facetsMap)
 		}
-		linkMap.set(facetIndex, null)
 	}
 	var facetIndexSet = new Set()
 	for (facet of mesh.facets) {
@@ -317,7 +404,10 @@ function getMeshAnalysis(mesh) {
 		}
 		var greatestFacetIndex = -1
 		for (facetIndex of facetIndexSet) {
-			var linkFacetIndex = linkMap.get(facetIndex)
+			var linkFacetIndex = null
+			if (linkMap.has(facetIndex)) {
+				linkFacetIndex = linkMap.get(facetIndex)
+			}
 			if (linkFacetIndex == null) {
 				linkFacetIndex = facetIndex
 			}
@@ -345,9 +435,7 @@ function getMeshAnalysis(mesh) {
 			}
 		}
 	}
-	for (link of linkMap.values()) {
-		numberOfShapes += (link == null)
-	}
+	var joinedMap = getJoinedMap(mesh.facets.length, linkMap)
 	var largeFacet = getLargeFacet(mesh)
 	var numberOfTooThinFacets = 0
 	for (var facet of mesh.facets) {
@@ -366,11 +454,13 @@ function getMeshAnalysis(mesh) {
 	if (loneEdges.length > 0) {
 		attributeMap.set('loneEdges', loneEdges.join(';'))
 	}
+	var meshBoundingBox = getMeshBoundingBox(mesh)
+	attributeMap.set('boundingBox', meshBoundingBox[0].toString() + ' ' + meshBoundingBox[1].toString())
 	attributeMap.set('numberOfEdges', numberOfEdges.toString())
 	attributeMap.set('numberOfErrors', numberOfErrors.toString())
 	attributeMap.set('numberOfFacets', mesh.facets.length.toString())
 	attributeMap.set('numberOfIncorrectEdges', numberOfIncorrectEdges.toString())
-	attributeMap.set('numberOfShapes', numberOfShapes.toString())
+	attributeMap.set('numberOfShapes', joinedMap.size.toString())
 	attributeMap.set('numberOfTooThinFacets', numberOfTooThinFacets.toString())
 	if (moreThanDoubleEdges.length > 0) {
 		attributeMap.set('moreThanDoubleEdges', moreThanDoubleEdges.join(';'))
@@ -379,6 +469,47 @@ function getMeshAnalysis(mesh) {
 		attributeMap.set('unidirectionalEdges', unidirectionalEdges.join(';'))
 	}
 	return attributeMap
+}
+
+function getMeshBoundingBox(mesh) {
+	var boundingBox = null
+	var points = mesh.points
+	for (facet of mesh.facets) {
+		for (vertexIndex of facet) {
+			var point = points[vertexIndex]
+			if (boundingBox == null) {
+				boundingBox = [point.slice(0), point.slice(0)]
+			}
+			else {
+				widenBoundingBox(boundingBox, point)
+			}
+		}
+	}
+	return boundingBox
+}
+
+function getMeshByPolygonSet(pointMap, polygonSet) {
+	var facets = new Array(polygonSet.size)
+	var points = new Array(pointMap.size)
+	var mesh = {facets:facets, points:points}
+	var pointIndex = 0
+	for (key of pointMap.keys()) {
+		var point = pointMap.get(key)
+		pointMap.set(key, pointIndex)
+		points[pointIndex] = point
+		pointIndex++
+	}
+	var facetIndex = 0
+	for (polygonKeyString of polygonSet.keys()) {
+		var polygonKeys = polygonKeyString.split(' ')
+		var facet = new Array(polygonKeys.length)
+		for (polygonKeyIndex = 0; polygonKeyIndex < polygonKeys.length; polygonKeyIndex++) {
+			facet[polygonKeyIndex] = pointMap.get(polygonKeys[polygonKeyIndex])
+		}
+		facets[facetIndex] = facet
+		facetIndex++
+	}
+	return mesh
 }
 
 function getNormalByFacet(facet, points) {
@@ -420,6 +551,17 @@ function getPillarMesh(isSeparate, isTriangular, polygons, transform3D, zList) {
 		}
 	}
 	return {facets:facets, points:points}
+}
+
+function getPointAlongEdge(edge, points, z) {
+	var nodes = edge.split(' ')
+	var begin = points[nodes[0]]
+	if (nodes.length == 1) {
+		return begin.slice(0, 2)
+	}
+	var end = points[nodes[1]]
+	var endZ = end[2]
+	return getXYByPortion((endZ - z) / (endZ - begin[2]), begin, end)
 }
 
 function getPolygon3D(polygon) {
@@ -495,72 +637,65 @@ function getXIntersectionsByMesh(mesh, y, z) {
 	return xIntersections
 }
 
-function getXYPolygonsByLineKeys(lineKeysMap, points, z) {
-	polygonEdges = []
-	for (var lineKeys of lineKeysMap.values()) {
-		for (var lineKey of lineKeys) {
-			if (lineKey != null) {
-				var polygonEdge = []
-				var edges = lineKey.split('#')
-				var edgeEnd = edges[1]
-				do {
-					polygonEdge.push(edgeEnd)
-					var endLineKeys = lineKeysMap.get(edgeEnd)
-					var originalLineKey = lineKey
-					var lineKey = null
-					for (var endLineIndex = 0; endLineIndex < endLineKeys.length; endLineIndex++) {
-						var endLineKey = endLineKeys[endLineIndex]
-						if (endLineKey != originalLineKey) {
-							lineKey = endLineKey
-							endLineIndex = endLineKeys.length
-							if (lineKey != null) {
-								edges = lineKey.split('#')
-								if (edgeEnd == edges[0]) {
-									edgeEnd = edges[1]
-								}
-								else {
-									edgeEnd = edges[0]
-								}
+function getXYPolygonsByArrows(arrowsMap, points, z) {
+	var xyPolygons = []
+	for (arrows of arrowsMap.values()) {
+		if (arrows != null) {
+			var arrow = arrows[0]
+			var keys = [arrow.beginKey]
+			removeArrowFromMap(arrows, arrowsMap, arrow.beginKey)
+			do {
+				if (arrowsMap.has(arrow.endKey)) {
+					var nextArrows = arrowsMap.get(arrow.endKey)
+					if (nextArrows == null) {
+						warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was null in the arrowsMap:\n from the keys:\n'
+						warning(warningString, [arrow, arrowsMap, keys])
+						break
+					}
+					else {
+						for (var nextArrowIndex = nextArrows.length - 1; nextArrowIndex > -1; nextArrowIndex--) {
+							var nextArrow = nextArrows[nextArrowIndex]
+							if (arrow.beginKey == nextArrow.endKey && arrow.endKey == nextArrow.beginKey) {
+								nextArrows.splice(nextArrowIndex, 1)
 							}
 						}
-					}
-					for (var endLineIndex = 0; endLineIndex < endLineKeys.length; endLineIndex++) {
-						endLineKeys[endLineIndex] = null
-					}
-					if (polygonEdge.length > 9876543) {
-						warningString = 'polygon is too large or there is a mistake, length: \nlineKey: \npolygonEdge: '
-						warning(warningString, [polygonEdge.length, lineKey, polygonEdge])
-						lineKey = null
+						if (nextArrows.length == 0) {
+							warningString = 'In getXYPolygonsByArrows, from the arrow.endKey:\n nextArrows.length == 0 in the arrowsMap:\n from the keys:\n'
+							warning(warningString, [arrow, arrowsMap, keys])
+							break
+						}
+						arrow = nextArrows[0]
+						removeArrowFromMap(nextArrows, arrowsMap, arrow.beginKey)
+						keys.push(arrow.beginKey)
 					}
 				}
-				while (lineKey != null)
-				polygonEdge.pop()
-				polygonEdges.push(polygonEdge)
+				else {
+					warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was not in the arrowsMap:\n from the keys:\n'
+					warning(warningString, [arrow, arrowsMap, keys])
+					break
+				}
+				if (keys[0] == arrow.endKey) {
+					for (var keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+						keys[keyIndex] = getPointAlongEdge(keys[keyIndex], points, z)
+					}
+					xyPolygons.push(keys)
+					break
+				}
+				if (keys.length > 9876543) {
+					warningString = 'In getXYPolygonsByArrows, polygon is too large or there is a mistake, length: \narrowKey: \nkeys: '
+					warning(warningString, [keys.length, arrow, keys])
+					break
+				}
 			}
+			while (true)
 		}
-	}
-	var xyPolygons = new Array(polygonEdges.length)
-	for (var polygonEdgeIndex = 0; polygonEdgeIndex < polygonEdges.length; polygonEdgeIndex++) {
-		var polygonEdge = polygonEdges[polygonEdgeIndex]
-		var xyPolygon = new Array(polygonEdge.length)
-		for (var edgeIndex = 0; edgeIndex < polygonEdge.length; edgeIndex++) {
-			var edge = polygonEdge[edgeIndex]
-			var nodes = edge.split(' ')
-			var begin = points[nodes[0]]
-			var end = points[nodes[1]]
-			var deltaZ = end[2] - begin[2]
-			var beginPortion = (end[2] - z) / deltaZ
-			var endPortion = 1.0 - beginPortion
-			xyPolygon[edgeIndex] = [beginPortion * begin[0] + endPortion * end[0], beginPortion * begin[1] + endPortion * end[1]]
-		}
-		xyPolygons[polygonEdgeIndex] = xyPolygon
 	}
 	return xyPolygons
 }
 
 function getXYPolygonsByZ(mesh, z) {
 	var facets = mesh.facets
-	var lineKeysMap = new Map()
+	var arrowsMap = new Map()
 	var points = mesh.points
 	for (facet of facets) {
 		var zList = new Array(facet.length)
@@ -568,11 +703,11 @@ function getXYPolygonsByZ(mesh, z) {
 			zList[vertexIndex] = points[facet[vertexIndex]][2]
 		}
 		var edges = getEdgesByFacet(facet, z, zList)
-		if (edges.length == 2) {
-			addToLineKeysMap(edges, lineKeysMap)
+		if (edges != null) {
+			addToArrowsMap(arrowsMap, edges)
 		}
 	}
-	return getXYPolygonsByLineKeys(lineKeysMap, points, z)
+	return getXYPolygonsByArrows(arrowsMap, points, z)
 }
 
 function getXYPolygonsMapByMesh(mesh) {
@@ -593,23 +728,24 @@ function getXYPolygonsMapByMesh(mesh) {
 		minimumZ = Math.ceil(minimumZ)
 		for (var z = minimumZ; z < maximumZ; z++) {
 			var edges = getEdgesByFacet(facet, z, zList)
-			if (edges.length == 2) {
-				var lineKeysMap = null
+//		console.log(z)
+//		console.log(edges)
+			if (edges != null) {
+				var arrowsMap = null
 				if (xyPolygonsMap.has(z)) {
-					lineKeysMap = xyPolygonsMap.get(z)
+					arrowsMap = xyPolygonsMap.get(z)
 				}
 				else {
-					lineKeysMap = new Map()
-					xyPolygonsMap.set(z, lineKeysMap)
+					arrowsMap = new Map()
+					xyPolygonsMap.set(z, arrowsMap)
 				}
-				addToLineKeysMap(edges, lineKeysMap)
+				addToArrowsMap(arrowsMap, edges)
 			}
 		}
 	}
-
  	for (entry of xyPolygonsMap) {
 		var z = entry[0]
-		xyPolygonsMap.set(z, getXYPolygonsByLineKeys(entry[1], points, z))
+		xyPolygonsMap.set(z, getXYPolygonsByArrows(entry[1], points, z))
 	}
 	return xyPolygonsMap
 }
@@ -619,4 +755,13 @@ function linkFacetVertexes(pointIndexes, polygonFacet) {
 		polygonFacet[vertexIndex] = pointIndexes[polygonFacet[vertexIndex]]
 	}
 	return polygonFacet
+}
+
+function removeArrowFromMap(arrows, arrowsMap, key) {
+	if (arrows.length == 1) {
+		arrowsMap.set(key, null)
+	}
+	else {
+		arrows.shift()
+	}
 }
