@@ -24,23 +24,31 @@ function compareArrayDescending(a, b) {
 	return 0
 }
 
-function compareIntersections(a, b) {
-	if (a[0] == b[0]) {
-		return a[1] - b[1]
-	}
-	return a[0] - b[0]
+function compareNumberAscending(a, b) {
+	return a - b
 }
 
 function compareNumberDescending(a, b) {
 	return b - a
 }
 
-function compareNumbers(a, b) {
-	return a - b
+function compareSignedIntersectionAscending(a, b) {
+	if (a[0] == b[0]) {
+		return a[1] - b[1]
+	}
+	return a[0] - b[0]
+}
+
+function getArraysBySplittingStrings(strings, stringSeparator) {
+	var arrays = new Array(strings.length)
+	for (var stringIndex = 0; stringIndex < strings.length; stringIndex++) {
+		arrays[stringIndex] = strings[stringIndex].split(stringSeparator)
+	}
+	return arrays
 }
 
 function getArraysCopy(arrays) {
-	arraysCopy = new Array(arrays.length)
+	var arraysCopy = new Array(arrays.length)
 	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
 		arraysCopy[arrayIndex] = arrays[arrayIndex].slice(0)
 	}
