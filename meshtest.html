@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/></head>
+<body>
+<script src="help.js"></script>
+<script src="maparray.js"></script>
+<script src="matrix.js"></script>
+<script src="pixel.js"></script>
+<script src="polygon.js"></script>
+<script src="polyhedron.js"></script>
+<script src="voxel.js"></script>
+<script>
+//License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
+
+const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
+// joined coplanar mesh from polygons only, remove identical mesh points, count empty intersection pairs
+// intersect xyz, add nodes between exteriors to polygons, add node within new triangle
+// change concat to array lengthening in addPixelRow
+// delete coplanar nodes, make basic shapes
+// triangulate coplanar for output, combine loops from multiple meshes
+// check for line intersection between polygons
+// check for and join polylines in getXYPolygonsMap when there are missing faces
+// check for intersection pairs between exteriors
+// check for unplanar polygons and triangulate
+// check for z at node level when converting to xy
+// maybe speed: numeric indexes
+
+function drawLines(lines, pointMap) {
+	for (line of lines) {
+		drawXYZPolyline([pointMap.get(line.beginKey), pointMap.get(line.endKey)], gPlanarColors[line.crossDirectionIndex])
+//	document.writeln('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"  style="fill:none;stroke:' + line.color + ';" />')
+//	document.writeln('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"  style="fill:none;stroke:' + line.color + ';" marker-end="url(#arrowhead)" />')
+	}
+}
+
+function drawMesh(mesh) {
+	var index = 0
+	var points = mesh.points
+	for (facet of mesh.facets) {
+		var polygon = new Array(facet.length)
+		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
+			polygon[keyIndex] = points[facet[keyIndex]]
+			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
+		}
+		drawXYZPolygon(polygon, getRGBByIndex(index))
+		index++
+	}
+}
+
+function drawPixelMap(pixelMap) {
+	for (entry of pixelMap) {
+		var key = entry[0]
+		var value = entry[1]
+		var parameters = key.split(',')
+		var cx = parseFloat(parameters[0])
+		var cy = parseFloat(parameters[1])
+		document.writeln('<circle cx="' + cx + '" cy="' + cy + '" r="0.1" />')
+		for (directionIndex = 0; directionIndex < gXYDirections.length; directionIndex++) {
+			var xy = value[directionIndex]
+			if (xy != null) {
+				var direction = gXYDirections[directionIndex]
+				document.writeln('<circle cx="' + xy[0] + '" cy="' + xy[1] + '" r="0.02" />')
+				var cxTip = cx + 0.1 * direction[0]
+				var cyTip = cy + 0.1 * direction[1]
+				document.writeln('<circle cx="' + cxTip + '" cy="' + cyTip + '" r="0.03" />')
+			}
+		}
+	}
+}
+
+function drawVoxelMap(voxelMap) {
+	for (entry of voxelMap) {
+		var value = entry[1]
+		var parameters = entry[0].split(',').slice(0).map(parseFloat)
+		var center = getXYPointStringByXYZ(parameters).split(',')
+		document.writeln('<circle cx="' + center[0] + '" cy="' + center[1] + '" r="0.1" />')
+		for (directionIndex = 0; directionIndex < gDirections.length; directionIndex++) {
+			xyz = value[directionIndex]
+			if (xyz != null) {
+				direction = gDirections[directionIndex]
+				var cTip = getXYPointStringByXYZ(xyz).split(',')
+				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.02" />')
+				var cDirection = getXYPointStringByXYZ(addXYZ(getXYZMultiplicationByScalar(direction, 0.1), parameters)).split(',')
+				document.writeln('<circle cx="' + cDirection[0] + '" cy="' + cDirection[1] + '" r="0.03" />')
+			}
+		}
+	}
+}
+
+function drawXYLines(lines, pointMap) {
+	for (line of lines) {
+		var pointStrings = [pointMap.get(line.beginKey).join(','), pointMap.get(line.endKey).join(',')]
+		document.writeln('<polyline  points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + gPlanarColors[0].join(',') + ')" />')
+	}
+}
+
+function drawXYPolygon(xyPolygon, rgb) {
+	var pointStrings = new Array(xyPolygon.length)
+	for (var pointIndex = 0; pointIndex < xyPolygon.length; pointIndex++) {
+		pointStrings[pointIndex] = xyPolygon[pointIndex].join(',')
+	}
+	document.writeln('<polygon  points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
+}
+
+function drawXYPolygons(xyPolygons) {
+	for (xyPolygon of xyPolygons) {
+		drawXYPolygon(xyPolygon, getRGB())
+	}
+}
+
+function drawXYZPolygon(points, rgb) {
+	document.writeln('<polygon  points="' + getXYPointStringsByXYZ(points).join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
+}
+
+function drawXYZPolygons(xyzPolygons) {
+	for (xyzPolygon of xyzPolygons) {
+		drawXYZPolygon(xyzPolygon, getRGB())
+	}
+}
+
+function drawXYZPolygonKeyStrings(xyzPolygonKeyStrings) {
+	drawXYZPolygons(convertKeyStringsToPolygons(xyzPolygonKeyStrings))
+}
+
+function drawXYZPolygonKeyStringsByMap(pointMap, polygonKeyStrings) {
+	var index = 0
+	for (polygonKeyString of polygonKeyStrings) {
+		var polygon = polygonKeyString.split(' ')
+		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
+			polygon[keyIndex] = pointMap.get(polygon[keyIndex])
+			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
+		}
+		drawXYZPolygon(polygon, getRGBByIndex(index))
+		index++
+	}
+}
+
+function drawXYZPolyline(points, rgb) {
+	document.writeln('<polyline  points="' + getXYPointStringsByXYZ(points).join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
+}
+
+function getXYPointStringByXYZ(point) {
+	return [point[0] + point[2] * 0.2, point[1] + point[2] * 0.1].join(',')
+//	return [point[0] + point[2] * 0.4, point[1] + point[2] * 0.25].join(',')
+}
+
+function getXYPointStringsByXYZ(points) {
+	var pointStrings = new Array(points.length)
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		pointStrings[pointIndex] = getXYPointStringByXYZ(points[pointIndex])
+	}
+	return pointStrings
+}
+
+function testFace() {
+	var lines = []
+	var pointMap = new Map()
+	var tipMap = new Map()
+	var pointString = '0,-1,0 9,-1,0 0,-1,4 0,4,0'
+	points = getPointStringConvertedToPoints(pointString)
+	var mesh = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:points}
+	var xyzLattice = getXYZLatticeByMesh(mesh)
+	var voxelMap = getVoxelsByXYZLattice(xyzLattice)
+//	drawVoxelMap(voxelMap)
+	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
+	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
+	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
+//	drawLines(lines, pointMap)
+	var polygonSet = new Set()
+	createPolygon(polygonSet, tipMap)
+	drawXYZPolygonKeyStringsByMap(pointMap, getJoinedCoplanarPolygonKeyStrings(pointMap, polygonSet.keys()))
+//	drawXYZPolygonKeyStringsByMap(pointMap, polygonSet.keys())
+
+
+
+//	var xyzPolygons = getPolygonsByLines(lines, pointMap)
+//	drawXYZPolygons(xyzPolygons)
+//	var lines = []
+//	var pointMap = new Map()
+//	var tipMap = new Map()
+//	rotateXYZParametersByPointList(2, mesh.points)
+//	var xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
+//	var voxelMap = getVoxelsByXYPolygonsMap(xyPolygonsMap)
+//	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
+//	var xyzPolygons = getPolygonsByLines(lines, pointMap)
+//	rotateXYZParametersByPointLists(-2, xyzPolygons)
+//	drawXYZPolygons(xyzPolygons)
+}
+
+function testIntersection() {
+	// nodes xy, xyz keystring, xyRotated, outside, aPortion, cPortion a b  c d   mapped by before after
+	// getPolygonNodesByPolygonKeyStrings
+	//{entry:workPolygon, exit:workPolygon}
+	//intersectionMap, loopIntersectionMap, meetingNodeSet?
+	//intersect the tool with the work, get intersection map, isCrossing, check meeting map
+	//tested by getSubtractionLoops, used by getSubtractionFaces, used by replaceFaces
+	polygons = ['8,-4 10,-4 8,-2', '7,-2 9,-5']
+	convertPointStringsToPointLists(polygons)
+//	polygons = [[[2,0], [0,0]], [[0,1], [3,-2]]]
+//	polygons = [[[3,0], [1,0]], [[0,1], [3,-1]]]
+	var polygonKeyStrings = getXYZPolygonKeyStrings(polygons, 0)
+	drawXYZPolygonKeyStrings(polygonKeyStrings)
+	ab = polygons[0]
+	cd = polygons[1]
+//	console.log(getIntersectionPortionsByRotated(ab[0][0], ab[1][0], cd[0], cd[1]))
+	getIntersectionPortions(ab[0], ab[1], cd[0], cd[1])
+}
+/*
+function testLoop() {
+	var lines = []
+	var pointMap = new Map()
+	var tipMap = new Map()
+	var xyPolygonsMap = new Map()
+	xyPolygonsMap.set(0, [[[3,-4], [9,-1], [10,-4]]])
+	xyPolygonsMap.set(1, [[[3,-4], [9,-1], [10,-4]]])
+	var voxelMap = getVoxelsByXYPolygonsMap(xyPolygonsMap)
+	drawVoxelMap(voxelMap)
+	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
+//	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
+//	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
+	var xyzPolygons = getPolygonsByLines(lines, pointMap)
+	drawXYZPolygons(xyzPolygons)
+//	drawLines(lines, pointMap)
+}
+*/
+function testPixelBoolean() {
+	var lines = []
+	var pixelMap = new Map()
+	var pointMap = new Map()
+	var tipMap = new Map()
+	addTestPixels(pixelMap)
+	createPixelTips(pixelMap)
+	addPixelLines(pixelMap, lines, pointMap, tipMap)
+	var xyPolygons = getPolygonsByLines(lines, pointMap)
+	var xyLattice = getXYLattice(xyPolygons)
+	var xyPolygons = getXYPolygonsByLattice(xyLattice)
+//	drawXYPolygon(xyPolygons[0], [255, 0, 0])
+	var xyPolygonB = [[8.5,1.5], [8.5,3.5], [9.5,3.5], [9.5,1.5]]
+	var xyLatticeB = getXYLattice([xyPolygonB])
+//	console.log(xyLatticeB)
+	var xyPolygonBFromLattice = getXYPolygonsByLattice(xyLatticeB)[0]
+//	console.log(xyPolygonBFromLattice)
+//	xyLatticeC = getXYLatticeAddition(xyLattice, xyLatticeB)
+	xyLatticeC = getXYLatticeExclusiveIntersection(xyLattice, xyLatticeB)
+//	xyLatticeC = getXYLatticeIntersection(xyLattice, xyLatticeB)
+//	xyLatticeC = getXYLatticeSubtraction(xyLattice, xyLatticeB)
+	var xyPolygonsCFromLattice = getXYPolygonsByLattice(xyLatticeC)
+	drawXYPolygons(xyPolygonsCFromLattice)
+//	var pointListTest = [[0, 1, 2]]
+//	rotateXYZParametersByPointList(2, pointListTest)
+}
+
+function testPolygonJoining() {
+	var pointMapMimic = {get:function(key){return getXYZByKey(key)}}
+//	polygonKeyStrings = ['0,0,0 1,1,0 1,0,0', '1,0,0 1,1,0 3,1,0']
+//	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 3,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 3,2,0 2,2,0 1,3,0']
+//	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 4,2,0 5,2,0 6,2,0 4,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 6,2,0 5,2,0 4,2,0 3,2,0 2,2,0 1,3,0']
+//	polygonKeyStrings = getXYZPolygonKeyStrings([[[-1,-6], [-1,-4], [0,-4], [1,-5], [2,-4], [3,-4], [4,-5], [5,-4], [6,-4], [6,-6]], [[0,-4], [-1,-4], [-1,-2], [3,-2], [6,-2], [6,-4], [5,-4], [4,-3], [3,-4], [2,-4], [1,-3]]], 0)
+//	polygonKeyStrings = ['0,0,0 -1,0,0 0,1,0', '0,0,0 0,1,0 1,0,0', '0,0,0 1,0,0 0,-1,0', '0,0,0 0,-1,0 -1,0,0']
+//	polygonKeyStrings = ['0,-1,0 -1,0,0 0,0,0', '0,-1,0 0,0,0 1,0,0', '-1,0,0 0,1,1 1,0,0 0,0,0']
+	var xyPolygonKeyStrings = ['-1,0 -1,2 0,2 1,1 2,2 3,2 4,1 5,2 6,2 6,0', '0,2 -1,2 -1,4 3,4 6,4 6,2 5,2 4,3 3,2 2,2 1,3']
+	var xyPolygonKeyArrays = getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
+	var joinedPolygonKeyArrays = getJoinedPolygonKeyArrays(xyPolygonKeyArrays)
+	var joinedPolygons = convertXYPolygonsToXYZ(convertPolygonKeyArraysToPolygons(joinedPolygonKeyArrays), 0)
+	drawXYZPolygon(addXYToList(getConnectedPolygon(joinedPolygons), [0, -6]), getRGB())
+}
+
+function testVoxel() {
+	var lines = []
+	var pointMap = new Map()
+	var polygonSet = new Set()
+	var tipMap = new Map()
+	var voxelMap = new Map()
+	addTestVoxels(voxelMap)
+	createTips(voxelMap)
+	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
+	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
+	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
+	createPolygon(polygonSet, tipMap)
+//	drawXYZPolygonKeyStringsByMap(pointMap, polygonSet.keys())
+	drawVoxelMap(voxelMap)
+//	drawLines(lines, pointMap)
+//	console.log(mesh)
+	drawMesh(getJoinedCoplanarMesh(getMeshByPolygonSet(pointMap, polygonSet)))
+}
+
+function createSVGTest() {
+	document.writeln('<svg height="1100" width="1600">')
+	document.writeln('<defs>')
+	document.writeln('<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">')
+	document.writeln('<polygon points="0 0, 10 3.5, 0 7" />')
+	document.writeln('</marker>')
+	document.writeln('</defs>')
+	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(100,0,0,-100,150,400)">')
+	testVoxel()
+	testIntersection()
+//	testLoop()
+	testFace()
+	testPixelBoolean()
+	testPolygonJoining()
+	document.writeln('</g>')
+	document.writeln('</svg><br>')
+}
+
+createSVGTest()
+</script>
+</body>
+</html>
