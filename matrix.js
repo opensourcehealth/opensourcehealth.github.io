@@ -1,5 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+gRGBIndex = 0
 const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
@@ -451,6 +452,10 @@ function get3DUnitMatrix() {
 	return [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 }
 
+function getBrightness256(brightness) {
+	return Math.floor(255.0 * ((brightness) % 1.0))
+}
+
 //cross(A, B) = [ a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1 ]
 function getCrossProduct(a, b) {
 	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -522,16 +527,22 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 	return rowStrings.join('\n')
 }
 
-function getRGB(i) {
-	return [Math.floor(255.0 * ((i * 0.617) % 1.0)), Math.floor(255.0 * ((i * 0.733) % 1.0)), Math.floor(255.0 * ((i * 0.317) % 1.0))]
+function getRGB() {
+	gRGBIndex += 1
+	return getRGBByIndex(gRGBIndex)
+}
+
+function getRGBByIndex(rgbIndex) {
+	return [getBrightness256(rgbIndex * 0.617), getBrightness256(rgbIndex * 0.733), getBrightness256(rgbIndex * 0.317)]
 }
 
 function getXYAddition(xyA, xyB) {
 	return [xyA[0] + xyB[0], xyA[1] + xyB[1]]
 }
 
-function getXYAlong(along, xyA, xyB) {
-	return addXY(multiplyXYByScalar(getXYSubtraction(xyB, xyA), along), xyA)
+function getXYByPortion(portionA, xyA, xyB) {
+	var portionB = 1.0 - portionA
+	return [portionA * xyA[0] + portionB * xyB[0], portionA * xyA[1] + portionB * xyB[1]]
 }
 
 function getXYBy3DMatrix(point, matrix) {
@@ -550,6 +561,10 @@ function getXYLength(xy) {
 
 function getXYLengthSquared(xy) {
 	return xy[0] * xy[0] + xy[1] * xy[1]
+}
+
+function getXYMultiplication(xyA, xyB) {
+	return [xyA[0] * xyB[0], xyA[1] * xyB[1]]
 }
 
 function getXYPolar(angle, radius) {
@@ -593,7 +608,11 @@ function getXYZLengthSquared(xyz) {
 }
 
 function getXYZMultiplication(xyzA, xyzB) {
-	return [xyzA[0] * xyzB[0], xyzA[1] * xyzB[1], xyzA[2] * xyzB[2]];
+	return [xyzA[0] * xyzB[0], xyzA[1] * xyzB[1], xyzA[2] * xyzB[2]]
+}
+
+function getXYZMultiplicationByScalar(xyzA, scalarMultiplier) {
+	return [xyzA[0] * scalarMultiplier, xyzA[1] * scalarMultiplier, xyzA[2] * scalarMultiplier]
 }
 
 //function getXYZRotationByBasis(rotationBasis, xyz, xyRotator) {
