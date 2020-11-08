@@ -35,7 +35,7 @@ function warningByList(warnings) {
 		return
 	}
 	var firstString = warnings[0]
-	for (warning of warnings) {
+	for (var warning of warnings) {
 		console.log(warning)
 	}
 	if (gAlertSet.has(firstString)) {
