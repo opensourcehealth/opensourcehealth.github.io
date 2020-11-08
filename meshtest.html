@@ -13,20 +13,21 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// joined coplanar mesh from polygons only, remove identical mesh points, count empty intersection pairs
-// intersect xyz, add nodes between exteriors to polygons, add node within new triangle
-// change concat to array lengthening in addPixelRow
-// delete coplanar nodes, make basic shapes
-// triangulate coplanar for output, combine loops from multiple meshes
+// operate on mesh, check around pointStringMap, delete intersection removal
+// count empty intersection pairs
+// operate and transform polygons in wordscape
+// better colors, check that facet is concave before getting midpoint
+// add nodes between exteriors to polygons, add node within new triangle
+// triangulate coplanar for output, make basic shapes, combine loops from multiple meshes
+// drill
 // check for line intersection between polygons
 // check for and join polylines in getXYPolygonsMap when there are missing faces
 // check for intersection pairs between exteriors
 // check for unplanar polygons and triangulate
 // check for z at node level when converting to xy
-// maybe speed: numeric indexes
 
 function drawLines(lines, pointMap) {
-	for (line of lines) {
+	for (var line of lines) {
 		drawXYZPolyline([pointMap.get(line.beginKey), pointMap.get(line.endKey)], gPlanarColors[line.crossDirectionIndex])
 //	document.writeln('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"  style="fill:none;stroke:' + line.color + ';" />')
 //	document.writeln('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"  style="fill:none;stroke:' + line.color + ';" marker-end="url(#arrowhead)" />')
@@ -36,59 +37,63 @@ function drawLines(lines, pointMap) {
 function drawMesh(mesh) {
 	var index = 0
 	var points = mesh.points
-	for (facet of mesh.facets) {
+	var z = 0.0
+	for (var facet of mesh.facets) {
 		var polygon = new Array(facet.length)
 		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
 			polygon[keyIndex] = points[facet[keyIndex]]
 			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
+			z = polygon[keyIndex][2]
 		}
+		index = Math.round(z)
 		drawXYZPolygon(polygon, getRGBByIndex(index))
-		index++
+//		index++
 	}
 }
 
 function drawPixelMap(pixelMap) {
-	for (entry of pixelMap) {
+	for (var entry of pixelMap) {
 		var key = entry[0]
 		var value = entry[1]
 		var parameters = key.split(',')
 		var cx = parseFloat(parameters[0])
 		var cy = parseFloat(parameters[1])
-		document.writeln('<circle cx="' + cx + '" cy="' + cy + '" r="0.1" />')
+		document.writeln('<circle cx="' + cx + '" cy="' + cy + '" r="0.15" />')
 		for (directionIndex = 0; directionIndex < gXYDirections.length; directionIndex++) {
 			var xy = value[directionIndex]
 			if (xy != null) {
 				var direction = gXYDirections[directionIndex]
-				document.writeln('<circle cx="' + xy[0] + '" cy="' + xy[1] + '" r="0.02" />')
-				var cxTip = cx + 0.1 * direction[0]
-				var cyTip = cy + 0.1 * direction[1]
-				document.writeln('<circle cx="' + cxTip + '" cy="' + cyTip + '" r="0.03" />')
+				document.writeln('<circle cx="' + xy[0] + '" cy="' + xy[1] + '" r="0.04" />')
+				var cxTip = cx + 0.15 * direction[0]
+				var cyTip = cy + 0.15 * direction[1]
+				document.writeln('<circle cx="' + cxTip + '" cy="' + cyTip + '" r="0.02" />')
 			}
 		}
 	}
 }
 
 function drawVoxelMap(voxelMap) {
-	for (entry of voxelMap) {
+	for (var entry of voxelMap) {
 		var value = entry[1]
 		var parameters = entry[0].split(',').slice(0).map(parseFloat)
 		var center = getXYPointStringByXYZ(parameters).split(',')
-		document.writeln('<circle cx="' + center[0] + '" cy="' + center[1] + '" r="0.1" />')
+		var rgbString = '" style="stroke:rgb(' + getRGBByIndex(Math.round(parameters[2])).join(',') + ')" />'
+		document.writeln('<circle cx="' + center[0] + '" cy="' + center[1] + '" r="0.3' + rgbString)
 		for (directionIndex = 0; directionIndex < gDirections.length; directionIndex++) {
 			xyz = value[directionIndex]
 			if (xyz != null) {
 				direction = gDirections[directionIndex]
 				var cTip = getXYPointStringByXYZ(xyz).split(',')
-				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.02" />')
-				var cDirection = getXYPointStringByXYZ(addXYZ(getXYZMultiplicationByScalar(direction, 0.1), parameters)).split(',')
-				document.writeln('<circle cx="' + cDirection[0] + '" cy="' + cDirection[1] + '" r="0.03" />')
+				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.08' + rgbString)
+				var cDirection = getXYPointStringByXYZ(addXYZ(getXYZMultiplicationByScalar(direction, 0.3), parameters)).split(',')
+				document.writeln('<circle cx="' + cDirection[0] + '" cy="' + cDirection[1] + '" r="0.04' + rgbString)
 			}
 		}
 	}
 }
 
 function drawXYLines(lines, pointMap) {
-	for (line of lines) {
+	for (var line of lines) {
 		var pointStrings = [pointMap.get(line.beginKey).join(','), pointMap.get(line.endKey).join(',')]
 		document.writeln('<polyline  points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + gPlanarColors[0].join(',') + ')" />')
 	}
@@ -103,8 +108,15 @@ function drawXYPolygon(xyPolygon, rgb) {
 }
 
 function drawXYPolygons(xyPolygons) {
-	for (xyPolygon of xyPolygons) {
+	for (var xyPolygon of xyPolygons) {
 		drawXYPolygon(xyPolygon, getRGB())
+	}
+}
+
+function drawXYZPoints(points) {
+	for (var point of points) {
+		var center = getXYPointStringByXYZ(point).split(',')
+		document.writeln('<circle cx="' + center[0] + '" cy="' + center[1] + '" r="0.02" />')
 	}
 }
 
@@ -113,7 +125,7 @@ function drawXYZPolygon(points, rgb) {
 }
 
 function drawXYZPolygons(xyzPolygons) {
-	for (xyzPolygon of xyzPolygons) {
+	for (var xyzPolygon of xyzPolygons) {
 		drawXYZPolygon(xyzPolygon, getRGB())
 	}
 }
@@ -122,25 +134,13 @@ function drawXYZPolygonKeyStrings(xyzPolygonKeyStrings) {
 	drawXYZPolygons(convertKeyStringsToPolygons(xyzPolygonKeyStrings))
 }
 
-function drawXYZPolygonKeyStringsByMap(pointMap, polygonKeyStrings) {
-	var index = 0
-	for (polygonKeyString of polygonKeyStrings) {
-		var polygon = polygonKeyString.split(' ')
-		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
-			polygon[keyIndex] = pointMap.get(polygon[keyIndex])
-			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
-		}
-		drawXYZPolygon(polygon, getRGBByIndex(index))
-		index++
-	}
-}
-
 function drawXYZPolyline(points, rgb) {
 	document.writeln('<polyline  points="' + getXYPointStringsByXYZ(points).join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
 }
 
 function getXYPointStringByXYZ(point) {
-	return [point[0] + point[2] * 0.2, point[1] + point[2] * 0.1].join(',')
+//	return [point[0] + point[2] * 0.2, point[1] + point[2] * 0.1].join(',')
+	return [point[0] + point[2] * 0.3, point[1] + point[2] * 0.2].join(',')
 //	return [point[0] + point[2] * 0.4, point[1] + point[2] * 0.25].join(',')
 }
 
@@ -156,21 +156,22 @@ function testFace() {
 	var lines = []
 	var pointMap = new Map()
 	var tipMap = new Map()
+//	var pointString = '0,-1,0 450,-1,0 0,-1,200 0,200,0'
 	var pointString = '0,-1,0 9,-1,0 0,-1,4 0,4,0'
 	points = getPointStringConvertedToPoints(pointString)
 	var mesh = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:points}
-	var xyzLattice = getXYZLatticeByMesh(mesh)
-	var voxelMap = getVoxelsByXYZLattice(xyzLattice)
+	var lattice = getXYZLatticeByMesh(mesh)
+	var voxelMap = getVoxelMapByXYZLattice(lattice)
 //	drawVoxelMap(voxelMap)
 	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
 //	drawLines(lines, pointMap)
-	var polygonSet = new Set()
-	createPolygon(polygonSet, tipMap)
-	drawXYZPolygonKeyStringsByMap(pointMap, getJoinedCoplanarPolygonKeyStrings(pointMap, polygonSet.keys()))
-//	drawXYZPolygonKeyStringsByMap(pointMap, polygonSet.keys())
-
+//	drawMesh(getMeshByTipMap(pointMap, tipMap))
+	mesh = getJoinedCoplanarMesh(getMeshByTipMap(pointMap, tipMap))
+	addXYsByXY(mesh.points, [7, -6])
+	drawMesh(mesh)
+	drawXYZPoints(mesh.points)
 
 
 //	var xyzPolygons = getPolygonsByLines(lines, pointMap)
@@ -223,35 +224,93 @@ function testLoop() {
 //	drawLines(lines, pointMap)
 }
 */
+
+function testMeshBoolean() {
+	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
+	var pointsA = getPointStringConvertedToPoints(pointString)
+	addXYsByXY(pointsA, [0.00001, 0.0])
+//	addXYZsByZ(pointsA, -0.01777)
+	multiplyXYsByScalar(pointsA, 2.0)
+	var meshA = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsA}
+	var lattice = getXYZLatticeByMesh(meshA)
+	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
+	var pointsB = getPointStringConvertedToPoints(pointStringB)
+	addXYsByXY(pointsB, [1, 0.0])
+	addXYZsByZ(pointsB, -0.000000000000001)
+	multiplyXYsByScalar(pointsB, 2.0)
+	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
+//	var latticeC = getXYZLatticeAddition(lattice, latticeB)
+//	var latticeC = getXYZLatticeExclusiveIntersection(lattice, latticeB)
+//	var latticeC = getXYZLatticeIntersection(lattice, latticeB)
+//	var latticeC = getXYZLatticeSubtraction(lattice, latticeB)
+	var offsetMultiplier = 0.0
+//	var offsetMultiplier = 0.49
+//	var layerThickness = 0.100000
+	var layerThickness = 0.49999999999999999
+	var meshBoolean = null
+	meshBoolean = getMeshAddition(layerThickness, offsetMultiplier, meshA, meshB)
+	drawMesh(meshBoolean)
+//	drawXYZPoints(meshBoolean.points)
+	console.log(getMeshAnalysis(meshBoolean))
+}
+
 function testPixelBoolean() {
 	var lines = []
 	var pixelMap = new Map()
 	var pointMap = new Map()
 	var tipMap = new Map()
-	addTestPixels(pixelMap)
-	createPixelTips(pixelMap)
-	addPixelLines(pixelMap, lines, pointMap, tipMap)
-	var xyPolygons = getPolygonsByLines(lines, pointMap)
-	var xyLattice = getXYLattice(xyPolygons)
-	var xyPolygons = getXYPolygonsByLattice(xyLattice)
+	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
+//	var xyPolygonA = [[0, -1], [0, 4], [6, -1]]
+	addXYsByXY(xyPolygonA, [6, 0])
+//	addTestPixels(pixelMap)
+//	createPixelTips(pixelMap)
+//	addPixelLines(pixelMap, lines, pointMap, tipMap)
+//	var xyPolygons = getPolygonsByLines(lines, pointMap)
+	var xyLattice = getXYLattice([xyPolygonA])
+//	var xyLattice = getXYLattice(xyPolygons)
+//	var xyPolygons = getXYPolygonsByLattice(xyLattice)
 //	drawXYPolygon(xyPolygons[0], [255, 0, 0])
-	var xyPolygonB = [[8.5,1.5], [8.5,3.5], [9.5,3.5], [9.5,1.5]]
+//	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
+	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
+	addXYsByXY(xyPolygonB, [10, 0])
+//	var xyPolygonB = [[8.5,1.5], [8.5,3.5], [9.5,3.5], [9.5,1.5]]
 	var xyLatticeB = getXYLattice([xyPolygonB])
 //	console.log(xyLatticeB)
 	var xyPolygonBFromLattice = getXYPolygonsByLattice(xyLatticeB)[0]
 //	console.log(xyPolygonBFromLattice)
-//	xyLatticeC = getXYLatticeAddition(xyLattice, xyLatticeB)
-	xyLatticeC = getXYLatticeExclusiveIntersection(xyLattice, xyLatticeB)
+	xyLatticeC = getXYLatticeAddition(xyLattice, xyLatticeB)
+//	xyLatticeC = getXYLatticeExclusiveIntersection(xyLattice, xyLatticeB)
 //	xyLatticeC = getXYLatticeIntersection(xyLattice, xyLatticeB)
 //	xyLatticeC = getXYLatticeSubtraction(xyLattice, xyLatticeB)
+	drawPixelMap(getPixelMapByLattice(xyLatticeC[0]))
 	var xyPolygonsCFromLattice = getXYPolygonsByLattice(xyLatticeC)
 	drawXYPolygons(xyPolygonsCFromLattice)
 //	var pointListTest = [[0, 1, 2]]
 //	rotateXYZParametersByPointList(2, pointListTest)
 }
 
+function testPolygonBoolean() {
+	var xyPolygonA = [[0, 0], [4, 0], [0, 4]]
+	multiplyXYsByScalar(xyPolygonA, 2.0)
+//	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
+//	addXYsByXY(xyPolygonA, [6, 0])
+	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
+	addXYsByXY(xyPolygonB, [1, 0])
+//	addXYsByXY(xyPolygonB, [9, 0])
+	multiplyXYsByScalar(xyPolygonB, 2.0)
+//	drawXYPolygons([xyPolygonA])
+//	drawXYPolygons([xyPolygonB])
+	var layerThickness = 0.05
+	var offsetMultiplier = 0.45
+	var polygonsBoolean = null
+	polygonsBoolean = getPolygonsAddition(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
+//	polygonsBoolean = getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
+//	polygonsBoolean = getPolygonsIntersection(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
+//	polygonsBoolean = getPolygonsSubtraction(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
+	drawXYPolygons(polygonsBoolean)
+}
+
 function testPolygonJoining() {
-	var pointMapMimic = {get:function(key){return getXYZByKey(key)}}
 //	polygonKeyStrings = ['0,0,0 1,1,0 1,0,0', '1,0,0 1,1,0 3,1,0']
 //	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 3,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 3,2,0 2,2,0 1,3,0']
 //	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 4,2,0 5,2,0 6,2,0 4,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 6,2,0 5,2,0 4,2,0 3,2,0 2,2,0 1,3,0']
@@ -259,16 +318,17 @@ function testPolygonJoining() {
 //	polygonKeyStrings = ['0,0,0 -1,0,0 0,1,0', '0,0,0 0,1,0 1,0,0', '0,0,0 1,0,0 0,-1,0', '0,0,0 0,-1,0 -1,0,0']
 //	polygonKeyStrings = ['0,-1,0 -1,0,0 0,0,0', '0,-1,0 0,0,0 1,0,0', '-1,0,0 0,1,1 1,0,0 0,0,0']
 	var xyPolygonKeyStrings = ['-1,0 -1,2 0,2 1,1 2,2 3,2 4,1 5,2 6,2 6,0', '0,2 -1,2 -1,4 3,4 6,4 6,2 5,2 4,3 3,2 2,2 1,3']
-	var xyPolygonKeyArrays = getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
-	var joinedPolygonKeyArrays = getJoinedPolygonKeyArrays(xyPolygonKeyArrays)
-	var joinedPolygons = convertXYPolygonsToXYZ(convertPolygonKeyArraysToPolygons(joinedPolygonKeyArrays), 0)
-	drawXYZPolygon(addXYToList(getConnectedPolygon(joinedPolygons), [0, -6]), getRGB())
+	var xyFacets = getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
+	var joinedFacets = getJoinedFacets(xyFacets)
+	var joinedPolygons = convertXYPolygonsToXYZ(convertFacetsToPolygons(joinedFacets), 0)
+	var joinedMesh = getMeshByPolygons(joinedPolygons)
+	var connectedFacet = getConnectedFacet(joinedMesh)
+	drawMesh({facets:[connectedFacet], points:addXYsByXY(joinedMesh.points, [0, -6])})
 }
 
 function testVoxel() {
 	var lines = []
 	var pointMap = new Map()
-	var polygonSet = new Set()
 	var tipMap = new Map()
 	var voxelMap = new Map()
 	addTestVoxels(voxelMap)
@@ -276,12 +336,68 @@ function testVoxel() {
 	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
-	createPolygon(polygonSet, tipMap)
-//	drawXYZPolygonKeyStringsByMap(pointMap, polygonSet.keys())
-	drawVoxelMap(voxelMap)
+//	drawVoxelMap(voxelMap)
 //	drawLines(lines, pointMap)
-//	console.log(mesh)
-	drawMesh(getJoinedCoplanarMesh(getMeshByPolygonSet(pointMap, polygonSet)))
+	var mesh = getMeshByTipMap(pointMap, tipMap)
+//	drawMesh(mesh)
+	mesh = getJoinedCoplanarMesh(mesh)
+	drawMesh(mesh)
+	drawXYZPoints(mesh.points)
+}
+
+function testVoxelBoolean() {
+//	var lines = []
+//	var pointMap = new Map()
+//	var tipMap = new Map()
+	var pointString = '0,0,0 4,0,0 0,0,4 0,4,0'
+//	var pointString = '0,0,0 4,0,0 0,0,3 0,4,0'
+//	var pointString = '0,1,0 2,1,0 0,1,1 0,2,0'
+	var points = getPointStringConvertedToPoints(pointString)
+	var mesh = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:points}
+	var lattice = getXYZLatticeByMesh(mesh)
+//	var voxelMap = getVoxelMapByXYZLattice(xyzLattice)
+//	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
+//	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
+//	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
+//	mesh = getMeshByTipMap(pointMap, tipMap)
+//	mesh = getJoinedCoplanarMesh(mesh)
+	mesh = getMeshByLattice(lattice)
+//	drawMesh(mesh)
+	var linesB = []
+	var pointMapB = new Map()
+	var tipMapB = new Map()
+	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
+//	var pointStringB = '0,-1,0 6,-1,0 0,-1,3 0,4,0'
+//	var pointStringB = '0,0,0 6,0,0 0,0,4 0,4,0'
+//	var pointStringB = '0,0,0 4,0,0 0,0,1 0,2,0'
+	var pointsB = getPointStringConvertedToPoints(pointStringB)
+	addXYsByXY(pointsB, [1, 0])
+	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
+	var latticeB = getXYZLatticeByMesh(meshB)
+	var voxelMapB = getVoxelMapByXYZLattice(latticeB)
+	addVoxelLines(2, voxelMapB, linesB, pointMapB, tipMapB)
+	addVoxelLines(0, voxelMapB, linesB, pointMapB, tipMapB)
+	addVoxelLines(1, voxelMapB, linesB, pointMapB, tipMapB)
+	meshB = getMeshByTipMap(pointMapB, tipMapB)
+	meshB = getJoinedCoplanarMesh(meshB)
+//	drawMesh(meshB)
+//	var latticeC = getXYZLatticeAddition(lattice, latticeB)
+//	var latticeC = getXYZLatticeExclusiveIntersection(lattice, latticeB)
+	var latticeC = getXYZLatticeIntersection(lattice, latticeB)
+//	var latticeC = getXYZLatticeSubtraction(lattice, latticeB)
+	var linesC = []
+	var pointMapC = new Map()
+	var tipMapC = new Map()
+	var voxelMapC = getVoxelMapByXYZLattice(latticeC)
+	drawVoxelMap(voxelMapC)
+	addVoxelLines(2, voxelMapC, linesC, pointMapC, tipMapC)
+	addVoxelLines(0, voxelMapC, linesC, pointMapC, tipMapC)
+	addVoxelLines(1, voxelMapC, linesC, pointMapC, tipMapC)
+//	drawLines(linesC, pointMapC)
+	var meshC = getMeshByTipMap(pointMapC, tipMapC)
+	meshC = getJoinedCoplanarMesh(meshC)
+	drawMesh(meshC)
+//	console.log(getMeshAnalysis(meshC))
 }
 
 function createSVGTest() {
@@ -291,13 +407,16 @@ function createSVGTest() {
 	document.writeln('<polygon points="0 0, 10 3.5, 0 7" />')
 	document.writeln('</marker>')
 	document.writeln('</defs>')
-	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(100,0,0,-100,150,400)">')
-	testVoxel()
-	testIntersection()
+	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,150,400)">')
+//	testFace()
+//	testIntersection()
 //	testLoop()
-	testFace()
-	testPixelBoolean()
-	testPolygonJoining()
+	testMeshBoolean()
+//	testPixelBoolean()
+//	testPolygonBoolean()
+//	testPolygonJoining()
+//	testVoxel()
+//	testVoxelBoolean()
 	document.writeln('</g>')
 	document.writeln('</svg><br>')
 }
