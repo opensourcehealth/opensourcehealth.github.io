@@ -11,6 +11,42 @@ function addXY(xy, xyAddition) {
 	return xy
 }
 
+function addXYArraysByXY(arrays, xy) {
+	for (var array of arrays) {
+		addXYsByXY(array, xy)
+	}
+	return arrays
+}
+
+function addXYArraysByY(arrays, y) {
+	for (var array of arrays) {
+		addXYsByY(array, y)
+	}
+	return arrays
+}
+
+function addXYsByXY(xys, xy) {
+	for (var element of xys) {
+		element[0] += xy[0]
+		element[1] += xy[1]
+	}
+	return xys
+}
+
+function addXYsByY(xys, y) {
+	for (var xy of xys) {
+		xy[1] += y
+	}
+	return xys
+}
+
+function addXYZsByZ(xyzs, z) {
+	for (var xyz of xyzs) {
+		xyz[2] += z
+	}
+	return xyzs
+}
+
 function addXYZ(xyz, xyzAddition) {
 	xyz[0] += xyzAddition[0]
 	xyz[1] += xyzAddition[1]
@@ -615,21 +651,43 @@ function getXYZMultiplicationByScalar(xyzA, scalarMultiplier) {
 	return [xyzA[0] * scalarMultiplier, xyzA[1] * scalarMultiplier, xyzA[2] * scalarMultiplier]
 }
 
-//function getXYZRotationByBasis(rotationBasis, xyz, xyRotator) {
-//rotateXYZByBasis is probably better
-//	var basis0 = rotationBasis[0]
-//	var basis1 = rotationBasis[1]
-//	return [xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1], xyz[basis0] * xyRotator[1] + xyz[basis1] * xyRotator[0]]
-//}
-
 function getXYZSubtraction(xyzA, xyzB) {
 	return [xyzA[0] - xyzB[0], xyzA[1] - xyzB[1], xyzA[2] - xyzB[2]];
+}
+
+function multiplyXYArraysByScalar(xyArrays, multiplier) {
+	for (var xys of xyArrays) {
+		multiplyXYsByScalar(xys, multiplier)
+	}
+	return xyArrays
 }
 
 function multiplyXYByScalar(xy, scalarMultiplier) {
 	xy[0] *= scalarMultiplier
 	xy[1] *= scalarMultiplier
 	return xy
+}
+
+function multiplyXYsByScalar(xys, multiplier) {
+	for (var xy of xys) {
+		xy[0] *= multiplier
+		xy[1] *= multiplier
+	}
+	return xys
+}
+
+function multiplyXYZ(xyz, xyzMultiplier) {
+	xyz[0] *= xyzMultiplier[0]
+	xyz[1] *= xyzMultiplier[1]
+	xyz[2] *= xyzMultiplier[2]
+	return xyz
+}
+
+function multiplyXYZArraysByScalar(xyzArrays, multiplier) {
+	for (var xyzs of xyzArrays) {
+		multiplyXYZsByScalar(xyzs, multiplier)
+	}
+	return xyzArrays
 }
 
 function multiplyXYZByScalar(xyz, scalarMultiplier) {
@@ -639,11 +697,13 @@ function multiplyXYZByScalar(xyz, scalarMultiplier) {
 	return xyz
 }
 
-function multiplyXYZ(xyz, xyzMultiplier) {
-	xyz[0] *= xyzMultiplier[0]
-	xyz[1] *= xyzMultiplier[1]
-	xyz[2] *= xyzMultiplier[2]
-	return xyz
+function multiplyXYZsByScalar(xyzs, multiplier) {
+	for (var xyz of xyzs) {
+		xyz[0] *= multiplier
+		xyz[1] *= multiplier
+		xyz[2] *= multiplier
+	}
+	return xyzs
 }
 
 function normalizeXY(xy) {
@@ -668,6 +728,12 @@ function rotateXYZByBasis(rotationBasis, xyz, xyRotator) {
 	var xyzBasis0 = xyz[basis0]
 	xyz[basis0] = xyz[basis0] * xyRotator[0] - xyz[basis1] * xyRotator[1]
 	xyz[basis1] = xyzBasis0 * xyRotator[1] + xyz[basis1] * xyRotator[0]
+}
+
+function rotateXYZsByBasis(rotationBasis, xyzs, xyRotator) {
+	for (var xyz of xyzs) {
+		rotateXYZByBasis(rotationBasis, xyz, xyRotator)
+	}
 }
 
 function subtractXY(xyA, xyB) {
