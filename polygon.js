@@ -13,9 +13,9 @@ function addIntersectionsToSets(beginSet, endSet, intersections) {
 	}
 }
 
-function addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection) {
-	xyBeginY = xyBegin[1]
-	xyEndY = xyEnd[1]
+function addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection, y) {
+	var xyBeginY = xyBegin[1]
+	var xyEndY = xyEnd[1]
 	if ((xyBeginY < y) && (xyEndY < y)) {
 		return
 	}
@@ -45,10 +45,10 @@ function addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection) {
 		}
 		return
 	}
-	deltaY = xyEndY - xyBeginY
-	beginPortion = (xyEndY - y) / deltaY
-	endPortion = (y - xyBeginY) / deltaY
-	x = beginPortion * xyBegin[0] + endPortion * xyEnd[0]
+	var deltaY = xyEndY - xyBeginY
+	var beginPortion = (xyEndY - y) / deltaY
+	var endPortion = (y - xyBeginY) / deltaY
+	var x = beginPortion * xyBegin[0] + endPortion * xyEnd[0]
 	if ((xyBeginY < y) != (xyEndY < y)) {
 		tripleIntersection.belows.push(x)
 	}
@@ -89,19 +89,18 @@ function addToMeetingMapByRotated(a, aX, b, bX, c, close, d, meetingMap) {
 	return cPortion
 }
 
-function addXYToList(list, xy) {
-	for (value of list) {
-		value[0] += xy[0]
-		value[1] += xy[1]
+function convertFacetsToPolygons(facets) {
+	for (var facet of facets) {
+		convertFacetsToPolygon(facet)
 	}
-	return list
+	return facets
 }
 
-function addXYToLists(lists, xy) {
-	for (list of lists) {
-		addXYToList(list, xy)
+function convertFacetsToPolygon(facets) {
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		facets[facetIndex] = facets[facetIndex].split(',').map(parseFloat)
 	}
-	return lists
+	return facets
 }
 
 function convertKeyStringsToPolygons(keyStrings) {
@@ -118,25 +117,21 @@ function convertPointStringsToPointLists(pointStrings) {
 	return pointStrings
 }
 
-function convertPolygonKeyArraysToPolygons(polygonKeyArrays) {
-	for (polygonKeyArray of polygonKeyArrays) {
-		convertPolygonKeysToPolygon(polygonKeyArray)
-	}
-	return polygonKeyArrays
-}
-
-function convertPolygonKeysToPolygon(polygonKeys) {
-	for (var polygonKeyIndex = 0; polygonKeyIndex < polygonKeys.length; polygonKeyIndex++) {
-		polygonKeys[polygonKeyIndex] = polygonKeys[polygonKeyIndex].split(',').map(parseFloat)
-	}
-	return polygonKeys
-}
-
 function convertXYPolygonsToXYZ(xyPolygons, z) {
 	for (polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
 		xyPolygons[polygonIndex] = getXYZPolygon(xyPolygons[polygonIndex], z)
 	}
 	return xyPolygons
+}
+
+function getClosedFacet(beginIndex, facet) {
+	var facetLengthPlus = facet.length + 1
+	var closedFacet = new Array(facetLengthPlus)
+	for (keyIndex = 0; keyIndex < facetLengthPlus; keyIndex++) {
+		closedFacet[keyIndex] = facet[beginIndex % facet.length]
+		beginIndex += 1
+	}
+	return closedFacet
 }
 
 function getClosedPolygonKeyString(beginIndex, polygonKeyString) {
@@ -148,16 +143,6 @@ function getClosedPolygonKeyString(beginIndex, polygonKeyString) {
 		beginIndex += 1
 	}
 	return closedPolygon.join(' ')
-}
-
-function getClosedPolygon(beginIndex, polygon) {
-	var polygonLengthPlus = polygon.length + 1
-	var closedPolygon = new Array(polygonLengthPlus)
-	for (keyIndex = 0; keyIndex < polygonLengthPlus; keyIndex++) {
-		closedPolygon[keyIndex] = polygon[beginIndex % polygon.length].slice(0)
-		beginIndex += 1
-	}
-	return closedPolygon
 }
 
 function getClosestConnection(distances) {
@@ -185,15 +170,18 @@ function getClosestConnection(distances) {
 	return [closestFirstKeyIndex, closestOtherKeyIndex, closestPolygonIndex + 1]
 }
 
-function getConnectedPolygon(polygons) {
-	while (polygons.length > 1) {
-		var distanceArrays = getPolygonDistanceArrays(polygons)
-		var connection = getClosestConnection(distanceArrays)
-		var firstPolygon = getClosedPolygon(connection[0], polygons[0])
-		polygons[0] = firstPolygon.concat(getClosedPolygon(connection[1], polygons[connection[2]]))
-		polygons.splice(connection[2], 1)
+function getConnectedFacet(mesh) {
+	if (mesh.facets.length == 0) {
+		return []
 	}
-	return polygons[0]
+	while (mesh.facets.length > 1) {
+		var distanceArrays = getPolygonDistanceArraysByMesh(mesh)
+		var connection = getClosestConnection(distanceArrays)
+		var firstFacet = getClosedFacet(connection[0], mesh.facets[0])
+		mesh.facets[0] = firstFacet.concat(getClosedFacet(connection[1], mesh.facets[connection[2]]))
+		mesh.facets.splice(connection[2], 1)
+	}
+	return mesh.facets[0]
 }
 
 function getConnectedPolygonKeyString(pointMap, polygonKeyStrings) {
@@ -207,10 +195,93 @@ function getConnectedPolygonKeyString(pointMap, polygonKeyStrings) {
 	return polygonKeyStrings[0]
 }
 
+function getFacetsByArrowKeyMap(arrowKeyMap) {
+	var facets = []
+	for (var arrow of arrowKeyMap.values()) {
+		if (arrow != null) {
+			var arrowString = arrow.beginKey.toString() + ' ' + arrow.endKey.toString()
+			var facet = [arrow.beginKey]
+			arrowKeyMap.set(arrowString, null)
+			do {
+				if (arrowKeyMap.has(arrow.endKey)) {
+					var nextArrow = arrowKeyMap.get(arrow.endKey)
+					if (nextArrow == null) {
+//						warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was null in the arrowKeyMap:\n from the facet:\n'
+//						warning(warningString, [arrow, arrowKeyMap, facet])
+						break
+					}
+					else {
+						arrow = nextArrow
+						arrowKeyMap.set(arrow.beginKey, null)
+						facet.push(arrow.beginKey)
+					}
+				}
+				else {
+//					warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was not in the arrowKeyMap:\n from the facet:\n'
+//					warning(warningString, [arrow, arrowKeyMap, facet])
+					break
+				}
+				if (facet[0] == arrow.endKey) {
+					facets.push(facet)
+					break
+				}
+				if (facet.length > 987654) {
+//					warningString = 'In getFacetsByarrowKeyMap, polygon is too large or there is a mistake, length: \narrowKey: \nfacet: '
+//					warning(warningString, [facet.length, arrow, facet])
+					break
+				}
+			}
+			while (true)
+		}
+	}
+	return facets
+}
+
+function getFacetsByArrowMap(arrowMap) {
+	var facets = []
+	for (var arrow of arrowMap.values()) {
+		if (arrow != null) {
+			var facet = [arrow.beginKey]
+			arrowMap.set(arrow.beginKey, null)
+			do {
+				if (arrowMap.has(arrow.endKey)) {
+					var nextArrow = arrowMap.get(arrow.endKey)
+					if (nextArrow == null) {
+//						warningString = 'In getFacetsByArrowMap, arrow.endKey:\n was null in the arrowMap:\n from the facet:\n'
+//						warning(warningString, [arrow, arrowMap, facet])
+						break
+					}
+					else {
+						arrow = nextArrow
+						arrowMap.set(arrow.beginKey, null)
+						facet.push(arrow.beginKey)
+					}
+				}
+				else {
+//					warningString = 'In getFacetsByArrowMap, arrow.endKey:\n was not in the arrowMap:\n from the facet:\n'
+//					warning(warningString, [arrow, arrowMap, facet])
+					break
+				}
+				if (facet[0] == arrow.endKey) {
+					facets.push(facet)
+					break
+				}
+				if (facet.length > 987654) {
+//					warningString = 'In getFacetsByArrowMap, polygon is too large or there is a mistake, length: \narrowKey: \nfacet: '
+//					warning(warningString, [facet.length, arrow, facet])
+					break
+				}
+			}
+			while (true)
+		}
+	}
+	return facets
+}
+
 function getIntersectionPairsMap(xyPolygons) {
 	var intersectionPairsMap = new Map()
 	var tripleIntersectionMap = new Map()
-	for (xyPolygon of xyPolygons) {
+	for (var xyPolygon of xyPolygons) {
 		for (xyIndex = 0; xyIndex < xyPolygon.length; xyIndex++) {
 			var endIndex = (xyIndex + 1) % xyPolygon.length
 			var xyBegin = xyPolygon[xyIndex]
@@ -228,11 +299,11 @@ function getIntersectionPairsMap(xyPolygons) {
 					tripleIntersection = {aboves:[], belows:[], centers:[]}
 					tripleIntersectionMap.set(y, tripleIntersection)
 				}
-				addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection)
+				addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection, y)
 			}
 		}
 	}
-	for (y of tripleIntersectionMap.keys()) {
+	for (var y of tripleIntersectionMap.keys()) {
 		var tripleIntersection = tripleIntersectionMap.get(y)
 		tripleIntersection.aboves.sort(compareNumberAscending)
 		tripleIntersection.belows.sort(compareNumberAscending)
@@ -243,12 +314,12 @@ function getIntersectionPairsMap(xyPolygons) {
 		addIntersectionsToSets(beginSet, endSet, tripleIntersection.belows)
 		addIntersectionsToSets(beginSet, endSet, tripleIntersection.centers)
 		var beginIntersections = []
-		for (intersection of beginSet) {
+		for (var intersection of beginSet) {
 			beginIntersections.push(intersection)
 		}
 		beginIntersections.sort(compareNumberAscending)
 		var endIntersections = []
-		for (intersection of endSet) {
+		for (var intersection of endSet) {
 			endIntersections.push(intersection)
 		}
 		endIntersections.sort(compareNumberAscending)
@@ -267,19 +338,26 @@ function getIntersectionPairsMap(xyPolygons) {
 						endIntersection:endIntersection}
 					intersectionPairs.push(intersectionPair)
 				}
-				else {
-					console.log('endIndex < beginIndex, beginIndex: ' + beginIndex + '	endIndex: ' + endIndex)
-					console.log('beginIntersection: ' + beginIntersection + '	endIntersection: ' + endIntersection)
-					console.log('y: ' + y)
-					console.log('tripleIntersection.belows: ' + tripleIntersection.belows)
-					tripleIntersection.belows.sort(compareNumberAscending)
-					console.log('tripleIntersection.belows: ' + tripleIntersection.belows)
-				}
+//				else {
+//					console.log('endIndex < beginIndex, beginIndex: ' + beginIndex + '	endIndex: ' + endIndex)
+//					console.log('beginIntersection: ' + beginIntersection + '	endIntersection: ' + endIntersection)
+//					console.log('y: ' + y)
+//					console.log('tripleIntersection.belows: ' + tripleIntersection.belows)
+//					tripleIntersection.belows.sort(compareNumberAscending)
+//					console.log('tripleIntersection.belows: ' + tripleIntersection.belows)
+//				}
 			}
 		}
 		else {
 			console.log('beginIntersections.length: ' + beginIntersections.length + '   != endIntersections.length: endIntersections.length')
 			console.log(intersections)
+		}
+		for (var intersectionPairIndex = 1; intersectionPairIndex < intersectionPairs.length; intersectionPairIndex++) {
+			var intersectionPair = intersectionPairs[intersectionPairIndex]
+			var previousIntersectionPair = intersectionPairs[intersectionPairIndex - 1]
+			if (previousIntersectionPair.endIntersection == intersectionPair.beginIntersection) {
+				warnings(['In getIntersectionPairsMap intersections meet', intersectionPairs, intersectionPairsMap])
+			}
 		}
 		intersectionPairsMap.set(y, intersectionPairs)
 	}
@@ -330,10 +408,28 @@ function getIntersectionPortions(a, b, c, d) {
 	return cPortion
 }
 
+function getIsColinear(beginPoint, centerPoint, endPoint) {
+	var vectorA = getXYZSubtraction(centerPoint, beginPoint)
+	var vectorB = getXYZSubtraction(endPoint, centerPoint)
+	var vectorALength = getXYZLength(vectorA)
+	var vectorBLength = getXYZLength(vectorB)
+	if (vectorALength == 0.0 && vectorBLength == 0.0) {
+		warningByList(['In getIsColinear both vectors have zero length:', vectorA, vectorB])
+		return true
+	}
+	if (vectorALength == 0.0 || vectorBLength == 0.0) {
+		warningByList(['In getIsColinear a vector has zero length:', vectorA, vectorB])
+		return false
+	}
+	divideXYZByScalar(vectorA, vectorALength)
+	divideXYZByScalar(vectorB, vectorBLength)
+	return getDotProduct(vectorA, vectorB) > 0.9999
+}
+
 function getJoinedCoplanarPolygonKeyStrings(pointMap, polygonKeyStrings) {
 	var arcMap = new Map()
 	var polygonKeyStringLinkMap = new Map()
-	for (polygonKeyString of polygonKeyStrings) {
+	for (var polygonKeyString of polygonKeyStrings) {
 		polygon = polygonKeyString.split(' ')
 		normalVector = getNormalVector(pointMap, polygonKeyString)
 		for (keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
@@ -343,7 +439,7 @@ function getJoinedCoplanarPolygonKeyStrings(pointMap, polygonKeyStrings) {
 			arcMap.set(key1 + ' ' + key2, arc)
 		}
 	}
-	for (arc of arcMap.values()) {
+	for (var arc of arcMap.values()) {
 		if (arc != null) {
 			reversedArcKey = arc[2] + ' ' + arc[1]
 			if (arcMap.has(reversedArcKey)) {
@@ -377,10 +473,10 @@ function getJoinedCoplanarPolygonKeyStrings(pointMap, polygonKeyStrings) {
 		}
 	}
 	var joinedPolygonKeyStringMap = new Map()
-	for (arc of arcMap.values()) {
+	for (var arc of arcMap.values()) {
 		if (arc != null) {
 			polygon = []
-			polygonKeyStringHead = getPolygonKeyStringHead(arc[5], polygonKeyStringLinkMap)
+			linkHead = getLinkHead(arc[5], polygonKeyStringLinkMap)
 			do {
 				polygon.push(arc[1])
 				arcMap.set(arc[1] + ' ' + arc[2], null)
@@ -388,39 +484,88 @@ function getJoinedCoplanarPolygonKeyStrings(pointMap, polygonKeyStrings) {
 			}
 			while (arc != null);
 			polygonKeyString = polygon.join(' ')
-			addArrayElementToMap(polygonKeyString, polygonKeyStringHead, joinedPolygonKeyStringMap)
+			addArrayElementToMap(polygonKeyString, linkHead, joinedPolygonKeyStringMap)
 		}
 	}
 	var joinedPolygonKeyStrings = []
-	for (polygonKeyStrings of joinedPolygonKeyStringMap.values()) {
+	for (var polygonKeyStrings of joinedPolygonKeyStringMap.values()) {
 		joinedPolygonKeyStrings.push(getConnectedPolygonKeyString(pointMap, polygonKeyStrings))
 	}
 	return joinedPolygonKeyStrings
 }
 
-function getJoinedMap(length, linkMap) {
-	var joinedMap = new Map()
-	for (var index = 0; index < length; index++) {
-		var polygonKeyStringHead = getPolygonKeyStringHead(index, linkMap)
-		addArrayElementToMap(index, polygonKeyStringHead, joinedMap)
+function getJoinedFacets(facets) {
+	var arcMap = new Map()
+	for (var facet of facets) {
+		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			var beginArc = facet[vertexIndex]
+			var beginKey = facet[(vertexIndex + 1) % facet.length]
+			var endKey = facet[(vertexIndex + 2) % facet.length]
+			var endArc = facet[(vertexIndex + 3) % facet.length]
+			arcMap.set(beginKey + ' ' + endKey, [beginArc, endArc])
+		}
 	}
-	return joinedMap
+	for (var key of arcMap.keys()) {
+		var arc = arcMap.get(key)
+		if (arc != null) {
+			var keyStrings = key.split(' ')
+			var reversedKey = keyStrings[1] + ' ' + keyStrings[0]
+			if (arcMap.has(reversedKey)) {
+				var reversedArc = arcMap.get(reversedKey)
+				if (reversedArc != null) {
+					arcMap.get(arc[0] + ' ' + keyStrings[0])[1] = reversedArc[1]
+					arcMap.get(keyStrings[1] + ' ' + arc[1])[0] = reversedArc[0]
+					arcMap.get(reversedArc[0] + ' ' + keyStrings[1])[1] = arc[1]
+					arcMap.get(keyStrings[0] + ' ' + reversedArc[1])[0] = arc[0]
+					arcMap.set(key, null)
+					arcMap.set(reversedKey, null)
+				}
+			}
+		}
+	}
+	var joinedFacets = []
+	for (var key of arcMap.keys()) {
+		var arc = arcMap.get(key)
+		if (arc != null) {
+			var facet = []
+			do {
+				facet.push(arc[0])
+				arcMap.set(key, null)
+				key = key.split(' ')[1] + ' ' + arc[1]
+				arc = arcMap.get(key)
+			}
+			while (arc != null);
+			joinedFacets.push(facet)
+		}
+	}
+	return joinedFacets
 }
 
-function getJoinedPolygonKeyArrays(polygonKeyArrays) {
+/*
+function getJoinedFacetsBackup(facets) {
 	var arrowMap = new Map()
-	for (polygonKeyArray of polygonKeyArrays) {
-		for (keyIndex = 0; keyIndex < polygonKeyArray.length; keyIndex++) {
-			var beginKey = polygonKeyArray[keyIndex]
-			var endKey = polygonKeyArray[(keyIndex + 1) % polygonKeyArray.length]
+	var arrowKeyMap = new Map()
+	for (var facet of facets) {
+		for (var keyIndex = 0; keyIndex < facet.length; keyIndex++) {
+			var beginKey = facet[keyIndex]
+			var endKey = facet[(keyIndex + 1) % facet.length]
+			var arrowString = beginKey.toString() + ' ' + endKey.toString()
+			var arrowStringReverse = endKey.toString() + ' ' + beginKey.toString()
+			if (arrowKeyMap.has(arrowStringReverse)) {
+				arrowKeyMap.delete(arrowStringReverse)
+			}
+			else {
+				arrowKeyMap.set(arrowString, {beginKey:beginKey, endKey:endKey})
+			}
 			var shouldAddArrow = true
 			if (arrowMap.has(endKey)) {
-				otherArrows = arrowMap.get(endKey)
+				var otherArrows = arrowMap.get(endKey)
 				for (var otherArrowIndex = otherArrows.length - 1; otherArrowIndex > -1; otherArrowIndex--) {
 					var otherArrow = otherArrows[otherArrowIndex]
 					if (beginKey == otherArrow.endKey && endKey == otherArrow.beginKey) {
 						shouldAddArrow = false
 						otherArrows.splice(otherArrowIndex, 1)
+						break
 					}
 				}
 				if (otherArrows.length == 0) {
@@ -432,15 +577,48 @@ function getJoinedPolygonKeyArrays(polygonKeyArrays) {
 			}
 		}
 	}
-	for (key of arrowMap.keys()) {
-		arrowMap.set(key, arrowMap.get(key)[0])
+//				console.log(arrowSet)
+	var shouldStop = false
+//	var extraArrowArrays = []
+	for (var key of arrowMap.keys()) {
+		var arrows = arrowMap.get(key)
+		arrowMap.set(key, arrows[0])
+		if (arrows.length > 1) {
+			warningByList(['In getJoinedFacets arrows.length > 1', arrows.length, arrows, facets])
+//			return facets
+//			extraArrowArrays.push(arrows)
+//a[1]=1
+//			shouldStop = true
+//			return null
+		}
+//		else {
+//		arrowMap.set(key, arrows[0])
+//	}
 	}
-	return getPolygonKeysByArrowMap(arrowMap)
+//	if (shouldStop) {
+//a[1]=1
+//		for (var extraArrows of extraArrowArrays) {
+//			var extraArrow0 = extraArrows[0]
+//			var extraArrow1 = extraArrows[1]
+//			console.log(extraArrow0.beginKey + ',' + extraArrow0.endKey + ' ' + extraArrow1.beginKey + ',' + extraArrow1.endKey)
+//		}
+//	}
+	return getFacetsByArrowMap(arrowMap)
+}
+*/
+
+function getJoinedMap(length, linkMap) {
+	var joinedMap = new Map()
+	for (var index = 0; index < length; index++) {
+		var linkHead = getLinkHead(index, linkMap)
+		addArrayElementToMap(index, linkHead, joinedMap)
+	}
+	return joinedMap
 }
 /*
 function getJoinedPolygonKeyStrings(polygonKeyStrings) {
 	arcMap = new Map()
-	for (polygonKeyString of polygonKeyStrings) {
+	for (var polygonKeyString of polygonKeyStrings) {
 		polygon = polygonKeyString.split(' ')
 		for (keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
 			key1 = polygon[(keyIndex + 1) % polygon.length]
@@ -450,7 +628,7 @@ function getJoinedPolygonKeyStrings(polygonKeyStrings) {
 			arcMap.set(key1 + ' ' + key2, arc)
 		}
 	}
-	for (arc of arcMap.values()) {
+	for (var arc of arcMap.values()) {
 		if (arc != null) {
 			reversedArcKey = arc[2] + ' ' + arc[1]
 			if (arcMap.has(reversedArcKey)) {
@@ -467,7 +645,7 @@ function getJoinedPolygonKeyStrings(polygonKeyStrings) {
 		}
 	}
 	joinedPolygonKeyStrings = []
-	for (arc of arcMap.values()) {
+	for (var arc of arcMap.values()) {
 		if (arc != null) {
 			polygon = []
 			do {
@@ -482,23 +660,25 @@ function getJoinedPolygonKeyStrings(polygonKeyStrings) {
 	return joinedPolygonKeyStrings
 }
 */
-function getNormalVectorBackup(pointMap, polygonKeyString) {
-	polygon = polygonKeyString.split(' ')
-	xyz = [0.0, 0.0, 0.0]
-	divisor = 0.0
-	for (keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
-		pointZero = pointMap.get(polygon[keyIndex])
-		pointOne = pointMap.get(polygon[(keyIndex + 1) % polygon.length])
-		pointTwo = pointMap.get(polygon[(keyIndex + 2) % polygon.length])
-		vectorA = normalizeXYZ(getXYZSubtraction(pointOne, pointZero))
-		vectorB = normalizeXYZ(getXYZSubtraction(pointTwo, pointZero))
-		if (Math.abs(getDotProduct(vectorA, vectorB)) < 0.9999) {
-			addXYZ(xyz, normalizeXYZ(getCrossProduct(vectorA, vectorB)))
-			divisor += 1.0
+
+function getLinkHead(key, linkMap) {
+	if (!linkMap.has(key)) {
+		return key
+	}
+	var keys = [key]
+	do {
+		key = linkMap.get(key)
+		keys.push(key)
+		if (keys.length > 98765) {
+			warningByList(['In getLinkHead keys.length > 98765', keys, linkMap])
+			break
 		}
 	}
-	divideXYZByScalar(xyz, divisor)
-	return xyz
+	while (linkMap.has(key))
+	for (keyIndex = 0; keyIndex < keys.length - 1; keyIndex++) {
+		linkMap.set(keys[keyIndex], key)
+	}
+	return key
 }
 
 function getNormalVector(pointMap, polygonKeyString) {
@@ -522,8 +702,7 @@ function getNormalVector(pointMap, polygonKeyString) {
 			}
 		}
 	}
-	divideXYZByScalar(xyz, divisor)
-	return xyz
+	return divideXYZByScalar(xyz, divisor)
 }
 
 function getPointStringConvertedToPoints(pointString) {
@@ -540,28 +719,6 @@ function getPolygonByKeyString(keyString) {
 		polygon[keyIndex] = polygon[keyIndex].split(',').map(parseFloat)
 	}
 	return polygon
-}
-
-function getPolygonDistanceArrays(polygons) {
-	var firstPolygon = polygons[0]
-	var distanceArrays = new Array(firstPolygon.length)
-	for (firstKeyIndex = 0; firstKeyIndex < firstPolygon.length; firstKeyIndex++) {
-		var firstPoint = firstPolygon[firstKeyIndex]
-		var polygonLengthMinus = polygons.length - 1
-		var polygonDistances = new Array(polygonLengthMinus)
-		var otherPolygonIndex = 1
-		for (polygonIndex = 0; polygonIndex < polygonLengthMinus; polygonIndex++) {
-			var otherPolygon = polygons[otherPolygonIndex]
-			var polygonDistance = new Array(otherPolygon.length)
-			for (otherKeyIndex = 0; otherKeyIndex < otherPolygon.length; otherKeyIndex++) {
-				polygonDistance[otherKeyIndex] = getXYZLengthSquared(getXYZSubtraction(firstPoint, otherPolygon[otherKeyIndex]))
-			}
-			polygonDistances[polygonIndex] = polygonDistance
-			otherPolygonIndex += 1
-		}
-		distanceArrays[firstKeyIndex] = polygonDistances
-	}
-	return distanceArrays
 }
 
 function getPolygonDistancesByMap(pointMap, polygonKeyStrings) {
@@ -585,61 +742,30 @@ function getPolygonDistancesByMap(pointMap, polygonKeyStrings) {
 	return distances
 }
 
-function getPolygonKeysByArrowMap(arrowMap) {
-	var polygonKeys = []
-	for (arrow of arrowMap.values()) {
-		if (arrow != null) {
-			var keys = [arrow.beginKey]
-			arrowMap.set(arrow.beginKey, null)
-			do {
-				if (arrowMap.has(arrow.endKey)) {
-					var nextArrow = arrowMap.get(arrow.endKey)
-					if (nextArrow == null) {
-						warningString = 'In getPolygonsByLines, arrow.endKey:\n was null in the arrowMap:\n from the polygonKeyString:\n'
-						warning(warningString, [arrow, arrowMap, keys])
-						break
-					}
-					else {
-						arrow = nextArrow
-						arrowMap.set(arrow.beginKey, null)
-						keys.push(arrow.beginKey)
-					}
-				}
-				else {
-					warningString = 'In getPolygonsByLines, arrow.endKey:\n was not in the arrowMap:\n from the polygonKeyString:\n'
-					warning(warningString, [arrow, arrowMap, keys])
-					break
-				}
-				if (keys[0] == arrow.endKey) {
-					polygonKeys.push(keys)
-					break
-				}
-				if (keys.length > 9876543) {
-					warningString = 'In getPolygonsByLines, polygon is too large or there is a mistake, length: \narrowKey: \nkeys: '
-					warning(warningString, [keys.length, arrow, keys])
-					break
-				}
+function getPolygonDistanceArraysByMesh(mesh) {
+	var facets = mesh.facets
+	var facetLengthMinus = facets.length - 1
+	var firstFacet = facets[0]
+	var distanceArrays = new Array(firstFacet.length)
+	var points = mesh.points
+	for (firstKeyIndex = 0; firstKeyIndex < firstFacet.length; firstKeyIndex++) {
+		var firstPoint = points[firstFacet[firstKeyIndex]]
+		var otherPolygonIndex = 1
+		var polygons = new Array(facetLengthMinus)
+		for (var polygonIndex = 0; polygonIndex < facetLengthMinus; polygonIndex++) {
+			var otherPolygon = facets[otherPolygonIndex]
+			var polygon = new Array(otherPolygon.length)
+			for (otherKeyIndex = 0; otherKeyIndex < otherPolygon.length; otherKeyIndex++) {
+				var otherPoint = points[otherPolygon[otherKeyIndex]]
+				var difference = getXYZSubtraction(firstPoint, otherPoint)
+				polygon[otherKeyIndex] = getXYZLengthSquared(difference)
 			}
-			while (true)
+			polygons[polygonIndex] = polygon
+			otherPolygonIndex += 1
 		}
+		distanceArrays[firstKeyIndex] = polygons
 	}
-	return polygonKeys
-}
-
-function getPolygonKeyStringHead(polygonKeyString, polygonKeyStringLinkMap) {
-	if (!polygonKeyStringLinkMap.has(polygonKeyString)) {
-		return polygonKeyString
-	}
-	polygonKeyStrings = [polygonKeyString]
-	do {
-		polygonKeyString = polygonKeyStringLinkMap.get(polygonKeyString)
-		polygonKeyStrings.push(polygonKeyString)
-	}
-	while (polygonKeyStringLinkMap.has(polygonKeyString));
-	for (polygonKeyStringIndex = 0; polygonKeyStringIndex < polygonKeyStrings.length - 1; polygonKeyStringIndex++) {
-		polygonKeyStringLinkMap.set(polygonKeyStrings[polygonKeyStringIndex], polygonKeyString)
-	}
-	return polygonKeyString
+	return distanceArrays
 }
 
 function getPolygonRotatedToBottom(polygon) {
@@ -648,19 +774,23 @@ function getPolygonRotatedToBottom(polygon) {
 	}
 	var bottomIndex = 0
 	var minimumKey = polygon[0]
-	for (keyIndex = 1; keyIndex < polygon.length; keyIndex++) {
+	for (var keyIndex = 1; keyIndex < polygon.length; keyIndex++) {
 		var key = polygon[keyIndex]
 		if (key < minimumKey) {
 			minimumKey = key
 			bottomIndex = keyIndex
 		}
 	}
-	return polygon.slice(bottomIndex).concat(polygon.slice(0,bottomIndex))
+	var polygonRotatedToBottom = new Array(polygon.length)
+	for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
+		polygonRotatedToBottom[keyIndex] = polygon[(keyIndex + bottomIndex) % polygon.length]
+	}
+	return polygonRotatedToBottom
 }
 
 function getPolygonsByArrowMap(arrowMap, pointMap) {
-	var polygons = getPolygonKeysByArrowMap(arrowMap)
-	for (polygon of polygons) {
+	var polygons = getFacetsByArrowMap(arrowMap)
+	for (var polygon of polygons) {
 		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
 			polygon[keyIndex] = pointMap.get(polygon[keyIndex] )
 		}
@@ -670,10 +800,73 @@ function getPolygonsByArrowMap(arrowMap, pointMap) {
 
 function getPolygonsByLines(lines, pointMap) {
 	var arrowMap = new Map()
-	for (line of lines) {
+	for (var line of lines) {
 		arrowMap.set(line.beginKey, line)
 	}
 	return getPolygonsByArrowMap(arrowMap, pointMap)
+}
+
+function getXYPolygonsByArrows(arrowsMap, points, z) {
+	var xyPolygons = []
+	for (var arrows of arrowsMap.values()) {
+		if (arrows != null) {
+			var arrow = arrows[0]
+			var keys = [arrow.beginKey]
+			removeArrowFromMap(arrows, arrowsMap, arrow.beginKey)
+			do {
+				if (arrowsMap.has(arrow.endKey)) {
+					var nextArrows = arrowsMap.get(arrow.endKey)
+					if (nextArrows == null) {
+						warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was null in the arrowsMap:\n from the keys:\n'
+						warning(warningString, [arrow, arrowsMap, keys])
+						break
+					}
+					else {
+						var nextArrow = null
+						for (var nextArrowIndex = nextArrows.length - 1; nextArrowIndex > -1; nextArrowIndex--) {
+							var nextArrow = nextArrows[nextArrowIndex]
+							if (arrow.beginKey == nextArrow.endKey && arrow.endKey == nextArrow.beginKey) {
+								nextArrows.splice(nextArrowIndex, 1)
+								break
+							}
+						}
+						if (nextArrows.length == 0) {
+							arrowsMap.set(arrow.endKey, null)
+//							warningString = 'In getXYPolygonsByArrows, from the arrow.endKey:\n nextArrows.length == 0 in the arrowsMap:\n from the keys:\n'
+//							warning(warningString, [arrow, arrowsMap, keys, xyPolygons])
+							break
+						}
+						else {
+							arrow = nextArrows[0]
+							removeArrowFromMap(nextArrows, arrowsMap, arrow.beginKey)
+							keys.push(arrow.beginKey)
+						}
+					}
+				}
+				else {
+					warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was not in the arrowsMap:\n from the keys:\n'
+					warning(warningString, [arrow, arrowsMap, keys])
+					break
+				}
+				if (keys[0] == arrow.endKey) {
+					xyPolygons.push(keys)
+					break
+				}
+				if (keys.length > 987654) {
+					warningString = 'In getXYPolygonsByArrows, polygon is too large or there is a mistake, length: \narrowKey: \nkeys: '
+					warning(warningString, [keys.length, arrow, keys])
+					break
+				}
+			}
+			while (true)
+		}
+	}
+	for (var xyPolygon of xyPolygons) {
+		for (var keyIndex = 0; keyIndex < xyPolygon.length; keyIndex++) {
+			xyPolygon[keyIndex] = getPointAlongEdge(xyPolygon[keyIndex], points, z)
+		}
+	}
+	return xyPolygons
 }
 
 function getXYZPolygon(xyPolygon, z) {
@@ -706,7 +899,7 @@ function getXYZPolygonKeyStringsByKeyStrings(xyPolygonKeyStrings, z) {
 }
 
 function rotateXYZParametersByPointList(rotation, pointList) {
-	for (point of pointList) {
+	for (var point of pointList) {
 		var original0 = point[0]
 		var rotationPlus3 = rotation + 3
 		var indexFrom0 = rotationPlus3 % 3
@@ -718,14 +911,14 @@ function rotateXYZParametersByPointList(rotation, pointList) {
 }
 
 function rotateXYZParametersByPointLists(rotation, pointLists) {
-	for (pointList of pointLists) {
+	for (var pointList of pointLists) {
 		rotateXYZParametersByPointList(rotation, pointList)
 	}
 }
 
 function swapXY(xyPolygons) {
-	for (xyPolygon of xyPolygons) {
-		for (point of xyPolygon) {
+	for (var xyPolygon of xyPolygons) {
+		for (var point of xyPolygon) {
 			var x = point[0]
 			point[0] = point[1]
 			point[1] = x
