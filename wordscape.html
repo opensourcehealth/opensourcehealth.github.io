@@ -84,7 +84,7 @@ wordArea.oninput = areaInput
 */
 function addToCapitalizationMap(capitalizedWordString) {
 	capitalizedWords = capitalizedWordString.split(' ').filter(lengthCheck)
-	for (capitalizedWord of capitalizedWords) {
+	for (var capitalizedWord of capitalizedWords) {
 		wordLower = capitalizedWord.toLowerCase()
 		if (capitalizedWord != wordLower) {
 			gCapitalizationMap.set(wordLower, capitalizedWord)
@@ -101,7 +101,7 @@ function addToDescendants(descendants, statement) {
 		return
 	}
 	if (statement.children != null) {
-		for (child of statement.children) {
+		for (var child of statement.children) {
 			descendants.push(child)
 			addToDescendants(descendants, child)
 		}
@@ -120,7 +120,7 @@ function addToMeshArea(meshString) {
 	meshArea.value = meshArea.value + '\n' + meshString
 }
 
-function analyzeOutputMesh(attributeMap, meshGenerator, registry) {
+function analyzeOutputMesh(attributeMap, meshGenerator, registry, statement) {
 	if (attributeMap.has('outputTriangleMesh')) {
 		if (attributeMap.get('outputTriangleMesh') == 'stl') {
 			addToMeshArea(getTriangleMeshString('stl', attributeMap.get('id'), meshGenerator.getTriangleMesh()))
@@ -189,7 +189,7 @@ function getFunctionMapCapitalize(alternatingEntries) {
 function getGroupBoundingBox(caller, statement) {
 	var boundingBox = null
 	var descendants = getDescendants(statement)
-	for (child of descendants) {
+	for (var child of descendants) {
 		boundingBox = widenStatementBoundingBox(boundingBox, caller, child)
 	}
 	return boundingBox
@@ -200,7 +200,7 @@ function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchS
 	var replacedTokens = []
 	var tokens = getTokens('-', [bracketString])
 	tokens = getTokens('+', tokens)
-	for (token of tokens) {
+	for (var token of tokens) {
 		indexOfSearchSuffix = token.indexOf(searchSuffix)
 		if (indexOfSearchSuffix != -1) {
 			beforeSuffix = token.slice(0, indexOfSearchSuffix).trim()
@@ -227,7 +227,7 @@ function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
 	}
 	var splitBracketStrings = bracketString.split(']')
 	var replacedStrings = []
-	for (splitBracketString of splitBracketStrings) {
+	for (var splitBracketString of splitBracketStrings) {
 		if (splitBracketString.length > 1) {
 			var tokens = splitBracketString.split('[')
 			if (tokens[0].length > 0) {
@@ -290,7 +290,7 @@ function getLineByStatement(passthrough, statement) {
 		firstWord = '<' + statement.tag
 	}
 	attributeWords = [firstWord]
-	for (entry of statement.attributeMap) {
+	for (var entry of statement.attributeMap) {
 		value = entry[1]
 		quoteString = '"'
 		if (value.indexOf('"') != -1) {
@@ -322,7 +322,7 @@ function getPolygonPoints(attributeMap) {
 	if (pointWords.length % 2 == 1) {
 		warningString = 'Warning, points have an odd number of parameters: \n in the statement with the attributes:'
 		var entries = []
-		for (entry of attributeMap) {
+		for (var entry of attributeMap) {
 			entries.push(entry)
 		}
 		warning(warningString, [pointWords, entries])
@@ -348,7 +348,7 @@ function getPolygonPoints(attributeMap) {
 
 function getPolygonsByChildren(children) {
 	var polygons = []
-	for (child of children) {
+	for (var child of children) {
 		var points = getPolygonPoints(child.attributeMap)
 		if (points != null) {
 			polygons.push(points)
@@ -391,7 +391,7 @@ function getStatement(line) {
 		children = []
 	}
 	var attributes = getAttributes(quoteSeparatedWords.slice(1, lastIndex + 1))
-	for (attribute of attributes) {
+	for (var attribute of attributes) {
 		keyStrings = attribute[0].split('.')
 		if (keyStrings.length == 1) {
 			attribute[0] = getCapitalizedKey(attribute[0])
@@ -417,7 +417,7 @@ function getStatement(line) {
 
 function getTokens(delimeter, searchStrings) {
 	tokens = []
-	for (searchString of searchStrings) {
+	for (var searchString of searchStrings) {
 		subTokens = searchString.split(delimeter)
 		for (subTokenIndex = 0; subTokenIndex < subTokens.length; subTokenIndex++) {
 			tokens.push(subTokens[subTokenIndex])
@@ -432,7 +432,7 @@ function getTokens(delimeter, searchStrings) {
 function processDescendants(registry, rootStatement, tagMap) {
 	var descendants = [rootStatement]
 	addToDescendants(descendants, rootStatement)
-	for (statement of descendants) {
+	for (var statement of descendants) {
 		if (tagMap.has(statement.tag)) {
 			tagMap.get(statement.tag)(registry, statement)
 		}
@@ -447,7 +447,7 @@ function processExtrusion(registry, statement) {
 	var zList = getFloats(attributeMap.get('zList'))
 	var polygons = getPolygonsByChildren(statement.children)
 	var sections = [{layerIndex:0, polygons:polygons}]
-	for (const child of statement.children) {
+	for (var child of statement.children) {
 		if (child.tag == 'layer') {
 			var layerIndex = sections[sections.length - 1].layerIndex + 1
 			if (child.attributeMap.has('layerIndex')) {
@@ -476,7 +476,7 @@ function processExtrusion(registry, statement) {
 		}
 	}
 	var extrusion = new Extrusion(isJoined, layers, null, zList)
-	analyzeOutputMesh(attributeMap, extrusion, registry)
+	analyzeOutputMesh(attributeMap, extrusion, registry, statement)
 }
 
 function processGroup(registry, statement) {
@@ -572,13 +572,13 @@ function processOutline(registry, statement) {
 		['stroke-width', '1']])
 	if (attributeMap.has('style')) {
 		styles = attributeMap.get('style').replace(/ /g, '').split(';')
-		for (style of styles) {
+		for (var style of styles) {
 			var entry = style.split(':')
 			styleMap.set(entry[0], entry[1])
 		}
 	}
 	styles = []
-	for (entry of styleMap) {
+	for (var entry of styleMap) {
 		styles.push(entry[0] + ':' + entry[1])
 	}
 	attributeMap.set('style', styles.join(';'))
@@ -610,7 +610,7 @@ function processPillar(registry, statement) {
 		}
 	}
 	var pillar = new Pillar(isSeparate, polygons, null, zList)
-	analyzeOutputMesh(attributeMap, pillar, registry)
+	analyzeOutputMesh(attributeMap, pillar, registry, statement)
 }
 
 function processVerticalHole(registry, statement) {
@@ -685,7 +685,7 @@ function updateSVGArea() {
 				const idJoinWord = '_'
 				var keys = 'cx cy x y r'.split(' ')
 				var subIdentifiers = []
-				for (key of keys) {
+				for (var key of keys) {
 					if (statement.attributeMap.has(key)) {
 						subIdentifiers.push(key + statement.attributeMap.get(key))
 					}
@@ -764,10 +764,10 @@ function updateSVGArea() {
 	var defaultStatement = getStatement('default')
 	svgStatement.children.splice(0, 0, defaultStatement)
 	defaultStatement.parent = svgStatement
-	for (entry of registry.defaultMap) {
+	for (var entry of registry.defaultMap) {
 		tagMap = entry[1]
 		defaultStrings = []
-		for (tagEntry of tagMap) {
+		for (var tagEntry of tagMap) {
 			defaultStrings.push(tagEntry.join(':'))
 		}
 		defaultStatement.attributeMap.set(entry[0], defaultStrings.join(';'))
@@ -796,7 +796,7 @@ function updateSVGArea() {
 	}
 	var nesting = 0
 	var svgLines = []
-	for (statement of descendants) {
+	for (var statement of descendants) {
 		if (statement.nestingIncrement < 0) {
 			nesting += statement.nestingIncrement
 		}
@@ -824,7 +824,7 @@ function widenPolygonBoundingBox(boundingBox, caller, statement) {
 		return boundingBox
 	}
 	var transformedMatrix = getTransformed2DMatrix(caller, statement)
-	for (point of points) {
+	for (var point of points) {
 		transform2DPoint(point, transformedMatrix)
 		if (boundingBox == null) {
 			boundingBox = [point.slice(0), point.slice(0)]
