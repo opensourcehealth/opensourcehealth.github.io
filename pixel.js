@@ -47,12 +47,12 @@ function addPixelLine(key, lines, pixelMap, pointMap, root, rotationIndex, tipMa
 			tips = null
 		}
 		endTipRotationIndex = (endTipRotationIndex + 3) % 4
-		endTipDirectionIndex = planar[endTipRotationIndex]
+		endTipDirectionIndex = gXYPlanar[endTipRotationIndex]
 	}
 }
 
 function addPixelLines(pixelMap, lines, pointMap, tipMap) {
-	for (entry of pixelMap) {
+	for (var entry of pixelMap) {
 		key = entry[0]
 		parameters = key.split(',')
 		root = [parseInt(parameters[0]), parseInt(parameters[1])]
@@ -70,11 +70,13 @@ function addPixelRow(directionIndex, entry, pixelMap, signedIntersectionsMap) {
 	var keyBeside = (y + gXYDirections[directionIndex][1]).toString()
 	if (signedIntersectionsMap.has(keyBeside)) {
 		var signedIntersectionsAbove = signedIntersectionsMap.get(keyBeside)
-		var signedIntersectionsInverted = []
-		for (signedIntersection of signedIntersectionsAbove) {
-			signedIntersectionsInverted.push([signedIntersection[0], -signedIntersection[1]])
+		var signedIntersectionsLength = signedIntersections.length
+		signedIntersections = signedIntersections.slice(0)
+		signedIntersections.length = signedIntersectionsLength + signedIntersectionsAbove.length
+		for (var signedIntersection of signedIntersectionsAbove) {
+			signedIntersections[signedIntersectionsLength] = [signedIntersection[0], -signedIntersection[1]]
+			signedIntersectionsLength += 1
 		}
-		signedIntersections = signedIntersections.concat(signedIntersectionsInverted)
 	}
 	signedIntersections.sort(compareSignedIntersectionAscending)
 	var existence = 0
@@ -102,7 +104,7 @@ function addPixelRow(directionIndex, entry, pixelMap, signedIntersectionsMap) {
 }
 
 function addPixels(pixelMap, signedIntersectionsMap) {
-	for (entry of signedIntersectionsMap) {
+	for (var entry of signedIntersectionsMap) {
 		addPixelRow(2, entry, pixelMap, signedIntersectionsMap)
 		addPixelRow(3, entry, pixelMap, signedIntersectionsMap)
 	}
@@ -124,7 +126,7 @@ function addTestPixels(pixelMap) {
 }
 
 function createPixelTips(pixelMap) {
-	for (entry of pixelMap) {
+	for (var entry of pixelMap) {
 		parameters = entry[0].split(',')
 		root = [parseInt(parameters[0]), parseInt(parameters[1])]
 		distance = [0.3, 0.3]
@@ -143,19 +145,20 @@ function existenceConditionOne(existence) {
 }
 
 function existenceConditionPositive(existence) {
-	return existence > 0
+	return existence > 0.000001
 }
 
 function existenceConditionTwo(existence) {
 	return existence == 2
 }
-
+gTotalClose = 0
 function getIntersectionPairsByExistence(existenceCondition, signedIntersections) {
 	var beginIntersection = null
 	var currentExistenceCondition = false
 	var existence = 0
 	var intersectionPairs = []
 	var lastExistenceCondition = false
+	var shouldLog = false
 	for (signedIntersectionIndex = 0; signedIntersectionIndex < signedIntersections.length; signedIntersectionIndex++) {
 		var signedIntersection = signedIntersections[signedIntersectionIndex]
 		var existenceChange = signedIntersection[1]
@@ -164,6 +167,11 @@ function getIntersectionPairsByExistence(existenceCondition, signedIntersections
 		if (currentExistenceCondition) {
 			if (beginIntersection == null) {
 				beginIntersection = signedIntersection[0]
+				if (Math.abs(beginIntersection) == 0.01777/0.49999999999999999) {
+					shouldLog = true
+					console.log('signedIntersections')
+					console.log(signedIntersections)
+				}
 			}
 		}
 		else {
@@ -172,19 +180,75 @@ function getIntersectionPairsByExistence(existenceCondition, signedIntersections
 				var endIntersection = signedIntersection[0]
 				var endIndex = Math.round(Math.floor(endIntersection) + 0.001)
 				if (endIndex >= beginIndex) {
-					var intersectionPair = {
-						beginIndex:beginIndex,
-						beginIntersection:beginIntersection,
-						endIndex:endIndex,
-						endIntersection:endIntersection}
-					intersectionPairs.push(intersectionPair)
+					var shouldAddPair = true
+					if (intersectionPairs.length > 0) {
+						var lastIntersectionPair = intersectionPairs[intersectionPairs.length - 1]
+						if (Math.abs(lastIntersectionPair.endIntersection - beginIntersection) < gClose) {
+							shouldAddPair = false
+							gTotalClose += 1
+//							console.log('lastIntersectionPair')
+//							console.log(lastIntersectionPair)
+//							console.log(endIndex)
+//							console.log(endIntersection)
+//							console.log(gTotalClose)
+							lastIntersectionPair.endIndex = endIndex
+							lastIntersectionPair.endIntersection = endIntersection
+						}
+					}
+					if (shouldAddPair) {
+						var intersectionPair = {
+							beginIndex:beginIndex,
+							beginIntersection:beginIntersection,
+							endIndex:endIndex,
+							endIntersection:endIntersection}
+						intersectionPairs.push(intersectionPair)
+					}
 				}
+//				else {
+//					console.log('beginIndex')
+//					console.log(beginIndex)
+//					console.log(beginIntersection)
+//					console.log(endIndex)
+//					console.log(endIntersection)
+//				}
 				beginIntersection = null
 			}
 		}
 		lastExistenceCondition = currentExistenceCondition
 	}
+				if (shouldLog) {
+					console.log('intersectionPairs')
+					console.log(intersectionPairs)
+				}
 	return intersectionPairs
+}
+
+function getIntersectionPairsMapBoolean(existenceCondition, signB, intersectionPairsMapA, intersectionPairsMapB) {
+	var intersectionPairsMapBoolean = new Map()
+	var keySet = new Set()
+	if (intersectionPairsMapA != null) {
+		addElementsToSet(intersectionPairsMapA.keys(), keySet)
+	}
+	if (intersectionPairsMapB != null) {
+		addElementsToSet(intersectionPairsMapB.keys(), keySet)
+	}
+	for (var key of keySet) {
+		var intersectionPairsA = null
+		if (intersectionPairsMapA != null) {
+			if (intersectionPairsMapA.has(key)) {
+				intersectionPairsA = intersectionPairsMapA.get(key)
+			}
+		}
+		var intersectionPairsB = null
+		if (intersectionPairsMapB != null) {
+			if (intersectionPairsMapB.has(key)) {
+				intersectionPairsB = intersectionPairsMapB.get(key)
+			}
+		}
+		var signedIntersections = getSignedIntersections(intersectionPairsA, intersectionPairsB, signB)
+		intersectionPairsMapBoolean.set(key, getIntersectionPairsByExistence(existenceCondition, signedIntersections))
+	}
+	return intersectionPairsMapBoolean
 }
 
 function getPixel(key, pixelMap) {
@@ -198,18 +262,54 @@ function getPixel(key, pixelMap) {
 
 function getPixelMapByLattice(intersectionPairsMap) {
 	var pixelMap = new Map()
-	for (entry of intersectionPairsMap) {
+	for (var entry of intersectionPairsMap) {
 		var y = entry[0]
-		for (intersectionPair of entry[1]) {
+		for (var intersectionPair of entry[1]) {
 			var key = [intersectionPair.beginIndex, y]
 			var position = [intersectionPair.beginIntersection, y]
-			getPixel(key.join(','), pixelMap)[0] = position
+			var beginPixel = getPixel(key.join(','), pixelMap)
+			beginPixel[0] = position
+			if (beginPixel[1] != null) {
+				beginPixel[0] = null
+				beginPixel[1] = null
+			}
 			key[0] = intersectionPair.endIndex
-			position = [intersectionPair.endIntersection, position[1]]
-			getPixel(key.join(','), pixelMap)[1] = position
+			getPixel(key.join(','), pixelMap)[1] = [intersectionPair.endIntersection, position[1]]
 		}
 	}
 	return pixelMap
+}
+
+function getPolygonsAddition(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
+	return getPolygonsBoolean(existenceConditionPositive, layerThickness, offsetMultiplier, polygonsA, polygonsB, 1)
+}
+
+function getPolygonsBoolean(existenceCondition, layerThickness, offsetMultiplier, polygonsA, polygonsB, signB) {
+	var offsetY = offsetMultiplier * layerThickness
+	var oneOverLayerThickness = 1.0 / layerThickness
+	var polygonsATransformed = getArrayArraysCopy(polygonsA)
+	var polygonsBTransformed = getArrayArraysCopy(polygonsB)
+	addXYArraysByY(polygonsATransformed, -offsetY)
+	addXYArraysByY(polygonsBTransformed, -offsetY)
+	multiplyXYArraysByScalar(polygonsATransformed, oneOverLayerThickness)
+	multiplyXYArraysByScalar(polygonsBTransformed, oneOverLayerThickness)
+	var xyLatticeA = getXYLattice(polygonsATransformed)
+	var xyLatticeB = getXYLattice(polygonsBTransformed)
+	var xyLatticeBoolean = getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB)
+	var polygonsBoolean = getXYPolygonsByLattice(xyLatticeBoolean)
+	return addXYArraysByY(multiplyXYArraysByScalar(polygonsBoolean, layerThickness), offsetY)
+}
+
+function getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
+	return getPolygonsBoolean(existenceConditionOne, layerThickness, offsetMultiplier, polygonsA, polygonsB, 1)
+}
+
+function getPolygonsIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
+	return getPolygonsBoolean(existenceConditionTwo, layerThickness, offsetMultiplier, polygonsA, polygonsB, 1)
+}
+
+function getPolygonsSubtraction(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
+	return getPolygonsBoolean(existenceConditionPositive, layerThickness, offsetMultiplier, polygonsA, polygonsB, -1)
 }
 
 function getSignedIntersections(intersectionPairsA, intersectionPairsB, signB) {
@@ -223,14 +323,14 @@ function getSignedIntersections(intersectionPairsA, intersectionPairsB, signB) {
 	var signedIntersections = new Array(totalIntersectionPairLength + totalIntersectionPairLength)
 	var signedIntersectionIndex = 0
 	if (intersectionPairsA != null) {
-		for (intersectionPairA of intersectionPairsA) {
+		for (var intersectionPairA of intersectionPairsA) {
 			signedIntersections[signedIntersectionIndex] = [intersectionPairA.beginIntersection, 1]
 			signedIntersections[signedIntersectionIndex + 1] = [intersectionPairA.endIntersection, -1]
 			signedIntersectionIndex += 2
 		}
 	}
 	if (intersectionPairsB != null) {
-		for (intersectionPairB of intersectionPairsB) {
+		for (var intersectionPairB of intersectionPairsB) {
 			signedIntersections[signedIntersectionIndex] = [intersectionPairB.beginIntersection, signB]
 			signedIntersections[signedIntersectionIndex + 1] = [intersectionPairB.endIntersection, -signB]
 			signedIntersectionIndex += 2
@@ -240,19 +340,19 @@ function getSignedIntersections(intersectionPairsA, intersectionPairsB, signB) {
 	return signedIntersections
 }
 
-function getSignedIntersectionsMapBySpacelMap(exteriorMap) {
+function getSignedIntersectionsMapBySpacelMap(spacelMap) {
 	var signedIntersectionsMap = new Map()
-	for (entry of exteriorMap) {
+	for (var entry of spacelMap) {
 		var key = entry[0]
-		var exterior = entry[1]
-		if (exterior[0] != null) {
+		var spacel = entry[1]
+		if (spacel[0] != null) {
 			addSpacel(key, signedIntersectionsMap)
 		}
-		if (exterior[1] != null) {
+		if (spacel[1] != null) {
 			addSpacel(key, signedIntersectionsMap)
 		}
 	}
-	for (entry of signedIntersectionsMap) {
+	for (var entry of signedIntersectionsMap) {
 		var intersections = entry[1]
 		intersections.sort(compareNumberAscending)
 		var intersectionDirections = []
@@ -276,6 +376,7 @@ function getXYLattice(xyPolygons) {
 	xyLattice[0] = getIntersectionPairsMap(xyPolygons)
 	swapXY(xyPolygons)
 	xyLattice[1] = getIntersectionPairsMap(xyPolygons)
+	swapXY(xyPolygons)
 	return xyLattice
 }
 
@@ -285,26 +386,10 @@ function getXYLatticeAddition(xyLatticeA, xyLatticeB) {
 
 function getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB) {
 	var xyLatticeC = new Array(xyLatticeA.length)
-	for (var intersectionPairsMapIndex = 0; intersectionPairsMapIndex < xyLatticeA.length; intersectionPairsMapIndex++) {
-		var intersectionPairsMapA = xyLatticeA[intersectionPairsMapIndex]
-		var intersectionPairsMapB = xyLatticeB[intersectionPairsMapIndex]
-		var intersectionPairsMapC = new Map()
-		xyLatticeC[intersectionPairsMapIndex] = intersectionPairsMapC
-		var keySet = new Set()
-		addElementsToSet(intersectionPairsMapA.keys(), keySet)
-		addElementsToSet(intersectionPairsMapB.keys(), keySet)
-		for (key of keySet) {
-			var intersectionPairsA = null
-			if (intersectionPairsMapA.has(key)) {
-				intersectionPairsA = intersectionPairsMapA.get(key)
-			}
-			var intersectionPairsB = null
-			if (intersectionPairsMapB.has(key)) {
-				intersectionPairsB = intersectionPairsMapB.get(key)
-			}
-			var signedIntersections = getSignedIntersections(intersectionPairsA, intersectionPairsB, signB)
-			intersectionPairsMapC.set(key, getIntersectionPairsByExistence(existenceCondition, signedIntersections))
-		}
+	for (var mapIndex = 0; mapIndex < xyLatticeA.length; mapIndex++) {
+		var intersectionPairsMapA = xyLatticeA[mapIndex]
+		var intersectionPairsMapB = xyLatticeB[mapIndex]
+		xyLatticeC[mapIndex] = getIntersectionPairsMapBoolean(existenceCondition, signB, intersectionPairsMapA, intersectionPairsMapB)
 	}
 	return xyLatticeC
 }
@@ -334,9 +419,9 @@ function getXYPolygonsByLattice(xyLattice) {
 }
 
 function positionPixelsByIntersectionPairsMap(intersectionPairsMap, pixelMap) {
-	for (entry of intersectionPairsMap) {
+	for (var entry of intersectionPairsMap) {
 		var y = entry[0]
-		for (intersectionPair of entry[1]) {
+		for (var intersectionPair of entry[1]) {
 			var key = [y, intersectionPair.beginIndex]
 			var position = [y, intersectionPair.beginIntersection]
 			setPixelPosition(2, key, position, pixelMap)
