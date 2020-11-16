@@ -2,11 +2,24 @@
 
 function setViewSelect(selectedIndex, views, viewSelectID) {
 	var viewSelect = document.getElementById(viewSelectID)
+	var options = viewSelect.options
 	viewSelect.hidden = false
-	for (view of views) {
-		var option = document.createElement('option')
+	views.sort(compareIDAscending)
+	for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
+		view = views[viewIndex]
+		var option = null
+		if (viewIndex >= options.length) {
+			option = document.createElement('option')
+			viewSelect.add(option)
+		}
+		else {
+			option = options[viewIndex]
+		}
 		option.text = view.id
-		viewSelect.add(option)
+	}
+	var optionLength = options.length
+	for (var optionIndex = optionLength - 1; optionIndex >= views.length; optionIndex--) {
+		options.remove(optionIndex)
 	}
 	viewSelect.selectedIndex = selectedIndex
 }
@@ -17,9 +30,9 @@ function viewerMouseDown(event) {
 	}
 	meshViewer.mouseDown = [event.offsetX, event.offsetY]
 	meshViewer.isCircle = false
-	meshViewer.beginModelHandlesPath()
-	meshViewer.isHandle = meshViewer.context.isPointInPath(event.offsetX, event.offsetY)
-	if (meshViewer.isHandle) {
+	meshViewer.beginModelRingPath()
+	meshViewer.isRing = meshViewer.context.isPointInPath(event.offsetX, event.offsetY)
+	if (meshViewer.isRing) {
 		meshViewer.mouseDownNegative = meshViewer.getOffsetNormal(event)
 		meshViewer.mouseDownNegative[1] = -meshViewer.mouseDownNegative[1]
 	}
@@ -71,10 +84,10 @@ var meshViewer = {
 		this.context.beginPath()
 		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusCircle, 0, Math.PI + Math.PI)
 	},
-	beginModelHandlesPath: function() {
+	beginModelRingPath: function() {
 		this.context.beginPath()
-		this.context.moveTo(this.halfWidth + this.modelRadiusHandle, this.halfHeight)
-		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusHandle, 0, Math.PI + Math.PI)
+		this.context.moveTo(this.halfWidth + this.modelRadiusRing, this.halfHeight)
+		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusRing, 0, Math.PI + Math.PI)
 		this.context.moveTo(this.halfWidth + this.modelRadiusCircle, this.halfHeight)
 		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusCircle, Math.PI + Math.PI, 0, true)
 		this.context.closePath()
@@ -85,41 +98,36 @@ var meshViewer = {
 		}
 		var mesh = this.view.mesh
 		var facets = mesh.facets
-		var points = mesh.points
-		var zPolygons = new Array(facets.length)
+		var zPolygons = []
 		var centerRotationMatrix = getMultiplied3DMatrix(this.view.rotationMatrix, this.view.scaleCenterMatrix)
 		centerRotationMatrix = getMultiplied3DMatrix(this.canvasCenterMatrix, centerRotationMatrix)
 		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-		for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-			var facet = facets[facetIndex]
-			var zPolygon = new Array(2)
-			zPolygon[0] = new Array(facet.length)
-			zPolygon[1] = new Array(facet.length)
-			for (var vertexIndexIndex = 0; vertexIndexIndex < facet.length; vertexIndexIndex++) {
-				var vertexIndex = facet[vertexIndexIndex]
-				var point = getXYZBy3DMatrix(points[vertexIndex], centerRotationMatrix)
-				zPolygon[0][vertexIndexIndex] = point[2]
-				zPolygon[1][vertexIndexIndex] = [point[0], point[1]]
+		var xyzs = getXYZsBy3DMatrix(centerRotationMatrix, mesh.points)
+		for (var facet of facets) {
+			var zPolygon = [new Array(facet.length), facet]
+			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+				zPolygon[0][vertexIndex] = xyzs[facet[vertexIndex]][2]
 			}
 			zPolygon[0].sort(compareNumberDescending)
-			zPolygons[facetIndex] = zPolygon
-		}
-		zPolygons.sort(compareArrayDescending)
-		var lineWidthOverPolygonsLength = 5.0 / zPolygons.length
-		this.context.strokeStyle = 'black'
-		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
-			var zPolygon = zPolygons[zPolygonIndex]
-			this.context.beginPath()
-			for (point of zPolygon[1]) {
-				if (vertexIndexIndex == 0) {
-					this.moveToXY(point)
-				}
-				else {
-					this.lineToXY(point)
+			var normal = getNormalByFlatFacet(facet, xyzs)
+			if (normal != null) {
+				if (normal[2] > 0.0) {
+					zPolygons.push(zPolygon)
 				}
 			}
+		}
+		zPolygons.sort(compareArrayAscending)
+		var widthOverLength = 6.0 / zPolygons.length
+		this.context.strokeStyle = 'black'
+		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
+			this.context.beginPath()
+			var facet = zPolygons[zPolygonIndex][1]
+			this.moveToXY(xyzs[facet[0]])
+			for (var vertexIndex = 1; vertexIndex < facet.length; vertexIndex++) {
+				this.lineToXY(xyzs[facet[vertexIndex]])
+			}
 			this.context.closePath()
-			this.context.lineWidth = Math.floor(lineWidthOverPolygonsLength * zPolygonIndex) + 1
+			this.context.lineWidth = Math.ceil(widthOverLength * (zPolygonIndex + 1))
  			this.context.stroke()
 			this.context.fill()
 		}
@@ -127,13 +135,13 @@ var meshViewer = {
 	drawModelControlPath: function(event) {
 		this.beginModelCirclePath()
 		if (this.context.isPointInPath(event.offsetX, event.offsetY)) {
-			this.beginModelHandlesPath()
+			this.beginModelRingPath()
 			this.erasePath()
 			this.beginModelCirclePath()
 			this.drawPath()
 			return
 		}
-		this.beginModelHandlesPath()
+		this.beginModelRingPath()
 		if (this.context.isPointInPath(event.offsetX, event.offsetY)) {
 			this.drawPath()
 			return
@@ -164,13 +172,13 @@ var meshViewer = {
 			this.drawModelControlPath(event)
 			return
 		}
-		var mouseMovement = [this.mouseDown[0] - event.offsetX, this.mouseDown[1] - event.offsetY]
+		var mouseMovement = [event.offsetX - this.mouseDown[0], event.offsetY - this.mouseDown[1]]
 		var movementLength = getXYLength(mouseMovement)
 		if (movementLength == 0.0) {
 			return
 		}
-		var movementNormal = divideXYByScalar(mouseMovement.slice(0), movementLength)
 		if (this.isCircle) {
+			var movementNormal = divideXYByScalar(mouseMovement.slice(0), movementLength)
 			movementNormal[1] = -movementNormal[1]
 			this.view.rotationMatrix = getMultiplied3DMatrix(get3DMatrixRotatedByXY(movementNormal), this.view.lastRotationMatrix)
 			var rotationY = this.rotationMultiplier * movementLength
@@ -180,7 +188,7 @@ var meshViewer = {
 			this.draw()
 			return
 		}
-		if (this.isHandle) {
+		if (this.isRing) {
 			var mouseMoveNormal = this.getOffsetNormal(event)
 			var rotationXY = getXYRotation(mouseMoveNormal, this.mouseDownNegative)
 			this.view.rotationMatrix = getMultiplied3DMatrix(get3DMatrixRotatedByXY(rotationXY), this.view.lastRotationMatrix)
@@ -201,7 +209,7 @@ var meshViewer = {
 		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
 		var meshCenterMatrix = get3DTransformByTranslate3D([-center[0], -center[1], -center[2]])
 		// using 2.0 + Math.PI to get average of edge and center movement
-		var scaleMatrix = get3DTransformByScale3D([scale, -scale])
+		var scaleMatrix = get3DTransformByScale3D([scale, -scale, scale])
 		this.view.rotationMatrix = get3DUnitMatrix()
 		this.view.scaleCenterMatrix = getMultiplied3DMatrix(scaleMatrix, meshCenterMatrix)
 		this.view.lastRotationMatrix = this.view.rotationMatrix
@@ -222,7 +230,7 @@ var meshViewer = {
 		this.modelDiameter = (this.canvas.width - this.doubleTextSpace - this.doubleTextSpace)
 		this.canvasCenterMatrix = get3DTransformByTranslate3D(this.canvasCenter)
 		this.modelRadiusCircle = 0.5 * this.modelDiameter + this.textSpace
-		this.modelRadiusHandle = this.modelRadiusCircle + this.textSpace
+		this.modelRadiusRing = this.modelRadiusCircle + this.textSpace
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
 		setViewSelect(selectedIndex, this.views, this.viewSelectID)
