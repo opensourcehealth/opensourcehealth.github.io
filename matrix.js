@@ -619,7 +619,7 @@ function getXYZAddition(xyzA, xyzB) {
 	return [xyzA[0] + xyzB[0], xyzA[1] + xyzB[1], xyzA[2] + xyzB[2]];
 }
 
-function getXYZBy3DMatrix(point, matrix) {
+function getXYZBy3DMatrix(matrix, point) {
 //	0 4 8  12
 //	1 5 9  13
 //	2 6 10 14
@@ -649,6 +649,14 @@ function getXYZMultiplication(xyzA, xyzB) {
 
 function getXYZMultiplicationByScalar(xyzA, scalarMultiplier) {
 	return [xyzA[0] * scalarMultiplier, xyzA[1] * scalarMultiplier, xyzA[2] * scalarMultiplier]
+}
+
+function getXYZsBy3DMatrix(matrix, points) {
+	var xyzs = new Array(points.length)
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		xyzs[pointIndex] = getXYZBy3DMatrix(matrix, points[pointIndex])
+	}
+	return xyzs
 }
 
 function getXYZSubtraction(xyzA, xyzB) {
