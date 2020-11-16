@@ -1,5 +1,8 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+const gClose = 0.0000001
+const gOneOverClose = Math.round(1.0 / gClose)
+
 function get2DMatrix(attributeMap) {
 	if (attributeMap == null) {
 		return null
@@ -44,7 +47,7 @@ function getAddition(additionString) {
 	var multiplier = 1.0
 	var totalValue = 0.0
 	var values = additionString.replace(/-/g, ' - ').split('+').join(' + ').split(' ').filter(lengthCheck)
-	for (value of values) {
+	for (var value of values) {
 		if (value == '-') {
 			multiplier = -1.0
 		}
@@ -58,6 +61,10 @@ function getAddition(additionString) {
 		}
 	}
 	return totalValue
+}
+
+function getCloseString(floatValue) {
+	return (Math.round(floatValue * gOneOverClose) * gClose).toString()
 }
 
 function getFloats(commaSeparated) {
