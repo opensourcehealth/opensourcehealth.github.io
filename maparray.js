@@ -14,6 +14,16 @@ function addElementsToSet(elements, setToAddTo) {
 	}
 }
 
+function compareArrayAscending(a, b) {
+	var minimumLength = Math.min(a.length, b.length)
+	for (var elementIndex = 0; elementIndex < minimumLength; elementIndex++) {
+		if (a[0][elementIndex] != b[0][elementIndex]) {
+			return a[0][elementIndex] - b[0][elementIndex]
+		}
+	}
+	return 0
+}
+
 function compareArrayDescending(a, b) {
 	var minimumLength = Math.min(a.length, b.length)
 	for (var elementIndex = 0; elementIndex < minimumLength; elementIndex++) {
@@ -22,6 +32,18 @@ function compareArrayDescending(a, b) {
 		}
 	}
 	return 0
+}
+
+function compareFirstElementAscending(a, b) {
+	return a[0] - b[0]
+}
+
+function compareFirstElementDescending(a, b) {
+	return b[0] - a[0]
+}
+
+function compareIDAscending(a, b) {
+	return a.id > b.id
 }
 
 function compareNumberAscending(a, b) {
@@ -45,6 +67,14 @@ function getArraysBySplittingStrings(strings, stringSeparator) {
 		arrays[stringIndex] = strings[stringIndex].split(stringSeparator)
 	}
 	return arrays
+}
+
+function getArrayWithAddedElement(arrayToAddTo, element) {
+	if (arrayToAddTo == null) {
+		return [element]
+	}
+	arrayToAddTo.push(element)
+	return arrayToAddTo
 }
 
 function getNumberOfDifferences(arraysA, arraysB) {
