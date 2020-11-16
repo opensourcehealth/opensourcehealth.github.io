@@ -164,16 +164,6 @@ function createTipsByIntersectionPairsMap(intersectionPairsMap, voxelMap, z) {
 	for (var entry of intersectionPairsMap) {
 		var y = entry[0]
 		var intersectionPairs = entry[1]
-		for (var intersectionPairIndex = intersectionPairs.length - 2; intersectionPairIndex > -1; intersectionPairIndex--) {
-			var intersectionPair = intersectionPairs[intersectionPairIndex]
-			var nextIndex = intersectionPairIndex + 1
-			var intersectionPairNext = intersectionPairs[nextIndex]
-			if (intersectionPair.endIntersection == intersectionPairNext.beginIntersection) {
-				intersectionPair.endIndex = intersectionPairNext.endIndex
-				intersectionPair.endIntersection = intersectionPairNext.endIntersection
-				intersectionPairs.splice(nextIndex, 1)
-			}
-		}
 		for (var intersectionPair of intersectionPairs) {
 			var key = [intersectionPair.beginIndex, y, z]
 			var position = [intersectionPair.beginIntersection, y, z]
@@ -208,6 +198,102 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	return mesh
 }
 
+function getMeshExclusiveIntersection(layerThickness, offsetMultiplier, meshA, meshB) {
+	return getMeshBoolean(existenceConditionOne, layerThickness, offsetMultiplier, meshA, meshB, 1)
+}
+
+function getMeshIntersection(layerThickness, offsetMultiplier, meshA, meshB) {
+	return getMeshBoolean(existenceConditionTwo, layerThickness, offsetMultiplier, meshA, meshB, 1)
+}
+
+function getMeshSubtraction(layerThickness, offsetMultiplier, meshA, meshB) {
+	return getMeshBoolean(existenceConditionPositive, layerThickness, offsetMultiplier, meshA, meshB, -1)
+}
+/*
+function setPointsMaps(key, pointMap, points, pointStringIndexMap) {
+	var close = 0.0000001
+	var closeDivided = 0.3 * close
+	var oneOverClose = 10000000.0
+	var point = pointMap.get(key)
+//	var pointString = (point[0]-0.00003).toFixed(4) + ' ' + (point[1]-0.00003).toFixed(4) + ' ' + (point[2]-0.00003).toFixed(4)
+	var x = point[0]
+	var y = point[1]
+	var z = point[2]
+	var xRound = Math.round(x * oneOverClose) * close
+	var yRound = Math.round(y * oneOverClose) * close
+	var zRound = Math.round(z * oneOverClose) * close
+	var pointXString = xRound.toFixed(7)
+//	var pointXString = xRound.toString()
+//	var pointXString = x.toFixed(7)
+	var pointXStrings = [pointXString]
+	var pointYString = yRound.toFixed(7)
+//	var pointYString = yRound.toString()
+//	var pointYString = y.toFixed(7)
+	var pointYStrings = [pointYString]
+	var pointZString = zRound.toFixed(7)
+//	var pointZString = zRound.toString()
+//	var pointZString = z.toFixed(7)
+	var pointZStrings = [pointZString]
+	var pointString = pointXString + ' ' + pointYString + ' ' + pointZString
+//	console.log('x - parseFloat(pointXString)')
+//	console.log(x - parseFloat(pointXString))
+//	console.log(x - xRound)
+
+	if (x.toFixed(7) != xRound.toFixed(7)) {
+		console.log('x')
+		console.log(x)
+		console.log(x.toFixed(7))
+		console.log(xRound.toFixed(7))
+	}
+	if (y.toFixed(7) != yRound.toFixed(7)) {
+		console.log('y')
+		console.log(y)
+		console.log(y.toFixed(7))
+		console.log(yRound.toFixed(7))
+	}
+	if (z.toFixed(7) != zRound.toFixed(7)) {
+		console.log('z')
+		console.log(z)
+		console.log(z.toFixed(7))
+		console.log(zRound.toFixed(7))
+	}
+
+//	var differenceX = Math.abs(xRound - parseFloat(x.toFixed(7)))
+//	var differenceX = Math.abs(x - parseFloat(x.toFixed(7)))
+//	var differenceX = Math.abs(x - xRound)
+//	if (differenceX > closeDivided) {
+//		console.log('x')
+//		console.log(x)
+//		console.log(differenceX)
+//		console.log(close)
+//	}
+//	var differenceY = Math.abs(yRound - parseFloat(y.toFixed(7)))
+//	var differenceY = Math.abs(y - parseFloat(y.toFixed(7)))
+//	var differenceY = Math.abs(y - yRound)
+//	if (differenceY > closeDivided) {
+//		console.log('y')
+//		console.log(y)
+//		console.log(differenceY)
+//		console.log(close)
+//	}
+//	var differenceZ = Math.abs(zRound - parseFloat(z.toFixed(7)))
+//	var differenceZ = Math.abs(z - parseFloat(z.toFixed(7)))
+//	var differenceZ = Math.abs(z - zRound)
+//	if (differenceZ > closeDivided) {
+//		console.log('z')
+//		console.log(z)
+//		console.log(differenceZ)
+//		console.log(close)
+//	}
+	if (pointStringIndexMap.has(pointString)) {
+		pointMap.set(key, pointStringIndexMap.get(pointString))
+		return
+	}
+	pointStringIndexMap.set(pointString, points.length)
+	pointMap.set(key, points.length)
+	points.push(point)
+}
+*/
 function getMeshByTipMap(pointMap, tipMap) {
 	var centerSideMap = new Map()
 	var facets = []
@@ -217,8 +303,7 @@ function getMeshByTipMap(pointMap, tipMap) {
 	var mesh = {facets:facets, points:points}
 	for (var key of pointMap.keys()) {
 		var point = pointMap.get(key)
-		var pointString = (point[0]-0.00003).toFixed(4) + ' ' + (point[1]-0.00003).toFixed(4) + ' ' + (point[2]-0.00003).toFixed(4)
-//		var pointString = point[0].toFixed(7) + ' ' + point[1].toFixed(7) + ' ' + point[2].toFixed(7)
+		var pointString = getCloseString(point[0]) + ' ' + getCloseString(point[1]) + ' ' + getCloseString(point[2])
 		if (pointStringIndexMap.has(pointString)) {
 			pointMap.set(key, pointStringIndexMap.get(pointString))
 		}
@@ -227,6 +312,7 @@ function getMeshByTipMap(pointMap, tipMap) {
 			pointMap.set(key, points.length)
 			points.push(point)
 		}
+
 	}
 	for (var tip of tipMap.values()) {
 		for (var line of tip.lines) {
@@ -499,16 +585,6 @@ function positionVoxelsByIntersectionPairsMap(intersectionPairsMap, plane, voxel
 	for (var entry of intersectionPairsMap) {
 		var y = entry[0]
 		var intersectionPairs = entry[1]
-		for (var intersectionPairIndex = intersectionPairs.length - 2; intersectionPairIndex > -1; intersectionPairIndex--) {
-			var intersectionPair = intersectionPairs[intersectionPairIndex]
-			var nextIndex = intersectionPairIndex + 1
-			var intersectionPairNext = intersectionPairs[nextIndex]
-			if (intersectionPair.endIntersection == intersectionPairNext.beginIntersection) {
-				intersectionPair.endIndex = intersectionPairNext.endIndex
-				intersectionPair.endIntersection = intersectionPairNext.endIntersection
-				intersectionPairs.splice(nextIndex, 1)
-			}
-		}
 		for (var intersectionPair of intersectionPairs) {
 			var key = new Array(3)
 			key[plane0] = intersectionPair.beginIndex
@@ -544,9 +620,10 @@ function setVoxelPosition(direction, key, position, voxelMap) {
 			console.log(key)
 			console.log(position)
 			console.log(voxelMap)
-//			key[0] += 0
-//			key[1] += -1
-//			key[2] += 0
+/*
+			key[0] += 1
+			key[1] += 0
+			key[2] += 0
 			keyString = key.join(',')
 			console.log(key)
 			console.log(voxelMap.has(keyString))
@@ -555,7 +632,22 @@ function setVoxelPosition(direction, key, position, voxelMap) {
 				if (voxel[direction] != null) {
 					voxel[direction] = position
 				}
+				return
 			}
+			key[0] += -2
+			key[1] += 0
+			key[2] += 0
+			keyString = key.join(',')
+			console.log(key)
+			console.log(voxelMap.has(keyString))
+			if (voxelMap.has(keyString)) {
+				var voxel = voxelMap.get(keyString)
+				if (voxel[direction] != null) {
+					voxel[direction] = position
+				}
+				return
+			}
+*/
 		}
 
 	}
