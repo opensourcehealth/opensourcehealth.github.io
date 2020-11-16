@@ -1,5 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+const gVeryClose = 0.1 * gClose
 const gXYDirections = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 
 function addLineToMap(line, lines, map, point) {
@@ -167,18 +168,13 @@ function getIntersectionPairsByExistence(existenceCondition, signedIntersections
 		if (currentExistenceCondition) {
 			if (beginIntersection == null) {
 				beginIntersection = signedIntersection[0]
-				if (Math.abs(beginIntersection) == 0.01777/0.49999999999999999) {
-					shouldLog = true
-					console.log('signedIntersections')
-					console.log(signedIntersections)
-				}
 			}
 		}
 		else {
 			if (lastExistenceCondition) {
-				var beginIndex = Math.round(Math.ceil(beginIntersection) + 0.001)
+				var beginIndex = Math.round(Math.ceil(beginIntersection - gVeryClose))
 				var endIntersection = signedIntersection[0]
-				var endIndex = Math.round(Math.floor(endIntersection) + 0.001)
+				var endIndex = Math.round(Math.floor(endIntersection + gVeryClose))
 				if (endIndex >= beginIndex) {
 					var shouldAddPair = true
 					if (intersectionPairs.length > 0) {
@@ -204,13 +200,6 @@ function getIntersectionPairsByExistence(existenceCondition, signedIntersections
 						intersectionPairs.push(intersectionPair)
 					}
 				}
-//				else {
-//					console.log('beginIndex')
-//					console.log(beginIndex)
-//					console.log(beginIntersection)
-//					console.log(endIndex)
-//					console.log(endIntersection)
-//				}
 				beginIntersection = null
 			}
 		}
