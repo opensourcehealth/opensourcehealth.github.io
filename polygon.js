@@ -1,5 +1,39 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+function addInsideConnectedFacets(endFacets, facets, points) {
+	var linkMap = new Map()
+	var xyPolygons = getPolygonsByFacets(endFacets, points)
+	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
+		var maximumXIntersections = []
+		var xyPolygon = xyPolygons[polygonIndex]
+		for (var otherIndex = 0; otherIndex < xyPolygons.length; otherIndex++) {
+			if (polygonIndex != otherIndex) {
+				var xyOtherPolygon = xyPolygons[otherIndex]
+				var maximumXIntersection = getMaximumXIntersectionByPolygon(xyPolygon[0], xyOtherPolygon)
+				if (maximumXIntersection != null) {
+					maximumXIntersections.push([maximumXIntersection, otherIndex])
+				}
+			}
+		}
+		var otherIndexSet = new Set()
+		for (var maximumXIntersection of maximumXIntersections) {
+			otherIndexSet.add(maximumXIntersection[1])
+		}
+		maximumXIntersections.sort(compareFirstElementDescending)
+		if (otherIndexSet.size % 2 == 1) {
+			addToLinkMap(polygonIndex, maximumXIntersections[0][1], linkMap)
+		}
+	}
+	var joinedMap = getJoinedMap(xyPolygons.length, linkMap)
+	for (var joined of joinedMap.values()) {
+		var joinedFacets = []
+		for (var joinedIndex of joined) {
+			joinedFacets.push(endFacets[joinedIndex])
+		}
+		facets.push(getConnectedFacet(joinedFacets, points))
+	}
+}
+
 function addIntersectionsToSets(beginSet, endSet, intersections) {
 	for (intersectionIndex = 0; intersectionIndex < intersections.length; intersectionIndex += 2) {
 		endIntersectionIndex = intersectionIndex + 1
@@ -213,6 +247,13 @@ function getConnectedXYPolygon(xyPolygons) {
 	return xyPolygons[0]
 }
 */
+
+function getDoubleTriangleArea(a, b, c) {
+	var aX = a[0]
+	var aY = a[1]
+	return (b[0] - aX) * (aY - c[1]) + (b[1] - aY) * (c[0] - aX)
+}
+
 function getFacetsByArrowKeyMap(arrowKeyMap) {
 	var facets = []
 	for (var arrow of arrowKeyMap.values()) {
@@ -294,40 +335,6 @@ function getFacetsByArrowMap(arrowMap) {
 		}
 	}
 	return facets
-}
-
-function addInsideConnectedFacets(endFacets, facets, points) {
-	var linkMap = new Map()
-	var xyPolygons = getPolygonsByFacets(endFacets, points)
-	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
-		var maximumXIntersections = []
-		var xyPolygon = xyPolygons[polygonIndex]
-		for (var otherIndex = 0; otherIndex < xyPolygons.length; otherIndex++) {
-			if (polygonIndex != otherIndex) {
-				var xyOtherPolygon = xyPolygons[otherIndex]
-				var maximumXIntersection = getMaximumXIntersectionByPolygon(xyPolygon[0], xyOtherPolygon)
-				if (maximumXIntersection != null) {
-					maximumXIntersections.push([maximumXIntersection, otherIndex])
-				}
-			}
-		}
-		var otherIndexSet = new Set()
-		for (var maximumXIntersection of maximumXIntersections) {
-			otherIndexSet.add(maximumXIntersection[1])
-		}
-		maximumXIntersections.sort(compareFirstElementDescending)
-		if (otherIndexSet.size % 2 == 1) {
-			addToLinkMap(polygonIndex, maximumXIntersections[0][1], linkMap)
-		}
-	}
-	var joinedMap = getJoinedMap(xyPolygons.length, linkMap)
-	for (var joined of joinedMap.values()) {
-		var joinedFacets = []
-		for (var joinedIndex of joined) {
-			joinedFacets.push(endFacets[joinedIndex])
-		}
-		facets.push(getConnectedFacet(joinedFacets, points))
-	}
 }
 
 function getInsideConnectedFacets(facets, points) {
@@ -550,7 +557,7 @@ function getIsColinear(beginPoint, centerPoint, endPoint) {
 	}
 	divideXYZByScalar(vectorA, vectorALength)
 	divideXYZByScalar(vectorB, vectorBLength)
-	return getDotProduct(vectorA, vectorB) > 0.9999
+	return getXYZDotProduct(vectorA, vectorB) > 0.9999
 }
 
 function getIsPointInsidePolygon(point, polygon) {
@@ -868,7 +875,7 @@ function getNormalByPolygon(polygon) {
 		if (vectorALength != 0.0 && vectorBLength != 0.0) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
-			if (Math.abs(getDotProduct(vectorA, vectorB)) < 0.9999999) {
+			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999999) {
 				return normalizeXYZ(getCrossProduct(vectorA, vectorB))
 			}
 		}
@@ -891,7 +898,7 @@ function getNormalVector(pointMap, polygonKeyString) {
 		if (vectorALength != 0.0 && vectorBLength != 0.0) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
-			if (Math.abs(getDotProduct(vectorA, vectorB)) < 0.9999) {
+			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999) {
 				addXYZ(xyz, normalizeXYZ(getCrossProduct(vectorA, vectorB)))
 				divisor += 1.0
 			}
@@ -911,12 +918,7 @@ function getPointStringConvertedToPoints(pointString) {
 function getPolygonArea(polygon) {
 	var polygonArea = 0.0
 	for (var pointIndex = 0; pointIndex < polygon.length - 2; pointIndex++) {
-		var a = polygon[pointIndex]
-		var b = polygon[pointIndex + 1]
-		var c = polygon[pointIndex + 2]
-		var aX = a[0]
-		var aY = a[1]
-		polygonArea += (b[0] - aX) * (aY - c[1]) + (b[1] - aY) * (c[0] - aX)
+		polygonArea += getDoubleTriangleArea(polygon[pointIndex], polygon[pointIndex + 1], polygon[pointIndex + 2])
 	}
 	return 0.5 * polygonArea
 }
@@ -1052,6 +1054,10 @@ function getPolygonsByLines(lines, pointMap) {
 	return getPolygonsByArrowMap(arrowMap, pointMap)
 }
 
+function getTriangleMiddle(a, b, c) {
+	return multiplyXYZByScalar(addXYZ(addXYZ(getXYZAddition(b, b), a), c), 0.25)
+}
+
 function getXYPolygonsByArrows(arrowsMap, points, z) {
 	var xyPolygons = []
 	for (var arrows of arrowsMap.values()) {
@@ -1142,6 +1148,36 @@ function getXYZPolygonKeyStringsByKeyStrings(xyPolygonKeyStrings, z) {
 		polygonKeyStrings[polygonIndex] = xyPolygonKeyStrings[polygonIndex].split(' ').join(commaZStringSemicolon) + commaZString
 	}
 	return polygonKeyStrings
+}
+
+function getZByPointPolygon(point, polygon) {
+	var greatestIndex = 0
+	if (polygon.length > 3) {
+		var greatestArea = getDoubleTriangleArea(polygon[0], polygon[1], polygon[2])
+		for (var pointIndex = 1; pointIndex < polygon.length - 2; pointIndex++) {
+			var doubleTriangleArea = getDoubleTriangleArea(polygon[pointIndex], polygon[pointIndex + 1], polygon[pointIndex + 2])
+			if (doubleTriangleArea > greatestArea) {
+				greatestArea = doubleTriangleArea
+				greatestIndex = pointIndex
+			}
+		}
+	}
+	var a = polygon[greatestIndex]
+	var b = polygon[greatestIndex + 1]
+	var c = polygon[greatestIndex + 2]
+	var bMinusA = getXYSubtraction(b, a)
+	var bMinusALength = getXYLength(bMinusA)
+	var bMinusAMmirror = [bMinusA[0] / bMinusALength, -bMinusA[1] / bMinusALength]
+	var bMinusAX = bMinusA[0] * bMinusAMmirror[0] - bMinusA[1] * bMinusAMmirror[1]
+	var cMinusA = getXYRotation(getXYSubtraction(c, a), bMinusAMmirror)
+	var pointMinusA = getXYRotation(getXYSubtraction(point, a), bMinusAMmirror)
+	var pointAlongC = pointMinusA[1] / cMinusA[1]
+	var pointAlongB = (pointMinusA[0] - cMinusA[0] * pointAlongC) / bMinusAX
+	var aMultiplied = getXYZMultiplicationByScalar(a, 1 - pointAlongB - pointAlongC)
+	var bMultiplied = getXYZMultiplicationByScalar(b, pointAlongB)
+	var cMultiplied = getXYZMultiplicationByScalar(c, pointAlongC)
+	var xyz = addXYZ(addXYZ(aMultiplied, bMultiplied), cMultiplied)
+	return xyz[2]
 }
 
 function rotateXYZParametersByPointList(rotation, pointList) {
