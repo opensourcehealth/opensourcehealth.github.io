@@ -497,10 +497,6 @@ function getCrossProduct(a, b) {
 	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
-function getDotProduct(xyzA, xyzB) {
-	return xyzA[0] * xyzB[0] + xyzA[1] * xyzB[1] + xyzA[2] * xyzB[2]
-}
-
 function getMultiplied2DMatrix(matrixA, matrixB) {
 //	a c e		0 2 4
 //	b d f		1 3 5
@@ -591,6 +587,10 @@ function getXYBy3DMatrix(point, matrix) {
 	return [x, y]
 }
 
+function getXYDotProduct(xyA, xyB) {
+	return xyA[0] * xyB[0] + xyA[1] * xyB[1]
+}
+
 function getXYLength(xy) {
 	return Math.sqrt(getXYLengthSquared(xy))
 }
@@ -633,6 +633,10 @@ function getXYZBy3DMatrix(matrix, point) {
 function getXYZByKey(key) {
 	parameters = key.split(',')
 	return [parseFloat(parameters[0]), parseFloat(parameters[1]), parseFloat(parameters[2])]
+}
+
+function getXYZDotProduct(xyzA, xyzB) {
+	return xyzA[0] * xyzB[0] + xyzA[1] * xyzB[1] + xyzA[2] * xyzB[2]
 }
 
 function getXYZLength(xyz) {
