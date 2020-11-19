@@ -97,7 +97,7 @@ function addToFacets(arrowIndexSetMap, facets, points, polygonFacet) {
 		var vectorBLength = getXYZLength(vectorB)
 		divideXYZByScalar(vectorA, vectorALength)
 		divideXYZByScalar(vectorB, vectorBLength)
-		if (getDotProduct(vectorA, vectorB) > 0.9999999) {
+		if (getXYZDotProduct(vectorA, vectorB) > 0.9999999) {
 			if (vectorALength > vectorBLength) {
 				arrowIndexSetMap.set(pointIndex.toString() + ' ' + previousPointIndex.toString(), nextPointIndex)
 			}
@@ -257,6 +257,22 @@ function getIntersectingFacetIndexes(facets, points, polygon) {
 	return intersectingFacetIndexes
 }
 
+function getIntersectingFacetIndexesByZ(facets, points, polygon, zList) {
+	if (zList.length != 2) {
+		return null
+	}
+	var intersectingFacetIndexes = getIntersectingFacetIndexes(facets, points, polygon)
+	var intersectingFacetIndexesByZ = null
+	zList.sort()
+	for (var intersectingFacetIndex of intersectingFacetIndexes) {
+		var z = getZByPointPolygon(polygon[0], getPolygonByFacet(facets[intersectingFacetIndex], points))
+		if (z >= zList[0] && z <= zList[1]) {
+			intersectingFacetIndexesByZ = getArrayWithAddedElement(intersectingFacetIndexesByZ, intersectingFacetIndex)
+		}
+	}
+	return intersectingFacetIndexesByZ
+}
+
 function getIsFacetPointingOutside(facet, mesh) {
 	var normal = getNormalByFacet(facet, mesh.points)
 	if (normal == null || facet.length < 3) {
@@ -270,14 +286,12 @@ function getIsFacetPointingOutside(facet, mesh) {
 	}
 	rotateXYZsByBasis(gXYRotationBasis, rotatedPoints, [normal[0], -normal[1]])
 	var rotatedMesh = {facets:mesh.facets, points:rotatedPoints}
-	var midpoint = rotatedPoints[facet[1]]
-	midpoint = addXYZ(getXYZAddition(midpoint, midpoint), rotatedPoints[facet[0]])
-	midpoint = multiplyXYZByScalar(addXYZ(midpoint, rotatedPoints[facet[2]]), 0.25)
-	var xIntersections = getXIntersectionsByMesh(rotatedMesh, midpoint[1], midpoint[2])
+	var triangleMiddle = getTriangleMiddle(rotatedPoints[facet[0]], rotatedPoints[facet[1]], rotatedPoints[facet[2]])
+	var xIntersections = getXIntersectionsByMesh(rotatedMesh, triangleMiddle[1], triangleMiddle[2])
 	var numberOfIntersectionsToLeft = 0
-	var midpointXPlus = midpoint[0] + gClose
+	var triangleMiddleXPlus = triangleMiddle[0] + gClose
 	for (var xIntersection of xIntersections) {
-		if (xIntersection < midpointXPlus) {
+		if (xIntersection < triangleMiddleXPlus) {
 			numberOfIntersectionsToLeft += 1
 		}
 	}
@@ -599,7 +613,7 @@ function getNormalByFacet(facet, points) {
 		if (vectorALength != 0.0 && vectorBLength != 0.0) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
-			if (Math.abs(getDotProduct(vectorA, vectorB)) < 0.9999999) {
+			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999999) {
 				var normal = normalizeXYZ(getCrossProduct(vectorA, vectorB))
 				if (lastNormal != null) {
 					if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) > 0.00000000000001) {
@@ -628,7 +642,7 @@ function getNormalByFlatFacet(facet, points) {
 		if (vectorALength != 0.0 && vectorBLength != 0.0) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
-			if (Math.abs(getDotProduct(vectorA, vectorB)) < 0.9999999) {
+			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999999) {
 				return normalizeXYZ(getCrossProduct(vectorA, vectorB))
 			}
 		}
