@@ -14,9 +14,10 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// make facet layers, connect intersecting polygons, add facets
+// travelgame, region terrain=riverside, creature race=human, view map=region_riverside
 // check linkMap in getMeshAnalysis, count empty intersection pairs
-// operate and transform polygons in wordscape
+// add warning for missing work and other missing and getStatementID whileIndex
+// operate and transform polygons in wordscape, maybe use true location instead of inverse for points in drillMesh
 // better colors, check that facet is concave before getting midpoint
 // add nodes between exteriors to polygons, add node within new triangle
 // triangulate coplanar for output, make basic shapes, combine loops from multiple meshes
@@ -163,39 +164,32 @@ function testConnectedPolygons() {
 	drawXYPolygons(xyPolygons)
 }
 
-function testDrill() {
-	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,1 0,7,1 10,-1,1 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
-	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+function testDrillByMesh() {
+	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 10,-1,2 0,7,2 0,-1,2 14,1,6 16,1,6 14,3,6'
+//	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,2 0,7,2 10,-1,2 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
+	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
 	var points = getPointStringConvertedToPoints(pointString)
-//	addInsideConnectedFacets(endFacets, facets, points)getIsClockwise(polygon)
-//	var xyzPolygons = getPolygonsByFacets(facets, points)
-//	drawXYZPolygons(xyzPolygons)
-	var centerPolygon = [[2, 1], [4, 1], [3, 3]]
-	var polygonA = [points[0], points[1], points[2]]
-	addXYsByXY(centerPolygon, [2.0, 0.0])
+	var centerPolygon = [[4, 1], [6, 1], [5, 3]]
+	var centerMesh = getPillarMesh([0.0, 1.0], false, [centerPolygon], get3DUnitMatrix())
+//	drawMesh(centerMesh)
 //	drawXYPolygon(centerPolygon, getRGB())
-	var intersectingFacetIndexes = getIntersectingFacetIndexesByZ(facets, points, centerPolygon, [-1, 2])
-	console.log(intersectingFacetIndexes)
-	console.log(getPolygonArea(centerPolygon))
-	console.log(getPolygonArea(polygonA))
-	console.log(getIsClockwise(centerPolygon))
-	console.log(getIsClockwise(polygonA))
-	console.log(points)
-	for (var intersectingFacetIndex of intersectingFacetIndexes) {
-		var intersectingFacet = facets[intersectingFacetIndex]
-		var polygon = getPolygonByFacet(intersectingFacet, points)
-		var z = getZByPointPolygon(centerPolygon[0], polygon)
-		var centerXYZPolygon = getXYZPolygon(centerPolygon, z)
-		var centerFacet = new Array(centerXYZPolygon.length)
-		var pointsLength = points.length
-		for (var pointIndex = 0; pointIndex < centerPolygon.length; pointIndex++) {
-			centerFacet[pointIndex] = pointsLength
-			pointsLength += 1
-		}
-		pushArray(points, centerXYZPolygon)
-		facets[intersectingFacetIndex] = getConnectedFacet([intersectingFacet, centerFacet], points)
-	}
-	console.log(points)
+	drillByMesh(centerMesh, null, get3DUnitMatrix(), {facets:facets, points:points})
+	drawXYZPolygons(getPolygonsByFacets(facets, points))
+}
+
+function testDrillByPolygon() {
+//	var basisXZ = get3DTransformByBasis([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
+	var basisXZ = get3DTransformByBasis([1.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 10,-1,2 0,7,2 0,-1,2 14,1,6 16,1,6 14,3,6'
+//	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,1 0,7,1 10,-1,1 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
+	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
+	var points = getPointStringConvertedToPoints(pointString)
+	points = getXYZsBy3DMatrix(basisXZ, points)
+	var centerPolygon = [[2, 1], [4, 1], [3, 3]]
+	addXYsByXY(centerPolygon, [2.0, 0.0])
+	drawXYPolygon(centerPolygon, getRGB())
+//	drillByPolygon(centerPolygon, null, basisXZ, {facets:facets, points:points})
+	drillByPolygon(centerPolygon, [-10, 2], basisXZ, {facets:facets, points:points})
 	drawXYZPolygons(getPolygonsByFacets(facets, points))
 }
 
@@ -455,7 +449,8 @@ function createSVGTest() {
 	document.writeln('</defs>')
 	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,150,400)">')
 //	testConnectedPolygons()
-	testDrill()
+	testDrillByMesh()
+//	testDrillByPolygon()
 //	testFace()
 //	testIntersection()
 //	testLoop()
