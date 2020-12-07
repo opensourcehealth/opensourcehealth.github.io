@@ -165,6 +165,55 @@ function get2DUnitMatrix() {
 	return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
 }
 
+function get3DInverseRotation(originalMatrix) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	var determinant = 0.0
+	var inverseMatrix = get3DUnitMatrix()
+	for (var columnIndex = 0; columnIndex < 3; columnIndex++) {
+		for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
+			var elementIndex = 4 * columnIndex + rowIndex
+			var columnBegin = 0 + (columnIndex == 0)
+			var columnEnd = 2 - (columnIndex == 2)
+			var rowBegin = 0 + (rowIndex == 0)
+			var rowEnd = 2 - (rowIndex == 2)
+			var quadrupleBegin = 4 * columnBegin
+			var quadrupleEnd = 4 * columnEnd
+			inverseMatrix[elementIndex] = originalMatrix[quadrupleBegin + rowBegin] * originalMatrix[quadrupleEnd + rowEnd]
+			inverseMatrix[elementIndex] -= originalMatrix[quadrupleEnd + rowBegin] * originalMatrix[quadrupleBegin + rowEnd]
+			if ((columnIndex + rowIndex) % 2 == 1) {
+				inverseMatrix[elementIndex] = -inverseMatrix[elementIndex]
+			}
+		}
+	}
+	for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
+		determinant += inverseMatrix[rowIndex] * originalMatrix[rowIndex]
+	}
+//	using 1.0 / determinant gives approximate matrix but exact point when inverted
+	determinant = 1.0 / determinant
+	for (var columnIndex = 0; columnIndex < 3; columnIndex++) {
+		for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
+			inverseMatrix[4 * columnIndex + rowIndex] *= determinant
+		}
+	}
+	for (var step = 1; step < 4; step++) {
+		var columnOriginal = step
+		var rowOriginal = 0
+		if (step == 3) {
+			columnOriginal = 2
+			rowOriginal = 1
+		}
+		var originalIndex = 4 * columnOriginal + rowOriginal
+		var originalValue = inverseMatrix[originalIndex]
+		var swapIndex = 4 * rowOriginal + columnOriginal
+		inverseMatrix[originalIndex] = inverseMatrix[swapIndex]
+		inverseMatrix[swapIndex] = originalValue
+	}
+	return inverseMatrix
+}
+
 function get3DMatrixRotatedByXY(xyRotator) {
 	var latestMatrix = get3DUnitMatrix()
 //	0 4 8  12
@@ -198,17 +247,17 @@ function get3DTransformByBasis(floats) {
 //	0 0 0 1
 //
 	latestMatrix[0] = floats[0]
-	latestMatrix[4] = floats[1]
-	latestMatrix[8] = floats[2]
+	latestMatrix[1] = floats[1]
+	latestMatrix[2] = floats[2]
 	if (floats.length < 6) {
 		return latestMatrix
 	}
-	latestMatrix[1] = floats[3]
+	latestMatrix[4] = floats[3]
 	latestMatrix[5] = floats[4]
-	latestMatrix[9] = floats[5]
-	xyz = getCrossProduct(floats, floats.slice(3,6))
-	latestMatrix[2] = xyz[0]
-	latestMatrix[6] = xyz[1]
+	latestMatrix[6] = floats[5]
+	var xyz = getCrossProduct(floats, floats.slice(3,6))
+	latestMatrix[8] = xyz[0]
+	latestMatrix[9] = xyz[1]
 	latestMatrix[10] = xyz[2]
 	if (floats.length < 9) {
 		return latestMatrix
@@ -665,6 +714,13 @@ function getXYZsBy3DMatrix(matrix, points) {
 
 function getXYZSubtraction(xyzA, xyzB) {
 	return [xyzA[0] - xyzB[0], xyzA[1] - xyzB[1], xyzA[2] - xyzB[2]];
+}
+
+function invertXYZ(xyz) {
+	xyz[0] = -xyz[0]
+	xyz[1] = -xyz[1]
+	xyz[2] = -xyz[2]
+	return xyz
 }
 
 function multiplyXYArraysByScalar(xyArrays, multiplier) {
