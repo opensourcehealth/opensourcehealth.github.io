@@ -115,3 +115,28 @@ function getTransformed2DMatrix(caller, statement) {
 	}
 	return transformedMatrix
 }
+
+function getTransformed3DMatrix(caller, statement) {
+	var transformedMatrix = get3DMatrix(statement.attributeMap)
+	for (downIndex = 0; downIndex < 9876; downIndex++) {
+		statement = statement.parent
+		if (statement == null || statement == caller) {
+			if (transformedMatrix == null) {
+				return get3DUnitMatrix()
+			}
+			else {
+				return transformedMatrix
+			}
+		}
+		statementMatrix = get3DMatrix(statement.attributeMap)
+		if (statementMatrix != null) {
+			if (transformedMatrix == null) {
+				transformedMatrix = statementMatrix
+			}
+			else {
+				transformedMatrix = getMultiplied3DMatrix(statementMatrix, transformedMatrix)
+			}
+		}
+	}
+	return transformedMatrix
+}
