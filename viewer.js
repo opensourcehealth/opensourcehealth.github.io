@@ -67,18 +67,8 @@ function viewSelectChanged() {
 }
 
 var meshViewer = {
-	initialize: function(id, viewSelectID) {
-		this.id = id
-		this.view = null
-		this.views = []
-		this.viewSelectID = viewSelectID
-		this.mouseDown = null
-		this.textHeight = 12
-		this.textSpace = this.textHeight * 3 / 2
-		this.doubleTextSpace = this.textSpace + this.textSpace
-	},
-	addMesh: function(id, matrix3D, mesh) {
-		this.views.push({id:id, matrix3D:matrix3D, mesh:mesh, rotationMatrix:null})
+	addMesh: function(id, matrix3D) {
+		this.views.push({id:id, matrix3D:matrix3D, rotationMatrix:null})
 	},
 	beginModelCirclePath: function() {
 		this.context.beginPath()
@@ -96,7 +86,7 @@ var meshViewer = {
 		if (this.view == null) {
 			return
 		}
-		var mesh = this.view.mesh
+		var mesh = this.meshGeneratorMap.get(this.view.id).getMesh()
 		var facets = mesh.facets
 		var zPolygons = []
 		var centerRotationMatrix = getMultiplied3DMatrix(this.view.rotationMatrix, this.view.scaleCenterMatrix)
@@ -111,13 +101,14 @@ var meshViewer = {
 			zPolygon[0].sort(compareNumberDescending)
 			var normal = getNormalByFlatFacet(facet, xyzs)
 			if (normal != null) {
-				if (normal[2] > 0.0) {
+				if (normal[2] < 0.0) {
 					zPolygons.push(zPolygon)
 				}
 			}
 		}
 		zPolygons.sort(compareArrayAscending)
-		var widthOverLength = 6.0 / zPolygons.length
+//		var widthOverLength = 6.0 / zPolygons.length
+		this.context.lineWidth = 5.0
 		this.context.strokeStyle = 'black'
 		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
 			this.context.beginPath()
@@ -127,7 +118,7 @@ var meshViewer = {
 				this.lineToXY(xyzs[facet[vertexIndex]])
 			}
 			this.context.closePath()
-			this.context.lineWidth = Math.ceil(widthOverLength * (zPolygonIndex + 1))
+//			this.context.lineWidth = Math.ceil(widthOverLength * (zPolygonIndex + 1))
  			this.context.stroke()
 			this.context.fill()
 		}
@@ -160,6 +151,12 @@ var meshViewer = {
 	},
 	getOffsetNormal: function(event) {
 		return normalizeXY([event.offsetX - this.halfWidth, event.offsetY - this.halfHeight])
+	},
+	initialize: function() {
+		this.canvasID = null
+		this.textHeight = 12
+		this.textSpace = this.textHeight * 3 / 2
+		this.doubleTextSpace = this.textSpace + this.textSpace
 	},
 	lineToXY: function(xy) {
 		this.context.lineTo(xy[0], xy[1])
@@ -198,12 +195,27 @@ var meshViewer = {
 	moveToXY: function(xy) {
 		this.context.moveTo(xy[0], xy[1])
 	},
+	setID: function(canvasID, meshGeneratorMap, viewSelectID) {
+		if (canvasID != this.canvasID) {
+			this.canvasID = canvasID
+			this.canvas = document.getElementById(canvasID)
+			this.canvas.addEventListener('mousedown', viewerMouseDown)
+			this.canvas.addEventListener('mousemove', viewerMouseMove)
+			this.canvas.addEventListener('mouseout', viewerMouseOut)
+			this.canvas.addEventListener('mouseup', viewerMouseUp)
+		}
+		this.meshGeneratorMap = meshGeneratorMap
+		this.view = null
+		this.views = []
+		this.viewSelectID = viewSelectID
+		this.mouseDown = null
+	},
 	setView: function(viewIndex) {
 		this.view = this.views[viewIndex]
 		if (this.view.rotationMatrix != null) {
 			return
 		}
-		var meshBoundingBox = getMeshBoundingBox(this.view.mesh)
+		var meshBoundingBox = getMeshBoundingBox(this.meshGeneratorMap.get(this.view.id).getMesh())
 		var meshExtent = getXYZSubtraction(meshBoundingBox[1], meshBoundingBox[0])
 		var scale = this.modelDiameter / getXYZLength(meshExtent)
 		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
@@ -218,7 +230,6 @@ var meshViewer = {
 		if (this.views.length == 0) {
 			return
 		}
-		this.canvas = document.getElementById(this.id)
 		this.canvas.height = height
 		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
 		this.context = this.canvas.getContext('2d')
@@ -235,10 +246,8 @@ var meshViewer = {
 		var selectedIndex = 0
 		setViewSelect(selectedIndex, this.views, this.viewSelectID)
 		this.setView(selectedIndex)
-		this.canvas.addEventListener('mousedown', viewerMouseDown)
-		this.canvas.addEventListener('mousemove', viewerMouseMove)
-		this.canvas.addEventListener('mouseout', viewerMouseOut)
-		this.canvas.addEventListener('mouseup', viewerMouseUp)
 		this.draw()
 	}
 }
+
+meshViewer.initialize()
