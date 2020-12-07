@@ -127,18 +127,145 @@ function addToLinkMap(indexA, indexB, linkMap) {
 	}
 }
 
-function addToPillarMesh(endFacets, facets, points, polygon3D, zList) {
-	var polygon3Ds = new Array(zList.length)
-	for (var zIndex = 0; zIndex < zList.length; zIndex++) {
-		var z = zList[zIndex]
+function addToPillarMesh(endFacets, facets, heights, points, polygon3D) {
+	var polygon3Ds = new Array(heights.length)
+	for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
+		var height = heights[heightIndex]
 		var polygon3DZ = new Array(polygon3D.length)
 		for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
 			var vertex = polygon3D[vertexIndex]
-			polygon3DZ[vertexIndex] = [vertex[0], vertex[1], vertex[2] + z]
+			polygon3DZ[vertexIndex] = [vertex[0], vertex[1], vertex[2] + height]
 		}
-		polygon3Ds[zIndex] = polygon3DZ
+		polygon3Ds[heightIndex] = polygon3DZ
 	}
 	addPolygon3DsToMesh(endFacets, facets, points, polygon3Ds)
+}
+
+function drillByMesh(drillMesh, heights, matrix, workMesh) {
+	var drillFacet = null
+	var drillFacetIndex = 0
+	var drillFacets = getArraysCopy(drillMesh.facets)
+	var drillPoints = getArraysCopy(drillMesh.points)
+	var drillPolygon = null
+	for (; drillFacetIndex < drillFacets.length; drillFacetIndex++) {
+		drillFacet = drillFacets[drillFacetIndex]
+		var polygon = getPolygonByFacet(drillFacet, drillPoints)
+		var isZZero = true
+		for (var point of polygon) {
+			if (point[2] != 0.0) {
+				isZZero = false
+				break
+			}
+		}
+		if (isZZero) {
+			drillPolygon = polygon
+			break
+		}
+	}
+	if (drillPolygon == null) {
+		warningByList(['In drillByMesh drillPolygon == null', drillMesh])
+		return
+	}
+	var facets = workMesh.facets
+	var points = workMesh.points
+	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), points)
+	var intersectingFacetIndexes = getIntersectingFacetIndexesByHeight(facets, heights, inversePoints, drillPolygon)
+	if (intersectingFacetIndexes == null) {
+		warningByList(['In drillByMesh intersectingFacetIndexes == null', heights])
+		return
+	}
+	if (intersectingFacetIndexes.length < 1) {
+		warningByList(['In drillByMesh intersectingFacetIndexes.length < 1', intersectingFacetIndexes])
+		return
+	}
+	for (var intersectingFacetIndex of intersectingFacetIndexes) {
+		var isDrillPolygonClockwise = getIsClockwise(drillPolygon)
+		var intersectingFacet = facets[intersectingFacetIndex]
+		var workPolygon = getPolygonByFacet(intersectingFacet, inversePoints)
+		if (getIsClockwise(workPolygon) == isDrillPolygonClockwise) {
+			var height = getZByPointPolygon(drillPolygon[0], workPolygon)
+			for (var facetIndex = 0; facetIndex < drillFacets.length; facetIndex++) {
+				facet = drillFacets[facetIndex]
+				for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+					facet[vertexIndex] = facet[vertexIndex] + points.length
+				}
+				facet.reverse()
+				if (facetIndex != drillFacetIndex) {
+					facets.push(facet)
+				}
+			}
+			for (var drillPoint of drillPoints) {
+				drillPoint[2] += height
+			}
+			pushArray(inversePoints, drillPoints)
+			facets[intersectingFacetIndex] = getConnectedFacet([intersectingFacet, drillFacet], inversePoints)
+			pushArray(points, getXYZsBy3DMatrix(matrix, inversePoints.slice(points.length, inversePoints.length)))
+		}
+	}
+}
+
+function drillByPolygon(drillPolygon, heights, matrix, mesh) {
+	var facets = mesh.facets
+	var points = mesh.points
+	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), points)
+	var intersectingFacetIndexes = getIntersectingFacetIndexesByHeight(facets, heights, inversePoints, drillPolygon)
+	if (intersectingFacetIndexes == null) {
+		return
+	}
+	if (intersectingFacetIndexes.length < 2) {
+		warningByList(['In drillByPolygon intersectingFacetIndexes.length < 2', intersectingFacetIndexes])
+		return
+	}
+	var intersectingFacetIndexPairs = []
+	for (var intersectingIndexIndex = 0; intersectingIndexIndex < intersectingFacetIndexes.length; intersectingIndexIndex++) {
+		var nextIndexIndex = intersectingIndexIndex + 1
+		if (nextIndexIndex < intersectingFacetIndexes.length) {
+			var intersectingFacetIndex = intersectingFacetIndexes[intersectingIndexIndex]
+			var nextIntersectingFacetIndex = intersectingFacetIndexes[nextIndexIndex]
+			var isPolygonClockwise = getIsClockwise(getPolygonByFacet(facets[intersectingFacetIndex], inversePoints))
+			var isNextPolygonClockwise = getIsClockwise(getPolygonByFacet(facets[nextIntersectingFacetIndex], inversePoints))
+			if (isPolygonClockwise && !isNextPolygonClockwise) {
+				intersectingFacetIndexPairs.push([intersectingFacetIndex, nextIntersectingFacetIndex])
+				intersectingIndexIndex += 1
+			}
+		}
+	}
+	for (var intersectingFacetIndexes of intersectingFacetIndexPairs) {
+		var drillFacets = new Array(2)
+		var isDrillPolygonClockwise = getIsClockwise(drillPolygon)
+		for (var drillFacetIndex = 0; drillFacetIndex < 2; drillFacetIndex++) {
+			var intersectingFacetIndex = intersectingFacetIndexes[drillFacetIndex]
+			var intersectingFacet = facets[intersectingFacetIndex]
+			var polygon = getPolygonByFacet(intersectingFacet, inversePoints)
+			var height = getZByPointPolygon(drillPolygon[0], polygon)
+			var drillXYZPolygon = getXYZPolygon(drillPolygon, height)
+			var drillFacet = new Array(drillXYZPolygon.length)
+			var pointsLength = inversePoints.length
+			for (var pointIndex = 0; pointIndex < drillPolygon.length; pointIndex++) {
+				drillFacet[pointIndex] = pointsLength
+				pointsLength += 1
+			}
+			pushArray(inversePoints, drillXYZPolygon)
+			if (getIsClockwise(polygon) == isDrillPolygonClockwise) {
+				drillFacet.reverse()
+			}
+			drillFacets[drillFacetIndex] = drillFacet
+			facets[intersectingFacetIndex] = getConnectedFacet([intersectingFacet, drillFacet], inversePoints)
+		}
+		var facetBegin = drillFacets[0]
+		var facetEnd = drillFacets[1]
+		var facetLengthMinus = facetBegin.length - 1
+		for (var pointIndex = 0; pointIndex < facetBegin.length; pointIndex++) {
+			var nextIndex = (pointIndex + 1) % facetBegin.length
+			var bottomBeginIndex = facetBegin[nextIndex]
+			var bottomEndIndex = facetBegin[pointIndex]
+			var topBeginIndex = facetEnd[facetLengthMinus - pointIndex]
+			var topEndIndex = facetEnd[facetLengthMinus - nextIndex]
+			var polygonFacet = [bottomBeginIndex, bottomEndIndex, topBeginIndex, topEndIndex]
+			facets.push(polygonFacet)
+		}
+		pushArray(points, getXYZsBy3DMatrix(matrix, inversePoints.slice(points.length, inversePoints.length)))
+	}
 }
 
 function getEdgeKey(aString, bString) {
@@ -179,22 +306,24 @@ function getEdgesByFacet(facet, z, zList) {
 	return edges
 }
 
-function getExtrusionMesh(isJoined, isTriangular, layers, transform3D) {
+function getExtrusionMesh(isJoined, layers, transform3D) {
 	if (layers.length == 0) {
 		return null
 	}
 	if (layers[0].polygons.length == 0) {
 		return null
 	}
-	polygon3DLists = []
+	var isClockwise = null
+	var isUpsideDown = false
+	var polygon3DLists = []
 	for (var polygonIndex = 0; polygonIndex < layers[0].polygons.length; polygonIndex++) {
 		polygon3DLists.push([])
 	}
 	for (var layerIndex = 0; layerIndex < layers.length; layerIndex++) {
-		layer = layers[layerIndex]
-		nextIndex = layerIndex + 1
+		var layer = layers[layerIndex]
+		var nextIndex = layerIndex + 1
 		if (nextIndex < layers.length) {
-			nextLayer = layers[nextIndex]
+			var nextLayer = layers[nextIndex]
 			if (layer.polygons.length != nextLayer.polygons.length) {
 				return null
 			}
@@ -205,42 +334,35 @@ function getExtrusionMesh(isJoined, isTriangular, layers, transform3D) {
 			}
 		}
 		for (var polygonIndex = 0; polygonIndex < layer.polygons.length; polygonIndex++) {
-			var polygon3D = getPolygon3D(layer.polygons[polygonIndex], layer.z)
-			for (var vertex of polygon3D) {
-				vertex[2] += layer.z
+			var polygon = layer.polygons[polygonIndex]
+			if (isClockwise == null && polygon.length > 2) {
+				isClockwise = getIsClockwise(polygon)
+				isUpsideDown = layers[0].height > layers[layers.length - 1].height
+				if (!isClockwise) {
+					isUpsideDown = !isUpsideDown
+				}
 			}
-			polygon3DLists[polygonIndex].push(polygon3D)
+			polygon3DLists[polygonIndex].push(getPolygon3D(polygon, layer.height))
 		}
 	}
 	var facetsLayers = null
 	var facets = []
 	var points = []
 	for (var polygon3Ds of polygon3DLists) {
+		if (isUpsideDown) {
+			polygon3Ds.reverse()
+		}
 		var endFacets = []
 		addPolygon3DsToMesh(endFacets, facets, points, polygon3Ds)
-//		for (var polygon3D of polygon3Ds) {
-//			if (isJoined) {
-//				for (var zIndex = 0; zIndex < zList.length; zIndex += 2) {
-//					addPartToPillarMesh(endFacets, facets, points, polygon3D, zList.slice(zIndex, zIndex + 2))
-//				}
-//			}
-//			else {
-//			addPolygon3DsToMesh(endFacets, facets, points, polygon3Ds)
-//				addToPillarMesh(endFacets, facets, points, polygon3D, zList)
-//			}
-//		}
 		if (facetsLayers == null) {
 			facetsLayers = Array(endFacets.length).fill(null)
 		}
 		for (var endFacetIndex = 0; endFacetIndex < endFacets.length; endFacetIndex++) {
-			facetsLayers[endFacetIndex] = getArrayWithAddedElement(facetsLayers[endFacetIndex], endFacets[endFacetIndex])
+			facetsLayers[endFacetIndex] = getPushElement(facetsLayers[endFacetIndex], endFacets[endFacetIndex])
 		}
 	}
 	for (var facetsLayer of facetsLayers) {
 		addInsideConnectedFacets(facetsLayer, facets, points)
-	}
-	if (isTriangular) {
-		triangulateFacets(facets)
 	}
 	return {facets:facets, points:points}
 }
@@ -251,26 +373,45 @@ function getIntersectingFacetIndexes(facets, points, polygon) {
 	for (var facetPolygonIndex = 0; facetPolygonIndex < facetPolygons.length; facetPolygonIndex++) {
 		var facetPolygon = facetPolygons[facetPolygonIndex]
 		if (getIsPolygonIntersecting(facetPolygon, polygon)) {
-			intersectingFacetIndexes = getArrayWithAddedElement(intersectingFacetIndexes, facetPolygonIndex)
+			intersectingFacetIndexes = getPushElement(intersectingFacetIndexes, facetPolygonIndex)
 		}
 	}
 	return intersectingFacetIndexes
 }
 
-function getIntersectingFacetIndexesByZ(facets, points, polygon, zList) {
-	if (zList.length != 2) {
-		return null
-	}
+function getIntersectingFacetIndexesByHeight(facets, heights, points, polygon) {
 	var intersectingFacetIndexes = getIntersectingFacetIndexes(facets, points, polygon)
-	var intersectingFacetIndexesByZ = null
-	zList.sort()
-	for (var intersectingFacetIndex of intersectingFacetIndexes) {
+	if (intersectingFacetIndexes == null) {
+		warningByList(['In getIntersectingFacetIndexesByHeight intersectingFacetIndexes == null', polygon, facets, points])
+		return
+	}
+	for (var intersectingIndexIndex = 0; intersectingIndexIndex < intersectingFacetIndexes.length; intersectingIndexIndex++) {
+		var intersectingFacetIndex = intersectingFacetIndexes[intersectingIndexIndex]
 		var z = getZByPointPolygon(polygon[0], getPolygonByFacet(facets[intersectingFacetIndex], points))
-		if (z >= zList[0] && z <= zList[1]) {
-			intersectingFacetIndexesByZ = getArrayWithAddedElement(intersectingFacetIndexesByZ, intersectingFacetIndex)
+		intersectingFacetIndexes[intersectingIndexIndex] = [z, intersectingFacetIndex]
+	}
+	intersectingFacetIndexes.sort(compareFirstElementAscending)
+	if (heights == null) {
+		for (var intersectingIndexIndex = 0; intersectingIndexIndex < intersectingFacetIndexes.length; intersectingIndexIndex++) {
+			intersectingFacetIndexes[intersectingIndexIndex] = intersectingFacetIndexes[intersectingIndexIndex][1]
+		}
+		return intersectingFacetIndexes
+	}
+	var intersectingFacetIndexesByHeight = null
+	heights.sort(compareNumberAscending)
+	var ranges = []
+	for (var heightIndex = 0; heightIndex < heights.length; heightIndex += 2) {
+		var heightNextIndex = heightIndex + 1
+		if (heightNextIndex < heights.length) {
+			ranges.push([heights[heightIndex], heights[heightNextIndex]])
 		}
 	}
-	return intersectingFacetIndexesByZ
+	for (var intersectingFacetIndex of intersectingFacetIndexes) {
+		if (getIsInRanges(ranges, intersectingFacetIndex[0])) {
+			intersectingFacetIndexesByHeight = getPushElement(intersectingFacetIndexesByHeight, intersectingFacetIndex[1])
+		}
+	}
+	return intersectingFacetIndexesByHeight
 }
 
 function getIsFacetPointingOutside(facet, mesh) {
@@ -299,6 +440,15 @@ function getIsFacetPointingOutside(facet, mesh) {
 		return null
 	}
 	return numberOfIntersectionsToLeft % 2 == 0
+}
+
+function getIsInRanges(ranges, value) {
+	for (var range of ranges) {
+		if (value >= range[0] && value <= range[1]) {
+			return true
+		}
+	}
+	return false
 }
 
 function getJoinedCoplanarMesh(mesh) {
@@ -602,10 +752,11 @@ function getNormalByFacet(facet, points) {
 		return null
 	}
 	var lastNormal = null
-	for (vertexIndex = 0; vertexIndex < facet.length - 2; vertexIndex++) {
-		var pointA = points[facet[vertexIndex]]
-		var center = points[facet[vertexIndex + 1]]
-		var pointB = points[facet[vertexIndex + 2]]
+	var crossProductLengthTotal = 0.0
+	for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+		var center = points[facet[vertexIndex]]
+		var pointA = points[facet[(vertexIndex + 1) % facet.length]]
+		var pointB = points[facet[(vertexIndex + 2) % facet.length]]
 		var vectorA = getXYZSubtraction(pointA, center)
 		var vectorB = getXYZSubtraction(pointB, center)
 		var vectorALength = getXYZLength(vectorA)
@@ -614,15 +765,32 @@ function getNormalByFacet(facet, points) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
 			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999999) {
-				var normal = normalizeXYZ(getCrossProduct(vectorA, vectorB))
-				if (lastNormal != null) {
-					if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) > 0.00000000000001) {
-						return null
+				var crossProduct = getCrossProduct(vectorA, vectorB)
+				var crossProductLength = getXYZLength(crossProduct)
+				var normal = divideXYZByScalar(crossProduct, crossProductLength)
+				if (lastNormal == null) {
+					lastNormal = normal
+					crossProductLengthTotal += crossProductLength
+				}
+				else {
+					if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) < 0.00000000000001) {
+						crossProductLengthTotal += crossProductLength
+					}
+					else {
+						invertXYZ(normal)
+						if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) < 0.00000000000001) {
+							crossProductLengthTotal -= crossProductLength
+						}
+						else {
+							return null
+						}
 					}
 				}
-				lastNormal = normal
 			}
 		}
+	}
+	if (crossProductLengthTotal < 0.0) {
+		return invertXYZ(lastNormal)
 	}
 	return lastNormal
 }
@@ -631,10 +799,12 @@ function getNormalByFlatFacet(facet, points) {
 	if (facet.length < 3) {
 		return null
 	}
-	for (vertexIndex = 0; vertexIndex < facet.length - 2; vertexIndex++) {
-		var pointA = points[facet[vertexIndex]]
-		var center = points[facet[vertexIndex + 1]]
-		var pointB = points[facet[vertexIndex + 2]]
+	var lastNormal = null
+	var crossProductLengthTotal = 0.0
+	for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+		var center = points[facet[vertexIndex]]
+		var pointA = points[facet[(vertexIndex + 1) % facet.length]]
+		var pointB = points[facet[(vertexIndex + 2) % facet.length]]
 		var vectorA = getXYZSubtraction(pointA, center)
 		var vectorB = getXYZSubtraction(pointB, center)
 		var vectorALength = getXYZLength(vectorA)
@@ -643,45 +813,75 @@ function getNormalByFlatFacet(facet, points) {
 			divideXYZByScalar(vectorA, vectorALength)
 			divideXYZByScalar(vectorB, vectorBLength)
 			if (Math.abs(getXYZDotProduct(vectorA, vectorB)) < 0.9999999) {
-				return normalizeXYZ(getCrossProduct(vectorA, vectorB))
+				var crossProduct = getCrossProduct(vectorA, vectorB)
+				var crossProductLength = getXYZLength(crossProduct)
+				var normal = divideXYZByScalar(crossProduct, crossProductLength)
+				if (lastNormal == null) {
+					lastNormal = normal
+					crossProductLengthTotal += crossProductLength
+				}
+				else {
+					if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) < 0.00000000000001) {
+						crossProductLengthTotal += crossProductLength
+					}
+					else {
+						invertXYZ(normal)
+						if (getXYZLengthSquared(getXYZSubtraction(normal, lastNormal)) < 0.00000000000001) {
+							crossProductLengthTotal -= crossProductLength
+						}
+					}
+				}
 			}
 		}
+	}
+	if (crossProductLengthTotal < 0.0) {
+		return invertXYZ(lastNormal)
 	}
 	return lastNormal
 }
 
-function getPillarMesh(isSeparate, isTriangular, polygons, transform3D, zList) {
-	if (polygons.length == 0 || zList.length == 0) {
+function getPillarMesh(heights, isSeparate, polygons, transform3D) {
+	if (polygons.length == 0 || heights.length == 0) {
 		return null
 	}
 	var facetsLayers = null
 	var facets = []
+	var isUpsideDown = false
 	var points = []
 	for (var polygon of polygons) {
+		if (polygon.length > 2) {
+			isUpsideDown = heights[0] > heights[heights.length - 1]
+			if (!getIsClockwise(polygon)) {
+				isUpsideDown = !isUpsideDown
+			}
+			break
+		}
+	}
+	for (var polygon of polygons) {
 		if (polygon.length > 0) {
+			if (isUpsideDown) {
+				polygon.reverse()
+			}
 			var endFacets = []
 			var polygon3D = getPolygon3D(polygon, 0.0)
 			if (isSeparate) {
-				for (var zIndex = 0; zIndex < zList.length; zIndex += 2) {
-					addToPillarMesh(endFacets, facets, points, polygon3D, zList.slice(zIndex, zIndex + 2))
+				for (var heightIndex = 0; heightIndex < heights.length; heightIndex += 2) {
+					addToPillarMesh(endFacets, facets, heights.slice(heightIndex, heightIndex + 2), points, polygon3D)
 				}
 			}
 			else {
-				addToPillarMesh(endFacets, facets, points, polygon3D, zList)
+				addToPillarMesh(endFacets, facets, heights, points, polygon3D)
 			}
 			if (facetsLayers == null) {
 				facetsLayers = Array(endFacets.length).fill(null)
 			}
 			for (var endFacetIndex = 0; endFacetIndex < endFacets.length; endFacetIndex++) {
-				facetsLayers[endFacetIndex] = getArrayWithAddedElement(facetsLayers[endFacetIndex], endFacets[endFacetIndex])
+				facetsLayers[endFacetIndex] = getPushElement(facetsLayers[endFacetIndex], endFacets[endFacetIndex])
 			}
 		}
 	}
 	for (var facetsLayer of facetsLayers) {
 		addInsideConnectedFacets(facetsLayer, facets, points)
-	}
-	if (isTriangular) {
-		triangulateFacets(facets)
 	}
 	return {facets:facets, points:points}
 }
@@ -739,6 +939,18 @@ function getPolygonFacet(pointIndexStart, polygon3D) {
 		pointIndexStart += 1
 	}
 	return polygonFacet
+}
+
+function getTriangleMesh(mesh) {
+	var facets = mesh.facets
+	var triangleFacets = []
+	for (var facet of facets) {
+		triangleFacets.push([facet[0], facet[1], facet[2]])
+		for (vertexIndex = 2; vertexIndex < facet.length - 1; vertexIndex++) {
+			triangleFacets.push([facet[0], facet[vertexIndex], facet[vertexIndex + 1]])
+		}
+	}
+	return {facets:triangleFacets, points:mesh.points}
 }
 
 function getTriangleMeshString(filetype, id, mesh) {
@@ -854,15 +1066,5 @@ function removeArrowFromMap(arrows, arrowsMap, key) {
 	}
 	else {
 		arrows.shift()
-	}
-}
-
-function triangulateFacets(facets) {
-	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		var facet = facets[facetIndex]
-		facets[facetIndex] = [facet[0], facet[1], facet[2]]
-		for (vertexIndex = 2; vertexIndex < facet.length - 1; vertexIndex++) {
-			facets.push([facet[0], facet[vertexIndex], facet[vertexIndex + 1]])
-		}
 	}
 }
