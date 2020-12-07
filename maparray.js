@@ -61,6 +61,14 @@ function compareSignedIntersectionAscending(a, b) {
 	return a[0] - b[0]
 }
 
+function getArrayArraysCopy(arrayArrays) {
+	var arrayArraysCopy = new Array(arrayArrays.length)
+	for (var arraysIndex = 0; arraysIndex < arrayArrays.length; arraysIndex++) {
+		arrayArraysCopy[arraysIndex] = getArraysCopy(arrayArrays[arraysIndex])
+	}
+	return arrayArraysCopy
+}
+
 function getArraysBySplittingStrings(strings, stringSeparator) {
 	var arrays = new Array(strings.length)
 	for (var stringIndex = 0; stringIndex < strings.length; stringIndex++) {
@@ -69,12 +77,22 @@ function getArraysBySplittingStrings(strings, stringSeparator) {
 	return arrays
 }
 
-function getArrayWithAddedElement(arrayToAddTo, element) {
-	if (arrayToAddTo == null) {
-		return [element]
+function getArraysCopy(arrays) {
+	var arraysCopy = new Array(arrays.length)
+	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+		arraysCopy[arrayIndex] = arrays[arrayIndex].slice(0)
 	}
-	arrayToAddTo.push(element)
-	return arrayToAddTo
+	return arraysCopy
+}
+
+function getArraysToString(arrays) {
+	var arraysToString = []
+	for (var array of arrays) {
+		for (var element of array) {
+			arraysToString.push(element.toString())
+		}
+	}
+	return arraysToString
 }
 
 function getNumberOfDifferences(arraysA, arraysB) {
@@ -99,30 +117,12 @@ function getNumberOfDifferences(arraysA, arraysB) {
 	return numberOfDifferences
 }
 
-function getArraysToString(arrays) {
-	var arraysToString = []
-	for (var array of arrays) {
-		for (var element of array) {
-			arraysToString.push(element.toString())
-		}
+function getPushElement(arrayToAddTo, element) {
+	if (arrayToAddTo == null) {
+		return [element]
 	}
-	return arraysToString
-}
-
-function getArrayArraysCopy(arrayArrays) {
-	var arrayArraysCopy = new Array(arrayArrays.length)
-	for (var arraysIndex = 0; arraysIndex < arrayArrays.length; arraysIndex++) {
-		arrayArraysCopy[arraysIndex] = getArraysCopy(arrayArrays[arraysIndex])
-	}
-	return arrayArraysCopy
-}
-
-function getArraysCopy(arrays) {
-	var arraysCopy = new Array(arrays.length)
-	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
-		arraysCopy[arrayIndex] = arrays[arrayIndex].slice(0)
-	}
-	return arraysCopy
+	arrayToAddTo.push(element)
+	return arrayToAddTo
 }
 
 function notNullCheck(element) {
