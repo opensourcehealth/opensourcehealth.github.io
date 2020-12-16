@@ -91,6 +91,23 @@ function addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection, y) {
 	}
 }
 
+function addPolygonToNodeStrings(alongIndexesMap, nodeStrings, polygon, prefix, prefixOther) {
+	for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
+		var endIndex = (pointIndex + 1) % polygon.length
+		var alongIndexKey = prefix + pointIndex.toString()
+		nodeStrings.push(alongIndexKey)
+		if (alongIndexesMap.has(alongIndexKey)) {
+			var alongIndexes = alongIndexesMap.get(alongIndexKey)
+			for (var alongIndex of alongIndexes) {
+				var meetingIndexString = alongIndex[1].toString()
+				nodeStrings.push('m' + prefixOther + meetingIndexString)
+				nodeStrings.push('m' + prefix + meetingIndexString)
+			}
+		}
+		nodeStrings.push(prefix + endIndex.toString())
+	}
+}
+/*
 function addToMeetingMapByRotated(a, aX, b, bX, c, close, d, meetingMap) {
 	if (aX == bX) {
 		return null
@@ -122,7 +139,7 @@ function addToMeetingMapByRotated(a, aX, b, bX, c, close, d, meetingMap) {
 	meetingMap.set(key, meeting)
 	return cPortion
 }
-
+*/
 function convertFacetsToPolygons(facets) {
 	for (var facet of facets) {
 		convertFacetsToPolygon(facet)
@@ -523,7 +540,7 @@ function getIntersectionPortionsByRotated(aX, bX, c, close, d) {
 //	console.log(xIntercept)
 	return [cPortion]
 }
-*/
+
 function getIntersectionPortions(a, b, c, d) {
 	var meetingMap = new Map()
 	deltaAB = getXYSubtraction(b, a)
@@ -536,6 +553,117 @@ function getIntersectionPortions(a, b, c, d) {
 	dT = getXYRotation(d, reverseRotation)
 	cPortion = addToMeetingMapByRotated(a, aT[0], b, bT[0], cT, close, dT, meetingMap)
 	return cPortion
+}
+*/
+
+function getIntersectedPolygons(toolPolygon, workPolygon) {
+	var alongIndexesMap = new Map()
+	var intersectedPolygons = []
+	var nodeStrings = []
+	var nodeMap = new Map()
+	var segmentMap = new Map()
+	var meetings = []
+	var workPointIndexes = []
+	for (var toolPointIndex = 0; toolPointIndex < toolPolygon.length; toolPointIndex++) {
+		var toolEndIndex = (toolPointIndex + 1) % toolPolygon.length
+		var toolBegin = toolPolygon[toolPointIndex]
+		var toolEnd = toolPolygon[toolEndIndex]
+		var delta = getXYSubtraction(toolEnd, toolBegin)
+		var deltaLength = getXYLength(delta)
+		if (deltaLength != 0.0) {
+			divideXYByScalar(delta, deltaLength)
+			var reverseRotation = [delta[0], -delta[1]]
+			var toolBeginRotated = getXYRotation(toolBegin, reverseRotation)
+			var toolEndRotated = getXYRotation(toolEnd, reverseRotation)
+			var y = toolBeginRotated[1]
+			var workPolygonRotated = getXYRotations(workPolygon, reverseRotation)
+			for (var workPointIndex = 0; workPointIndex < workPolygonRotated.length; workPointIndex++) {
+				var workEndIndex = (workPointIndex + 1) % workPolygonRotated.length
+				var workBegin = workPolygonRotated[workPointIndex]
+				var workEnd = workPolygonRotated[workEndIndex]
+				var meeting = getMeeting(toolBeginRotated[0], toolEndRotated[0], y, workBegin, workEnd)
+				if (meeting != null) {
+					addArrayElementToMap([meeting.toolAlong, meetings.length], 't,' + toolPointIndex.toString(), alongIndexesMap)
+					addArrayElementToMap([meeting.workAlong, meetings.length], 'w,' + workPointIndex.toString(), alongIndexesMap)
+					meetings.push(meeting)
+					workPointIndexes.push(workPointIndex)
+				}
+			}
+		}
+	}
+	for (var alongIndexes of alongIndexesMap.values()) {
+		alongIndexes.sort(compareFirstElementAscending)
+	}
+	addPolygonToNodeStrings(alongIndexesMap, nodeStrings, toolPolygon, 't,', 'w,')
+	addPolygonToNodeStrings(alongIndexesMap, nodeStrings, workPolygon, 'w,', 't,')
+	for (var nodeStringIndex = 0; nodeStringIndex < nodeStrings.length; nodeStringIndex += 2) {
+		nodeMap.set(nodeStrings[nodeStringIndex], nodeStrings[nodeStringIndex + 1])
+	}
+	var nodePolygons = []
+	for (var nodeKey of nodeMap.keys()) {
+		var nodeValue = nodeMap.get(nodeKey)
+		if (nodeValue != null) {
+			var nodePolygon = []
+			nodePolygons.push(nodePolygon)
+			for (var whileIndex = 0; whileIndex < 987654; whileIndex++) {
+				nodeMap.set(nodeKey, null)
+				if (nodeValue == null) {
+					break
+				}
+				else {
+					nodePolygon.push(nodeKey)
+				}
+				nodeKey = nodeValue
+				nodeValue = nodeMap.get(nodeKey)
+			}
+		}
+	}
+	for (var nodePolygon of nodePolygons) {
+		for (var node of nodePolygon) {
+			var nodeStrings = node.split(',')
+			if (nodeStrings[0] == 't') {
+				if (getIsPointInsidePolygon(toolPolygon[parseInt(nodeStrings[1])], workPolygon)) {
+					intersectedPolygons.push(nodePolygon)
+				}
+				break
+			}
+			if (nodeStrings[0] == 'w') {
+				if (!getIsPointInsidePolygon(workPolygon[parseInt(nodeStrings[1])], toolPolygon)) {
+					intersectedPolygons.push(nodePolygon)
+				}
+				break
+			}
+		}
+	}
+	for (var intersectedPolygon of intersectedPolygons) {
+		for (var nodeStringIndex = 0; nodeStringIndex < intersectedPolygon.length; nodeStringIndex++) {
+			var nodeStrings = intersectedPolygon[nodeStringIndex].split(',')
+			var nodeIndex = parseInt(nodeStrings[1])
+			if (nodeStrings[0] == 't') {
+				intersectedPolygon[nodeStringIndex] = toolPolygon[nodeIndex]
+			}
+			else {
+				if (nodeStrings[0] == 'w') {
+					intersectedPolygon[nodeStringIndex] = workPolygon[nodeIndex]
+				}
+				else {
+					var workAlong = meetings[nodeIndex].workAlong
+					var point = workPolygon[workPointIndexes[nodeIndex]].slice(0)
+					var endPoint = workPolygon[(workPointIndex + 1) % workPolygon.length]
+					if (point.length == 2) {
+						multiplyXYByScalar(point, (1.0 - workAlong))
+						addXY(point, getXYMultiplicationByScalar(endPoint, workAlong))
+					}
+					else {
+						multiplyXYZByScalar(point, (1.0 - workAlong))
+						addXYZ(point, getXYZMultiplicationByScalar(endPoint, workAlong))
+					}
+					intersectedPolygon[nodeStringIndex] = point
+				}
+			}
+		}
+	}
+	return intersectedPolygons
 }
 
 function getIsClockwise(polygon) {
@@ -858,6 +986,42 @@ function getMaximumXIntersectionByPolygon(xy, xyPolygonB) {
 		return null
 	}
 	return maximumX
+}
+
+function getMeeting(toolBeginX, toolEndX, toolY, workBegin, workEnd) {
+	if (toolBeginX == toolEndX) {
+		return null
+	}
+	if (toolBeginX > toolEndX) {
+		console.log('should never happen toolBeginX > toolEndX:' + toolBeginX + '    toolEndX:' + toolEndX)
+		console.log('toolBeginX:' + toolBeginX + '    toolEndX:' + toolEndX)
+	}
+	var workBeginX = workBegin[0]
+	var workEndX = workEnd[0]
+	var workBeginY = workBegin[1]
+	var workEndY = workEnd[1]
+	if ((workBeginX < toolBeginX) && (workEndX < toolBeginX)) {
+		return null
+	}
+	if ((workBeginX > toolEndX) && (workEndX > toolEndX)) {
+		return null
+	}
+	if ((workBeginY < toolY) && (workEndY < toolY)) {
+		return null
+	}
+	if ((workBeginY > toolY) && (workEndY > toolY)) {
+		return null
+	}
+	var deltaY = workEndY - workBeginY
+	var workAlong = (toolY - workBeginY) / deltaY
+	var toolInterceptX = (1.0 - workAlong) * workBeginX + workAlong * workEndX
+	if (toolInterceptX < toolBeginX) {
+		return null
+	}
+	if (toolInterceptX > toolEndX) {
+		return null
+	}
+	return {toolAlong:(toolInterceptX - toolBeginX) / (toolEndX - toolBeginX), workAlong:workAlong}
 }
 /*
 function getNormalByPolygon(polygon) {
