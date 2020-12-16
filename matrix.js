@@ -652,12 +652,24 @@ function getXYMultiplication(xyA, xyB) {
 	return [xyA[0] * xyB[0], xyA[1] * xyB[1]]
 }
 
+function getXYMultiplicationByScalar(xyA, scalarMultiplier) {
+	return [xyA[0] * scalarMultiplier, xyA[1] * scalarMultiplier]
+}
+
 function getXYPolar(angle, radius) {
 	return [radius * Math.cos(angle), radius * Math.sin(angle)]
 }
 
 function getXYRotation(xy, xyRotator) {
 	return [xy[0] * xyRotator[0] - xy[1] * xyRotator[1], xy[0] * xyRotator[1] + xy[1] * xyRotator[0]]
+}
+
+function getXYRotations(xys, xyRotator) {
+	var xyRotations = new Array(xys.length)
+	for (var xyIndex = 0; xyIndex < xys.length; xyIndex++) {
+		xyRotations[xyIndex] = getXYRotation(xys[xyIndex], xyRotator)
+	}
+	return xyRotations
 }
 
 function getXYSubtraction(xyA, xyB) {
