@@ -1,5 +1,7 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+var gCapitalizationMap = new Map()
+
 function addSliceToWords(lineSlice, quoteSeparatedWords) {
 	if (lineSlice.indexOf('=') != -1) {
 		lineSlice = getLineWithEndspace(['/>', '>', '[', '{'], lineSlice)
@@ -8,11 +10,21 @@ function addSliceToWords(lineSlice, quoteSeparatedWords) {
 	pushArray(quoteSeparatedWords, snippets)
 }
 
+function addToCapitalizationMap(capitalizedWordString) {
+	capitalizedWords = capitalizedWordString.split(' ').filter(lengthCheck)
+	for (var capitalizedWord of capitalizedWords) {
+		wordLower = capitalizedWord.toLowerCase()
+		if (capitalizedWord != wordLower) {
+			gCapitalizationMap.set(wordLower, capitalizedWord)
+		}
+	}
+}
+
 function getAttributes(tokens) {
 	var attributes = []
 	var key = null
 	var values = []
-	for (token of tokens) {
+	for (var token of tokens) {
 		if (token == '=') {
 			if (key != null) {
 				attributes.push([key, values.slice(0, -1).join(' ')])
@@ -30,6 +42,13 @@ function getAttributes(tokens) {
 	return attributes
 }
 
+function getCapitalizedKey(key) {
+	if (gCapitalizationMap.has(key.toLowerCase())) {
+		return gCapitalizationMap.get(key.toLowerCase())
+	}
+	return key
+}
+
 function getEndOfLine(text) {
 	if (text.indexOf('\r\n') > -1) {
 		return '\r\n'
@@ -45,7 +64,7 @@ function getJoinWord() {
 }
 
 function getLineWithEndspace(endWords, line) {
-	for (endWord of endWords) {
+	for (var endWord of endWords) {
 		if (line.endsWith(endWord)) {
 			spaceThenEndWord = ' ' + endWord
 			if (!line.endsWith(spaceThenEndWord)) {
@@ -61,7 +80,7 @@ function getQuoteSeparatedWords(line) {
 	var searchIndexes = [-1,-1]
 	var start = 0
 	var quoteSeparatedWords = []
-	for (whileIndex = 0; whileIndex < 9876543; whileIndex++) {
+	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
 		for (quoteIndex = quoteSymbols.length -1; quoteIndex > -1; quoteIndex--) {
 			searchIndex = line.indexOf(quoteSymbols[quoteIndex], start)
 			if (searchIndex < 0) {
