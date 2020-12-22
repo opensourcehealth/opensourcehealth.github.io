@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8"/>
+	<title>Travelgame</title>
+</head>
+<body>
+<table>
+<tr>
+<th><p id="paragraphText"></p></th><th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
+</tr>
+</table>
+<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
+<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
+<a hidden="true" id="queryLink" href="index.html">Original Link</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select id="pixelSelect" onchange ="pixelSelectChanged()"></select>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<select id="scaleSelect" onchange ="scaleSelectChanged()"></select><br>
+<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<br>
+<h3>SVG</h3>
+<textarea id="svgArea" rows="40" cols="120"></textarea><br>
+<br>
+<br>
+<script src="codec.js"></script>
+<script src="help.js"></script>
+<script src="maparray.js"></script>
+<script src="matrix.js"></script>
+<script src="parsenumber.js"></script>
+<script src="parseword.js"></script>
+<script src="terrainviewer.js"></script>
+<script>
+//License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
+//
+//Everything has getChildrenInBoundingBox(can be null), getSpeed(can be 0), id, image
+//view map=region, mouseMoved other directions, resolution 1km move 6
+//View, travel, drive, hiring, working, trading, saving
+//building, learning, make earth map, hiding/stealing, lying/counterfeiting/forgery, taking, killing
+//Asteroid, firestorm, volcano, flood, fish, plague, global warming, biodiversity
+//view from flight, aerovator
+
+function addToDescendants(descendants, statement) {
+	var lengthLimit = 10000000
+	if (descendants.length >= lengthLimit) {
+		var warningText = 'Recursion limit of\ndescendants reached, no further statements will be processed.'
+		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
+		warning(warningText, warningVariables)
+		return
+	}
+	if (statement.children != null) {
+		for (var child of statement.children) {
+			descendants.push(child)
+			addToDescendants(descendants, child)
+		}
+	}
+}
+
+function getBracketedEntry(bracketString) {
+	indexOfBeginBracket = bracketString.indexOf('(')
+	indexOfEndBracket = bracketString.indexOf(')')
+	if (indexOfBeginBracket == -1 || indexOfEndBracket == -1 || indexOfBeginBracket > indexOfEndBracket) {
+		return null
+	}
+	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
+}
+
+function getDescendants(statement) {
+	var descendants = []
+	addToDescendants(descendants, statement)
+	return descendants
+}
+
+function getFunctionMapCapitalize(alternatingEntries) {
+	var functionMap = new Map()
+	for (alternatingIndex = 0; alternatingIndex < alternatingEntries.length; alternatingIndex += 2) {
+		key = alternatingEntries[alternatingIndex]
+		keyLower = key.toLowerCase()
+		if (key != keyLower) {
+			gCapitalizationMap.set(keyLower, key)
+		}
+		nextIndex = alternatingIndex + 1
+		value = alternatingEntries[nextIndex]
+		functionMap.set(key, value)
+	}
+	return functionMap
+}
+
+function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix) {
+	searchSuffix = '.' + searchSuffix
+	var replacedTokens = []
+	var tokens = getTokens('-', [bracketString])
+	tokens = getTokens('+', tokens)
+	for (var token of tokens) {
+		indexOfSearchSuffix = token.indexOf(searchSuffix)
+		if (indexOfSearchSuffix != -1) {
+			beforeSuffix = token.slice(0, indexOfSearchSuffix).trim()
+			if (replacementMap.has(beforeSuffix)) {
+				value = parseFloat(replacementMap.get(beforeSuffix)) + increment
+				replacedTokens.push(value)
+			}
+			else {
+				warningText = 'Error in getIDReplacedBySuffix, could not find id:\nin search string:'
+				warningVariables = [beforeSuffix, bracketString]
+				warning(warningText, warningVariables)
+			}
+		}
+		else {
+			replacedTokens.push(token)
+		}
+	}
+	return replacedTokens.join('')
+}
+
+function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
+	if (bracketString.indexOf(']') == -1) {
+		return getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix)
+	}
+	var splitBracketStrings = bracketString.split(']')
+	var replacedStrings = []
+	for (var splitBracketString of splitBracketStrings) {
+		if (splitBracketString.length > 1) {
+			var tokens = splitBracketString.split('[')
+			if (tokens[0].length > 0) {
+				replacedStrings.push(tokens[0])
+			}
+			var lastToken = tokens[tokens.length - 1].replace(/ /g, '')
+			if (replacementMap.has(lastToken)) {
+				value = parseFloat(replacementMap.get(lastToken)) + increment
+				replacedStrings.push(value)
+			}
+			else {
+				warningText = 'Error in getIDReplaced, could not find id:\nin search string:'
+				warningVariables = [lastToken, bracketString]
+				warning(warningText, warningVariables)
+			}
+		}
+	}
+	return replacedStrings.join('')
+}
+
+function getIsIDUnique(id, registry, statement) {
+	if (registry.idMap.has(id)) {
+		return false
+	}
+	statement.attributeMap.set('id', id)
+	return true
+}
+
+function getKeyStatement(key, statement) {
+	if (statement.attributeMap.has(key)) {
+		return [key, statement]
+	}
+	key = statement.tag + '.' + key
+	statement = statement.parent
+	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
+		if (statement == null) {
+			break
+		}
+		else {
+			if (statement.attributeMap.has(key)) {
+				return [key, statement]
+			}
+			statement = statement.parent
+		}
+	}
+	return null
+}
+
+function getLineByStatement(passthrough, statement) {
+	if (statement.tag == null) {
+		if (statement.nestingIncrement == -1) {
+			if (statement.openingStatement == null) {
+				return '</g>'
+			}
+			else {
+				if (statement.openingStatement.tag == passthrough) {
+					return '</' + passthrough + '>'
+				}
+				return '</g>'
+			}
+		}
+		else {
+			return ''
+		}
+	}
+	firstWord = '<g'
+	if (statement.nestingIncrement < 1 || statement.tag == passthrough) {
+		firstWord = '<' + statement.tag
+	}
+	attributeWords = [firstWord]
+	for (var entry of statement.attributeMap) {
+		value = entry[1]
+		quoteString = '"'
+		if (value.indexOf('"') != -1) {
+			quoteString = '\''
+		}
+		attributeWords.push(entry[0] + '=' + quoteString + value + quoteString)
+	}
+	attributeLine = attributeWords.join(' ')
+	lineClosing = '>'
+	if (statement.nestingIncrement == 0) {
+		lineClosing = '/>'
+	}
+	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
+		return attributeLine + lineClosing
+	}
+	return attributeLine + ' ' + lineClosing
+}
+
+function getStatement(line) {
+	var children = null
+	var nestingIncrement = 0
+	var quoteSeparatedWords = getQuoteSeparatedWords(line)
+	var lastIndex = quoteSeparatedWords.length - 1
+	var tag = null
+	if (quoteSeparatedWords.length > 0) {
+		firstWord = quoteSeparatedWords[0]
+		if (firstWord.startsWith('</') || firstWord == ']' || firstWord == '}') {
+			nestingIncrement = -1
+		}
+		else {
+			if (firstWord.startsWith('<')) {
+				firstWord = firstWord.slice(1)
+			}
+			if (firstWord.length > 0) {
+				tag = getCapitalizedKey(firstWord)
+			}
+		}
+		if (quoteSeparatedWords.length > 1) {
+			var lastWord = quoteSeparatedWords[lastIndex]
+			if (lastWord == '>' || lastWord == '[' || lastWord == '{') {
+				nestingIncrement = 1
+			}
+			if (lastWord.endsWith('>') || lastWord == '[' || lastWord == '{') {
+				lastIndex -= 1
+			}
+		}
+	}
+	if (tag != null) {
+		children = []
+	}
+	var attributes = getAttributes(quoteSeparatedWords.slice(1, lastIndex + 1))
+	for (var attribute of attributes) {
+		keyStrings = attribute[0].split('.')
+		if (keyStrings.length == 1) {
+			attribute[0] = getCapitalizedKey(attribute[0])
+		}
+		else {
+			if (keyStrings.length == 2) {
+				keyStrings[0] = getCapitalizedKey(keyStrings[0])
+				keyStrings[1] = getCapitalizedKey(keyStrings[1])
+				attribute[0] = keyStrings.join('.')
+			}
+		}
+	}
+	var attributeMap = new Map(attributes)
+	var statement = {
+	attributeMap:attributeMap,
+	children:children,
+	nestingIncrement:nestingIncrement,
+	openingStatement:null,
+	parent:null,
+	tag:tag}
+	return statement
+}
+
+function getStatementID(registry, statement) {
+	if (statement.attributeMap.has('id')) {
+		return statement.attributeMap.get('id')
+	}
+	const idJoinWord = '_'
+	var statementID = statement.tag
+	if (statement.attributeMap.has('work')) {
+		statementID += idJoinWord + statement.attributeMap.get('work')
+	}
+	else {
+		var parentMap = statement.parent.attributeMap
+		if (parentMap.has('id')) {
+			statementID += idJoinWord + parentMap.get('id')
+		}
+	}
+	if (getIsIDUnique(statementID, registry, statement)) {
+		return statementID
+	}
+	if (statement.attributeMap.has('points')) {
+		var pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
+		statementID += idJoinWord + pointStrings.join(idJoinWord)
+		if (getIsIDUnique(statementID, registry, statement)) {
+			return statementID
+		}
+	}
+	var keys = 'cx cy x y r'.split(' ')
+	for (var key of keys) {
+		if (statement.attributeMap.has(key)) {
+			statementID += idJoinWord + key + statement.attributeMap.get(key)
+			if (getIsIDUnique(statementID, registry, statement)) {
+				return statementID
+			}
+		}
+	}
+	for (whileIndex = 1; whileIndex < 987654; whileIndex++) {
+		var check = statementID + idJoinWord + whileIndex.toString()
+		if (getIsIDUnique(check, registry, statement)) {
+			return check
+		}
+	}
+	return statementID
+}
+
+function getTokens(delimeter, searchStrings) {
+	tokens = []
+	for (var searchString of searchStrings) {
+		subTokens = searchString.split(delimeter)
+		for (subTokenIndex = 0; subTokenIndex < subTokens.length; subTokenIndex++) {
+			tokens.push(subTokens[subTokenIndex])
+			if (subTokenIndex < subTokens.length - 1) {
+				tokens.push(delimeter)
+			}
+		}
+	}
+	return tokens
+}
+
+function processDescendants(registry, rootStatement, tagMap) {
+	var descendants = [rootStatement]
+	addToDescendants(descendants, rootStatement)
+	for (var statement of descendants) {
+		if (tagMap.has(statement.tag)) {
+			tagMap.get(statement.tag)(registry, statement)
+		}
+	}
+}
+
+function processCreature(registry, statement) {
+	var attributeMap = statement.attributeMap
+	if (!attributeMap.has('archetype')) {
+		return
+	}
+	var storageMap = registry.storageMap
+	var selectedRegion = storageMap.get('selectedRegion')
+	var archetype = attributeMap.get('archetype')
+	var creature = new Creature(archetype)
+	if (selectedRegion != null) {
+		selectedRegion.add(creature)
+	}
+}
+
+function processRegion(registry, statement) {
+	var attributeMap = statement.attributeMap
+	if (!attributeMap.has('terrain')) {
+		return
+	}
+	var storageMap = registry.storageMap
+	var selectedRegion = storageMap.get('selectedRegion')
+	var terrain = attributeMap.get('terrain')
+	var region = new Region(terrain)
+	if (selectedRegion != null) {
+		selectedRegion.add(region)
+	}
+	storageMap.set('selectedRegion', region)
+	terrainViewer.region = region
+}
+
+function processView(registry, statement) {
+	var attributeMap = statement.attributeMap
+	angle = getFloatValue(40.0, 'angle', registry, statement) * Math.PI / 180.0
+	cx = getFloatValue(0.0, 'cx', registry, statement)
+	cy = getFloatValue(0.0, 'cy', registry, statement)
+	radius = getFloatValue(1.0, 'r', registry, statement)
+	sagAngle = getFloatValue(15.0, 'sagAngle', registry, statement) * Math.PI / 180.0
+	sides = getFloatValue(24.0, 'sides', registry, statement)
+	points = []
+	beginAngle = Math.PI / 2.0 - angle
+	endAngle = 1.5 * Math.PI + angle
+	maximumIncrement = 2.0 * Math.PI / sides
+	deltaAngle = endAngle - beginAngle
+	arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * angle)
+	angleIncrement = deltaAngle / arcSides
+	halfAngleIncrement = 0.5 * angleIncrement
+	beginAngle -= halfAngleIncrement
+	endAngle += halfAngleIncrement + 0.001 * angle
+	outerRadius = radius / Math.cos(0.5 * angleIncrement)
+	for (pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
+		x = cx + Math.sin(pointAngle) * outerRadius
+		y = cy + Math.cos(pointAngle) * outerRadius
+		points.push([x, y])
+	}
+	topY = cy + radius
+	deltaBegin = getXYSubtraction(points[0], points[1])
+	sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
+	segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
+	approachRunOverRise = sagRunOverRise - segmentRunOverRise
+	topMinusSegment = topY - points[0][1]
+	topX = topMinusSegment * segmentRunOverRise + points[0][0]
+	aboveMinusTopY = (topX - cx) / approachRunOverRise
+	sagDeltaX = aboveMinusTopY * sagRunOverRise
+	aboveY = topY + aboveMinusTopY
+	points[0] = [cx + sagDeltaX, aboveY]
+	points[points.length - 1] = [cx - sagDeltaX, aboveY]
+	for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		point = points[pointIndex]
+		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
+	}
+	attributeMap.set('points', points.join(' '))
+	statement.tag = 'polygon'
+}
+
+function update() {
+	var svgString = updateSVGArea()
+	document.getElementById('paragraphText').innerHTML = svgString
+	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
+}
+
+function updateSVGArea() {
+	var documentRoot = getStatement('documentRoot {')
+	var lastParent = documentRoot
+	var lines = getBracketReplacedLines('wordArea')
+//	var maximumWidth = 740
+	var maximumWidth = 390
+	var storageMap = new Map()
+	storageMap.set('selectedEntity', null)
+	storageMap.set('selectedRegion', null)
+	storageMap.set('terrainViewer.maximumHeight', maximumWidth)
+	storageMap.set('terrainViewer.maximumWidth', maximumWidth)
+	var registry = {defaultMap:new Map(), idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
+	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
+	var svgStatement = null
+	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		line = lines[lineIndex]
+		var statement = getStatement(line)
+		statement.parent = lastParent
+		statement.parent.children.push(statement)
+		if (statement.tag != null) {
+			registry.idMap.set(getStatementID(registry, statement), statement)
+		}
+		if (statement.nestingIncrement == 1) {
+			lastParent = statement
+		}
+		else {
+			if (statement.nestingIncrement == -1) {
+				if (lastParent.parent == null) {
+					lastParent.children.pop(statement)
+					warning('Warning, text has too many closing brackets, at lineIndex:', [lineIndex, lastParent, statement])
+				}
+				else {
+					lastParent = lastParent.parent
+					statement.openingStatement = statement.parent
+				}
+			}
+		}
+		if (svgStatement == null) {
+			if (statement.tag == 'svg') {
+				svgStatement = statement
+			}
+		}
+	}
+	for (childIndex = documentRoot.children.length -1; childIndex > -1; childIndex--) {
+		child = documentRoot.children[childIndex]
+		if (child.tag == null && child.openingStatement == null) {
+			documentRoot.children.splice(childIndex, 1)
+		}
+	}
+	processDescendants(registry, documentRoot, gTagGameMap)
+	if (svgStatement == null) {
+		svgStatement = documentRoot
+		svgStatement.tag = 'svg'
+		svgEnd = getStatement('</svg>')
+		svgStatement.children.push(svgEnd)
+		svgEnd.openingStatement = svgStatement
+	}
+	else {
+		documentRoot = null
+		svgStatement.parent = null
+	}
+	var defaultStatement = getStatement('default')
+	for (var entry of registry.defaultMap) {
+		tagMap = entry[1]
+		defaultStrings = []
+		for (var tagEntry of tagMap) {
+			defaultStrings.push(tagEntry.join(':'))
+		}
+		defaultStatement.attributeMap.set(entry[0], defaultStrings.join(';'))
+	}
+	if (defaultStatement.attributeMap.size > 0) {
+		svgStatement.children.splice(0, 0, defaultStatement)
+		defaultStatement.parent = svgStatement
+	}
+	var descendants = [svgStatement]
+	addToDescendants(descendants, svgStatement)
+	var lineThickness = 10
+	var boundingBox = null
+	var height = 200
+	var padding = 5
+	var width = 200
+//	if (boundingBox != null) {
+//		height += boundingBox[1][1]
+//		width += boundingBox[1][0] + lineThickness
+//	}
+	if (registry.storageMap.has('group')) {
+		width += registry.storageMap.get('group').scaledBorder
+	}
+	if (!svgStatement.attributeMap.has('height')) {
+		svgStatement.attributeMap.set('height', height.toFixed())
+	}
+	if (!svgStatement.attributeMap.has('style')) {
+		svgStatement.attributeMap.set('style', 'border:1px solid black;padding:' + padding.toString() + 'px')
+	}
+	if (!svgStatement.attributeMap.has('width')) {
+		svgStatement.attributeMap.set('width', width.toFixed())
+	}
+	if (!svgStatement.attributeMap.has('xmlns')) {
+		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
+	}
+	var nesting = 0
+	var svgLines = []
+	for (var statement of descendants) {
+		if (statement.nestingIncrement < 0) {
+			nesting += statement.nestingIncrement
+		}
+		var svgLine = getLineByStatement('svg', statement)
+		for (var indentationIndex = 1; indentationIndex < nesting; indentationIndex++) {
+			svgLine = '  ' + svgLine
+		}
+		svgLines.push(svgLine)
+		if (statement.nestingIncrement > 0) {
+			nesting += statement.nestingIncrement
+		}
+	}
+	var joinWord = getJoinWord()
+	var svgString = svgLines.join(joinWord)
+	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('svgArea', svgLines)
+	document.getElementById('svgArea').value = svgString
+	terrainViewer.start(registry.storageMap.get('terrainViewer.maximumHeight'))
+	return svgString
+}
+
+function widenPolygonBoundingBox(boundingBox, caller, statement) {
+	var points = getPolygonPoints(statement)
+	if (points == null) {
+		return boundingBox
+	}
+	var transformedMatrix = getTransformed2DMatrix(caller, statement)
+	for (var point of points) {
+		transform2DPoint(point, transformedMatrix)
+		if (boundingBox == null) {
+			boundingBox = [point.slice(0), point.slice(0)]
+		}
+		else {
+			widenBoundingBox(boundingBox, point)
+		}
+	}
+	return boundingBox
+}
+
+function widenStatementBoundingBox(boundingBox, caller, statement) {
+	if (statement.tag == 'polygon') {
+		return widenPolygonBoundingBox(boundingBox, caller, statement)
+	}
+	return boundingBox
+}
+
+function Creature(archetype) {
+	this.archetype = archetype
+	this.children = []
+	this.location = null
+	this.parent = null
+	this.add = function(child) {
+		this.children.push(child)
+		child.location = null
+		child.parent = this
+		return true
+	}
+	this.getChildren = function() {
+		return this.children
+	}
+}
+
+function Region(terrain) {
+	this.addLocation = [0, 0]
+	this.childrenMap = new Map()
+	this.location = [0, 0]
+	this.parent = null
+	this.terrainMap = new Map()
+	this.terrain = terrain
+	this.add = function(child) {
+		var addKey = this.addLocation[0].toString() + ',' + this.addLocation[1].toString()
+		var children = null
+		if (this.childrenMap.has(addKey)) {
+			children = this.childrenMap.get(addKey)
+		}
+		else {
+			children = []
+			this.childrenMap.set(addKey, children)
+		}
+		children.push(child)
+		child.location = this.addLocation.slice(0)
+		child.parent = this
+		return true
+	}
+	this.getChildren = function() {
+		var allChildren = []
+		for (var children of this.childrenMap.values()) {
+			pushArray(allChildren, children)
+		}
+		return allChildren
+	}
+}
+
+var gCapitalizationMap = new Map()
+var gTagGameMap = getFunctionMapCapitalize([
+	'creature', processCreature,
+	'region', processRegion,
+	'view', processView])
+
+setTextArea('wordArea')
+update()
+</script>
+</body>
+</html>
