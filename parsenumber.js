@@ -1,7 +1,9 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gClose = 0.0000001
+const gHashMultiplier = 1.0 / 65537
 const gOneOverClose = Math.round(1.0 / gClose)
+const gHashRemainderMultiplier = (1.0 - (65536.0 * gHashMultiplier)) / 65536.0
 
 function get2DMatrix(attributeMap) {
 	if (attributeMap == null) {
@@ -89,6 +91,34 @@ function getFloatValue(defaultValue, key, registry, statement) {
 	floatString = keyStatement[1].attributeMap.get(keyStatement[0])
 	attributeMap.delete(key)
 	return parseFloat(floatString)
+}
+
+function getHashCubed(text) {
+	var hashAround = getHashFloat(text) - 0.5
+	return hashAround * hashAround * hashAround * 4.0
+}
+
+function getHashFloat(text) {
+	var hash = 0
+	for (var index = text.length - 1; index > -1; index--) {
+		hash = (hash << 5) - hash + text.charCodeAt(index)
+		hash = hash & hash
+	}
+	var hashPositive = hash >>> 0
+	hash = getRotated32Bit(hash, (hashPositive) % 31)
+	hash = getRotatedLow24Bit(hash, (hashPositive) % 23)
+//	25033 = 65536 * (1.5 - Math.sqrt(1.25))
+	return ((((hash >>> 0) % 65537) * 25033) % 65537) * gHashMultiplier + Math.abs(hash >> 15) * gHashRemainderMultiplier
+}
+
+function getRotated32Bit(a, rotation)
+{
+	return a >>> rotation | a << (-rotation & 31)
+}
+
+function getRotatedLow24Bit(a, rotation)
+{
+	return (a << 8) >>> (8 + rotation) | (a << (-rotation & 31)) >>> 8 | (a >>> 24) << 24
 }
 
 function getTransformed2DMatrix(caller, statement) {
