@@ -118,43 +118,6 @@ var terrainViewer = {
 			this.pathByPolygon(sideArrow)
 			this.drawPath()
 		}
-		return
-		var mesh = this.objectMap.get(this.view.id).getMesh()
-		var facets = mesh.facets
-		var zPolygons = []
-		var centerRotationMatrix = getMultiplied3DMatrix(this.view.rotationMatrix, this.view.scaleCenterMatrix)
-		centerRotationMatrix = getMultiplied3DMatrix(this.canvasCenterMatrix, centerRotationMatrix)
-		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-		var xyzs = getXYZsBy3DMatrix(centerRotationMatrix, mesh.points)
-		for (var facet of facets) {
-			var zPolygon = [new Array(facet.length), facet]
-			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-				zPolygon[0][vertexIndex] = xyzs[facet[vertexIndex]][2]
-			}
-			zPolygon[0].sort(compareNumberDescending)
-			var normal = getNormalByFlatFacet(facet, xyzs)
-			if (normal != null) {
-				if (normal[2] < 0.0) {
-					zPolygons.push(zPolygon)
-				}
-			}
-		}
-		zPolygons.sort(compareArrayAscending)
-//		var widthOverLength = 6.0 / zPolygons.length
-		this.context.lineWidth = 5.0
-		this.context.strokeStyle = 'black'
-		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
-			this.context.beginPath()
-			var facet = zPolygons[zPolygonIndex][1]
-			this.moveToXY(xyzs[facet[0]])
-			for (var vertexIndex = 1; vertexIndex < facet.length; vertexIndex++) {
-				this.lineToXY(xyzs[facet[vertexIndex]])
-			}
-			this.context.closePath()
-//			this.context.lineWidth = Math.ceil(widthOverLength * (zPolygonIndex + 1))
- 			this.context.stroke()
-			this.context.fill()
-		}
 	},
 	drawImage: function(source, x, y) {
 		var image = null
@@ -211,7 +174,8 @@ var terrainViewer = {
 		this.context.fillRect(x, y, this.terrainHeight, this.terrainHeight)
 	},
 	drawTerrain: function(depth, screenXY) {
-		var terrainParameters = this.getTerrainParameters(depth, getXYAddition(this.location, screenXY))
+		var locationAtAdepth = getXYMultiplicationByScalar(this.location, 1.0 / this.depthMultipliers[depth])
+		var terrainParameters = this.getTerrainParameters(depth, getXYAddition(locationAtAdepth, screenXY))
 		var altitude = terrainParameters[0]
 		var altitudeTemperature = terrainParameters[1] - 0.003 * Math.max(altitude, 0.0)
 		if (altitudeTemperature < -12.0) {
@@ -223,8 +187,8 @@ var terrainViewer = {
 			return
 		}
 		if (altitudeTemperature < 0.0) {
-			this.drawRectangleByScreenXY('#f0f000', screenXY)
-//			this.drawRectangleByScreenXY('#f0f0f0', screenXY)
+//			this.drawRectangleByScreenXY('#f0f000', screenXY)
+			this.drawRectangleByScreenXY('#f0f0f0', screenXY)
 			return
 		}
 		if (terrainParameters[2] > 0.0) {
@@ -259,7 +223,6 @@ var terrainViewer = {
 		terrainParameters[1] *= this.temperatureMultipliers[depthIndex]
 		terrainParameters[2] *= this.wetnessMultipliers[depthIndex]
 		var nextDepth = depthIndex + 1
-//		if (false) {
 		if (nextDepth < this.numberOfDepths) {
 			var halfX = 0.5 * parcelXY[0] + 0.000001
 			var nextParcelX = Math.floor(halfX)
@@ -306,6 +269,7 @@ var terrainViewer = {
 		this.scales = new Array(this.numberOfScales)
 		this.scaleSelectedIndex = 0
 		this.scaleStrings = new Array(this.numberOfScales)
+		this.selectedRegion = null
 		this.altitudeMultipliers = new Array(this.numberOfDepths)
 		this.circumferences = new Array(this.numberOfDepths)
 		this.depthMultipliers = new Array(this.numberOfDepths)
@@ -347,11 +311,27 @@ var terrainViewer = {
 		for (var sideArrowIndex = 0; sideArrowIndex < 4; sideArrowIndex++) {
 			this.pathByPolygon(this.sideArrows[sideArrowIndex])
 			if (this.context.isPointInPath(event.offsetX, event.offsetY)) {
-				addXY(this.location, getXYMultiplicationByScalar(gRotations[sideArrowIndex], this.pixelMultiplier))
+				var rotationMultiplied = getXYMultiplicationByScalar(gRotations[sideArrowIndex], this.pixelMultiplier)
+				multiplyXYByScalar(rotationMultiplied, this.depthMultipliers[this.scaleSelectedIndex])
+				addXY(this.location, rotationMultiplied)
 				this.draw()
 				return
 			}
 		}
+		if (event.offsetX <= this.textSpace || event.offsetX >= this.screenRight) {
+			return
+		}
+		if (event.offsetY <= this.textSpace || event.offsetY >= this.screenBottom) {
+			return
+		}
+		var increment = [event.offsetX - this.pixelCorner[0], this.pixelCorner[1] - event.offsetY]
+		divideXYByScalar(increment, this.imageHeight / this.pixelMultiplier)
+		increment[0] = Math.floor(increment[0])
+		increment[1] = Math.ceil(increment[1])
+		multiplyXYByScalar(increment, this.depthMultipliers[this.scaleSelectedIndex])
+//		multiplyXYByScalar(increment, )
+		addXY(this.location, increment)
+		this.draw()
 	},
 	moveToXY: function(xy) {
 		this.context.moveTo(xy[0], xy[1])
@@ -399,23 +379,24 @@ var terrainViewer = {
 		var pixelEndYMinus = this.pixelEndY - 1
 		this.pixelCorner = [this.textSpace - this.pixelBeginX * this.terrainHeight, this.textSpace + pixelEndYMinus * this.terrainHeight]
 	},
-	start: function(height) {
+	start: function(height, selectedRegion) {
 		this.pixelHeight = Math.floor((height - this.doubleTextSpace) / this.imageHeight)
 		this.pixelWidth = this.pixelHeight
 		height = this.pixelHeight * this.imageHeight
 		this.canvas.height = height + this.doubleTextSpace
 		this.canvas.width = this.canvas.height
-		console.log(this.region.terrain)
 		if (this.region == null) {
 			return
 		}
+		this.location = this.region.entry.slice(0)
 		this.context = this.canvas.getContext('2d')
 		this.context.fillStyle = 'white'
 		this.context.lineJoin = 'round'
 		this.halfHeight = this.canvas.height / 2
 		this.halfWidth = this.canvas.width / 2
 		this.canvasCenter = [this.halfWidth, this.halfHeight]
-
+		this.screenRight = this.canvas.width - this.textSpace
+		this.screenBottom = this.canvas.height - this.textSpace
 		var borderRightInnerX = this.halfWidth - this.textSpaceMinus
 		var rightArrowInnerTop = -this.doubleTextSpace
 		var borderRightOuterX = this.halfWidth - 2
