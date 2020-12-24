@@ -56,11 +56,39 @@ function getEndOfLine(text) {
 	return '\n'
 }
 
+function getIsIDUnique(id, registry, statement) {
+	if (registry.idMap.has(id)) {
+		return false
+	}
+	statement.attributeMap.set('id', id)
+	return true
+}
+
 function getJoinWord() {
 	if (navigator.appVersion.indexOf("Win") > -1) {
 		return '\r\n'
 	}
 	return '\n'
+}
+
+function getKeyStatement(key, statement) {
+	if (statement.attributeMap.has(key)) {
+		return [key, statement]
+	}
+	key = statement.tag + '.' + key
+	statement = statement.parent
+	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
+		if (statement == null) {
+			break
+		}
+		else {
+			if (statement.attributeMap.has(key)) {
+				return [key, statement]
+			}
+			statement = statement.parent
+		}
+	}
+	return null
 }
 
 function getLineWithEndspace(endWords, line) {
@@ -114,6 +142,52 @@ function getQuoteSeparatedWords(line) {
 
 function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceReplacement) {//should be moved to parseWord
 	return originalString.slice(0, spliceIndex) + spliceReplacement + originalString.slice(spliceIndex + spliceRemoved)
+}
+
+function getStatementID(registry, statement) {
+	if (statement.attributeMap.has('id')) {
+		return statement.attributeMap.get('id')
+	}
+	const idJoinWord = '_'
+	var statementID = statement.tag
+	if (getIsIDUnique(statementID, registry, statement)) {
+		return statementID
+	}
+	if (statement.attributeMap.has('work')) {
+		statementID += idJoinWord + statement.attributeMap.get('work')
+	}
+	else {
+		var parentMap = statement.parent.attributeMap
+		if (parentMap.has('id')) {
+			statementID += idJoinWord + parentMap.get('id')
+		}
+	}
+	if (getIsIDUnique(statementID, registry, statement)) {
+		return statementID
+	}
+	if (statement.attributeMap.has('points')) {
+		var pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
+		statementID += idJoinWord + pointStrings.join(idJoinWord)
+		if (getIsIDUnique(statementID, registry, statement)) {
+			return statementID
+		}
+	}
+	var keys = 'cx cy x y r'.split(' ')
+	for (var key of keys) {
+		if (statement.attributeMap.has(key)) {
+			statementID += idJoinWord + key + statement.attributeMap.get(key)
+			if (getIsIDUnique(statementID, registry, statement)) {
+				return statementID
+			}
+		}
+	}
+	for (whileIndex = 1; whileIndex < 987654; whileIndex++) {
+		var check = statementID + idJoinWord + whileIndex.toString()
+		if (getIsIDUnique(check, registry, statement)) {
+			return check
+		}
+	}
+	return statementID
 }
 
 function lengthCheck(word) {
