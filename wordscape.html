@@ -82,16 +82,6 @@ areaInput = function(evt) {
 wordArea.onkeydown = areaKeyDown
 wordArea.oninput = areaInput
 */
-function addToCapitalizationMap(capitalizedWordString) {
-	capitalizedWords = capitalizedWordString.split(' ').filter(lengthCheck)
-	for (var capitalizedWord of capitalizedWords) {
-		wordLower = capitalizedWord.toLowerCase()
-		if (capitalizedWord != wordLower) {
-			gCapitalizationMap.set(wordLower, capitalizedWord)
-		}
-	}
-}
-
 function addToDescendants(descendants, statement) {
 	var lengthLimit = 10000000
 	if (descendants.length >= lengthLimit) {
@@ -122,7 +112,7 @@ function addToMeshArea(meshString) {
 
 function analyzeOutputMesh(attributeMap, meshGenerator, registry, statement) {
 	var attributeID = attributeMap.get('id')
-	registry.meshGeneratorMap.set(attributeID, meshGenerator)
+	registry.objectMap.set(attributeID, meshGenerator)
 	if (attributeMap.has('outputTriangleMesh')) {
 		if (attributeMap.get('outputTriangleMesh') == 'stl') {
 			addToMeshArea(getTriangleMeshString('stl', attributeID, getTriangleMesh(meshGenerator.getMesh())))
@@ -158,13 +148,6 @@ function getBracketedEntry(bracketString) {
 		return null
 	}
 	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
-}
-
-function getCapitalizedKey(key) {
-	if (gCapitalizationMap.has(key.toLowerCase())) {
-		return gCapitalizationMap.get(key.toLowerCase())
-	}
-	return key
 }
 
 function getDescendants(statement) {
@@ -250,34 +233,6 @@ function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
 	return replacedStrings.join('')
 }
 
-function getIsIDUnique(id, registry, statement) {
-	if (registry.idMap.has(id)) {
-		return false
-	}
-	statement.attributeMap.set('id', id)
-	return true
-}
-
-function getKeyStatement(key, statement) {
-	if (statement.attributeMap.has(key)) {
-		return [key, statement]
-	}
-	key = statement.tag + '.' + key
-	statement = statement.parent
-	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
-		if (statement == null) {
-			break
-		}
-		else {
-			if (statement.attributeMap.has(key)) {
-				return [key, statement]
-			}
-			statement = statement.parent
-		}
-	}
-	return null
-}
-
 function getLineByStatement(passthrough, statement) {
 	if (statement.tag == null) {
 		if (statement.nestingIncrement == -1) {
@@ -323,8 +278,8 @@ function getMeshesByChildren(children, registry) {
 	var meshes = []
 	for (var child of children) {
 		var attributeID = child.attributeMap.get('id')
-		if (registry.meshGeneratorMap.has(attributeID)) {
-			meshes.push(registry.meshGeneratorMap.get(attributeID).getMesh())
+		if (registry.objectMap.has(attributeID)) {
+			meshes.push(registry.objectMap.get(attributeID).getMesh())
 		}
 	}
 	return meshes
@@ -436,49 +391,6 @@ function getStatement(line) {
 	return statement
 }
 
-function getStatementID(registry, statement) {
-	if (statement.attributeMap.has('id')) {
-		return statement.attributeMap.get('id')
-	}
-	const idJoinWord = '_'
-	var statementID = statement.tag
-	if (statement.attributeMap.has('work')) {
-		statementID += idJoinWord + statement.attributeMap.get('work')
-	}
-	else {
-		var parentMap = statement.parent.attributeMap
-		if (parentMap.has('id')) {
-			statementID += idJoinWord + parentMap.get('id')
-		}
-	}
-	if (getIsIDUnique(statementID, registry, statement)) {
-		return statementID
-	}
-	if (statement.attributeMap.has('points')) {
-		var pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
-		statementID += idJoinWord + pointStrings.join(idJoinWord)
-		if (getIsIDUnique(statementID, registry, statement)) {
-			return statementID
-		}
-	}
-	var keys = 'cx cy x y r'.split(' ')
-	for (var key of keys) {
-		if (statement.attributeMap.has(key)) {
-			statementID += idJoinWord + key + statement.attributeMap.get(key)
-			if (getIsIDUnique(statementID, registry, statement)) {
-				return statementID
-			}
-		}
-	}
-	for (whileIndex = 1; whileIndex < 987654; whileIndex++) {
-		var check = statementID + idJoinWord + whileIndex.toString()
-		if (getIsIDUnique(check, registry, statement)) {
-			return check
-		}
-	}
-	return statementID
-}
-
 function getTokens(delimeter, searchStrings) {
 	tokens = []
 	for (var searchString of searchStrings) {
@@ -517,10 +429,10 @@ function processCopyMesh(registry, statement) {
 		return
 	}
 	var workID = attributeMap.get('work')
-	if (!registry.meshGeneratorMap.has(workID)) {
+	if (!registry.objectMap.has(workID)) {
 		return
 	}
-	var mesh = registry.meshGeneratorMap.get(workID).getMesh()
+	var mesh = registry.objectMap.get(workID).getMesh()
 	analyzeOutputMesh(attributeMap, new Mesh({facets:getArraysCopy(mesh.facets), points:getArraysCopy(mesh.points)}), registry, statement)
 }
 
@@ -540,10 +452,10 @@ function processDrill(registry, statement) {
 		return
 	}
 	var work = attributeMap.get('work')
-	if (!registry.meshGeneratorMap.has(work)) {
+	if (!registry.objectMap.has(work)) {
 		return
 	}
-	var workMesh = registry.meshGeneratorMap.get(work).getMesh()
+	var workMesh = registry.objectMap.get(work).getMesh()
 	var heights = null
 	if (attributeMap.has('heights')) {
 		heights = getFloats(attributeMap.get('heights'))
@@ -788,8 +700,8 @@ function updateSVGArea() {
 	var documentRoot = getStatement('documentRoot {')
 	var lastParent = documentRoot
 	var lines = getBracketReplacedLines('wordArea')
-	var registry = {defaultMap:new Map(), idMap:new Map(), meshGeneratorMap:new Map(), storageMap:new Map()}
-	meshViewer.setID('viewerCanvas', registry.meshGeneratorMap, 'viewSelect')
+	var registry = {defaultMap:new Map(), idMap:new Map(), objectMap:new Map(), storageMap:new Map()}
+	meshViewer.setID('viewerCanvas', registry.objectMap, 'viewSelect')
 	var svgStatement = null
 	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
 		line = lines[lineIndex]
@@ -844,8 +756,6 @@ function updateSVGArea() {
 		svgStatement.parent = null
 	}
 	var defaultStatement = getStatement('default')
-	svgStatement.children.splice(0, 0, defaultStatement)
-	defaultStatement.parent = svgStatement
 	for (var entry of registry.defaultMap) {
 		tagMap = entry[1]
 		defaultStrings = []
@@ -854,13 +764,21 @@ function updateSVGArea() {
 		}
 		defaultStatement.attributeMap.set(entry[0], defaultStrings.join(';'))
 	}
+	if (defaultStatement.attributeMap.size > 0) {
+		svgStatement.children.splice(0, 0, defaultStatement)
+		defaultStatement.parent = svgStatement
+	}
 	var descendants = [svgStatement]
 	addToDescendants(descendants, svgStatement)
 	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, svgStatement)
-	var height = boundingBox[1][1] + lineThickness
+	var height = lineThickness
 	var padding = 5
-	var width = boundingBox[1][0] + lineThickness
+	var width = lineThickness
+	if (boundingBox != null) {
+		height += boundingBox[1][1]
+		width += boundingBox[1][0] + lineThickness
+	}
 	if (registry.storageMap.has('group')) {
 		width += registry.storageMap.get('group').scaledBorder
 	}
@@ -959,7 +877,6 @@ function Pillar(heights, isSeparate, polygons, transform3D) {
 	}
 }
 
-var gCapitalizationMap = new Map()
 var gFollowingMap = getFunctionMapCapitalize(['group', processGroup])
 var gTagCreateLinearMap = getFunctionMapCapitalize([
 	'mirror', processMirror,
