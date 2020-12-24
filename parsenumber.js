@@ -74,7 +74,7 @@ function getFloats(commaSeparated) {
 }
 
 function getFloatValue(defaultValue, key, registry, statement) {
-	attributeMap = statement.attributeMap
+	var attributeMap = statement.attributeMap
 	var tagMap = null
 	if (registry.defaultMap.has(statement.tag)) {
 		tagMap = registry.defaultMap.get(statement.tag)
@@ -84,13 +84,29 @@ function getFloatValue(defaultValue, key, registry, statement) {
 		registry.defaultMap.set(statement.tag, tagMap)
 	}
 	tagMap.set(key, defaultValue.toString())
-	keyStatement = getKeyStatement(key, statement)
+	var keyStatement = getKeyStatement(key, statement)
 	if (keyStatement == null) {
 		return defaultValue
 	}
-	floatString = keyStatement[1].attributeMap.get(keyStatement[0])
-	attributeMap.delete(key)
-	return parseFloat(floatString)
+	return parseFloat(keyStatement[1].attributeMap.get(keyStatement[0]))
+}
+
+function getFloatValues(defaultValue, key, registry, statement) {
+	var attributeMap = statement.attributeMap
+	var tagMap = null
+	if (registry.defaultMap.has(statement.tag)) {
+		tagMap = registry.defaultMap.get(statement.tag)
+	}
+	else {
+		tagMap = new Map()
+		registry.defaultMap.set(statement.tag, tagMap)
+	}
+	tagMap.set(key, defaultValue.toString())
+	var keyStatement = getKeyStatement(key, statement)
+	if (keyStatement == null) {
+		return defaultValue
+	}
+	return getFloats(keyStatement[1].attributeMap.get(keyStatement[0]))
 }
 
 function getHashCubed(text) {
