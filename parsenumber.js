@@ -127,6 +127,10 @@ function getHashFloat(text) {
 	return ((((hash >>> 0) % 65537) * 25033) % 65537) * gHashMultiplier + Math.abs(hash >> 15) * gHashRemainderMultiplier
 }
 
+function getHashInt(multiplier, text) {
+	return Math.floor(multiplier * getHashFloat(text))
+}
+
 function getRotated32Bit(a, rotation)
 {
 	return a >>> rotation | a << (-rotation & 31)
