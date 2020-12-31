@@ -430,6 +430,9 @@ function updateSVGArea() {
 	if (!tagSet.has('region')) {
 		xmlStatement.children.splice(0, 0, getStatement('region'))
 	}
+	if (!tagSet.has('creature')) {
+		xmlStatement.children.splice(-2, 0, getStatement('creature'))
+	}
 	if (!tagSet.has('terrainViewer')) {
 		xmlStatement.children.splice(-1, 0, getStatement('terrainViewer'))
 	}
