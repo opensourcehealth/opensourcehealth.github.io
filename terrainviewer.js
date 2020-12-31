@@ -106,9 +106,13 @@ var terrainViewer = {
 		this.context.closePath()
 	},
 	draw: function() {
+		console.log(this.location)
 		for (var pixelX = this.pixelBeginX; pixelX < this.pixelEndX; pixelX++) {
 			for (var pixelY = this.pixelBeginY; pixelY < this.pixelEndY; pixelY++) {
-				this.drawTerrain(this.scaleSelectedIndex, [pixelX, pixelY])
+				var objectViews = this.drawTerrain(this.scaleSelectedIndex, [pixelX, pixelY])
+				if (objectViews != null) {
+					this.drawImageByScreenXY([pixelX, pixelY], objectViews[1])
+				}
 			}
 		}
 		if (this.pixelMultiplier == 1) {
@@ -174,29 +178,38 @@ var terrainViewer = {
 		this.context.fillRect(x, y, this.terrainHeight, this.terrainHeight)
 	},
 	drawTerrain: function(depth, screenXY) {
-		var locationAtAdepth = getXYMultiplicationByScalar(this.location, 1.0 / this.depthMultipliers[depth])
+		var depthMultiplier = this.depthMultipliers[depth]
+		var locationAtAdepth = [Math.floor(this.location[0] / depthMultiplier), Math.floor(this.location[1] / depthMultiplier)]
 		var terrainParameters = this.getTerrainParameters(depth, getXYAddition(locationAtAdepth, screenXY))
 		var altitude = terrainParameters[0]
 		var altitudeTemperature = terrainParameters[1] - 0.003 * Math.max(altitude, 0.0)
 		if (altitudeTemperature < -12.0) {
 			this.drawRectangleByScreenXY('#fdfdff', screenXY)
-			return
+			return null
 		}
 		if (altitude < 0.0) {
 			this.drawRectangleByScreenXY('#0000ff', screenXY)
-			return
+			return null
 		}
 		if (altitudeTemperature < 0.0) {
 //			this.drawRectangleByScreenXY('#f0f000', screenXY)
 			this.drawRectangleByScreenXY('#f0f0f0', screenXY)
-			return
+			return null
+		}
+		var objectViews = null
+		if (terrainParameters.length > 3) {
+			var objectViews = this.objectTypeMap.get(terrainParameters[3][2])
+			if (this.pixelMultiplier != 1) {
+				this.drawRectangleByScreenXY(objectViews[0], screenXY)
+				return null
+			}
 		}
 		if (terrainParameters[2] > 0.0) {
 			this.drawRectangleByScreenXY('#00ff00', screenXY)
+			return objectViews
 		}
-		else {
-			this.drawRectangleByScreenXY('#ffff00', screenXY)
-		}
+		this.drawRectangleByScreenXY('#ffff00', screenXY)
+		return objectViews
 	},
 	erasePath: function() {
 		this.context.lineWidth = 3
@@ -236,7 +249,8 @@ var terrainViewer = {
 			if (minorParcelY == nextParcelY) {
 				minorParcelY = nextParcelY - 1
 			}
-			var nextParameters = getXYZMultiplicationByScalar(this.getTerrainParameters(nextDepth, [nextParcelX, nextParcelY]), 9.0)
+			var centerParameters = this.getTerrainParameters(nextDepth, [nextParcelX, nextParcelY])
+			var nextParameters = getXYZMultiplicationByScalar(centerParameters, 9.0)
 			var minorParameters = getXYZMultiplicationByScalar(this.getTerrainParameters(nextDepth, [minorParcelX, nextParcelY]), 3.0)
 			addXYZ(nextParameters, minorParameters)
 			var minorParameters = getXYZMultiplicationByScalar(this.getTerrainParameters(nextDepth, [nextParcelX, minorParcelY]), 3.0)
@@ -244,10 +258,34 @@ var terrainViewer = {
 			addXYZ(nextParameters, this.getTerrainParameters(nextDepth, [minorParcelX, minorParcelY]))
 			multiplyXYZByScalar(nextParameters, 1.0 / 16.0)
 			addXYZ(terrainParameters, nextParameters)
+			for (var centerParameterIndex = 3; centerParameterIndex < centerParameters.length; centerParameterIndex++) {
+				var centerParameter = centerParameters[centerParameterIndex]
+				var depthMultiplier = this.depthMultipliers[depthIndex]
+				var beginX = depthMultiplier * parcelXY[0]
+				if (centerParameter[0] >= beginX && centerParameter[0] < (beginX + depthMultiplier)) {
+					var beginY = depthMultiplier * parcelXY[1]
+					if (centerParameter[1] >= beginY && centerParameter[1] < (beginY + depthMultiplier)) {
+						terrainParameters.push(centerParameter)
+					}
+				}
+			}
 		}
 		else {
 			terrainParameters[0] -= this.extraWater
 			terrainParameters[1] = 17.0 - 7.0 * Math.pow(Math.abs(parcelXY[1] + 0.5), 2.0)
+
+		}
+		if (depthIndex == 2) {
+			if (getHashFloat(depthKey + 'v') < 0.1) {
+				var depthMultiplier = this.depthMultipliers[depthIndex]
+				var objectType = 'd'
+				if (getHashFloat('o' + depthKey) > 0.5) {
+					objectType = 'h'
+				}
+				var x = getHashInt(depthMultiplier, depthKey + 'x') + depthMultiplier * parcelXY[0]
+				var y = getHashInt(depthMultiplier, 'y' + depthKey) + depthMultiplier * parcelXY[1]
+				terrainParameters.push([x, y, objectType])
+			}
 		}
 		terrainMap.set(xyKey, terrainParameters)
 		return terrainParameters
@@ -263,6 +301,7 @@ var terrainViewer = {
 		this.loadingImages = []
 		this.numberOfDepths = 13
 		this.numberOfScales = 9
+		this.objectTypeMap = new Map([['d', ['#ebaf4c', 'beehive.png']], ['h', ['#ffa500', 'reddragonwelsh.png']]])
 		this.pixelMultiplier = 1
 		this.pixelMultiplierStrings = ['x1 (Default)', 'x2', 'x4', 'x8', 'x16', 'x32', 'x64']
 		this.pixelSelectedIndex = 0
@@ -283,8 +322,8 @@ var terrainViewer = {
 			this.circumferences[depthIndex] = circumference
 			this.depthMultipliers[depthIndex] = depthMultiplier
 			this.terrainMaps[depthIndex] = new Map()
-//			this.wetnessMultipliers[depthIndex] = 1.0
 			this.temperatureMultipliers[depthIndex] = 0.00015 * Math.pow(depthMultiplier, 1.6)
+//			this.wetnessMultipliers[depthIndex] = 1.0
 			this.wetnessMultipliers[depthIndex] = Math.pow(depthMultiplier, -0.02)
 			circumference /= 2
 			depthMultiplier += depthMultiplier
