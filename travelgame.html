@@ -71,6 +71,50 @@ function getDescendants(statement) {
 	return descendants
 }
 
+function getIsOccupied(childrenMaps, location, terrain) {
+	if (terrain.getTerrainParameters(location, 0).length > 3) {
+		return true
+	}
+	for (var scaleIndex = 0; scaleIndex < childrenMaps.length; scaleIndex++) {
+		var childrenMap = childrenMaps[scaleIndex]
+		var locationAtScale = terrain.getLocationAtScale(location, scaleIndex)
+		var xyKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
+		if (childrenMap.has(xyKey)) {
+			var children = childrenMap.get(xyKey)
+			for (var child of children) {
+				if (child.location[0] == location[0] && child.location[1] == location[1]) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+function getEntryLocation(childrenMaps, entryCenter, terrain) {
+	var childrenMap = childrenMaps[0]
+	if (!childrenMap.has(entryCenter[0].toString() + ',' + entryCenter[1].toString())) {
+		return entryCenter
+	}
+	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
+		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
+			for (var x = 1 - shellIndex; x < shellIndex; x++) {
+				var entryLocation = getXYAddition(entryCenter, [x, signedShellIndex])
+				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
+					return entryLocation
+				}
+			}
+			for (var y = - shellIndex; y <= shellIndex; y++) {
+				var entryLocation = getXYAddition(entryCenter, [signedShellIndex, y])
+				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
+					return entryLocation
+				}
+			}
+		}
+	}
+	return entryCenter
+}
+
 function getFunctionMapCapitalize(alternatingEntries) {
 	var functionMap = new Map()
 	for (alternatingIndex = 0; alternatingIndex < alternatingEntries.length; alternatingIndex += 2) {
@@ -263,13 +307,23 @@ function processDescendants(registry, rootStatement, tagMap) {
 
 function processCreature(registry, statement) {
 	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('archetype')) {
-		attributeMap.set('archetype', 'sage')
+	var creature = new Creature()
+	if (attributeMap.has('race')) {
+		if (attributeMap.get('race') == 'red dragon') {
+			creature.color = '#ffa500'
+			creature.filename = 'red_dragon_welsh.png'
+		}
 	}
+//	if (!attributeMap.has('archetype')) {
+//		attributeMap.set('archetype', 'sage')
+//	}
 	var storageMap = registry.storageMap
 	var selectedRegion = storageMap.get('selectedRegion')
-	var archetype = attributeMap.get('archetype')
-	var creature = new Creature(archetype)
+//	var archetype = attributeMap.get('archetype')
+	creature.color = getStringValue(creature.color, 'color', registry, statement)
+	creature.filename = getStringValue(creature.filename, 'filename', registry, statement)
+	creature.location = getFloatValues(creature.location, 'location', registry, statement)
+	creature.scaleIndex = getIntValue(creature.scaleIndex, 'scaleIndex', registry, statement)
 	if (selectedRegion != null) {
 		selectedRegion.add(creature)
 	}
@@ -282,10 +336,10 @@ function processRegion(registry, statement) {
 	}
 	var storageMap = registry.storageMap
 	var selectedRegion = storageMap.get('selectedRegion')
-	var terrain = attributeMap.get('terrain')
+	var terrainString = attributeMap.get('terrain')
+	var terrain = new Terrain(terrainString)
 	var region = new Region(terrain)
-//	region.entry = getFloatValues([0.0, 0.0], 'entry', registry, statement)
-	region.entry = getFloatValues([4280,0], 'entry', registry, statement)
+	region.entry = getFloatValues([6204,0], 'entry', registry, statement)
 	if (selectedRegion != null) {
 		selectedRegion.add(region)
 	}
@@ -504,11 +558,14 @@ function widenStatementBoundingBox(boundingBox, caller, statement) {
 	return boundingBox
 }
 
-function Creature(archetype) {
-	this.archetype = archetype
+function Creature() {
+	this.archetype = null
 	this.children = []
-	this.location = null
+	this.color = '#696006'
+	this.filename = 'delfador.png'
+	this.location = [0.0, 0.0]
 	this.parent = null
+	this.scaleIndex = 0
 	this.add = function(child) {
 		this.children.push(child)
 		child.location = null
@@ -521,31 +578,40 @@ function Creature(archetype) {
 }
 
 function Region(terrain) {
-	this.childrenMap = new Map()
+	this.childrenMaps = []
 	this.entry = [0, 0]
 	this.location = [0, 0]
 	this.parent = null
+	this.scaleIndex = 0
 	this.terrainMap = new Map()
 	this.terrain = terrain
 	this.add = function(child) {
-		var addKey = this.entry[0].toString() + ',' + this.entry[1].toString()
+		for (var mapIndex = this.childrenMaps.length; mapIndex < child.scaleIndex + 1; mapIndex++) {
+			this.childrenMaps.push(new Map())
+		}
+		addXY(child.location, this.entry)
+		child.location = getEntryLocation(this.childrenMaps, child.location, this.terrain)
+		var childrenMap = this.childrenMaps[child.scaleIndex]
+		var locationAtScale = this.terrain.getLocationAtScale(child.location, child.scaleIndex)
+		var addKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
 		var children = null
-		if (this.childrenMap.has(addKey)) {
-			children = this.childrenMap.get(addKey)
+		if (childrenMap.has(addKey)) {
+			children = childrenMap.get(addKey)
 		}
 		else {
 			children = []
-			this.childrenMap.set(addKey, children)
+			childrenMap.set(addKey, children)
 		}
 		children.push(child)
-		child.location = this.entry.slice(0)
 		child.parent = this
 		return true
 	}
 	this.getChildren = function() {
 		var allChildren = []
-		for (var children of this.childrenMap.values()) {
-			pushArray(allChildren, children)
+		for (var childrenMap of this.childrenMaps) {
+			for (var children of this.childrenMap.values()) {
+				pushArray(allChildren, children)
+			}
 		}
 		return allChildren
 	}
