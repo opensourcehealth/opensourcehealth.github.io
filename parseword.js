@@ -91,6 +91,20 @@ function getKeyStatement(key, statement) {
 	return null
 }
 
+function getKeyStatementByDefault(defaultValue, key, registry, statement) {
+	var attributeMap = statement.attributeMap
+	var tagMap = null
+	if (registry.defaultMap.has(statement.tag)) {
+		tagMap = registry.defaultMap.get(statement.tag)
+	}
+	else {
+		tagMap = new Map()
+		registry.defaultMap.set(statement.tag, tagMap)
+	}
+	tagMap.set(key, defaultValue.toString())
+	return getKeyStatement(key, statement)
+}
+
 function getLineWithEndspace(endWords, line) {
 	for (var endWord of endWords) {
 		if (line.endsWith(endWord)) {
@@ -188,6 +202,14 @@ function getStatementID(registry, statement) {
 		}
 	}
 	return statementID
+}
+
+function getStringValue(defaultValue, key, registry, statement) {
+	var keyStatement = getKeyStatementByDefault(defaultValue, key, registry, statement)
+	if (keyStatement == null) {
+		return defaultValue
+	}
+	return keyStatement[1].attributeMap.get(keyStatement[0])
 }
 
 function lengthCheck(word) {
