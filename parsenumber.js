@@ -74,17 +74,7 @@ function getFloats(commaSeparated) {
 }
 
 function getFloatValue(defaultValue, key, registry, statement) {
-	var attributeMap = statement.attributeMap
-	var tagMap = null
-	if (registry.defaultMap.has(statement.tag)) {
-		tagMap = registry.defaultMap.get(statement.tag)
-	}
-	else {
-		tagMap = new Map()
-		registry.defaultMap.set(statement.tag, tagMap)
-	}
-	tagMap.set(key, defaultValue.toString())
-	var keyStatement = getKeyStatement(key, statement)
+	var keyStatement = getKeyStatementByDefault(defaultValue, key, registry, statement)
 	if (keyStatement == null) {
 		return defaultValue
 	}
@@ -92,17 +82,7 @@ function getFloatValue(defaultValue, key, registry, statement) {
 }
 
 function getFloatValues(defaultValue, key, registry, statement) {
-	var attributeMap = statement.attributeMap
-	var tagMap = null
-	if (registry.defaultMap.has(statement.tag)) {
-		tagMap = registry.defaultMap.get(statement.tag)
-	}
-	else {
-		tagMap = new Map()
-		registry.defaultMap.set(statement.tag, tagMap)
-	}
-	tagMap.set(key, defaultValue.toString())
-	var keyStatement = getKeyStatement(key, statement)
+	var keyStatement = getKeyStatementByDefault(defaultValue, key, registry, statement)
 	if (keyStatement == null) {
 		return defaultValue
 	}
@@ -129,6 +109,14 @@ function getHashFloat(text) {
 
 function getHashInt(multiplier, text) {
 	return Math.floor(multiplier * getHashFloat(text))
+}
+
+function getIntValue(defaultValue, key, registry, statement) {
+	var keyStatement = getKeyStatementByDefault(defaultValue, key, registry, statement)
+	if (keyStatement == null) {
+		return defaultValue
+	}
+	return parseInt(keyStatement[1].attributeMap.get(keyStatement[0]))
 }
 
 function getRotated32Bit(a, rotation)
