@@ -8,10 +8,32 @@ function addArrayElementToMap(element, key, mapToAddTo) {
 	mapToAddTo.set(key, [element])
 }
 
+function addElementListsToSet(elementLists, setToAddTo) {
+	for (var elements of elementLists) {
+		addElementsToSet(elements, setToAddTo)
+	}
+}
+
 function addElementsToSet(elements, setToAddTo) {
 	for (var element of elements) {
 		setToAddTo.add(element)
 	}
+}
+
+function addMapToMap(map, mapAddition) {
+	for (var entry of mapAddition) {
+		map.set(entry[0], entry[1])
+	}
+}
+
+function addValueToMapByKeys(keys, map, value) {
+	for (var key of keys) {
+		map.set(key, value)
+	}
+}
+
+function compareAbsoluteElementTwoAscending(a, b) {
+	return Math.abs(a[2]) - Math.abs(b[2])
 }
 
 function compareArrayAscending(a, b) {
@@ -35,11 +57,19 @@ function compareArrayDescending(a, b) {
 }
 
 function compareFirstElementAscending(a, b) {
+// in future rename to compareElementZero
 	return a[0] - b[0]
 }
 
 function compareFirstElementDescending(a, b) {
 	return b[0] - a[0]
+}
+
+function compareFirstThirdElementAscending(a, b) {
+	if (a[0] == b[0]) {
+		return a[2] - b[2]
+	}
+	return a[0] - b[0]
 }
 
 function compareIDAscending(a, b) {
@@ -95,6 +125,13 @@ function getArraysToString(arrays) {
 	return arraysToString
 }
 
+function getIsEmpty(array) {
+	if (array == null) {
+		return true
+	}
+	return array.length == 0
+}
+
 function getNumberOfDifferences(arraysA, arraysB) {
 	var numberOfDifferences = 0
 	if (arraysA.length != arraysB.length) {
@@ -136,5 +173,52 @@ function pushArray(elements, others) {
 	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
 		elements[elementsLength] = others[otherIndex]
 		elementsLength++
+	}
+}
+
+function removeNulls(elements) {
+	var withoutNullLength = 0
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		if (elements[elementIndex] != null) {
+			elements[withoutNullLength] = elements[elementIndex]
+			withoutNullLength += 1
+		}
+	}
+	elements.length = withoutNullLength
+}
+
+function removeRepeats(elements) {
+	for (var elementIndex = elements.length - 1; elementIndex > -1; elementIndex--) {
+		if (elements[elementIndex] == elements[(elementIndex + 1) % elements.length]) {
+			elements.splice(elementIndex, 1)
+		}
+	}
+}
+
+function reverseArray(elements) {
+	for (var element of elements) {
+		element.reverse()
+	}
+}
+
+function setArraysToArraysUntil(elements, others, until) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		for (var parameterIndex = 0; parameterIndex < until; parameterIndex++) {
+			elements[elementIndex][parameterIndex] = others[elementIndex][parameterIndex]
+		}
+	}
+}
+
+function spliceArray(elements, index, others) {
+	elements.length = elements.length + others.length
+	elementsLengthMinus = elements.length - 1
+	var fromIndex = elementsLengthMinus - others.length
+	for (var toIndex = elementsLengthMinus; toIndex >= index; toIndex--) {
+		elements[toIndex] = elements[fromIndex]
+		fromIndex--
+	}
+	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
+		elements[index] = others[otherIndex]
+		index++
 	}
 }
