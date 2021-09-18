@@ -1,12 +1,27 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+function setTypeSelect(selectedIndex, types, typeSelectID) {
+	var typeSelect = document.getElementById(typeSelectID)
+	if (typeSelect.hidden == false) {
+		return
+	}
+	var options = typeSelect.options
+	typeSelect.hidden = false
+	for (var type of types) {
+		option = document.createElement('option')
+		option.text = type
+		typeSelect.add(option)
+	}
+	typeSelect.selectedIndex = selectedIndex
+}
+
 function setViewSelect(selectedIndex, views, viewSelectID) {
 	var viewSelect = document.getElementById(viewSelectID)
 	var options = viewSelect.options
 	viewSelect.hidden = false
 	views.sort(compareIDAscending)
 	for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
-		view = views[viewIndex]
+		var view = views[viewIndex]
 		var option = null
 		if (viewIndex >= options.length) {
 			option = document.createElement('option')
@@ -24,6 +39,11 @@ function setViewSelect(selectedIndex, views, viewSelectID) {
 	viewSelect.selectedIndex = selectedIndex
 }
 
+function typeSelectChanged() {
+	var typeSelect = document.getElementById(meshViewer.typeSelectID)
+	meshViewer.setType(typeSelect.selectedIndex)
+	meshViewer.draw()
+}
 function viewerMouseDown(event) {
 	if (meshViewer.view == null) {
 		return
@@ -49,13 +69,19 @@ function viewerMouseMove(event) {
 
 function viewerMouseOut(event) {
 	meshViewer.mouseDown = null
+	if (meshViewer.view == null) {
+		return
+	}
 	meshViewer.view.rotationMatrix = meshViewer.view.lastRotationMatrix
 	meshViewer.draw()
 }
 
 function viewerMouseUp(event) {
-	meshViewer.mouseMoved(event)
 	meshViewer.mouseDown = null
+	if (meshViewer.view == null) {
+		return
+	}
+	meshViewer.mouseMoved(event)
 	meshViewer.view.lastRotationMatrix = meshViewer.view.rotationMatrix
 	meshViewer.drawModelControlPath(event)
 }
@@ -65,6 +91,7 @@ function viewSelectChanged() {
 	meshViewer.setView(viewSelect.selectedIndex)
 	meshViewer.draw()
 }
+
 
 var meshViewer = {
 	addMesh: function(id, matrix3D) {
@@ -86,7 +113,13 @@ var meshViewer = {
 		if (this.view == null) {
 			return
 		}
-		var mesh = this.meshGeneratorMap.get(this.view.id).getMesh()
+		var mesh = this.objectMap.get(this.view.id).getMesh()
+		if (this.type.indexOf('T') != -1) {
+			if (this.triangleMesh == null) {
+				this.triangleMesh = getTriangleMesh(mesh)
+			}
+			mesh = this.triangleMesh
+		}
 		var facets = mesh.facets
 		var zPolygons = []
 		var centerRotationMatrix = getMultiplied3DMatrix(this.view.rotationMatrix, this.view.scaleCenterMatrix)
@@ -99,16 +132,26 @@ var meshViewer = {
 				zPolygon[0][vertexIndex] = xyzs[facet[vertexIndex]][2]
 			}
 			zPolygon[0].sort(compareNumberDescending)
-			var normal = getNormalByFlatFacet(facet, xyzs)
-			if (normal != null) {
-				if (normal[2] < 0.0) {
-					zPolygons.push(zPolygon)
+			if (this.type[0] == 'S') {
+				var normal = getNormalByFacetIfFlat(facet, xyzs)
+				if (normal != null) {
+					if (normal[2] < 0.0) {
+						zPolygons.push(zPolygon)
+					}
 				}
+			}
+			else {
+				zPolygons.push(zPolygon)
 			}
 		}
 		zPolygons.sort(compareArrayAscending)
 //		var widthOverLength = 6.0 / zPolygons.length
-		this.context.lineWidth = 5.0
+		if (this.type[0] == 'S') {
+			this.context.lineWidth = 5.0
+		}
+		else {
+			this.context.lineWidth = 2.0
+		}
 		this.context.strokeStyle = 'black'
 		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
 			this.context.beginPath()
@@ -120,7 +163,9 @@ var meshViewer = {
 			this.context.closePath()
 //			this.context.lineWidth = Math.ceil(widthOverLength * (zPolygonIndex + 1))
  			this.context.stroke()
-			this.context.fill()
+			if (this.type[0] == 'S') {
+				this.context.fill()
+			}
 		}
 	},
 	drawModelControlPath: function(event) {
@@ -157,6 +202,7 @@ var meshViewer = {
 		this.textHeight = 12
 		this.textSpace = this.textHeight * 3 / 2
 		this.doubleTextSpace = this.textSpace + this.textSpace
+		this.typeSelectedIndex = 0
 	},
 	lineToXY: function(xy) {
 		this.context.lineTo(xy[0], xy[1])
@@ -193,9 +239,11 @@ var meshViewer = {
 		}
 	},
 	moveToXY: function(xy) {
-		this.context.moveTo(xy[0], xy[1])
+		if (xy != undefined) {
+			this.context.moveTo(xy[0], xy[1])
+		}
 	},
-	setID: function(canvasID, meshGeneratorMap, viewSelectID) {
+	setID: function(canvasID, objectMap, typeSelectID, viewSelectID) {
 		if (canvasID != this.canvasID) {
 			this.canvasID = canvasID
 			this.canvas = document.getElementById(canvasID)
@@ -204,34 +252,43 @@ var meshViewer = {
 			this.canvas.addEventListener('mouseout', viewerMouseOut)
 			this.canvas.addEventListener('mouseup', viewerMouseUp)
 		}
-		this.meshGeneratorMap = meshGeneratorMap
+		this.objectMap = objectMap
+		this.triangleMesh = null
+		this.types = ['Solid Polyhedral', 'Solid Triangular', 'Wireframe Polyhedral', 'Wireframe Triangular']
+		this.type = this.types[this.typeSelectedIndex]
+		this.typeSelectID = typeSelectID
 		this.view = null
 		this.views = []
 		this.viewSelectID = viewSelectID
 		this.mouseDown = null
+	},
+	setType: function(typeSelectedIndex) {
+		this.typeSelectedIndex = typeSelectedIndex
+		this.type = this.types[typeSelectedIndex]
 	},
 	setView: function(viewIndex) {
 		this.view = this.views[viewIndex]
 		if (this.view.rotationMatrix != null) {
 			return
 		}
-		var meshBoundingBox = getMeshBoundingBox(this.meshGeneratorMap.get(this.view.id).getMesh())
+		var meshBoundingBox = getMeshBoundingBox(this.objectMap.get(this.view.id).getMesh())
 		var meshExtent = getXYZSubtraction(meshBoundingBox[1], meshBoundingBox[0])
 		var scale = this.modelDiameter / getXYZLength(meshExtent)
 		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
 		var meshCenterMatrix = get3DTransformByTranslate3D([-center[0], -center[1], -center[2]])
 		// using 2.0 + Math.PI to get average of edge and center movement
 		var scaleMatrix = get3DTransformByScale3D([scale, -scale, scale])
+		this.triangleMesh = null
 		this.view.rotationMatrix = get3DUnitMatrix()
 		this.view.scaleCenterMatrix = getMultiplied3DMatrix(scaleMatrix, meshCenterMatrix)
 		this.view.lastRotationMatrix = this.view.rotationMatrix
 	},
 	start: function(height) {
+		this.canvas.height = height
+		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
 		if (this.views.length == 0) {
 			return
 		}
-		this.canvas.height = height
-		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
 		this.context = this.canvas.getContext('2d')
 		this.context.fillStyle = 'white'
 		this.context.lineJoin = 'round'
@@ -245,7 +302,9 @@ var meshViewer = {
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
 		setViewSelect(selectedIndex, this.views, this.viewSelectID)
+		setTypeSelect(this.typeSelectedIndex, this.types, this.typeSelectID)
 		this.setView(selectedIndex)
+		this.setType(this.typeSelectedIndex)
 		this.draw()
 	}
 }
