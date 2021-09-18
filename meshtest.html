@@ -2,31 +2,44 @@
 <html lang="en">
 <head><meta charset="utf-8"/></head>
 <body>
+<script src="alteration.js"></script>
+<script src="construction.js"></script>
+<script src="generator3d.js"></script>
 <script src="help.js"></script>
 <script src="maparray.js"></script>
 <script src="matrix.js"></script>
+<script src="meta.js"></script>
 <script src="parsenumber.js"></script>
 <script src="pixel.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
+<script src="statement.js"></script>
 <script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// travelgame, view map=region
+// getShapeGenerator, getStratas, change objectMap to meshGeneratorMap
 // check linkMap in getMeshAnalysis, count empty intersection pairs
+// convert process to class
+// processMirror - y mirror, outerX, outerY
 // add warning for missing work and other missing and getStatementID whileIndex
 // operate and transform polygons in wordscape, maybe use true location instead of inverse for points in drillMesh
-// better colors, check that facet is concave before getting midpoint
+// comment out exclusiveIntersection
+// better colors
 // add nodes between exteriors to polygons, add node within new triangle
 // triangulate coplanar for output, make basic shapes, combine loops from multiple meshes
-// drill
 // check for line intersection between polygons
 // check for and join polylines in getXYPolygonsMap when there are missing faces
 // check for intersection pairs between exteriors
 // check for unplanar polygons and triangulate
 // check for z at node level when converting to xy
+// getDirectedPolygon3D using vertex z if available
+// solids = [], solid = {meshes:[{name:, points:[], facets:[], matrix:4x4}], construction:"..", name, color, material}
+// construction -> + union, - difference, * intersection
+// getTriangularMesh, getPolyhedralMesh, getCarving, getStatement, get JSON
+// shape isLatticed, isPillar, mesh or pillar
+// else statement could check for previousStatement then set all the previousStatement of the siblings
 
 function drawLines(lines, pointMap) {
 	for (var line of lines) {
@@ -104,7 +117,12 @@ function drawXYLines(lines, pointMap) {
 function drawXYPolygon(xyPolygon, rgb) {
 	var pointStrings = new Array(xyPolygon.length)
 	for (var pointIndex = 0; pointIndex < xyPolygon.length; pointIndex++) {
-		pointStrings[pointIndex] = xyPolygon[pointIndex].join(',')
+		if (xyPolygon[pointIndex].length < 3) {
+			pointStrings[pointIndex] = xyPolygon[pointIndex].join(',')
+		}
+		else {
+			pointStrings[pointIndex] = xyPolygon[pointIndex].slice(0, 2).join(',')
+		}
 	}
 	document.writeln('<polygon  points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
 }
@@ -158,7 +176,7 @@ function testConnectedPolygons() {
 	var pointString = '-2,-2 -2,9 12,-2 0,-1 0,7 10,-1 1,0 1,5 6,0 2,1 4,1 2,3 11,1 13,1 11,3'
 	var facets = []
 	var endFacets = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11], [12, 13, 14]]
-	var points = getPointStringConvertedToPoints(pointString)
+	var points = getPointsByString(pointString)
 	addInsideConnectedFacets(endFacets, facets, points)
 	var xyPolygons = getPolygonsByFacets(facets, points)
 	drawXYPolygons(xyPolygons)
@@ -168,9 +186,9 @@ function testDrillByMesh() {
 	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 10,-1,2 0,7,2 0,-1,2 14,1,6 16,1,6 14,3,6'
 //	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,2 0,7,2 10,-1,2 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
 	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
-	var points = getPointStringConvertedToPoints(pointString)
+	var points = getPointsByString(pointString)
 	var centerPolygon = [[4, 1], [6, 1], [5, 3]]
-	var centerMesh = getPillarMesh([0.0, 1.0], false, [centerPolygon], get3DUnitMatrix())
+	var centerMesh = getPillarMesh([centerPolygon], [0.0, 1.0], get3DUnitMatrix())
 //	drawMesh(centerMesh)
 //	drawXYPolygon(centerPolygon, getRGB())
 	drillByMesh(centerMesh, null, get3DUnitMatrix(), {facets:facets, points:points})
@@ -183,7 +201,7 @@ function testDrillByPolygon() {
 	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 10,-1,2 0,7,2 0,-1,2 14,1,6 16,1,6 14,3,6'
 //	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,1 0,7,1 10,-1,1 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
 	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
-	var points = getPointStringConvertedToPoints(pointString)
+	var points = getPointsByString(pointString)
 	points = getXYZsBy3DMatrix(basisXZ, points)
 	var centerPolygon = [[2, 1], [4, 1], [3, 3]]
 	addXYsByXY(centerPolygon, [2.0, 0.0])
@@ -193,13 +211,44 @@ function testDrillByPolygon() {
 	drawXYZPolygons(getPolygonsByFacets(facets, points))
 }
 
+function testEquation() {
+	console.log('equationString')
+	var equationString = ' ( 1 + 1 ) * 3 * ( 2 + 2 ) '
+	var value = getValueByEquation(0.0, equationString, null, null, null, null)
+	console.log('value')
+	console.log(value)
+}
+
+function testExpand() {
+	console.log('testExpand')
+	var pointString = '0,-4,0 0,5,0 4,0,0 9,-4,0'
+	var polygon3D = getPointsByString(pointString)
+	var heights = [0.0, 1.0]
+//	var heights = [0.0, 0.5, 1.0]
+	var insets = [[1.0]]
+	var mesh = {facets:[], points:[]}
+	addToWedgeMesh(heights, insets, mesh, polygon3D)
+	var wedgeMesh = getWedgeMesh(heights, insets, [polygon3D], null)
+	drawMesh(wedgeMesh)
+	console.log('wedgeMesh points')
+	console.log(wedgeMesh.points)
+	console.log(wedgeMesh.facets)
+	var expansionXY = [1.6]
+	var expansionZ = 0.0
+//	var expansion = [1.6, 1.6, 0.0]
+	expandMesh(expansionXY, expansionZ, get3DUnitMatrix(), 1.0, wedgeMesh)
+//	drawMesh(wedgeMesh)
+//	taperMesh(get3DUnitMatrix(), 2.0, 40.0, 15.5, wedgeMesh)
+	drawMesh(wedgeMesh)
+}
+
 function testFace() {
 	var lines = []
 	var pointMap = new Map()
 	var tipMap = new Map()
 //	var pointString = '0,-1,0 450,-1,0 0,-1,200 0,200,0'
 	var pointString = '0,-1,0 9,-1,0 0,-1,4 0,4,0'
-	points = getPointStringConvertedToPoints(pointString)
+	points = getPointsByString(pointString)
 	var mesh = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:points}
 	var lattice = getXYZLatticeByMesh(mesh)
 	var voxelMap = getVoxelMapByXYZLattice(lattice)
@@ -220,7 +269,7 @@ function testFace() {
 //	var lines = []
 //	var pointMap = new Map()
 //	var tipMap = new Map()
-//	rotateXYZParametersByPointList(2, mesh.points)
+//	rotateXYZParametersByPoints(2, mesh.points)
 //	var xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
 //	var voxelMap = getVoxelsByXYPolygonsMap(xyPolygonsMap)
 //	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
@@ -229,29 +278,64 @@ function testFace() {
 //	drawXYZPolygons(xyzPolygons)
 }
 
-function testIntersection() {
-	//tested by getSubtractionLoops, used by getSubtractionFaces, used by replaceFaces
-//	meeting = {toolAlong, workAlong}
-//	added to meetings at meetingIndex as point from workAlong
-//	added to toolMeetingsMap as toolIndex, [toolAlong, meetingIndex]
-//	added to workMeetingsMap as workIndex, [workAlong, meetingIndex]
-//	sorted by along in both maps
-//	polygons divided into {beginIndex, beginPoints, endIndex, endPoints} set in toolSegmentMap and workSegmentMap
-//	polygons divided into {beginIndex, beginPoints, endIndex, endPoints} set in toolSegmentMap and workSegmentMap
-//	start in work points outside tool, make loops and add if new
-//	tool, work..
-//	tool:0, 1, 2	work:3, 4, 5	meeting:6, 7
-	polygons = ['8,-4 10,-4 8,0', '7,-2 9,-5 7,-5']
-	convertPointStringsToPointLists(polygons)
-//	console.log(getIntersectionPortionsByRotated(ab[0][0], ab[1][0], cd[0], cd[1]))
-//	getIntersectionPortions(ab[0], ab[1], cd[0], cd[1])
-//	var meeting = getMeeting(1.0, 4.0, 2.0, [0.0, 0.0], [16.0, 8.0])
-//	console.log('meeting')
-//	console.log(meeting)
-	var intersectedPolygons = getIntersectedPolygons(polygons[0], polygons[1])
-	console.log(intersectedPolygons)
-	drawXYPolygons(intersectedPolygons)
+function testFacetSubtraction() {
+//	in future facet normal hint for intersections - acceptance angle
+//	var pointString = '0,0 0,1 1,0'
+	var pointString = '7,-1,0 12,-8,0 7,-5,2 7,-8,0'
+	var points = getPointsByString(pointString)
+//	var toolString = '10,-9 14,-9 18,-3'
+//	var toolString = '8,-11 14,-11 8,-3'
+//	var toolString = '8,-7 9,-7 9,-6'
+//	var toolString = '8,-6 9,-12 9,5'
+//	var toolString = '5,-9 14,-9 5,2'
+//	var toolString = '8,-4 10,-7 11,-5'
+	var toolString = '4,-3 9,-3 4,3'
+//	var toolString = '8,-6 12,-5 8,-3'
+//	var toolString = '8,-4 8,-7 12,-6'
+//	var toolString = '8,-4 8,-7 10,-8'
+//	var toolString = '8,-6 8,-7 10,-6'
+	var toolPolygons = [getPointsByString(toolString)]
+//	var toolString = '6,-4 8,-4 8,-3'
+//	toolPolygons.push(getPointsByString(toolString))
+	var toolPillar = {polygons:toolPolygons, stratas:[[-5, 15]]}
+//	var bottomWorkFacets = [[0, 3, 2]]
+//	var sideWorkFacets = [[3, 1, 0]]
+	var bottomWorkFacets = [[0, 1, 3]]
+	var sideWorkFacets = [[3, 2, 0]]
+//	var topWorkFacets = [[0, 1, 3]]
+//	var topWorkFacets = [[3, 1, 0]]
+//	var topWorkFacets = [[1, 2, 3]]
+	var topWorkFacets = [[2, 1, 0], [1, 2, 3]]
+	var facets = []
+	pushArray(facets, bottomWorkFacets)
+	pushArray(facets, sideWorkFacets)
+	pushArray(facets, topWorkFacets)
+	var workMesh = {facets:facets, points:points}
+	console.log('workMesh facets')
+	console.log(facets.slice(0))
+//	sectionByPolygonMulti(get3DUnitMatrix(), toolPillar, workMesh)
+	drillByPolygonMulti(get3DUnitMatrix(), toolPillar, workMesh)
+//	drillByPolygonMulti(get3DTransformByRotateX([5.0]), 'i', toolPillar, workMesh)
+//	get3DUnitMatrix()
+	drawMesh(workMesh)
+//	drawMesh({facets:facets, points:points})
+	console.log('facets')
+	console.log(facets)
+	console.log(workMesh)
+	console.log(workMesh.points.length)
 }
+
+function testInset() {
+//	var pointString = '0,0 0,4 6,4 6,0'
+	var pointString = '0,-2 0,6 1,1 8,-2'
+	var xyPolygon = getPointsByString(pointString)
+	var insetPolygon = getInsetPolygon([[0.5]], xyPolygon)
+	console.log('insetPolygon')
+	console.log(insetPolygon)
+	drawXYPolygon(xyPolygon, getRGB())
+	drawXYPolygon(insetPolygon, getRGB())
+}
+
 /*
 function testLoop() {
 	var lines = []
@@ -273,14 +357,14 @@ function testLoop() {
 
 function testMeshBoolean() {
 	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
-	var pointsA = getPointStringConvertedToPoints(pointString)
+	var pointsA = getPointsByString(pointString)
 //	addXYsByXY(pointsA, [0.00001, 0.0])
 //	addXYZsByZ(pointsA, -0.01777)
 	multiplyXYsByScalar(pointsA, 2.0)
 	var meshA = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsA}
 	var lattice = getXYZLatticeByMesh(meshA)
 	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
-	var pointsB = getPointStringConvertedToPoints(pointStringB)
+	var pointsB = getPointsByString(pointStringB)
 	addXYsByXY(pointsB, [1, 0.0])
 //	addXYZsByZ(pointsB, -0.000000000000001)
 	multiplyXYsByScalar(pointsB, 2.0)
@@ -331,7 +415,7 @@ function testPixelBoolean() {
 	var xyPolygonsCFromLattice = getXYPolygonsByLattice(xyLatticeC)
 	drawXYPolygons(xyPolygonsCFromLattice)
 //	var pointListTest = [[0, 1, 2]]
-//	rotateXYZParametersByPointList(2, pointListTest)
+//	rotateXYZParametersByPoints(2, pointListTest)
 }
 
 function testPolygonBoolean() {
@@ -359,7 +443,6 @@ function testPolygonJoining() {
 //	polygonKeyStrings = ['0,0,0 1,1,0 1,0,0', '1,0,0 1,1,0 3,1,0']
 //	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 3,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 3,2,0 2,2,0 1,3,0']
 //	polygonKeyStrings = ['-1,0,0 -1,2,0 0,2,0 1,1,0 2,2,0 3,2,0 4,2,0 5,2,0 6,2,0 4,0,0', '0,2,0 -1,2,0 -1,4,0 3,4,0 6,2,0 5,2,0 4,2,0 3,2,0 2,2,0 1,3,0']
-//	polygonKeyStrings = getXYZPolygonKeyStrings([[[-1,-6], [-1,-4], [0,-4], [1,-5], [2,-4], [3,-4], [4,-5], [5,-4], [6,-4], [6,-6]], [[0,-4], [-1,-4], [-1,-2], [3,-2], [6,-2], [6,-4], [5,-4], [4,-3], [3,-4], [2,-4], [1,-3]]], 0)
 //	polygonKeyStrings = ['0,0,0 -1,0,0 0,1,0', '0,0,0 0,1,0 1,0,0', '0,0,0 1,0,0 0,-1,0', '0,0,0 0,-1,0 -1,0,0']
 //	polygonKeyStrings = ['0,-1,0 -1,0,0 0,0,0', '0,-1,0 0,0,0 1,0,0', '-1,0,0 0,1,1 1,0,0 0,0,0']
 	var xyPolygonKeyStrings = ['-1,0 -1,2 0,2 1,1 2,2 3,2 4,1 5,2 6,2 6,0', '0,2 -1,2 -1,4 3,4 6,4 6,2 5,2 4,3 3,2 2,2 1,3']
@@ -369,6 +452,169 @@ function testPolygonJoining() {
 	var joinedMesh = getMeshByPolygons(joinedPolygons)
 	var connectedFacet = getConnectedFacet(joinedMesh.facets, joinedMesh.points)
 	drawMesh({facets:[connectedFacet], points:addXYsByXY(joinedMesh.points, [0, -6])})
+}
+
+function testRemoveTooThinFacets() {
+	console.log('testRemoveTooThinFacets')
+//	console.log(getIsXYZSegmentClose([0,0,0], [10,0,-5], [2,0,0]))
+//	console.log(getIsXYZSegmentClose([0,0,0], [10,0,-5], [2,0,-1]))
+//	console.log(getIsXYZSegmentClose([0,0,0], [10,0,-5], [0,0,0]))
+	console.log(getIsXYZSegmentClose([2,0,0], [0,0,0], [1,0,0]))
+//	var pointString = '0,0,0 0,0,0 0,1,0 1,0,0'
+	var pointString = '0,0,0 1,0,0 2,0,0 3,2,0 3,0,0'
+	var points = getPointsByString(pointString)
+//	var facets = [[0, 1, 2, 3]]
+	var facets = [[0, 1, 2, 3, 4]]
+	console.log('points')
+	console.log(points)
+	console.log(facets)
+	var mesh = {facets:facets, points:points}
+	removeTooThinFacets(mesh)
+	console.log(facets)
+}
+
+function testScuplture() {
+	// triangulate after adding all facets
+	console.log('testScuplture')
+	var pointString = '7,-1 12,-8 7,-5 7,-8'
+	var points = getPointsByString(pointString)
+	var gridMap = new Map()
+	var gridMultiplier = getGridMultiplier(gridMap, points)
+	var closestPoint = getClosestPoint(gridMap, gridMultiplier, [0.0, 0.0])
+//	var closestPoint = getClosestPoint(gridMap, gridMultiplier, [7.0, -1.0])
+	console.log('gridMultiplier')
+	console.log(gridMultiplier)
+	console.log(gridMap)
+	console.log(closestPoint)
+	var layers = []
+	var polynodes = [[{point:[0, 0]}, {point:[0, 6]}, {point:[10, 0]}]]
+//	var polynodes = [[{point:[0, 0]}, {point:[5, 5]}, {point:[10, 0]}, {point:[5, -5]}]]
+	layers.push({connection:'s', height:0, polynodes:polynodes, transform3D:null})
+	polynodes = [
+		[{point:[0, 0], connections:null},
+		{point:[0, 2], connections:null},
+		{point:[0, 6], connections:null},
+		{point:[10, 0], connections:null}]]
+//		{point:[0, 6], connections:null},
+//		{point:[10, 0], connections:null},
+//		{point:[2, 2], connections:[]}]]
+//	polynodes = [
+//		[{point:[0, 0], connections:null},
+//		{point:[3, 5], connections:[[1]]},
+//		{point:[3, -5], connections:[[3]]}],
+//		[{point:[7, 5], connections:[[1, 0]]},
+//		{point:[10, 0], connections:[[2, 0]]},
+//		{point:[7, -5], connections:[[3, 0]]}]]
+	layers.push({connection:'p', height:2, polynodes:polynodes, transform3D:null})
+	polynodes = [
+		[{point:[0, 0], connections:null},
+		{point:[0, 2], connections:null},
+		{point:[10, 0], connections:null}]]
+//		{point:[0, 6], connections:null},
+//		{point:[10, 0], connections:null},
+//		{point:[2, 2], connections:null}]]
+//	polynodes = [
+//		[{point:[0, 0], connections:null},
+//		{point:[5, 5], connections:[[1], [0, 1]]},
+//		{point:[10, 0], connections:[[1, 1]]},
+//		{point:[5, -5], connections:[[2], [2, 1]]}]]
+	layers.push({connection:'p', height:4, polynodes:polynodes, transform3D:null})
+	console.log(layers)
+	var scupltureMesh = getScupltureMesh(layers, get3DUnitMatrix())
+	console.log(layers)
+	console.log(scupltureMesh)
+	drawMesh({facets:scupltureMesh.facets, points:scupltureMesh.points})
+}
+
+function testSubtraction() {
+	//tested by getSubtractionLoops, used by getSubtractionFaces
+//	meeting = {isToolNode, isWorkNode, toolAlong, workAlong}
+//	added to meetings at meetingIndex as point from workAlong
+//	added to toolMeetingsMap as toolIndex, [toolAlong, meetingIndex]
+//	added to workMeetingsMap as workIndex, [workAlong, meetingIndex]
+//	sorted by along in both maps
+//	polygons divided into {beginIndex, beginPoints, endIndex, endPoints} set in toolSegmentMap and workSegmentMap
+//	polygons divided into {beginIndex, beginPoints, endIndex, endPoints} set in toolSegmentMap and workSegmentMap
+//	start in work points outside tool, make loops and add if new
+//	tool, work..
+//	tool:0, 1, 2	work:3, 4, 5	meeting:6, 7
+//	polygons = ['8,-8 9,-8 9,-7', '7,-1 12,-8 7,-8']
+//	polygons = ['10,-4 10,-5 8,-4.99999995', '7,-1 12,-5 7,-5']
+//	polygons = ['10,-4 9,-5 8,-4', '7,-1 12,-5 7,-5']
+//	polygons = ['8,-7 9,-9 9,-6', '7,-1 12,-8 7,-5']
+//	polygons = ['8,-4 10,-7 11,-5', '7,-1 12,-5 7,-8']
+//	polygons = ['7,-8 9,-3 14,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['14,-8 9,-3 7,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['14,-8 9,-3 7,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['7,-8 9,-5 14,-5.00000025', '7,-5 12,-5 7,-1']
+//	polygons = ['6,-7 7,-3 7,-5 9,-5 10,-5 11,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['5,-5.00000025 10,-5 12,-8', '7,-5 12,-5 7,-1']
+	polygons = ['8,-4 12,-5 12,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-7 8,-4 11,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-7 10,-5 11,-5', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-7 10,-4 12,-6', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-17 8,-7 12,-5', '7,-5 12,-5 7,-1']
+//	polygons = ['12,-7 12,-3 15,-5', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-7 8,-5 9,-5 10,-5 11,-7', '7,-5 8,-5 9,-5 10,-5 12,-5 7,-1']
+	convertPointStringsToPointLists(polygons)
+	var polygon = polygons[0]
+	console.log('getPolygonInsideness(point, polygon)')
+	console.log(polygon)
+	console.log(getPolygonInsideness([10.5,-5], polygon))
+//	console.log(getPolygonInsideness([8,-7], polygon))
+//	console.log(getPolygonInsideness([8.1,-7], polygon))
+//	console.log(getIntersectionPortionsByRotated(ab[0][0], ab[1][0], cd[0], cd[1]))
+//	getIntersectionPortions(ab[0], ab[1], cd[0], cd[1])
+//	var meeting = getMeeting(1.0, 4.0, 2.0, [0.0, 0.0], [16.0, 8.0])
+//	console.log('meeting')
+//	console.log(meeting)
+	var subtractedPolygons = getOperatedPolygons('d', polygons[0], polygons[1])
+	console.log(subtractedPolygons)
+	drawXYPolygons(subtractedPolygons)
+}
+
+function testTaper() {
+	console.log('testTaper')
+//	var pointString = '0,-4,0 4,3,0 8,-4,0'
+	var pointString = '0,-4,0 4,2.92820323,0 8,-4,0'
+	var polygon3D = getPointsByString(pointString)
+	var heights = [0.0, 1.0]
+	var mesh = {facets:[], points:[]}
+	addToPillarMesh(heights, mesh, polygon3D)
+	var pillarMesh = getPillarMesh([polygon3D], heights, get3DUnitMatrix())
+//	drawMesh(pillarMesh)
+	console.log('pillarMesh points')
+	console.log(pillarMesh.points)
+	console.log(pillarMesh.facets)
+	taperMesh(get3DUnitMatrix(), 2.0, 40.0, 15.5, pillarMesh)
+	drawMesh(pillarMesh)
+}
+
+function testTriangleMesh() {
+//	var pointString = '0,0,0 0,4,0 4,4,0 1,2,0 4,0,0'
+//	var pointString = '0,0,0 0,4,0 4,4,0 4,3,0 1,3,0 1,1,0 4,1,0 4,0,0'
+//	var pointString = '-10,-30,0 -10,0,0 -20,0,0 -20,-9,0 -20,-21,0 -20,-30,0'
+//	var pointString = '39,-30,0, 17,-30,0, 14,-23,0, 14,-11,0, 17,-4,0, 0,0,0, 0,-34,0, 2,-30,0, 2,-4,0, 12,-4,0, 12,-30,0, 2,-30,0'
+//	var pointString = '39,-30,0, 17,-30,0, 14,-23,0, 14,-11,0, 17,-4,0, 0,0,0, 0,-34,0, 2,-30,0, 2,-4,0, 12,-4,0, 12,-30,0, 2,-30,0'
+	var pointString = '34,0,95 34,39,95 30,39,95 30,17,95 23,14,95 11,14,95 4,17,95 4,39,95 0,39,95 0,0,95 34,0,95 30,2,95 4,2,95 4,12,95 30,12,95 30,2,95'
+	var points = getPointsByString(pointString)
+	addXYsByY(points, -30)
+	multiplyXYZsByScalar(points, 0.2)
+//	drawXYPolygons([points])
+//	return
+	rotateXYZParametersByPoints(1, points)
+//	var facet = [4, 3, 2, 1, 0]
+//	var facet = [0, 1, 2, 3, 4, 5, 6, 7]
+//	var facet = [0, 1, 2, 3, 4, 5]
+//	var facet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+	var facet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+	var triangleFacets = getXYZTriangleFacets(facet, points, new Array(points.length))
+	var triangles = getPolygonsByFacets(triangleFacets, points)
+	rotateXYZParametersByPoints(-1, points)
+	console.log('triangles')
+	console.log(triangles)
+	console.log(points)
+	drawXYPolygons(triangles)
 }
 
 function testVoxel() {
@@ -397,7 +643,7 @@ function testVoxelBoolean() {
 	var pointString = '0,0,0 4,0,0 0,0,4 0,4,0'
 //	var pointString = '0,0,0 4,0,0 0,0,3 0,4,0'
 //	var pointString = '0,1,0 2,1,0 0,1,1 0,2,0'
-	var points = getPointStringConvertedToPoints(pointString)
+	var points = getPointsByString(pointString)
 	var mesh = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:points}
 	var lattice = getXYZLatticeByMesh(mesh)
 //	var voxelMap = getVoxelMapByXYZLattice(xyzLattice)
@@ -415,7 +661,7 @@ function testVoxelBoolean() {
 //	var pointStringB = '0,-1,0 6,-1,0 0,-1,3 0,4,0'
 //	var pointStringB = '0,0,0 6,0,0 0,0,4 0,4,0'
 //	var pointStringB = '0,0,0 4,0,0 0,0,1 0,2,0'
-	var pointsB = getPointStringConvertedToPoints(pointStringB)
+	var pointsB = getPointsByString(pointStringB)
 	addXYsByXY(pointsB, [1, 0])
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var latticeB = getXYZLatticeByMesh(meshB)
@@ -445,6 +691,25 @@ function testVoxelBoolean() {
 //	console.log(getMeshAnalysis(meshC))
 }
 
+function testWedge() {
+	console.log('testWedge')
+	var pointString = '0,0,0 0,6,0 6,0,0'
+	var polygon3D = getPointsByString(pointString)
+	var heights = [0.0, 0.5, 1.0]
+	var insets = [[1.0]]
+	var mesh = {facets:[], points:[]}
+	addToWedgeMesh(heights, insets, mesh, polygon3D)
+	console.log('points')
+	console.log(mesh.points)
+	console.log(mesh.facets)
+//	drawMesh(mesh)
+	var wedgeMesh = getWedgeMesh(heights, insets, [polygon3D], null)
+	drawMesh(wedgeMesh)
+	console.log('wedgeMesh points')
+	console.log(wedgeMesh.points)
+	console.log(wedgeMesh.facets)
+}
+
 function createSVGTest() {
 	document.writeln('<svg height="1100" width="1600">')
 	document.writeln('<defs>')
@@ -452,19 +717,31 @@ function createSVGTest() {
 	document.writeln('<polygon points="0 0, 10 3.5, 0 7" />')
 	document.writeln('</marker>')
 	document.writeln('</defs>')
-	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,150,400)">')
+	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,300,300)">')
+//	var before = new Date().getTime()
 //	testConnectedPolygons()
 //	testDrillByMesh()
 //	testDrillByPolygon()
+//	testExpand()
+//	testEquation()
 //	testFace()
-	testIntersection()
+//	testFacetSubtraction()
+//	testInset()
 //	testLoop()
 //	testMeshBoolean()
 //	testPixelBoolean()
 //	testPolygonBoolean()
 //	testPolygonJoining()
+//	testRemoveTooThinFacets()
+//	testScuplture()
+//	testSubtraction()
+//	testTaper()
+	testTriangleMesh()
 //	testVoxel()
 //	testVoxelBoolean()
+//	testWedge()
+//	console.log('Execution time')
+//	console.log(new Date().getTime() - before)
 	document.writeln('</g>')
 	document.writeln('</svg><br>')
 }
