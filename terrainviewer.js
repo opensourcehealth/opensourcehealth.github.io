@@ -88,19 +88,23 @@ var terrainViewer = {
 						this.drawImageByScreenXY(pixelSlide, screenXY)
 					}
 				}
+				var boundingBox = null
+				var scaleLocation = screenLocation.slice(0)
 				for (var scaleIndex = this.scaleSelectedIndex; scaleIndex < childrenMaps.length; scaleIndex++) {
 					var childrenMap = childrenMaps[scaleIndex]
-					var scaleLocation = getXYAddition(this.terrain.getLocationAtScale(this.location, scaleIndex), screenXY)
 					var xyKey = scaleLocation[0].toString() + ',' + scaleLocation[1].toString()
 					if (childrenMap.has(xyKey)) {
 						var children = childrenMap.get(xyKey)
 						for (var child of children) {
 							var childLocation = child.location
-							var scaleMultiplier = this.terrain.scaleMultipliers[scaleIndex]
-							var beginX = scaleMultiplier * scaleLocation[0]
-							if (childLocation[0] >= beginX && childLocation[0] < (beginX + scaleMultiplier)) {
-								var beginY = scaleMultiplier * screenLocation[1]
-								if (childLocation[1] >= beginY && childLocation[1] < (beginY + scaleMultiplier)) {
+							if (boundingBox == null) {
+								var scaleMultiplier = this.terrain.scaleMultipliers[this.scaleSelectedIndex]
+								var topLeft = getXYMultiplicationByScalar(screenLocation, scaleMultiplier)
+								var bottomRight = getXYAddition(topLeft, [scaleMultiplier, scaleMultiplier])
+								boundingBox = [topLeft, bottomRight]
+							}
+							if (childLocation[0] >= boundingBox[0][0] && childLocation[0] < boundingBox[1][0]) {
+								if (childLocation[1] >= boundingBox[0][1] && childLocation[1] < boundingBox[1][1]) {
 									if (this.pixelMultiplier == 1) {
 										this.drawImageByScreenXY(child.filename, screenXY)
 									}
@@ -111,6 +115,8 @@ var terrainViewer = {
 							}
 						}
 					}
+					scaleLocation[0] = Math.floor(0.5 * scaleLocation[0] + 0.000001)
+					scaleLocation[1] = Math.floor(0.5 * scaleLocation[1] + 0.000001)
 				}
 			}
 		}
