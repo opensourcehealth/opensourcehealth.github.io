@@ -566,13 +566,13 @@ function getXYZLatticeByMesh(mesh) {
 		swapXY(xyPolygons)
 		xyzLattice[1].set(entry[0], getIntersectionPairsMap(xyPolygons))
 	}
-	rotateXYZParametersByPointList(2, mesh.points)
+	rotateXYZParametersByPoints(2, mesh.points)
 	var xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
 	xyzLattice[2] = new Map()
 	for (var entry of xyPolygonsMap) {
 		xyzLattice[2].set(entry[0], getIntersectionPairsMap(entry[1]))
 	}
-	rotateXYZParametersByPointList(-2, mesh.points)
+	rotateXYZParametersByPoints(-2, mesh.points)
 	return xyzLattice
 }
 
