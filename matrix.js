@@ -5,6 +5,13 @@ const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
 
+function addArray(elements, elementsAddition) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		elements[elementIndex] += elementsAddition[elementIndex]
+	}
+	return elements
+}
+
 function addXY(xy, xyAddition) {
 	xy[0] += xyAddition[0]
 	xy[1] += xyAddition[1]
@@ -71,13 +78,80 @@ function get2DTransformByMatrix(floats) {
 	return floats
 }
 
+function get2DTransformByPlane(floats) {
+	var latestMatrix = get2DUnitMatrix()
+	if (floats.length == 0) {
+		return latestMatrix
+	}
+//	a c e		0 2 4
+//	b d f		1 3 5
+//	0 0 1		    +
+	latestMatrix[4] = floats[0]
+	if (floats.length == 1) {
+		latestMatrix[5] = 0.0
+	}
+	else {
+		latestMatrix[5] = floats[1]
+	}
+	if (floats.length < 3) {
+		return latestMatrix
+	}
+	latestMatrix[0] = floats[2]
+	latestMatrix[1] = floats[3]
+	if (floats.length == 4) {
+		latestMatrix[2] = -latestMatrix[1]
+		latestMatrix[3] = latestMatrix[0]
+	}
+	else {
+		latestMatrix[2] = floats[4]
+		latestMatrix[3] = floats[5]
+	}
+	return latestMatrix
+}
+
+function get2DTransformByPolar(floats) {
+	var latestMatrix = get2DUnitMatrix()
+	if (floats.length == 0) {
+		return latestMatrix
+	}
+//	a c e		0 2 4
+//	b d f		1 3 5
+//	0 0 1		    +
+	latestMatrix[4] = floats[0]
+	if (floats.length == 1) {
+		latestMatrix[5] = 0.0
+	}
+	else {
+		latestMatrix[5] = floats[1]
+	}
+	if (floats.length < 3) {
+		return latestMatrix
+	}
+	var rotation = floats[2] * gRadiansPerDegree
+	var cosAngle = Math.cos(rotation)
+	var sinAngle = Math.sin(rotation)
+	latestMatrix[0] = cosAngle
+	latestMatrix[1] = sinAngle
+	latestMatrix[2] = -sinAngle
+	latestMatrix[3] = cosAngle
+	if (floats.length < 4) {
+		return latestMatrix
+	}
+	var scale = floats[3]
+	latestMatrix[0] *= scale
+	latestMatrix[1] *= scale
+	latestMatrix[2] *= scale
+	latestMatrix[3] *= scale
+	return latestMatrix
+}
+
 function get2DTransformByRotate(floats) {
 	if (floats.length == 0) {
 		return get2DUnitMatrix()
 	}
-	rotation = floats[0] * Math.PI / 180.0
-	cosAngle = Math.cos(rotation)
-	sinAngle = Math.sin(rotation)
+	var rotation = floats[0] * gRadiansPerDegree
+	var cosAngle = Math.cos(rotation)
+	var sinAngle = Math.sin(rotation)
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
@@ -88,8 +162,8 @@ function get2DTransformByRotate(floats) {
 	if (floats.length < 2) {
 		return latestMatrix
 	}
-	x = 0.0
-	y = 0.0
+	var x = 0.0
+	var y = 0.0
 	if (floats.length > 1) {
 		x = floats[1]
 	}
@@ -115,11 +189,25 @@ function get2DTransformByScale(floats) {
 	return latestMatrix
 }
 
+function get2DTransformBySegment(beginPoint, endPoint) {
+	var latestMatrix = get2DUnitMatrix()
+//	a c e		0 2 4
+//	b d f		1 3 5
+	latestMatrix[4] = beginPoint[0]
+	latestMatrix[5] = beginPoint[1]
+	var subtraction = getXYSubtraction(endPoint, beginPoint)
+	latestMatrix[0] = subtraction[0]
+	latestMatrix[1] = subtraction[1]
+	latestMatrix[2] = -latestMatrix[1]
+	latestMatrix[3] = latestMatrix[0]
+	return latestMatrix
+}
+
 function get2DTransformBySkewX(floats) {
 	if (floats.length == 0) {
 		return get2DUnitMatrix()
 	}
-	var rotation = floats[0] * Math.PI / 180.0
+	var rotation = floats[0] * gRadiansPerDegree
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
@@ -133,7 +221,7 @@ function get2DTransformBySkewY(floats) {
 	if (floats.length == 0) {
 		return get2DUnitMatrix()
 	}
-	var rotation = floats[0] * Math.PI / 180.0
+	var rotation = floats[0] * gRadiansPerDegree
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
@@ -299,7 +387,7 @@ function get3DTransformByRotate3D(floats) {
 	var x = floats[0]
 	var y = floats[1]
 	var z = floats[2]
-	var rotation = floats[3] * Math.PI / 180.0
+	var rotation = floats[3] * gRadiansPerDegree
 	var cosAngle = Math.cos(rotation)
 	var sinAngle = Math.sin(rotation)
 	var t = 1.0 - cosAngle
@@ -339,7 +427,7 @@ function get3DTransformByRotateX(floats) {
 	if (floats.length == 0) {
 		return latestMatrix
 	}
-	rotation = floats[0] * Math.PI / 180.0
+	rotation = floats[0] * gRadiansPerDegree
 	cosAngle = Math.cos(rotation)
 	sinAngle = Math.sin(rotation)
 //	0 4 8  12
@@ -363,7 +451,7 @@ function get3DTransformByRotateY(floats) {
 	if (floats.length == 0) {
 		return latestMatrix
 	}
-	rotation = floats[0] * Math.PI / 180.0
+	rotation = floats[0] * gRadiansPerDegree
 	cosAngle = Math.cos(rotation)
 	sinAngle = Math.sin(rotation)
 //	0 4 8  12
@@ -387,7 +475,7 @@ function get3DTransformByRotateZ(floats) {
 	if (floats.length == 0) {
 		return latestMatrix
 	}
-	rotation = floats[0] * Math.PI / 180.0
+	rotation = floats[0] * gRadiansPerDegree
 	cosAngle = Math.cos(rotation)
 	sinAngle = Math.sin(rotation)
 //	0 4 8  12
@@ -537,6 +625,31 @@ function get3DUnitMatrix() {
 	return [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 }
 
+function getArrayDistanceSquared(arrayA, arrayB) {
+	var distanceSquared = 0.0
+	for (var arrayIndex = 0; arrayIndex < arrayA.length; arrayIndex++) {
+		var delta = arrayA[arrayIndex] - arrayB[arrayIndex]
+		distanceSquared += delta * delta
+	}
+	return distanceSquared
+}
+
+function getArrayMultiplicationByScalar(elements, scalarMultiplier) {
+	var arrayMultiplication = new Array(elements.length)
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		arrayMultiplication[elementIndex] = elements[elementIndex] * scalarMultiplier
+	}
+	return arrayMultiplication
+}
+
+function getArraysMultiplicationByScalar(elementLists, scalarMultiplier) {
+	var arraysMultiplication = new Array(elementLists.length)
+	for (var elementListIndex = 0; elementListIndex < elementLists.length; elementListIndex++) {
+		arraysMultiplication[elementListIndex] = getArrayMultiplicationByScalar(elementLists[elementListIndex], scalarMultiplier)
+	}
+	return arraysMultiplication
+}
+
 function getBrightness256(brightness) {
 	return Math.floor(255.0 * ((brightness) % 1.0))
 }
@@ -544,6 +657,11 @@ function getBrightness256(brightness) {
 //cross(A, B) = [ a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1 ]
 function getCrossProduct(a, b) {
 	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
+
+//cross(A, B) = [ a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1 ]
+function getCrossProductZ(a, b) {
+	return a[0] * b[1] - a[1] * b[0]
 }
 
 function getMultiplied2DMatrix(matrixA, matrixB) {
@@ -617,6 +735,17 @@ function getRGBByIndex(rgbIndex) {
 	return [getBrightness256(rgbIndex * 0.617), getBrightness256(rgbIndex * 0.733), getBrightness256(rgbIndex * 0.317)]
 }
 
+function getTransformedPolygons(polygon, transform2Ds) {
+	if (transform2Ds == null) {
+		return [polygon]
+	}
+	var transformedPolygons = []
+	for (var transform2D of transform2Ds) {
+		transformedPolygons.push(transform2DPoints(getArraysCopy(polygon), transform2D))
+	}
+	return transformedPolygons
+}
+
 function getXYAddition(xyA, xyB) {
 	return [xyA[0] + xyB[0], xyA[1] + xyB[1]]
 }
@@ -634,6 +763,14 @@ function getXYBy3DMatrix(point, matrix) {
 	var x = point[0] * matrix[0] + point[1] * matrix[4] + point[2] * matrix[8] + matrix[12]
 	var y = point[0] * matrix[1] + point[1] * matrix[5] + point[2] * matrix[9] + matrix[13]
 	return [x, y]
+}
+
+function getXYDistance(xyA, xyB) {
+	return Math.sqrt(getXYDistanceSquared(xyA, xyB))
+}
+
+function getXYDistanceSquared(xyA, xyB) {
+	return getXYLengthSquared(getXYSubtraction(xyA, xyB))
 }
 
 function getXYDotProduct(xyA, xyB) {
@@ -696,6 +833,10 @@ function getXYZByKey(key) {
 	return [parseFloat(parameters[0]), parseFloat(parameters[1]), parseFloat(parameters[2])]
 }
 
+function getXYZDistanceSquared(xyA, xyB) {
+	return getXYZLengthSquared(getXYZSubtraction(xyA, xyB))
+}
+
 function getXYZDotProduct(xyzA, xyzB) {
 	return xyzA[0] * xyzB[0] + xyzA[1] * xyzB[1] + xyzA[2] * xyzB[2]
 }
@@ -733,6 +874,13 @@ function invertXYZ(xyz) {
 	xyz[1] = -xyz[1]
 	xyz[2] = -xyz[2]
 	return xyz
+}
+
+function multiplyArrayByScalar(elements, scalarMultiplier) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		elements[elementIndex] *= scalarMultiplier
+	}
+	return elements
 }
 
 function multiplyXYArraysByScalar(xyArrays, multiplier) {
@@ -834,6 +982,13 @@ function transform2DPoint(point, matrix) {
 //	b d f		1 3 5
 	point[0] = point[0] * matrix[0] + point[1] * matrix[2] + matrix[4]
 	point[1] = originalX * matrix[1] + point[1] * matrix[3] + matrix[5]
+}
+
+function transform2DPoints(points, matrix) {
+	for (var point of points) {
+		transform2DPoint(point, matrix)
+	}
+	return points
 }
 
 function widenBoundingBox(boundingBox, point) {
