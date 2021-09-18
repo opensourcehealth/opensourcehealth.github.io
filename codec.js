@@ -36,6 +36,8 @@ var gEscapeTable = {
 var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
 var gEscapeExpression =	new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
 var gQueryMap = new Map()
+var gQueryLinkID = 'queryLink'
+var gQuerySelectID = null
 
 function getBracketReplacedLines(textAreaID) {
 	var wordString = document.getElementById(textAreaID).value
@@ -44,10 +46,10 @@ function getBracketReplacedLines(textAreaID) {
 }
 
 function querySelectChanged() {
-	var querySelect = document.getElementById('querySelect')
+	var querySelect = document.getElementById(gQuerySelectID)
 	var queryKey = querySelect.options[querySelect.selectedIndex].text
 	if (gQueryMap.has(queryKey)) {
-		var queryLink = document.getElementById('queryLink')
+		var queryLink = document.getElementById(gQueryLinkID)
 		queryLink.href = '?' + gQueryMap.get(queryKey)
 		queryLink.innerHTML = 'Go'
 	}
@@ -56,7 +58,7 @@ function querySelectChanged() {
 function setNumberOfRows(id, lines) {
 	var numberOfRows = 1
 	var oneOverColumns = 1.0 / document.getElementById(id).cols
-	for (line of lines) {
+	for (var line of lines) {
 		numberOfRows += Math.ceil(oneOverColumns * (line.length + 1))
 	}
 	document.getElementById(id).rows = numberOfRows
@@ -64,8 +66,9 @@ function setNumberOfRows(id, lines) {
 
 function setQueryStorage(newButtonID, querySelectID, wordString) {
 	var date = new Date()
+	gQuerySelectID = querySelectID
 	var queryTime = date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
-	var queryLink = document.getElementById('queryLink')
+	var queryLink = document.getElementById(gQueryLinkID)
 	var queryValue = wordString.replace(/\n/g, '%0A').replace(/,/g, '%2C')
 	if (typeof(Storage) == "undefined" || querySelectID == null) {
 		gBackupNumberOfUpdates += 1
@@ -107,7 +110,7 @@ function setQueryStorage(newButtonID, querySelectID, wordString) {
 		queryLink.hidden = false
 		querySelect.hidden = false
 	}
-	for (query of queries) {
+	for (var query of queries) {
 		var indexOfSemicolon = query.indexOf(';')
 		var key = query.slice(0, indexOfSemicolon)
 		if (!gQueryMap.has(key)) {
@@ -146,7 +149,7 @@ function setTextArea(textAreaID) {
 }
 
 function windowNew() {
-	var querySelect = document.getElementById('querySelect')
+	var querySelect = document.getElementById(gQuerySelectID)
 	var queryKey = querySelect.options[querySelect.selectedIndex].text
 	if (gQueryMap.has(queryKey)) {
 		window.open('?' + gQueryMap.get(queryKey))
