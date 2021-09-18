@@ -1,6 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-const gVeryClose = 0.1 * gClose
+const gTenthClose = 0.1 * gClose
 const gXYDirections = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 
 function addLineToMap(line, lines, map, point) {
@@ -172,9 +172,9 @@ function getIntersectionPairsByExistence(existenceCondition, signedIntersections
 		}
 		else {
 			if (lastExistenceCondition) {
-				var beginIndex = Math.round(Math.ceil(beginIntersection - gVeryClose))
+				var beginIndex = Math.round(Math.ceil(beginIntersection - gTenthClose))
 				var endIntersection = signedIntersection[0]
-				var endIndex = Math.round(Math.floor(endIntersection + gVeryClose))
+				var endIndex = Math.round(Math.floor(endIntersection + gTenthClose))
 				if (endIndex >= beginIndex) {
 					var shouldAddPair = true
 					if (intersectionPairs.length > 0) {
