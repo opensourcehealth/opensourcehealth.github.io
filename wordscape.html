@@ -10,11 +10,20 @@
 <th><p id="paragraphText"></p></th><th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
 </tr>
 </table>
-<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
-<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
-<a hidden="true" id="queryLink" href="index.html">Original Link</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<select hidden="true" id="viewSelect" onchange ="viewSelectChanged()"></select><br>
+<table style="width:50%">
+<tr>
+<td><button type="button" onclick="update()">Update</button><td>
+<td><select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select><td>
+<td><button hidden="false" id="newButton" onclick="windowNew()" type="button">New</button><td>
+<td><select hidden="true" id="viewSelect" onchange ="viewSelectChanged()"></select><td>
+</tr>
+<tr>
+<td><button hidden="true" type="button"></button><td>
+<td><select hidden="true"></select><td>
+<td><a hidden="true" id="queryLink" href="index.html">Original Link</a><td>
+<td><select hidden="true" id="typeSelect" onchange ="typeSelectChanged()"></select></td>
+</tr>
+</table>
 <textarea id="wordArea" rows="20" cols="120"></textarea><br>
 <br>
 <h3>SVG</h3>
@@ -23,14 +32,20 @@
 <h3>Mesh</h3>
 <textarea id="meshArea" rows="10" cols="120"></textarea><br>
 <br>
+<script src="alteration.js"></script>
+<script src="construction.js"></script>
 <script src="codec.js"></script>
 <script src="help.js"></script>
+<script src="generator2d.js"></script>
+<script src="generator3d.js"></script>
 <script src="maparray.js"></script>
 <script src="matrix.js"></script>
+<script src="meta.js"></script>
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
+<script src="statement.js"></script>
 <script src="viewer.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
@@ -39,7 +54,6 @@
 //change exterior to voxel and pixel
 //layers=[{transform, [polygon]}], closed, plane
 //test basis, transform in pillar
-//attach polygons in pillar/extrusion if inside one another
 //verticalHole should be widdershins, all widdershins should be reversed when making a mesh when on outside
 //analyze volume and surface area
 //view transform3D
@@ -82,21 +96,6 @@ areaInput = function(evt) {
 wordArea.onkeydown = areaKeyDown
 wordArea.oninput = areaInput
 */
-function addToDescendants(descendants, statement) {
-	var lengthLimit = 10000000
-	if (descendants.length >= lengthLimit) {
-		var warningText = 'Recursion limit of\ndescendants reached, no further statements will be processed.'
-		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
-		return
-	}
-	if (statement.children != null) {
-		for (var child of statement.children) {
-			descendants.push(child)
-			addToDescendants(descendants, child)
-		}
-	}
-}
 
 function addToMeshArea(meshString) {
 	if (meshString == null) {
@@ -120,11 +119,11 @@ function analyzeOutputMesh(attributeMap, meshGenerator, registry, statement) {
 	}
 	if (attributeMap.has('analysis')) {
 		var meshAnaysisMap = null
-		if (attributeMap.get('analysis') == 'triangle') {
+		if (attributeMap.get('analysis')[0] == 't') {
 			meshAnaysisMap = getMeshAnalysis(getTriangleMesh(meshGenerator.getMesh()))
 		}
 		else {
-			if (attributeMap.get('analysis') == 'polygon') {
+			if (attributeMap.get('analysis')[0] == 'p') {
 				meshAnaysisMap = getMeshAnalysis(meshGenerator.getMesh())
 			}
 		}
@@ -141,137 +140,22 @@ function analyzeOutputMesh(attributeMap, meshGenerator, registry, statement) {
 	}
 }
 
-function getBracketedEntry(bracketString) {
-	indexOfBeginBracket = bracketString.indexOf('(')
-	indexOfEndBracket = bracketString.indexOf(')')
-	if (indexOfBeginBracket == -1 || indexOfEndBracket == -1 || indexOfBeginBracket > indexOfEndBracket) {
-		return null
-	}
-	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
-}
-
-function getDescendants(statement) {
-	var descendants = []
-	addToDescendants(descendants, statement)
-	return descendants
-}
-
-function getFunctionMapCapitalize(alternatingEntries) {
-	var functionMap = new Map()
-	for (alternatingIndex = 0; alternatingIndex < alternatingEntries.length; alternatingIndex += 2) {
-		key = alternatingEntries[alternatingIndex]
-		keyLower = key.toLowerCase()
-		if (key != keyLower) {
-			gCapitalizationMap.set(keyLower, key)
-		}
-		nextIndex = alternatingIndex + 1
-		value = alternatingEntries[nextIndex]
-		functionMap.set(key, value)
-	}
-	return functionMap
-}
-
 function getGroupBoundingBox(caller, statement) {
 	var boundingBox = null
-	var descendants = getDescendants(statement)
+	var descendants = []
+	addToDescendantsInsideFirst(descendants, statement)
 	for (var child of descendants) {
 		boundingBox = widenStatementBoundingBox(boundingBox, caller, child)
 	}
 	return boundingBox
 }
 
-function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix) {
-	searchSuffix = '.' + searchSuffix
-	var replacedTokens = []
-	var tokens = getTokens('-', [bracketString])
-	tokens = getTokens('+', tokens)
-	for (var token of tokens) {
-		indexOfSearchSuffix = token.indexOf(searchSuffix)
-		if (indexOfSearchSuffix != -1) {
-			beforeSuffix = token.slice(0, indexOfSearchSuffix).trim()
-			if (replacementMap.has(beforeSuffix)) {
-				value = parseFloat(replacementMap.get(beforeSuffix)) + increment
-				replacedTokens.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplacedBySuffix, could not find id:\nin search string:'
-				warningVariables = [beforeSuffix, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-		else {
-			replacedTokens.push(token)
-		}
+function getInsets(statement) {
+	var insets = getPointsByTag('insets', statement, 'polygon')
+	if (insets == null) {
+		return [[1.0]]
 	}
-	return replacedTokens.join('')
-}
-
-function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
-	if (bracketString.indexOf(']') == -1) {
-		return getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix)
-	}
-	var splitBracketStrings = bracketString.split(']')
-	var replacedStrings = []
-	for (var splitBracketString of splitBracketStrings) {
-		if (splitBracketString.length > 1) {
-			var tokens = splitBracketString.split('[')
-			if (tokens[0].length > 0) {
-				replacedStrings.push(tokens[0])
-			}
-			var lastToken = tokens[tokens.length - 1].replace(/ /g, '')
-			if (replacementMap.has(lastToken)) {
-				value = parseFloat(replacementMap.get(lastToken)) + increment
-				replacedStrings.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplaced, could not find id:\nin search string:'
-				warningVariables = [lastToken, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-	}
-	return replacedStrings.join('')
-}
-
-function getLineByStatement(passthrough, statement) {
-	if (statement.tag == null) {
-		if (statement.nestingIncrement == -1) {
-			if (statement.openingStatement == null) {
-				return '</g>'
-			}
-			else {
-				if (statement.openingStatement.tag == passthrough) {
-					return '</' + passthrough + '>'
-				}
-				return '</g>'
-			}
-		}
-		else {
-			return ''
-		}
-	}
-	firstWord = '<g'
-	if (statement.nestingIncrement < 1 || statement.tag == passthrough) {
-		firstWord = '<' + statement.tag
-	}
-	attributeWords = [firstWord]
-	for (var entry of statement.attributeMap) {
-		value = entry[1]
-		quoteString = '"'
-		if (value.indexOf('"') != -1) {
-			quoteString = '\''
-		}
-		attributeWords.push(entry[0] + '=' + quoteString + value + quoteString)
-	}
-	attributeLine = attributeWords.join(' ')
-	lineClosing = '>'
-	if (statement.nestingIncrement == 0) {
-		lineClosing = '/>'
-	}
-	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
-		return attributeLine + lineClosing
-	}
-	return attributeLine + ' ' + lineClosing
+	return insets
 }
 
 function getMeshesByChildren(children, registry) {
@@ -286,41 +170,7 @@ function getMeshesByChildren(children, registry) {
 }
 
 function getPolygonPoints(statement) {
-	var attributeMap = statement.attributeMap
-	if (attributeMap == null) {
-		return null
-	}
-	if (statement.tag != 'polygon' || !attributeMap.has('points')) {
-		return null
-	}
-	var point = [0.0, 0.0]
-	var pointIndex = 0
-	var pointWords = attributeMap.get('points').replace(/~/g, '*').split('&').join('*,*').replace(/,/g, ' ').split(' ').filter(lengthCheck)
-	if (pointWords.length % 2 == 1) {
-		warningString = 'Warning, points have an odd number of parameters: \n in the statement with the attributes:'
-		var entries = []
-		for (var entry of attributeMap) {
-			entries.push(entry)
-		}
-		warning(warningString, [pointWords, entries])
-		pointWords.pop()
-	}
-	var points = new Array(pointWords.length / 2)
-	if (points.length == 0) {
-		return null
-	}
-	for (pointWordIndex = 0; pointWordIndex < pointWords.length; pointWordIndex += 2) {
-		for (parameterIndex = 0; parameterIndex < 2; parameterIndex++) {
-			var parameter = pointWords[pointWordIndex + parameterIndex]
-			if (parameter != '*') {
-				point[parameterIndex] = parseFloat(parameter)
-			}
-		}
-		points[pointIndex] = point
-		point = point.slice(0)
-		pointIndex += 1
-	}
-	return points
+	return getPointsByTag('points', statement, 'polygon')
 }
 
 function getPolygonsByChildren(children) {
@@ -334,359 +184,52 @@ function getPolygonsByChildren(children) {
 	return polygons
 }
 
-function getStatement(line) {
-	var children = null
-	var nestingIncrement = 0
-	var quoteSeparatedWords = getQuoteSeparatedWords(line)
-	var lastIndex = quoteSeparatedWords.length - 1
-	var tag = null
-	if (quoteSeparatedWords.length > 0) {
-		firstWord = quoteSeparatedWords[0]
-		if (firstWord.startsWith('</') || firstWord == ']' || firstWord == '}') {
-			nestingIncrement = -1
-		}
-		else {
-			if (firstWord.startsWith('<')) {
-				firstWord = firstWord.slice(1)
-			}
-			if (firstWord.length > 0) {
-				tag = getCapitalizedKey(firstWord)
-			}
-		}
-		if (quoteSeparatedWords.length > 1) {
-			var lastWord = quoteSeparatedWords[lastIndex]
-			if (lastWord == '>' || lastWord == '[' || lastWord == '{') {
-				nestingIncrement = 1
-			}
-			if (lastWord.endsWith('>') || lastWord == '[' || lastWord == '{') {
-				lastIndex -= 1
-			}
-		}
+function getStratas(attributeMap) {
+	var stratas = getFloatLists(attributeMap, 'stratas')
+	if (stratas == null) {
+		return [[]]
 	}
-	if (tag != null) {
-		children = []
+	if (stratas.length == 0) {
+		stratas.push([])
 	}
-	var attributes = getAttributes(quoteSeparatedWords.slice(1, lastIndex + 1))
-	for (var attribute of attributes) {
-		keyStrings = attribute[0].split('.')
-		if (keyStrings.length == 1) {
-			attribute[0] = getCapitalizedKey(attribute[0])
-		}
-		else {
-			if (keyStrings.length == 2) {
-				keyStrings[0] = getCapitalizedKey(keyStrings[0])
-				keyStrings[1] = getCapitalizedKey(keyStrings[1])
-				attribute[0] = keyStrings.join('.')
-			}
-		}
-	}
-	var attributeMap = new Map(attributes)
-	var statement = {
-	attributeMap:attributeMap,
-	children:children,
-	nestingIncrement:nestingIncrement,
-	openingStatement:null,
-	parent:null,
-	tag:tag}
-	return statement
+	return stratas
 }
 
-function getTokens(delimeter, searchStrings) {
-	tokens = []
-	for (var searchString of searchStrings) {
-		subTokens = searchString.split(delimeter)
-		for (subTokenIndex = 0; subTokenIndex < subTokens.length; subTokenIndex++) {
-			tokens.push(subTokens[subTokenIndex])
-			if (subTokenIndex < subTokens.length - 1) {
-				tokens.push(delimeter)
+function getTransform2DsByChildren(children) {
+	var transform2DsByChildren = null
+	for (var child of children) {
+		var transform2Ds = getPointsByTag('transform2Ds', child, 'derive2D')
+		if (transform2Ds != null) {
+			if (transform2DsByChildren == null) {
+				transform2DsByChildren = transform2Ds
+			}
+			else {
+				pushArray(transform2DsByChildren, transform2Ds)
 			}
 		}
 	}
-	return tokens
+	return transform2DsByChildren
 }
 
-function processCopyLinear(registry, statement) {
-	var attributeMap = statement.attributeMap
+function getWorkMesh(attributeMap, registry) {
 	if (!attributeMap.has('work')) {
-		return
-	}
-	var workID = attributeMap.get('work')
-	if (!registry.idMap.has(workID)) {
-		return
-	}
-	var workStatement = registry.idMap.get(workID)
-	var points = getPolygonPoints(workStatement)
-	if (points == null) {
-		return
-	}
-	statement.tag = workStatement.tag
-	attributeMap.set('points', points.join(' '))
-}
-
-function processCopyMesh(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('work')) {
-		return
-	}
-	var workID = attributeMap.get('work')
-	if (!registry.objectMap.has(workID)) {
-		return
-	}
-	var mesh = registry.objectMap.get(workID).getMesh()
-	analyzeOutputMesh(attributeMap, new Mesh({facets:getArraysCopy(mesh.facets), points:getArraysCopy(mesh.points)}), registry, statement)
-}
-
-function processDescendants(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendants(descendants, rootStatement)
-	for (var statement of descendants) {
-		if (tagMap.has(statement.tag)) {
-			tagMap.get(statement.tag)(registry, statement)
-		}
-	}
-}
-
-function processDrill(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('work')) {
-		return
+		return null
 	}
 	var work = attributeMap.get('work')
 	if (!registry.objectMap.has(work)) {
-		return
+		return null
 	}
-	var workMesh = registry.objectMap.get(work).getMesh()
-	var heights = null
-	if (attributeMap.has('heights')) {
-		heights = getFloats(attributeMap.get('heights'))
+	var workGenerator = registry.objectMap.get(work)
+	if (workGenerator == null) {
+		return null
 	}
-	var polygons = getPolygonsByChildren(statement.children)
-	var transformed3DMatrix = getTransformed3DMatrix(null, statement)
-	for (var polygon of polygons) {
-		drillByPolygon(polygon, heights, transformed3DMatrix, workMesh)
-	}
-	var drillMeshes = getMeshesByChildren(statement.children, registry)
-	for (var drillMesh of drillMeshes) {
-		drillByMesh(drillMesh, heights, transformed3DMatrix, workMesh)
-	}
-}
-
-function processExtrusion(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('heights')) {
-		return
-	}
-	var heights = getFloats(attributeMap.get('heights'))
-	var polygons = getPolygonsByChildren(statement.children)
-	var sections = [{layerIndex:0, polygons:polygons}]
-	for (var child of statement.children) {
-		if (child.tag == 'layer') {
-			var layerIndex = sections[sections.length - 1].layerIndex + 1
-			if (child.attributeMap.has('layerIndex')) {
-				layerIndex = child.attributeMap.get('layerIndex')
-			}
-			sections.push({layerIndex:layerIndex, polygons:getPolygonsByChildren(child.children)})
+	var workMesh = workGenerator.getMesh()
+	if (attributeMap.has('copy')) {
+		if (attributeMap.get('copy')[0] == 't') {
+			workMesh = getMeshCopy(workMesh)
 		}
 	}
-	sections.reverse()
-	var layers = []
-	for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
-		if (sections.length > 0) {
-			var lastSection = sections[sections.length - 1]
-			if (lastSection.layerIndex == heightIndex) {
-				polygons = lastSection.polygons
-				sections.pop()
-			}
-		}
-		layer = {height:heights[heightIndex], polygons:polygons, transform2D:null, transform3D:null}
-		layers.push(layer)
-	}
-	var isJoined = false
-	if (attributeMap.has('join')) {
-		if (attributeMap.get('join').toLowerCase() == 'true') {
-			isJoined = true
-		}
-	}
-	var extrusion = new Extrusion(isJoined, layers, null)
-	analyzeOutputMesh(attributeMap, extrusion, registry, statement)
-}
-
-function processGroup(registry, statement) {
-	var attributeMap = statement.attributeMap
-	var boundingBox = getGroupBoundingBox(statement, statement)
-	var height = boundingBox[1][1]
-	var width = boundingBox[1][0]
-	var border = 0
-	if (attributeMap.has('transform')) {
-		var transform = attributeMap.get('transform')
-		var entry = getBracketedEntry(transform)
-		if (entry != null) {
-			if (entry[0] == 'translate') {
-				commaSeparated = entry[1].split(',')
-				var xString = commaSeparated[0]
-				var groupStorage = null
-				if (registry.storageMap.has('group')) {
-					groupStorage = registry.storageMap.get('group')
-					xString = xString.replace('border', groupStorage.border.toString())
-					xString = getIDReplaced(xString, groupStorage.border + groupStorage.border, groupStorage.widthMap, 'width')
-				}
-				xString = xString.replace('width', (width + 1).toFixed(0))
-				var addition = getAddition(xString)
-				if (groupStorage == null) {
-					border = addition
-				}
-				xString = addition.toFixed(0)
-				if (commaSeparated.length > 1) {
-					yString = commaSeparated[1]
-					if (groupStorage != null) {
-						yString = getIDReplaced(yString, groupStorage.border, groupStorage.heightMap, 'height')
-					}
-					yString = yString.replace('height', (height + 1).toFixed(0))
-					xString = xString + ',' + getAddition(yString).toFixed(0)
-				}
-				attributeMap.set('transform', 'translate(' + xString + ')')
-			}
-		}
-	}
-	groupStorage = null
-	if (registry.storageMap.has('group')) {
-		groupStorage = registry.storageMap.get('group')
-	}
-	else {
-		var scaledBorder = border * getTransformed2DMatrix(null, statement)[0]
-		groupStorage = {border:border, heightMap:new Map(), scaledBorder:scaledBorder, widthMap:new Map()}
-		registry.storageMap.set('group', groupStorage)
-	}
-	if (attributeMap.has('id')) {
-		var id = attributeMap.get('id')
-		groupStorage.heightMap.set(id, height)
-		groupStorage.widthMap.set(id, width)
-	}
-}
-
-function processMirror(registry, statement) {
-	var attributeMap = statement.attributeMap
-	var angle = getFloatValue(0.0, 'angle', registry, statement) * Math.PI / 180.0
-	var x = getFloatValue(0.0, 'x', registry, statement)
-	var y = getFloatValue(0.0, 'y', registry, statement)
-	statement.tag = 'polygon'
-	var points = getPolygonPoints(statement)
-	if (points == null) {
-		return
-	}
-	var mirrorFromX = x + x
-	for (pointIndex = points.length - 1; pointIndex > -1; pointIndex--) {
-		var point = points[pointIndex]
-		var mirrorPoint = [mirrorFromX - point[0], point[1]]
-		points.push(mirrorPoint)
-	}
-	attributeMap.set('points', points.join(' '))
-}
-
-function processOutline(registry, statement) {
-	var attributeMap = statement.attributeMap
-	var floats = []
-	if (attributeMap.has('flip')) {
-		floats = getFloats(attributeMap.get('flip'))
-	}
-	else {
-		if (attributeMap.has('flipY')) {
-			floats = getFloats(attributeMap.get('flipY'))
-		}
-	}
-	if (floats.length > 0) {
-		scaleString = 'scale(' + floats[0] + ',' + (-floats[0]) + ')'
-		attributeMap.set('transform', scaleString)
-	}
-	var styleMap = new Map([
-		['fill', 'none'],
-		['stroke', 'rgb(0,0,0)'],
-		['stroke-width', '1']])
-	if (attributeMap.has('style')) {
-		styles = attributeMap.get('style').replace(/ /g, '').split(';')
-		for (var style of styles) {
-			var entry = style.split(':')
-			styleMap.set(entry[0], entry[1])
-		}
-	}
-	styles = []
-	for (var entry of styleMap) {
-		styles.push(entry[0] + ':' + entry[1])
-	}
-	attributeMap.set('style', styles.join(';'))
-	titleStrings = []
-	if (attributeMap.has('project')) {
-		titleStrings.push(attributeMap.get('project'))
-	}
-	if (attributeMap.has('id')) {
-		titleStrings.push(attributeMap.get('id'))
-	}
-	if (attributeMap.has('date')) {
-		titleStrings.push(attributeMap.get('date'))
-	}
-	titleStrings.push('Wordscape')
-	document.title = titleStrings.join(' - ')
-}
-
-function processPillar(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('heights')) {
-		return
-	}
-	var heights = getFloats(attributeMap.get('heights'))
-	var polygons = getPolygonsByChildren(statement.children)
-	var isSeparate = true
-	if (attributeMap.has('separate')) {
-		if (attributeMap.get('separate').toLowerCase() == 'false') {
-			isSeparate = false
-		}
-	}
-	var pillar = new Pillar(heights, isSeparate, polygons, null)
-	analyzeOutputMesh(attributeMap, pillar, registry, statement)
-}
-
-function processVerticalHole(registry, statement) {
-	var attributeMap = statement.attributeMap
-	angle = getFloatValue(40.0, 'angle', registry, statement) * Math.PI / 180.0
-	cx = getFloatValue(0.0, 'cx', registry, statement)
-	cy = getFloatValue(0.0, 'cy', registry, statement)
-	radius = getFloatValue(1.0, 'r', registry, statement)
-	sagAngle = getFloatValue(15.0, 'sagAngle', registry, statement) * Math.PI / 180.0
-	sides = getFloatValue(24.0, 'sides', registry, statement)
-	points = []
-	beginAngle = Math.PI / 2.0 - angle
-	endAngle = 1.5 * Math.PI + angle
-	maximumIncrement = 2.0 * Math.PI / sides
-	deltaAngle = endAngle - beginAngle
-	arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * angle)
-	angleIncrement = deltaAngle / arcSides
-	halfAngleIncrement = 0.5 * angleIncrement
-	beginAngle -= halfAngleIncrement
-	endAngle += halfAngleIncrement + 0.001 * angle
-	outerRadius = radius / Math.cos(0.5 * angleIncrement)
-	for (pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
-		x = cx + Math.sin(pointAngle) * outerRadius
-		y = cy + Math.cos(pointAngle) * outerRadius
-		points.push([x, y])
-	}
-	topY = cy + radius
-	deltaBegin = getXYSubtraction(points[0], points[1])
-	sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
-	segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
-	approachRunOverRise = sagRunOverRise - segmentRunOverRise
-	topMinusSegment = topY - points[0][1]
-	topX = topMinusSegment * segmentRunOverRise + points[0][0]
-	aboveMinusTopY = (topX - cx) / approachRunOverRise
-	sagDeltaX = aboveMinusTopY * sagRunOverRise
-	aboveY = topY + aboveMinusTopY
-	points[0] = [cx + sagDeltaX, aboveY]
-	points[points.length - 1] = [cx - sagDeltaX, aboveY]
-	for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		point = points[pointIndex]
-		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
-	}
-	attributeMap.set('points', points.join(' '))
-	statement.tag = 'polygon'
+	return workMesh
 }
 
 function update() {
@@ -697,79 +240,21 @@ function update() {
 }
 
 function updateSVGArea() {
-	var documentRoot = getStatement('documentRoot {')
-	var lastParent = documentRoot
 	var lines = getBracketReplacedLines('wordArea')
-	var registry = {defaultMap:new Map(), idMap:new Map(), objectMap:new Map(), storageMap:new Map()}
-	meshViewer.setID('viewerCanvas', registry.objectMap, 'viewSelect')
-	var svgStatement = null
-	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		line = lines[lineIndex]
-		var statement = getStatement(line)
-		statement.parent = lastParent
-		statement.parent.children.push(statement)
+	var registry = {idMap:new Map(), objectMap:new Map(), storageMap:new Map()}
+	meshViewer.setID('viewerCanvas', registry.objectMap, 'typeSelect', 'viewSelect')
+	var svgStatement = getDocumentRoot(lines, 'svg')
+	var descendants = [svgStatement]
+	addToDescendantsOutsideFirst(descendants, svgStatement)
+	for (var statement of descendants) {
 		if (statement.tag != null) {
 			registry.idMap.set(getStatementID(registry, statement), statement)
 		}
-		if (statement.nestingIncrement == 1) {
-			lastParent = statement
-		}
-		else {
-			if (statement.nestingIncrement == -1) {
-				if (lastParent.parent == null) {
-					lastParent.children.pop(statement)
-					warning('Warning, text has too many closing brackets, at lineIndex:', [lineIndex, lastParent, statement])
-				}
-				else {
-					lastParent = lastParent.parent
-					statement.openingStatement = statement.parent
-				}
-			}
-		}
-		if (svgStatement == null) {
-			if (statement.tag == 'svg') {
-				svgStatement = statement
-			}
-		}
 	}
-	for (childIndex = documentRoot.children.length -1; childIndex > -1; childIndex--) {
-		child = documentRoot.children[childIndex]
-		if (child.tag == null && child.openingStatement == null) {
-			documentRoot.children.splice(childIndex, 1)
-		}
-	}
-	processDescendants(registry, documentRoot, gTagCreateLinearMap)
-	processDescendants(registry, documentRoot, gTagCopyLinearMap)
-	processDescendants(registry, documentRoot, gTagCreateMeshMap)
-	processDescendants(registry, documentRoot, gTagCopyMeshMap)
-	processDescendants(registry, documentRoot, gTagModifyMeshMap)
-	processDescendants(registry, documentRoot, gFollowingMap)
-	if (svgStatement == null) {
-		svgStatement = documentRoot
-		svgStatement.tag = 'svg'
-		svgEnd = getStatement('</svg>')
-		svgStatement.children.push(svgEnd)
-		svgEnd.openingStatement = svgStatement
-	}
-	else {
-		documentRoot = null
-		svgStatement.parent = null
-	}
-	var defaultStatement = getStatement('default')
-	for (var entry of registry.defaultMap) {
-		tagMap = entry[1]
-		defaultStrings = []
-		for (var tagEntry of tagMap) {
-			defaultStrings.push(tagEntry.join(':'))
-		}
-		defaultStatement.attributeMap.set(entry[0], defaultStrings.join(';'))
-	}
-	if (defaultStatement.attributeMap.size > 0) {
-		svgStatement.children.splice(0, 0, defaultStatement)
-		defaultStatement.parent = svgStatement
-	}
+	createDefault(svgStatement, registry)
+	processDescendantsByTagMap(registry, svgStatement, gTagMap)
 	var descendants = [svgStatement]
-	addToDescendants(descendants, svgStatement)
+	addToDescendantsOutsideFirst(descendants, svgStatement)
 	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, svgStatement)
 	var height = lineThickness
@@ -782,6 +267,8 @@ function updateSVGArea() {
 	if (registry.storageMap.has('group')) {
 		width += registry.storageMap.get('group').scaledBorder
 	}
+	height = Math.max(height, 300)
+	width = Math.max(width, 300)
 	if (!svgStatement.attributeMap.has('height')) {
 		svgStatement.attributeMap.set('height', height.toFixed())
 	}
@@ -794,21 +281,7 @@ function updateSVGArea() {
 	if (!svgStatement.attributeMap.has('xmlns')) {
 		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
 	}
-	var nesting = 0
-	var svgLines = []
-	for (var statement of descendants) {
-		if (statement.nestingIncrement < 0) {
-			nesting += statement.nestingIncrement
-		}
-		var svgLine = getLineByStatement('svg', statement)
-		for (var indentationIndex = 1; indentationIndex < nesting; indentationIndex++) {
-			svgLine = '  ' + svgLine
-		}
-		svgLines.push(svgLine)
-		if (statement.nestingIncrement > 0) {
-			nesting += statement.nestingIncrement
-		}
-	}
+	var svgLines = getPassthroughLines(descendants, 'svg')
 	var joinWord = getJoinWord()
 	var svgString = svgLines.join(joinWord)
 	setNumberOfRows('wordArea', lines)
@@ -818,76 +291,13 @@ function updateSVGArea() {
 	return svgString
 }
 
-function widenPolygonBoundingBox(boundingBox, caller, statement) {
-	var points = getPolygonPoints(statement)
-	if (points == null) {
-		return boundingBox
-	}
-	var transformedMatrix = getTransformed2DMatrix(caller, statement)
-	for (var point of points) {
-		transform2DPoint(point, transformedMatrix)
-		if (boundingBox == null) {
-			boundingBox = [point.slice(0), point.slice(0)]
-		}
-		else {
-			widenBoundingBox(boundingBox, point)
-		}
-	}
-	return boundingBox
-}
+var gTagMap = new Map()
+setProcessorMap(gAlterationProcessors, gTagMap)
+setProcessorMap(gConstructionProcessors, gTagMap)
+setProcessorMap(gGenerator2DProcessors, gTagMap)
+setProcessorMap(gGenerator3DProcessors, gTagMap)
+setProcessorMap(gMetaProcessors, gTagMap)
 
-function widenStatementBoundingBox(boundingBox, caller, statement) {
-	if (statement.tag == 'polygon') {
-		return widenPolygonBoundingBox(boundingBox, caller, statement)
-	}
-	return boundingBox
-}
-
-function Extrusion(isJoined, layers, transform3D) {
-	this.isJoined = isJoined
-	this.layers = layers
-	this.mesh = null
-	this.transform3D = transform3D
-	this.getMesh = function() {
-		if (this.mesh == null) {
-			this.mesh = getExtrusionMesh(isJoined, this.layers, this.transform3D)
-		}
-		return this.mesh
-	}
-}
-
-function Mesh(mesh) {
-	this.mesh = mesh
-	this.getMesh = function() {
-		return this.mesh
-	}
-}
-
-function Pillar(heights, isSeparate, polygons, transform3D) {
-	this.isSeparate = isSeparate
-	this.mesh = null
-	this.polygons = polygons
-	this.transform3D = transform3D
-	this.heights = heights
-	this.getMesh = function() {
-		if (this.mesh == null) {
-			this.mesh = getPillarMesh(this.heights, isSeparate, this.polygons, this.transform3D)
-		}
-		return this.mesh
-	}
-}
-
-var gFollowingMap = getFunctionMapCapitalize(['group', processGroup])
-var gTagCreateLinearMap = getFunctionMapCapitalize([
-	'mirror', processMirror,
-	'outline', processOutline,
-	'verticalHole', processVerticalHole])
-var gTagCopyLinearMap = getFunctionMapCapitalize(['copyLinear', processCopyLinear])
-var gTagCreateMeshMap = getFunctionMapCapitalize(['extrusion', processExtrusion, 'pillar', processPillar])
-var gTagCopyMeshMap = getFunctionMapCapitalize(['copyMesh', processCopyMesh])
-var gTagModifyMeshMap = getFunctionMapCapitalize(['drill', processDrill])
-
-addToCapitalizationMap('sagAngle')
 setTextArea('wordArea')
 update()
 </script>
