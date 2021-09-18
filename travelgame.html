@@ -29,375 +29,19 @@
 <script src="matrix.js"></script>
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
+<script src="statement.js"></script>
+<script src="terrain.js"></script>
 <script src="terrainviewer.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
 //Everything has getChildrenInBoundingBox(can be null), getSpeed(can be 0), id, image
+//use bounding box for terrain
 //add default terrain, character and region, get extraWater and temperature from region, view map=region, get flyer, resolution 1km move 6
 //creating, drive, hiring, working, saving, trading
 //building, repairing, learning, make earth map, hiding/stealing, lying/counterfeiting/forgery, taking, killing
 //Asteroid, firestorm, volcano, flood, fish, plague, global warming, biodiversity
 //view from flight, aerovator
-
-function addToDescendants(descendants, statement) {
-	var lengthLimit = 10000000
-	if (descendants.length >= lengthLimit) {
-		var warningText = 'Recursion limit of\ndescendants reached, no further statements will be processed.'
-		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
-		return
-	}
-	if (statement.children != null) {
-		for (var child of statement.children) {
-			descendants.push(child)
-			addToDescendants(descendants, child)
-		}
-	}
-}
-
-function getBracketedEntry(bracketString) {
-	indexOfBeginBracket = bracketString.indexOf('(')
-	indexOfEndBracket = bracketString.indexOf(')')
-	if (indexOfBeginBracket == -1 || indexOfEndBracket == -1 || indexOfBeginBracket > indexOfEndBracket) {
-		return null
-	}
-	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
-}
-
-function getDescendants(statement) {
-	var descendants = []
-	addToDescendants(descendants, statement)
-	return descendants
-}
-
-function getIsOccupied(childrenMaps, location, terrain) {
-	if (terrain.getTerrainParameters(location, 0).length > 3) {
-		return true
-	}
-	for (var scaleIndex = 0; scaleIndex < childrenMaps.length; scaleIndex++) {
-		var childrenMap = childrenMaps[scaleIndex]
-		var locationAtScale = terrain.getLocationAtScale(location, scaleIndex)
-		var xyKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
-		if (childrenMap.has(xyKey)) {
-			var children = childrenMap.get(xyKey)
-			for (var child of children) {
-				if (child.location[0] == location[0] && child.location[1] == location[1]) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-function getEntryLocation(childrenMaps, entryCenter, terrain) {
-	var childrenMap = childrenMaps[0]
-	if (!childrenMap.has(entryCenter[0].toString() + ',' + entryCenter[1].toString())) {
-		return entryCenter
-	}
-	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
-		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
-			for (var x = 1 - shellIndex; x < shellIndex; x++) {
-				var entryLocation = getXYAddition(entryCenter, [x, signedShellIndex])
-				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
-					return entryLocation
-				}
-			}
-			for (var y = - shellIndex; y <= shellIndex; y++) {
-				var entryLocation = getXYAddition(entryCenter, [signedShellIndex, y])
-				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
-					return entryLocation
-				}
-			}
-		}
-	}
-	return entryCenter
-}
-
-function getFunctionMapCapitalize(alternatingEntries) {
-	var functionMap = new Map()
-	for (alternatingIndex = 0; alternatingIndex < alternatingEntries.length; alternatingIndex += 2) {
-		key = alternatingEntries[alternatingIndex]
-		keyLower = key.toLowerCase()
-		if (key != keyLower) {
-			gCapitalizationMap.set(keyLower, key)
-		}
-		nextIndex = alternatingIndex + 1
-		value = alternatingEntries[nextIndex]
-		functionMap.set(key, value)
-	}
-	return functionMap
-}
-
-function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix) {
-	searchSuffix = '.' + searchSuffix
-	var replacedTokens = []
-	var tokens = getTokens('-', [bracketString])
-	tokens = getTokens('+', tokens)
-	for (var token of tokens) {
-		indexOfSearchSuffix = token.indexOf(searchSuffix)
-		if (indexOfSearchSuffix != -1) {
-			beforeSuffix = token.slice(0, indexOfSearchSuffix).trim()
-			if (replacementMap.has(beforeSuffix)) {
-				value = parseFloat(replacementMap.get(beforeSuffix)) + increment
-				replacedTokens.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplacedBySuffix, could not find id:\nin search string:'
-				warningVariables = [beforeSuffix, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-		else {
-			replacedTokens.push(token)
-		}
-	}
-	return replacedTokens.join('')
-}
-
-function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
-	if (bracketString.indexOf(']') == -1) {
-		return getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix)
-	}
-	var splitBracketStrings = bracketString.split(']')
-	var replacedStrings = []
-	for (var splitBracketString of splitBracketStrings) {
-		if (splitBracketString.length > 1) {
-			var tokens = splitBracketString.split('[')
-			if (tokens[0].length > 0) {
-				replacedStrings.push(tokens[0])
-			}
-			var lastToken = tokens[tokens.length - 1].replace(/ /g, '')
-			if (replacementMap.has(lastToken)) {
-				value = parseFloat(replacementMap.get(lastToken)) + increment
-				replacedStrings.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplaced, could not find id:\nin search string:'
-				warningVariables = [lastToken, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-	}
-	return replacedStrings.join('')
-}
-
-function getLineByStatement(passthrough, statement) {
-	if (statement.tag == null) {
-		if (statement.nestingIncrement == -1) {
-			if (statement.openingStatement == null) {
-				return '</g>'
-			}
-			else {
-				if (statement.openingStatement.tag == passthrough) {
-					return '</' + passthrough + '>'
-				}
-				return '</g>'
-			}
-		}
-		else {
-			return ''
-		}
-	}
-	firstWord = '<g'
-	if (statement.nestingIncrement < 1 || statement.tag == passthrough) {
-		firstWord = '<' + statement.tag
-	}
-	attributeWords = [firstWord]
-	for (var entry of statement.attributeMap) {
-		value = entry[1]
-		quoteString = '"'
-		if (value.indexOf('"') != -1) {
-			quoteString = '\''
-		}
-		attributeWords.push(entry[0] + '=' + quoteString + value + quoteString)
-	}
-	attributeLine = attributeWords.join(' ')
-	lineClosing = '>'
-	if (statement.nestingIncrement == 0) {
-		lineClosing = '/>'
-	}
-	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
-		return attributeLine + lineClosing
-	}
-	return attributeLine + ' ' + lineClosing
-}
-
-function getStatement(line) {
-	var children = null
-	var nestingIncrement = 0
-	var quoteSeparatedWords = getQuoteSeparatedWords(line)
-	var lastIndex = quoteSeparatedWords.length - 1
-	var tag = null
-	if (quoteSeparatedWords.length > 0) {
-		firstWord = quoteSeparatedWords[0]
-		if (firstWord.startsWith('</') || firstWord == ']' || firstWord == '}') {
-			nestingIncrement = -1
-		}
-		else {
-			if (firstWord.startsWith('<')) {
-				firstWord = firstWord.slice(1)
-			}
-			if (firstWord.length > 0) {
-				tag = getCapitalizedKey(firstWord)
-			}
-		}
-		if (quoteSeparatedWords.length > 1) {
-			var lastWord = quoteSeparatedWords[lastIndex]
-			if (lastWord == '>' || lastWord == '[' || lastWord == '{') {
-				nestingIncrement = 1
-			}
-			if (lastWord.endsWith('>') || lastWord == '[' || lastWord == '{') {
-				lastIndex -= 1
-			}
-		}
-	}
-	if (tag != null) {
-		children = []
-	}
-	var attributes = getAttributes(quoteSeparatedWords.slice(1, lastIndex + 1))
-	for (var attribute of attributes) {
-		keyStrings = attribute[0].split('.')
-		if (keyStrings.length == 1) {
-			attribute[0] = getCapitalizedKey(attribute[0])
-		}
-		else {
-			if (keyStrings.length == 2) {
-				keyStrings[0] = getCapitalizedKey(keyStrings[0])
-				keyStrings[1] = getCapitalizedKey(keyStrings[1])
-				attribute[0] = keyStrings.join('.')
-			}
-		}
-	}
-	var attributeMap = new Map(attributes)
-	var statement = {
-	attributeMap:attributeMap,
-	children:children,
-	nestingIncrement:nestingIncrement,
-	openingStatement:null,
-	parent:null,
-	tag:tag}
-	return statement
-}
-
-function getTokens(delimeter, searchStrings) {
-	tokens = []
-	for (var searchString of searchStrings) {
-		subTokens = searchString.split(delimeter)
-		for (subTokenIndex = 0; subTokenIndex < subTokens.length; subTokenIndex++) {
-			tokens.push(subTokens[subTokenIndex])
-			if (subTokenIndex < subTokens.length - 1) {
-				tokens.push(delimeter)
-			}
-		}
-	}
-	return tokens
-}
-
-function processDescendants(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendants(descendants, rootStatement)
-	for (var statement of descendants) {
-		if (tagMap.has(statement.tag)) {
-			tagMap.get(statement.tag)(registry, statement)
-		}
-	}
-}
-
-function processCreature(registry, statement) {
-	var attributeMap = statement.attributeMap
-	var creature = new Creature()
-	if (attributeMap.has('race')) {
-		if (attributeMap.get('race') == 'red dragon') {
-			creature.color = '#ffa500'
-			creature.filename = 'red_dragon_welsh.png'
-		}
-	}
-//	if (!attributeMap.has('archetype')) {
-//		attributeMap.set('archetype', 'sage')
-//	}
-	var storageMap = registry.storageMap
-	var selectedRegion = storageMap.get('selectedRegion')
-//	var archetype = attributeMap.get('archetype')
-	creature.color = getStringValue(creature.color, 'color', registry, statement)
-	creature.filename = getStringValue(creature.filename, 'filename', registry, statement)
-	creature.location = getFloatValues(creature.location, 'location', registry, statement)
-	creature.scaleIndex = getIntValue(creature.scaleIndex, 'scaleIndex', registry, statement)
-	if (selectedRegion != null) {
-		selectedRegion.add(creature)
-	}
-}
-
-function processRegion(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('terrain')) {
-		attributeMap.set('terrain', 'oceanfront')
-	}
-	var storageMap = registry.storageMap
-	var selectedRegion = storageMap.get('selectedRegion')
-	var terrainString = attributeMap.get('terrain')
-	var terrain = new Terrain(terrainString)
-	var region = new Region(terrain)
-	region.entry = getFloatValues([6204,0], 'entry', registry, statement)
-	if (selectedRegion != null) {
-		selectedRegion.add(region)
-	}
-	storageMap.set('selectedRegion', region)
-	terrainViewer.region = region
-}
-
-function processTerrainViewer(registry, statement) {
-// unfinished, should make a getIntValue
-//	var maximumWidth = getFloatValue(740.0, 'maximumWidth', registry, statement)
-	var maximumWidth = getFloatValue(390.0, 'maximumWidth', registry, statement)
-	registry.storageMap.set('terrainViewer.maximumHeight', maximumWidth)
-	registry.storageMap.set('terrainViewer.maximumWidth', maximumWidth)
-}
-
-function processView(registry, statement) {
-	var attributeMap = statement.attributeMap
-	angle = getFloatValue(40.0, 'angle', registry, statement) * Math.PI / 180.0
-	cx = getFloatValue(0.0, 'cx', registry, statement)
-	cy = getFloatValue(0.0, 'cy', registry, statement)
-	radius = getFloatValue(1.0, 'r', registry, statement)
-	sagAngle = getFloatValue(15.0, 'sagAngle', registry, statement) * Math.PI / 180.0
-	sides = getFloatValue(24.0, 'sides', registry, statement)
-	points = []
-	beginAngle = Math.PI / 2.0 - angle
-	endAngle = 1.5 * Math.PI + angle
-	maximumIncrement = 2.0 * Math.PI / sides
-	deltaAngle = endAngle - beginAngle
-	arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * angle)
-	angleIncrement = deltaAngle / arcSides
-	halfAngleIncrement = 0.5 * angleIncrement
-	beginAngle -= halfAngleIncrement
-	endAngle += halfAngleIncrement + 0.001 * angle
-	outerRadius = radius / Math.cos(0.5 * angleIncrement)
-	for (pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
-		x = cx + Math.sin(pointAngle) * outerRadius
-		y = cy + Math.cos(pointAngle) * outerRadius
-		points.push([x, y])
-	}
-	topY = cy + radius
-	deltaBegin = getXYSubtraction(points[0], points[1])
-	sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
-	segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
-	approachRunOverRise = sagRunOverRise - segmentRunOverRise
-	topMinusSegment = topY - points[0][1]
-	topX = topMinusSegment * segmentRunOverRise + points[0][0]
-	aboveMinusTopY = (topX - cx) / approachRunOverRise
-	sagDeltaX = aboveMinusTopY * sagRunOverRise
-	aboveY = topY + aboveMinusTopY
-	points[0] = [cx + sagDeltaX, aboveY]
-	points[points.length - 1] = [cx - sagDeltaX, aboveY]
-	for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		point = points[pointIndex]
-		points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
-	}
-	attributeMap.set('points', points.join(' '))
-	statement.tag = 'polygon'
-}
 
 function update() {
 	updateSVGArea()
@@ -406,78 +50,23 @@ function update() {
 }
 
 function updateSVGArea() {
-	var documentRoot = getStatement('documentRoot {')
-	var lastParent = documentRoot
 	var lines = getBracketReplacedLines('wordArea')
 	var storageMap = new Map()
 	storageMap.set('selectedEntity', null)
 	storageMap.set('selectedRegion', null)
-	var registry = {defaultMap:new Map(), idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
+	var registry = {idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
 	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
-	var xmlStatement = null
-	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		line = lines[lineIndex]
-		var statement = getStatement(line)
-		statement.parent = lastParent
-		statement.parent.children.push(statement)
+	var xmlStatement = getDocumentRoot(lines, 'xml')
+	var descendants = [xmlStatement]
+	addToDescendantsOutsideFirst(descendants, xmlStatement)
+	for (var statement of descendants) {
 		if (statement.tag != null) {
 			registry.idMap.set(getStatementID(registry, statement), statement)
 		}
-		if (xmlStatement == null) {
-			if (statement.tag == 'xml') {
-				statement.nestingIncrement = 1
-				xmlStatement = statement
-			}
-		}
-		if (statement.nestingIncrement == 1) {
-			lastParent = statement
-		}
-		else {
-			if (statement.nestingIncrement == -1) {
-				if (lastParent.parent == null) {
-					lastParent.children.pop(statement)
-					warning('Warning, text has too many closing brackets, at lineIndex:', [lineIndex, lastParent, statement])
-				}
-				else {
-					lastParent = lastParent.parent
-					statement.openingStatement = statement.parent
-				}
-			}
-		}
-	}
-	for (childIndex = documentRoot.children.length -1; childIndex > -1; childIndex--) {
-		child = documentRoot.children[childIndex]
-		if (child.tag == null && child.openingStatement == null) {
-			documentRoot.children.splice(childIndex, 1)
-		}
-	}
-	if (xmlStatement == null) {
-		xmlStatement = documentRoot
-		xmlStatement.tag = 'xml'
-	}
-	else {
-		documentRoot = null
-		xmlStatement.parent = null
-	}
-	var xmlEnd = null
-	if (xmlStatement.children.length > 0) {
-		var lastChild = xmlStatement.children[xmlStatement.children.length - 1]
-		if (lastChild.openingStatement != null) {
-			if (lastChild.openingStatement.tag == 'xml') {
-				xmlEnd = lastChild
-			}
-		}
-	}
-	if (xmlEnd == null) {
-		xmlEnd = getStatement('</xml>')
-		xmlStatement.children.push(xmlEnd)
-		xmlEnd.openingStatement = xmlStatement
 	}
 	var tagSet = new Set()
-	var descendants = [xmlStatement]
-	addToDescendants(descendants, xmlStatement)
 	for (var statement of descendants) {
-		if (gTagGameMap.has(statement.tag)) {
+		if (gTagMap.has(statement.tag)) {
 			tagSet.add(statement.tag)
 		}
 	}
@@ -490,40 +79,14 @@ function updateSVGArea() {
 	if (!tagSet.has('terrainViewer')) {
 		xmlStatement.children.splice(-1, 0, getStatement('terrainViewer'))
 	}
-	processDescendants(registry, xmlStatement, gTagGameMap)
-	var defaultStatement = getStatement('default')
-	for (var entry of registry.defaultMap) {
-		tagMap = entry[1]
-		defaultStrings = []
-		for (var tagEntry of tagMap) {
-			defaultStrings.push(tagEntry.join(':'))
-		}
-		defaultStatement.attributeMap.set(entry[0], defaultStrings.join(';'))
-	}
-	if (defaultStatement.attributeMap.size > 0) {
-		xmlStatement.children.splice(0, 0, defaultStatement)
-		defaultStatement.parent = xmlStatement
-	}
+	createDefault(xmlStatement, registry)
+	processDescendantsByTagMap(registry, xmlStatement, gTagMap)
 	var descendants = [xmlStatement]
-	addToDescendants(descendants, xmlStatement)
+	addToDescendantsOutsideFirst(descendants, xmlStatement)
 	if (registry.storageMap.has('group')) {
 		width += registry.storageMap.get('group').scaledBorder
 	}
-	var nesting = 0
-	var xmlLines = []
-	for (var statement of descendants) {
-		if (statement.nestingIncrement < 0) {
-			nesting += statement.nestingIncrement
-		}
-		var xmlLine = getLineByStatement('xml', statement)
-		for (var indentationIndex = 1; indentationIndex < nesting; indentationIndex++) {
-			xmlLine = '  ' + xmlLine
-		}
-		xmlLines.push(xmlLine)
-		if (statement.nestingIncrement > 0) {
-			nesting += statement.nestingIncrement
-		}
-	}
+	var xmlLines = getPassthroughLines(descendants, 'xml')
 	var joinWord = getJoinWord()
 	var xmlString = xmlLines.join(joinWord)
 	setNumberOfRows('wordArea', lines)
@@ -533,96 +96,9 @@ function updateSVGArea() {
 	return xmlString
 }
 
-function widenPolygonBoundingBox(boundingBox, caller, statement) {
-	var points = getPolygonPoints(statement)
-	if (points == null) {
-		return boundingBox
-	}
-	var transformedMatrix = getTransformed2DMatrix(caller, statement)
-	for (var point of points) {
-		transform2DPoint(point, transformedMatrix)
-		if (boundingBox == null) {
-			boundingBox = [point.slice(0), point.slice(0)]
-		}
-		else {
-			widenBoundingBox(boundingBox, point)
-		}
-	}
-	return boundingBox
-}
-
-function widenStatementBoundingBox(boundingBox, caller, statement) {
-	if (statement.tag == 'polygon') {
-		return widenPolygonBoundingBox(boundingBox, caller, statement)
-	}
-	return boundingBox
-}
-
-function Creature() {
-	this.archetype = null
-	this.children = []
-	this.color = '#696006'
-	this.filename = 'delfador.png'
-	this.location = [0.0, 0.0]
-	this.parent = null
-	this.scaleIndex = 0
-	this.add = function(child) {
-		this.children.push(child)
-		child.location = null
-		child.parent = this
-		return true
-	}
-	this.getChildren = function() {
-		return this.children
-	}
-}
-
-function Region(terrain) {
-	this.childrenMaps = []
-	this.entry = [0, 0]
-	this.location = [0, 0]
-	this.parent = null
-	this.scaleIndex = 0
-	this.terrainMap = new Map()
-	this.terrain = terrain
-	this.add = function(child) {
-		for (var mapIndex = this.childrenMaps.length; mapIndex < child.scaleIndex + 1; mapIndex++) {
-			this.childrenMaps.push(new Map())
-		}
-		addXY(child.location, this.entry)
-		child.location = getEntryLocation(this.childrenMaps, child.location, this.terrain)
-		var childrenMap = this.childrenMaps[child.scaleIndex]
-		var locationAtScale = this.terrain.getLocationAtScale(child.location, child.scaleIndex)
-		var addKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
-		var children = null
-		if (childrenMap.has(addKey)) {
-			children = childrenMap.get(addKey)
-		}
-		else {
-			children = []
-			childrenMap.set(addKey, children)
-		}
-		children.push(child)
-		child.parent = this
-		return true
-	}
-	this.getChildren = function() {
-		var allChildren = []
-		for (var childrenMap of this.childrenMaps) {
-			for (var children of this.childrenMap.values()) {
-				pushArray(allChildren, children)
-			}
-		}
-		return allChildren
-	}
-}
-
 var gCapitalizationMap = new Map()
-var gTagGameMap = getFunctionMapCapitalize([
-	'creature', processCreature,
-	'region', processRegion,
-	'terrainViewer', processTerrainViewer,
-	'view', processView])
+var gTagMap = new Map()
+setProcessorMap(gTerrainProcessors, gTagMap)
 
 setTextArea('wordArea')
 update()
