@@ -23,9 +23,10 @@
 <textarea id="xmlArea" rows="40" cols="120"></textarea><br>
 <br>
 <br>
-<script src="codec.js"></script>
-<script src="help.js"></script>
 <script src="maparray.js"></script>
+<script src="codec.js"></script>
+<script src="evaluation.js"></script>
+<script src="help.js"></script>
 <script src="matrix.js"></script>
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
@@ -61,12 +62,12 @@ function updateSVGArea() {
 	addToDescendantsOutsideFirst(descendants, xmlStatement)
 	for (var statement of descendants) {
 		if (statement.tag != null) {
-			registry.idMap.set(getStatementID(registry, statement), statement)
+			getStatementID(registry, statement)
 		}
 	}
 	var tagSet = new Set()
 	for (var statement of descendants) {
-		if (gTagMap.has(statement.tag)) {
+		if (gTagCenterMap.has(statement.tag)) {
 			tagSet.add(statement.tag)
 		}
 	}
@@ -79,13 +80,10 @@ function updateSVGArea() {
 	if (!tagSet.has('terrainViewer')) {
 		xmlStatement.children.splice(-1, 0, getStatement('terrainViewer'))
 	}
-	createDefault(xmlStatement, registry)
-	processDescendantsByTagMap(registry, xmlStatement, gTagMap)
+	createDefault(registry, xmlStatement)
+	processDescendantsByTagMap(registry, xmlStatement, gTagCenterMap)
 	var descendants = [xmlStatement]
 	addToDescendantsOutsideFirst(descendants, xmlStatement)
-	if (registry.storageMap.has('group')) {
-		width += registry.storageMap.get('group').scaledBorder
-	}
 	var xmlLines = getPassthroughLines(descendants, 'xml')
 	var joinWord = getJoinWord()
 	var xmlString = xmlLines.join(joinWord)
@@ -96,9 +94,10 @@ function updateSVGArea() {
 	return xmlString
 }
 
-var gCapitalizationMap = new Map()
-var gTagMap = new Map()
-setProcessorMap(gTerrainProcessors, gTagMap)
+var gTagBeginMap = new Map()
+var gTagCenterMap = new Map()
+gProcessors = gTerrainProcessors
+initializeProcessors(gProcessors)
 
 setTextArea('wordArea')
 update()
