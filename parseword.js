@@ -1,30 +1,11 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 var gCapitalizationMap = new Map()
-
-function addSliceToWords(lineSlice, quoteSeparatedWords) {
-	if (lineSlice.indexOf('=') != -1) {
-		lineSlice = getLineWithEndspace(['/>', '>', '[', '{'], lineSlice)
-	}
-	snippets = lineSlice.replace(/=/g, ' = ').split(' ').filter(lengthCheck)
-	pushArray(quoteSeparatedWords, snippets)
-}
+const gQuoteSet = new Set(['"', "'"])
+const gSpaceEqualSet = new Set([' ', '='])
 
 function addToCapitalizationMap(capitalizedWord) {
-	var wordLower = capitalizedWord.toLowerCase()
-	if (capitalizedWord != wordLower) {
-		gCapitalizationMap.set(wordLower, capitalizedWord)
-	}
-}
-
-function addToCapitalizationMapByPhrase(capitalizedPhrase) {
-	if (capitalizedPhrase == null) {
-		return
-	}
-	var capitalizedWords = capitalizedPhrase.split(' ').filter(lengthCheck)
-	for (var capitalizedWord of capitalizedWords) {
-		addToCapitalizationMap(capitalizedWord)
-	}
+	gCapitalizationMap.set(capitalizedWord.toLowerCase(), capitalizedWord)
 }
 
 function getAttributes(tokens) {
@@ -51,7 +32,7 @@ function getAttributes(tokens) {
 
 function getBracketedEntry(bracketString) {
 	indexOfBeginBracket = bracketString.indexOf('(')
-	indexOfEndBracket = bracketString.indexOf(')')
+	indexOfEndBracket = bracketString.lastIndexOf(')')
 	if (indexOfBeginBracket == -1 || indexOfEndBracket == -1 || indexOfBeginBracket > indexOfEndBracket) {
 		return null
 	}
@@ -92,40 +73,39 @@ function getLineWithEndspace(endWords, line) {
 }
 
 function getQuoteSeparatedWords(line) {
-	var quoteSymbols = ['"', '\'']
-	var searchIndexes = [-1,-1]
-	var start = 0
+	var quoteCharacter = null
 	var quoteSeparatedWords = []
-	for (whileIndex = 0; whileIndex < 987654; whileIndex++) {
-		for (quoteIndex = quoteSymbols.length -1; quoteIndex > -1; quoteIndex--) {
-			searchIndex = line.indexOf(quoteSymbols[quoteIndex], start)
-			if (searchIndex < 0) {
-				searchIndexes.splice(quoteIndex, 1)
-				quoteSymbols.splice(quoteIndex, 1)
+	var start = 0
+	if (line.indexOf('=') != -1) {
+		line = getLineWithEndspace(['/>', '>', '[', '{'], line)
+	}
+	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
+		var character = line[characterIndex]
+		if (quoteCharacter == null) {
+			if (gSpaceEqualSet.has(character)) {
+				var quoteSeparatedWord = line.slice(start, characterIndex)
+				if (quoteSeparatedWord.length > 0) {
+					quoteSeparatedWords.push(quoteSeparatedWord)
+				}
+				if (character == '=') {
+					quoteSeparatedWords.push(character)
+				}
+				start = characterIndex + 1
 			}
 			else {
-				searchIndexes[quoteIndex] = searchIndex
+				if (gQuoteSet.has(character)) {
+					quoteCharacter = character
+				}
 			}
 		}
-		if (quoteSymbols.length == 0) {
-			addSliceToWords(line.slice(start), quoteSeparatedWords)
-			return quoteSeparatedWords
+		else {
+			if (character == quoteCharacter) {
+				quoteCharacter = null
+			}
 		}
-		firstIndex = searchIndexes[0]
-		quoteSymbol = quoteSymbols[0]
-		if (searchIndexes[1] < firstIndex) {
-			firstIndex = searchIndexes[1]
-			quoteSymbol = quoteSymbols[1]
-		}
-		end = line.indexOf(quoteSymbol, firstIndex + 1)
-		if (end < 0) {
-			addSliceToWords(line.slice(start), quoteSeparatedWords)
-			return quoteSeparatedWords
-		}
-		addSliceToWords(line.slice(start, firstIndex), quoteSeparatedWords)
-		start = end + 1
-		quoteSeparatedWords.push(line.slice(firstIndex + 1, end))
 	}
+	quoteSeparatedWords.push(line.slice(start))
+	return quoteSeparatedWords
 }
 
 function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceReplacement) {
@@ -134,4 +114,11 @@ function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceRepl
 
 function lengthCheck(word) {
 	return word.length > 0
+}
+
+function getStringsByMap(key, map) {
+	if (map.has(key)) {
+		return map.get(key).split(',').filter(lengthCheck)
+	}
+	return null
 }
