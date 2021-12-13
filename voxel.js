@@ -563,7 +563,7 @@ function getXYZLatticeByMesh(mesh) {
 	xyzLattice[1] = new Map()
 	for (var entry of xyPolygonsMap) {
 		var xyPolygons = entry[1]
-		swapXY(xyPolygons)
+		swapXYPolygons(xyPolygons)
 		xyzLattice[1].set(entry[0], getIntersectionPairsMap(xyPolygons))
 	}
 	rotateXYZParametersByPoints(2, mesh.points)
