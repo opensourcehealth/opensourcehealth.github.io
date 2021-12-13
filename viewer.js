@@ -2,11 +2,10 @@
 
 function setTypeSelect(selectedIndex, types, typeSelectID) {
 	var typeSelect = document.getElementById(typeSelectID)
-	if (typeSelect.hidden == false) {
+	var options = typeSelect.options
+	if (options.length > 0) {
 		return
 	}
-	var options = typeSelect.options
-	typeSelect.hidden = false
 	for (var type of types) {
 		option = document.createElement('option')
 		option.text = type
@@ -19,7 +18,6 @@ function setViewSelect(selectedIndex, views, viewSelectID) {
 	var viewSelect = document.getElementById(viewSelectID)
 	var options = viewSelect.options
 	viewSelect.hidden = false
-	views.sort(compareIDAscending)
 	for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
 		var view = views[viewIndex]
 		var option = null
@@ -95,6 +93,13 @@ function viewSelectChanged() {
 
 var meshViewer = {
 	addMesh: function(id, matrix3D) {
+		if (!this.objectMap.has(id)) {
+			return
+		}
+		var mesh = this.objectMap.get(id).getMesh()
+		if (mesh == null) {
+			return
+		}
 		this.views.push({id:id, matrix3D:matrix3D, rotationMatrix:null})
 	},
 	beginModelCirclePath: function() {
@@ -150,7 +155,7 @@ var meshViewer = {
 			this.context.lineWidth = 5.0
 		}
 		else {
-			this.context.lineWidth = 2.0
+			this.context.lineWidth = 1.0
 		}
 		this.context.strokeStyle = 'black'
 		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
@@ -202,6 +207,7 @@ var meshViewer = {
 		this.textHeight = 12
 		this.textSpace = this.textHeight * 3 / 2
 		this.doubleTextSpace = this.textSpace + this.textSpace
+		this.viewID = null
 		this.typeSelectedIndex = 0
 	},
 	lineToXY: function(xy) {
@@ -268,10 +274,11 @@ var meshViewer = {
 	},
 	setView: function(viewIndex) {
 		this.view = this.views[viewIndex]
+		this.viewID = this.view.id
 		if (this.view.rotationMatrix != null) {
 			return
 		}
-		var meshBoundingBox = getMeshBoundingBox(this.objectMap.get(this.view.id).getMesh())
+		var meshBoundingBox = getMeshBoundingBox(this.objectMap.get(this.viewID).getMesh())
 		var meshExtent = getXYZSubtraction(meshBoundingBox[1], meshBoundingBox[0])
 		var scale = this.modelDiameter / getXYZLength(meshExtent)
 		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
@@ -286,6 +293,9 @@ var meshViewer = {
 	start: function(height) {
 		this.canvas.height = height
 		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
+		var isHidden = (this.views.length == 0)
+		document.getElementById(this.typeSelectID).hidden = isHidden
+		document.getElementById(this.viewSelectID).hidden = isHidden
 		if (this.views.length == 0) {
 			return
 		}
@@ -301,8 +311,15 @@ var meshViewer = {
 		this.modelRadiusRing = this.modelRadiusCircle + this.textSpace
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
-		setViewSelect(selectedIndex, this.views, this.viewSelectID)
 		setTypeSelect(this.typeSelectedIndex, this.types, this.typeSelectID)
+		this.views.sort(compareIDAscending)
+		for (var viewIndex = 0; viewIndex < this.views.length; viewIndex++) {
+			if (this.views[viewIndex].id == this.viewID) {
+				selectedIndex = viewIndex
+				break
+			}
+		}
+		setViewSelect(selectedIndex, this.views, this.viewSelectID)
 		this.setView(selectedIndex)
 		this.setType(this.typeSelectedIndex)
 		this.draw()
