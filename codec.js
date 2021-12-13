@@ -35,6 +35,8 @@ var gEscapeTable = {
 	'%2C':','}
 var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
 var gEscapeExpression =	new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
+const gLZStringHeader = 'lz_'
+const gQueryDivider = '!@#$%^&_never_use_reserved_storage_divider'
 var gQueryMap = new Map()
 var gQueryLinkID = 'queryLink'
 var gQuerySelectID = null
@@ -43,6 +45,20 @@ function getBracketReplacedLines(textAreaID) {
 	var wordString = document.getElementById(textAreaID).value
 	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
 	return wordString.split(getEndOfLine(wordString))
+}
+
+function getCompressToEncodedURI(text) {
+	if (text.length < 1400) {
+		return text.replace(/\n/g, '%0A').replace(/,/g, '%2C')
+	}
+	return gLZStringHeader + LZString.compressToEncodedURIComponent(text)
+}
+
+function getDecompressFromEncodedURI(text) {
+	if (text.indexOf('=') == -1) {
+		return LZString.decompressFromEncodedURIComponent(text.slice(text.lastIndexOf('_') + 1))
+	}
+	return text
 }
 
 function querySelectChanged() {
@@ -69,7 +85,8 @@ function setQueryStorage(newButtonID, querySelectID, wordString) {
 	gQuerySelectID = querySelectID
 	var queryTime = date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
 	var queryLink = document.getElementById(gQueryLinkID)
-	var queryValue = wordString.replace(/\n/g, '%0A').replace(/,/g, '%2C')
+	var queryValue = wordString
+//	var queryValue = wordString.replace(/\n/g, '%0A').replace(/,/g, '%2C')
 	if (typeof(Storage) == "undefined" || querySelectID == null) {
 		gBackupNumberOfUpdates += 1
 		if (gBackupNumberOfUpdates > 0) {
@@ -82,7 +99,7 @@ function setQueryStorage(newButtonID, querySelectID, wordString) {
 	var queries = []
 	var query = queryTime + ';' + queryValue
 	if (sessionStorage.queries) {
-		queries = sessionStorage.queries.split(',')
+		queries = sessionStorage.queries.split(gQueryDivider)
 	}
 	var identicalKey = null
 	for (queryIndex = 0; queryIndex < queries.length; queryIndex++) {
@@ -101,7 +118,7 @@ function setQueryStorage(newButtonID, querySelectID, wordString) {
 		var indexOfSemicolon = query.indexOf(';')
 		var identicalKey = query.slice(0, indexOfSemicolon)
 	}
-	sessionStorage.queries = queries.toString()
+	sessionStorage.queries = queries.join(gQueryDivider)
 	var querySelect = document.getElementById(querySelectID)
 	if (queries.length > 1) {
 		if (newButtonID != null) {
@@ -117,7 +134,8 @@ function setQueryStorage(newButtonID, querySelectID, wordString) {
 			var option = document.createElement('option')
 			option.text = key
 			querySelect.add(option)
-			gQueryMap.set(key, query.slice(indexOfSemicolon + 1))
+			gQueryMap.set(key, getCompressToEncodedURI(query.slice(indexOfSemicolon + 1)))
+//			gQueryMap.set(key, query.slice(indexOfSemicolon + 1))
 		}
 	}
 	var options = querySelect.options
@@ -141,6 +159,7 @@ function setTextArea(textAreaID) {
 		query = query.slice(indexOfQuestionMark + 1)
 	}
 	query = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
+	query = getDecompressFromEncodedURI(query)
 	var indexOfNewline = query.indexOf('\n')
 	if (indexOfNewline < 0) {
 		query = query.replace(/></g, '>\n<')
