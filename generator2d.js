@@ -1,72 +1,181 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gMirror = {
-	name: 'mirror',
-	optionMap: null,
+function getOutlines(isMarkerAbsolute, marker, outset, polylines) {
+	var gridMap = new Map()
+	if (outset.length == 1) {
+		outset = [outset[0], outset[0]]
+	}
+	var outlines = []
+	var nodes = []
+	var points = []
+	for (var polyline of polylines) {
+		var previousIndex = null
+		for (var point of polyline) {
+			var pointIndex = getClosePointIndex(gridMap, point, points)
+			if (pointIndex == nodes.length) {
+				nodes.push([])
+			}
+			if (previousIndex != null) {
+				nodes[previousIndex].push(pointIndex)
+				nodes[pointIndex].push(previousIndex)
+			}
+			previousIndex = pointIndex
+		}
+	}
+	for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+		var node = nodes[nodeIndex]
+		if (node.length > 1) {
+			var nodePoint = points[nodeIndex]
+			var vectorZero = getXYSubtraction(points[node[0]], nodePoint)
+			divideXYByScalar(vectorZero, getXYLength(vectorZero))
+			for (var lineIndex = 1; lineIndex < node.length; lineIndex++) {
+				var vector = getXYSubtraction(points[node[lineIndex]], nodePoint)
+				divideXYByScalar(vector, getXYLength(vector))
+				node[lineIndex] = [getDirectionalProximity(vectorZero, vector), node[lineIndex]]
+			}
+			node[0] = [1.0, node[0]]
+			node.sort(compareFirstElementDescending)
+			for (var lineIndex = 0; lineIndex < node.length; lineIndex++) {
+				node[lineIndex] = node[lineIndex][1]
+			}
+		}
+	}
+	var arcMap = new Map()
+	for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
+		var node = nodes[nodeIndex]
+		for (var lineIndex = 0; lineIndex < node.length; lineIndex++) {
+			arcMap.set(node[(lineIndex - 0 + node.length) % node.length] + ' ' + nodeIndex, node[(lineIndex + 1 + node.length) % node.length])
+		}
+	}
+	var nodeOutlines = []
+	for (var key of arcMap.keys()) {
+		var end = arcMap.get(key)
+		if (end != null) {
+			var nodeOutline = []
+			do {
+				nodeOutline.push(end)
+				arcMap.set(key, null)
+				key = key.split(' ')[1] + ' ' + end
+				end = arcMap.get(key)
+			}
+			while (end != null)
+			nodeOutlines.push(nodeOutline)
+		}
+	}
+	var outlines = new Array(nodeOutlines.length)
+	for (var nodeOutlineIndex = 0; nodeOutlineIndex < nodeOutlines.length; nodeOutlineIndex++) {
+		var nodeOutline = nodeOutlines[nodeOutlineIndex]
+		var outline = []
+		for (var vertexIndex = 0; vertexIndex < nodeOutline.length; vertexIndex++) {
+			var nodeIndex = nodeOutline[vertexIndex]
+			var node = nodes[nodeIndex]
+			var centerPoint = points[nodeIndex]
+			var beginPoint = points[nodeOutline[(vertexIndex - 1 + nodeOutline.length) % nodeOutline.length]]
+			var centerBegin = normalizeXY(getXYSubtraction(beginPoint, centerPoint))
+			var endPoint = points[nodeOutline[(vertexIndex + 1) % nodeOutline.length]]
+			var centerEnd = normalizeXY(getXYSubtraction(endPoint, centerPoint))
+			if (node.length == 1) {
+				var rightVector = [-centerEnd[1], centerEnd[0]]
+				var rightOutsetVector = multiplyXY([-centerEnd[1], centerEnd[0]], outset)
+				var rightOutsetDotProduct = getXYDotProduct(rightVector, rightOutsetVector)
+				multiplyXYByScalar(rightVector, rightOutsetDotProduct)
+				if (marker == null) {
+					multiplyXYByScalar(centerEnd, rightOutsetDotProduct)
+					var extendedEnd = getXYSubtraction(centerPoint, centerEnd)
+					outline.push(getXYSubtraction(extendedEnd, rightVector))
+					outline.push(getXYAddition(extendedEnd, rightVector))
+				}
+				else {
+					outline.push(getXYSubtraction(centerPoint, rightVector))
+					var markerRightVector = rightVector
+					if (isMarkerAbsolute) {
+						markerRightVector = getXYDivisionByScalar(markerRightVector, getXYLength(markerRightVector))
+					}
+					for (var vertex of marker) {
+						outline.push(addXY(getXYRotation(vertex, markerRightVector), centerPoint))
+					}
+					outline.push(getXYAddition(centerPoint, rightVector))
+				}
+			}
+			else {
+				outline.push(getInsetPoint(centerEnd, centerPoint, centerBegin, outset))
+			}
+		}
+		removeCollinearXYPoints(outline)
+		outlines[nodeOutlineIndex] = outline
+	}
+	return outlines
+}
+
+var gOutline = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'outline',
 	processStatement:function(registry, statement) {
-		statement.tag = 'polygon'
-		var points = getPolygonPoints(statement)
+		var polylines = getPointListsRecursivelyDelete('points', registry, statement, 'polyline')
+		var polygons = getPointListsRecursivelyDelete('points', statement.children, registry, 'polygon')
+		for (var polygon of polygons) {
+			if (polygon.length > 0) {
+				polygon.push(polygon[polygon.length - 1])
+				polylines.push(polygon)
+			}
+		}
+		var isMarkerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
+		var marker = getPointsByKey('marker', registry, statement)
+		var outset = getFloatsByDefault([1.0], 'outset', registry, statement, this.name)
+		var outlines = getOutlines(isMarkerAbsolute, marker, outset, polylines)
+		statement.tag = 'g'
+		if (!getIsEmpty(outlines)) {
+			var exceptionSet = new Set(['markerAbsolute', 'marker', 'outset'])
+			var idStart = statement.attributeMap.get('id') + '_polygon_'
+			for (var outlineIndex = 0; outlineIndex < outlines.length; outlineIndex++) {
+				var id = idStart + outlineIndex.toString()
+				var polygonStatement = getStatementByException(exceptionSet, id, 'polygon', registry, statement)
+				polygonStatement.attributeMap.set('points', outlines[outlineIndex].join(' '))
+				gPolygon.processStatement(registry, polygonStatement)
+			}
+		}
+	}
+}
+
+var gPolygon = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'polygon',
+	processStatement:function(registry, statement) {
+		var points = getPointsIncludingWork(registry, statement)
 		if (points == null) {
 			return
 		}
-		var angle = getFloatByStatement('angle', registry, statement)
-		var mirrorStart = points.length - 1
-		var perpendicular = getFloatsByStatement('perpendicular', registry, statement)
-		if (!getIsEmpty(perpendicular)) {
-			if (perpendicular.length == 1) {
-				perpendicular.push(0.0)
-			}
+		setPointsExcept(points, registry, statement, this.name)
+	}
+}
+
+var gPolyline = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'polyline',
+	processStatement:function(registry, statement) {
+		var points = getPointsIncludingWork(registry, statement)
+		if (points == null) {
+			return
 		}
-		var direction = null
-		if (angle == null) {
-			if (getIsEmpty(perpendicular)) {
-				perpendicular = [0.0, 0.0]
-				if (points.length > 1) {
-					var penultimatePoint = points[points.length - 2]
-					var ultimatePoint = points[points.length - 1]
-					direction = getXYSubtraction(ultimatePoint, penultimatePoint)
-					direction = [direction[1], -direction[0]]
-					perpendicular = multiplyXYByScalar(getXYAddition(penultimatePoint, ultimatePoint), 0.5)
-					mirrorStart -= 2
-				}
-			}
-			if (direction == null) {
-				direction = [perpendicular[1], -perpendicular[0]]
-			}
-			var directionLength = getXYLength(direction)
-			if (directionLength == 0.0) {
-				direction = [0.0, 1.0]
-			}
-			else {
-				divideXYZByScalar(direction, directionLength)
-			}
-		}
-		else {
-			angle *= gRadiansPerDegree
-			direction = [Math.sin(angle), Math.cos(angle)]
-			if (getIsEmpty(perpendicular)) {
-				perpendicular = [0.0, 0.0]
-			}
-		}
-		var reverseRotation = [direction[0], -direction[1]]
-		var lineRotatedY = perpendicular[0] * reverseRotation[1] + perpendicular[1] * reverseRotation[0]
-		var mirrorFromY = lineRotatedY + lineRotatedY
-		for (var pointIndex = mirrorStart; pointIndex > -1; pointIndex--) {
-			var pointRotated = getXYRotation(points[pointIndex], reverseRotation)
-			pointRotated[1] = mirrorFromY - pointRotated[1]
-			points.push(getXYRotation(pointRotated, direction))
-		}
-		statement.attributeMap.set('points', points.join(' '))
+		setPointsExcept(points, registry, statement, this.name)
 	}
 }
 
 var gRectangle = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'rectangle',
-	optionMap: null,
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		statement.tag = 'polygon'
-		var points = getPolygonPoints(statement)
+		var points = getPointsIncludingWork(registry, statement)
 		if (points == null) {
 			return
 		}
@@ -80,13 +189,16 @@ var gRectangle = {
 			var maximumY = Math.max(points[0][1], points[1][1])
 			points = [[minimumX, minimumY], [minimumX, maximumY], [maximumX, maximumY], [maximumX, minimumY]]
 		}
-		attributeMap.set('points', points.join(' '))
+		setPointsExcept(points, registry, statement, this.name)
 	}
 }
 
 var gVerticalHole = {
+	initialize: function() {
+		addToCapitalizationMap('sagAngle')
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'verticalHole',
-	optionMap: new Map([['capitalized', 'sagAngle']]),
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		var overhangAngle = getFloatByDefault(40.0, 'overhangAngle', registry, statement, this.name) * gRadiansPerDegree
@@ -127,9 +239,9 @@ var gVerticalHole = {
 			point = points[pointIndex]
 			points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
 		}
-		attributeMap.set('points', points.join(' '))
 		statement.tag = 'polygon'
+		setPointsExcept(points, registry, statement, this.name)
 	}
 }
 
-var gGenerator2DProcessors = [gMirror, gRectangle, gVerticalHole]
+var gGenerator2DProcessors = [gOutline, gPolygon, gPolyline, gRectangle, gVerticalHole]
