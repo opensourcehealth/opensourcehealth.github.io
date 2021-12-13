@@ -6,7 +6,8 @@ const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
 
 function addArray(elements, elementsAddition) {
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+	var minimumLength = Math.min(elements.length, elementsAddition.length)
+	for (var elementIndex = 0; elementIndex < minimumLength; elementIndex++) {
 		elements[elementIndex] += elementsAddition[elementIndex]
 	}
 	return elements
@@ -664,6 +665,14 @@ function getCrossProductZ(a, b) {
 	return a[0] * b[1] - a[1] * b[0]
 }
 
+function getDirectionalProximity(xyA, xyB) {
+	var dotProduct = getXYDotProduct(xyA, xyB)
+	if (xyA[0] * xyB[1] <= xyA[1] * xyB[0]) {
+		return dotProduct
+	}
+	return - 2.0 - dotProduct
+}
+
 function getMultiplied2DMatrix(matrixA, matrixB) {
 //	a c e		0 2 4
 //	b d f		1 3 5
@@ -726,6 +735,10 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 	return rowStrings.join('\n')
 }
 
+function getPositiveModulo(x) {
+	return x - Math.floor(x)
+}
+
 function getRGB() {
 	gRGBIndex += 1
 	return getRGBByIndex(gRGBIndex)
@@ -773,6 +786,10 @@ function getXYDistanceSquared(xyA, xyB) {
 	return getXYLengthSquared(getXYSubtraction(xyA, xyB))
 }
 
+function getXYDivisionByScalar(xyA, scalarDivider) {
+	return [xyA[0] / scalarDivider, xyA[1] / scalarDivider]
+}
+
 function getXYDotProduct(xyA, xyB) {
 	return xyA[0] * xyB[0] + xyA[1] * xyB[1]
 }
@@ -793,8 +810,12 @@ function getXYMultiplicationByScalar(xyA, scalarMultiplier) {
 	return [xyA[0] * scalarMultiplier, xyA[1] * scalarMultiplier]
 }
 
-function getXYPolar(angle, radius) {
-	return [radius * Math.cos(angle), radius * Math.sin(angle)]
+function getXYPolar(angle) {
+	return [Math.cos(angle), -Math.sin(angle)]
+}
+
+function getXYPolarByRadius(angle, radius) {
+	return [radius * Math.cos(angle), radius * -Math.sin(angle)]
 }
 
 function getXYRotation(xy, xyRotator) {
@@ -881,6 +902,12 @@ function multiplyArrayByScalar(elements, scalarMultiplier) {
 		elements[elementIndex] *= scalarMultiplier
 	}
 	return elements
+}
+
+function multiplyXY(xyA, xyB) {
+	xyA[0] *= xyB[0]
+	xyA[1] *= xyB[1]
+	return xyA
 }
 
 function multiplyXYArraysByScalar(xyArrays, multiplier) {
