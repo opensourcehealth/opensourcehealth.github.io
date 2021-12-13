@@ -117,8 +117,10 @@ function Region(terrain) {
 }
 
 var gCreature = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'creature',
-	optionMap: null,
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		var creature = new Creature()
@@ -146,8 +148,10 @@ var gCreature = {
 }
 
 var gLaunch = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'launch',
-	optionMap: null,
 	processStatement:function(registry, statement) {
 		var workStatement = getWorkStatement(registry, statement)
 		if (workStatement == null) {
@@ -174,8 +178,10 @@ var gLaunch = {
 }
 
 var gRegion = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'region',
-	optionMap: null,
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		if (!attributeMap.has('terrain')) {
@@ -196,8 +202,10 @@ var gRegion = {
 }
 
 var gTerrainViewer = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'terrainViewer',
-	optionMap: null,
 	processStatement:function(registry, statement) {
 	//	var maximumWidth = getFloatByDefault(740.0, 'maximumWidth', registry, statement, this.name)
 		var maximumWidth = getFloatByDefault(390.0, 'maximumWidth', registry, statement, this.name)
