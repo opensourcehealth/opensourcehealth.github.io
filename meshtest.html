@@ -2,14 +2,18 @@
 <html lang="en">
 <head><meta charset="utf-8"/></head>
 <body>
+<script src="maparray.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
+<script src="evaluation.js"></script>
+<script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
 <script src="help.js"></script>
-<script src="maparray.js"></script>
+<script src="lzstring.js"></script>
 <script src="matrix.js"></script>
 <script src="meta.js"></script>
 <script src="parsenumber.js"></script>
+<script src="parseword.js"></script>
 <script src="pixel.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
@@ -19,13 +23,36 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// getShapeGenerator, getStratas, change objectMap to meshGeneratorMap
+// upload
+// try to eliminate openingStatement
+// triangulating identical points bug, check triangle speed
+// scalePoly(x, and y) in transform2Ds instead of extraTransform2Ds
+// multiply or mirror polygons, polylines and construction
+// Polyline.forEachY(symbol, array, array or scalar)
+// parabola
+// alphabetic encoding and compression
+// close to line in sculpture
+// use warningList instead of warning
+// spring or staple or hook or fastener
+// extrusion and sculpture by equations, transforms
+// 2d construction
+// delete getIntervalsIncludingEnd
+// check view problem in donut
+// bend __amplitudes=0,1 analysis=t basis2D=1,0 boundaryEquations=testBoundary center=2,2
+// translationEquations=testTranslation work=donut {
+// __rectangle points=-2 10
+// string testBoundary=point[2] > 7.0 testTranslation=[point[0], 0.0, 0.0]
+// }
+// check polygonAnalysis when there is are lone edges in brick around top wedge
+// connect facets on point line in construction
+// make viewer bigger with outside rotation handles
+// deprecate all non 3d tags in links
+//
+// getShapeGenerator, change objectMap to meshGeneratorMap, update changed text in transforms
 // check linkMap in getMeshAnalysis, count empty intersection pairs
-// convert process to class
-// processMirror - y mirror, outerX, outerY
 // add warning for missing work and other missing and getStatementID whileIndex
 // operate and transform polygons in wordscape, maybe use true location instead of inverse for points in drillMesh
-// comment out exclusiveIntersection
+// deprecate exclusiveIntersection
 // better colors
 // add nodes between exteriors to polygons, add node within new triangle
 // triangulate coplanar for output, make basic shapes, combine loops from multiple meshes
@@ -60,9 +87,9 @@ function drawMesh(mesh) {
 			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
 			z = polygon[keyIndex][2]
 		}
+		drawXYZPolygon(polygon, getRGB())
 		index = Math.round(z)
-		drawXYZPolygon(polygon, getRGBByIndex(index))
-//		index++
+//		drawXYZPolygon(polygon, getRGBByIndex(index))
 	}
 }
 
@@ -133,6 +160,25 @@ function drawXYPolygons(xyPolygons) {
 	}
 }
 
+function drawXYPolyline(xyPolyline, rgb) {
+	var pointStrings = new Array(xyPolyline.length)
+	for (var pointIndex = 0; pointIndex < xyPolyline.length; pointIndex++) {
+		if (xyPolyline[pointIndex].length < 3) {
+			pointStrings[pointIndex] = xyPolyline[pointIndex].join(',')
+		}
+		else {
+			pointStrings[pointIndex] = xyPolyline[pointIndex].slice(0, 2).join(',')
+		}
+	}
+	document.writeln('<polyline  points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
+}
+
+function drawXYPolylines(xyPolylines) {
+	for (var xyPolyline of xyPolylines) {
+		drawXYPolyline(xyPolyline, getRGB())
+	}
+}
+
 function drawXYZPoints(points) {
 	for (var point of points) {
 		var center = getXYPointStringByXYZ(point).split(',')
@@ -159,9 +205,8 @@ function drawXYZPolyline(points, rgb) {
 }
 
 function getXYPointStringByXYZ(point) {
-//	return [point[0] + point[2] * 0.2, point[1] + point[2] * 0.1].join(',')
+//	return [point[0], point[1] + point[2] * 0.3].join(',')
 	return [point[0] + point[2] * 0.3, point[1] + point[2] * 0.2].join(',')
-//	return [point[0] + point[2] * 0.4, point[1] + point[2] * 0.25].join(',')
 }
 
 function getXYPointStringsByXYZ(points) {
@@ -170,6 +215,36 @@ function getXYPointStringsByXYZ(points) {
 		pointStrings[pointIndex] = getXYPointStringByXYZ(points[pointIndex])
 	}
 	return pointStrings
+}
+
+function testBend() {
+	console.log('testBend')
+//	var pointString = '-2,-2 -2,9 12,-2 0,-1 0,7 10,-1 1,0 1,5 6,0 2,1 4,1 2,3 11,1 13,1 11,3'
+	var pointString = '-2,-2,0 -2,6,0 5,-2,0'
+//	var pointString = '-2,-2 -2,6 5,-2 4,-2 3,-2 2,-2 1.5,-2 1,-2 0,-2 -1,-2'
+	var points = getPointsByString(pointString)
+	drawXYPolygon(points, getRGB())
+	var boundaryEquation = 'point[0] > 0.0'
+	var boundaryPolygons = [[[-3,-3], [-3,2], [8,-3]]]
+	var translationEquation = '3.0'
+	var variableMap = new Map()
+	var parent = {parent:null, variableMap:variableMap}
+	var statement = {parent:parent}
+	drawXYPolygons(boundaryPolygons)
+	var stratas = [[-5,-3]]
+	var amplitudes = [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0, 6.0]]
+	var boundedPoints = getBoundedPoints3D([boundaryEquation], null, points, boundaryPolygons, null, statement, stratas)
+//	var boundedPoints = getBoundedPoints2D([boundaryEquation], points, boundaryPolygons, null, statement)
+//	var boundedPoints = getBoundedPoints2D(null, points, [[[-3,-3], [-3,2], [2,-3]]])
+	console.log('boundedPoints')
+	console.log(getArraysCopy(boundedPoints))
+	console.log(getArraysCopy(points))
+	console.log(boundaryPolygons)
+//	transformPoints2DByEquation(null, null, null, boundedPoints, null, statement, [translationEquation])
+	transformPoints3DByEquation(amplitudes, null, null, boundedPoints, null, statement, [translationEquation])
+	console.log(boundedPoints)
+	drawXYPolygon(points, getRGB())
+	console.log(points)
 }
 
 function testConnectedPolygons() {
@@ -212,11 +287,46 @@ function testDrillByPolygon() {
 }
 
 function testEquation() {
-	console.log('equationString')
-	var equationString = ' ( 1 + 1 ) * 3 * ( 2 + 2 ) '
-	var value = getValueByEquation(0.0, equationString, null, null, null, null)
+	console.log('testEquation')
+//	var valueString = ' 5 * ( 1 + 1 ) * 3 * ( 2 + 2 ) '
+//	var valueString = ' ( 3 % 2 ) * .3 * Math.min(8,11) + getStringLength( testString ) '
+//	var valueString = ' 25 + 10 * 1.5 '
+//	var valueString = ' -Math.min(8,11) -Math.min(8,11) -Math.min(8,11) '
+//	var valueString = ' -Math.min(8,11) **Math.min(8,11) '
+//	var valueString = ' -2+1 '
+//	var valueString = ' true && false '
+//	var valueString = ' 4, '
+//	var valueString = ' 1+2*3+4 '
+//	var valueString = ' getStringLength( testString ) '
+//	var valueString = ' ( 5 % 3 ) + getStringLength( testString ) '
+//	var valueString = ' getIntervalsIncludingEnd(0,3.5,1) '
+//	var valueString = ' testMap.value '
+//	var valueString = ' Math.sin(1) '
+//	var valueString = ' Polyline.sineWave(1) '
+//	var valueString = ' testArray[0] '
+//	var valueString = ' 1,2 '
+//	var valueString = ' [[3,5,7],[4,6,8]][0][1] '
+//	var valueString = ' [5*[2][0]] '
+	var valueString = ' -2e5 '
+	var mathMap = new Map([['min', Math.min], ['sin', Math.sin]])
+	var polylineMap = new Map([['sineWave', sineWave]])
+	var testMap = new Map([['value', '3']])
+	getStringLength.optionSet = gSetS
+	sineWave.optionSet = null
+	var variableMap = new Map([
+		['getIntervalsIncludingEnd', getIntervalsIncludingEnd],
+		['getStringLength', getStringLength],
+		['Polyline', polylineMap],
+		['Math', mathMap],
+		['test', '2'],
+		['testArray', '[3,4]'],
+		['testMap', testMap]])
+	var parent = {parent:null, variableMap:variableMap}
+	var statement = {parent:parent}
+	var value = getValueByEquation(null, statement, valueString)
 	console.log('value')
 	console.log(value)
+	console.log(parseFloat('2e5'))
 }
 
 function testExpand() {
@@ -284,12 +394,13 @@ function testFacetSubtraction() {
 	var pointString = '7,-1,0 12,-8,0 7,-5,2 7,-8,0'
 	var points = getPointsByString(pointString)
 //	var toolString = '10,-9 14,-9 18,-3'
+	var toolString = '10,-9 10,-8 14,-9 12,-3'
 //	var toolString = '8,-11 14,-11 8,-3'
-//	var toolString = '8,-7 9,-7 9,-6'
+//	var toolString = '8,-7 9,-7 9,-6.5'
 //	var toolString = '8,-6 9,-12 9,5'
 //	var toolString = '5,-9 14,-9 5,2'
 //	var toolString = '8,-4 10,-7 11,-5'
-	var toolString = '4,-3 9,-3 4,3'
+//	var toolString = '4,-3 9,-3 4,3'
 //	var toolString = '8,-6 12,-5 8,-3'
 //	var toolString = '8,-4 8,-7 12,-6'
 //	var toolString = '8,-4 8,-7 10,-8'
@@ -313,16 +424,26 @@ function testFacetSubtraction() {
 	var workMesh = {facets:facets, points:points}
 	console.log('workMesh facets')
 	console.log(facets.slice(0))
-//	sectionByPolygonMulti(get3DUnitMatrix(), toolPillar, workMesh)
-	drillByPolygonMulti(get3DUnitMatrix(), toolPillar, workMesh)
-//	drillByPolygonMulti(get3DTransformByRotateX([5.0]), 'i', toolPillar, workMesh)
-//	get3DUnitMatrix()
+//	sectionByPillar(get3DUnitMatrix(), toolPillar, null, workMesh)
+	drillByPillar(get3DUnitMatrix(), toolPillar, null, workMesh)
 	drawMesh(workMesh)
 //	drawMesh({facets:facets, points:points})
 	console.log('facets')
 	console.log(facets)
 	console.log(workMesh)
 	console.log(workMesh.points.length)
+	console.log(getMeshAnalysis(workMesh))
+}
+
+function testFillet() {
+	console.log('testFillet')
+	var polygon = getPointsByString('0,-2 0,4 4,4 4,2 2,2 2,0 4,0 4,-2')
+	var radius = 2.0
+	drawXYPolygon(polygon, getRGB())
+	var filletedPolygon = getFilletedPolygon(12, polygon, radius)
+	console.log('filletedPolygon')
+	console.log(filletedPolygon)
+	drawXYPolygon(filletedPolygon, getRGB())
 }
 
 function testInset() {
@@ -381,6 +502,37 @@ function testMeshBoolean() {
 	drawMesh(meshBoolean)
 //	drawXYZPoints(meshBoolean.points)
 	console.log(getMeshAnalysis(meshBoolean))
+}
+
+function testOutline() {
+	console.log('testOutline')
+	var branchAString = '0,0 0,2 0,4'
+	var branchA = getPointsByString('0,0 0,2 0,4')
+	var branchB = getPointsByString('0,2 2,2 4,4')
+	var branches = [branchA, branchB]
+	var radius = 0.5
+	var outlines = getOutlines(true, [[-2, 0], [0, 2], [2, 0]], [0.2, 0.1], branches)
+//	var outlines = getOutlines([[0, 1]], [1.0, 0.5], branches)
+//	var outlines = getOutlines(null, [1.0, 0.5], branches)
+	drawXYPolylines(branches)
+	drawXYPolygons(outlines)
+//	var filletedPolygons = getFilletedPolygons(12, outlines, radius)
+//	console.log('filletedPolygons')
+//	console.log(filletedPolygons)
+//	drawXYPolygons(filletedPolygons)
+/*
+var stringOld = 'file:///home/enrique/projects/mesh/wordscape.html?abstract%20date=20.09.16%20flipY=3%20id=U%20Channel%20project=Wordscape%20Test{%0Avar%20p=point(a%2C1%2C2)%20b=border()%20test=3.5+4%20testA=a%20n=95%20t=10%20tw=2%0Agroup%20transform3D=basis(x%20y)%20id=topView%20transform=translate(border()%2C-topByID()){%0Ascuplture%20analysis=p%20heights=getIntervalsIncludingEnd(0%2C10%2C2)%20view=true%20{%0Alayer%20{%0Apolygon%20nodes=0%205%20t%2C0%205%2C-5%0A}%0Alayer%20copy=%0Alayer%20{%0Apolygon%20nodes=0%203%2C5;1%203%2C-5;3%0Apolygon%20nodes=7%2C5;1%2C0%2010%2C0;2%2C0%207%2C-5;3%2C0%0A}%0Alayer%20{%0Apolygon%20nodes=0%205%205%2C-5%0Apolygon%20nodes=5%2010%2C0%205%2C-5%0A}%0Alayer%20{%0Apolygon%20nodes=0%2C0;0%2C0%205%2C5;1%2C0%2010%2C0;1%2C1%205%2C-5;2%2C0%0A}%0A}%0Aextrusion%20heights=0%2C75+20%20view=true%20{%0Amirror%20points=0%200%2C39%204%2C39%20%2C17%2011%2C14%20perpendicular=17%0A}%0Aemboss%20analysis=p%20work=extrusion%20stratas=50%2C200%20{%0Ascuplture%20analysis=p%20heights=-70%2C-45%2C-45%2C0%20id=scuplture_emboss%20view=true%20{%0Alayer%20{%0Arectangle%20points=4%2030%2C10%0A}%0Alayer%20copy=-1%0Alayer%20{%0Arectangle%20points=4%2C2%2030%2C12%0A}%0Alayer%20copy=-1%0A}%0A}%0A}%0Agroup%20transform3D=basis(x%20z)%20id=frontView%20transform=translate(border()%2C-border()-topByID()-topByID(topView)){%0AcopyMesh%20work=scuplture%20view=true%0AcopyLinear%20work=rectangle%0Amirror%20points=0%200%2C95%20perpendicular=11+6%0Amirror%20points=0%200%2C20%20angle=30%0A_expand%20analysis=polygonal%20copy=true%20expansionXY=1.0+2.0%2C2.0%20expansionZ=1%20view=true%20work=scuplture_emboss%0Aoutline%20outset=5{%0Apolyline%20points=%2C30%20%2C50%20%2C70%0A}%0A}%0Agroup%20transform3D=basis(y%20z)%20id=rightView%20transform=translate(2*border()+rightByID(topView)%2C-border()-topByID()-topByID(topView)){%0Amirror%20points=0%200%2Cn%20perpendicular=19.5%0Apolygon%20points=%2C%2010%2C10+8%2020%2C%20%2C5%0Aweld%20analysis=polygon%20work=extrusion%20stratas=-1%2C70%20{%0Aderive2D%20planes=%2C%20%2C-20%0Averticalhole%20cx=29%20cy=75%20r=test%0A}'
+var string = stringOld + stringOld
+console.log("Size of sample is: " + string.length);
+var compressed = LZString.compressToEncodedURIComponent(string);
+//var compressed = LZString.compress(string);
+console.log("Size of compressed sample is: " + compressed.length);
+string = LZString.decompressFromEncodedURIComponent(compressed);
+//string = LZString.decompress(compressed);
+console.log("Sample is: " + string);
+console.log("Compressed is: " + compressed);
+//compressToEncodedURIComponent decompressFromEncodedURIComponent
+*/
 }
 
 function testPixelBoolean() {
@@ -526,6 +678,29 @@ function testScuplture() {
 	drawMesh({facets:scupltureMesh.facets, points:scupltureMesh.points})
 }
 
+function testSplitPoints() {
+//	var pointString = '0,0,0 0,2,6 4,2,6 4,0,0'
+//	var pointString = '0,0,0 0,3,6 4,3,6 4,1,2 2,1,2 2,0,0'
+//	var pointString = '0,0,0 0,4,8 4,4,8 4,1,2 2,1,2 2,2,4 1,2,4 1,0,0'
+	var pointString = '-4,0,0 -4,4,8 -2,0,0 -2,4,8 0,0,0 0,4,8 4,4,8 4,1,2 2,1,2 2,2,4 1,2,4 1,0,0'
+	var points = getPointsByString(pointString)
+	var outerFacet = [0, 1, 3, 2]
+	var closeFacet = [2, 3, 5, 4]
+	var toolFacet = [4, 5, 6, 7, 8, 9, 10, 11]
+	var facets = [outerFacet, closeFacet, toolFacet]
+	drawXYPolygon(getPolygonByFacet(outerFacet, points), getRGB())
+	drawXYPolygon(getPolygonByFacet(closeFacet, points), getRGB())
+	drawXYPolygon(getPolygonByFacet(toolFacet, points), getRGB())
+	var workMesh = {facets:facets, points:points}
+	addSplitIndexesByHeights(2, [2, 3], workMesh)
+//	drawXYPolygon(splitPoints, getRGB())
+	console.log('splits')
+	console.log(workMesh)
+	console.log(outerFacet)
+	console.log(workMesh.splits)
+	drawMesh(workMesh)
+}
+
 function testSubtraction() {
 	//tested by getSubtractionLoops, used by getSubtractionFaces
 //	meeting = {isToolNode, isWorkNode, toolAlong, workAlong}
@@ -538,37 +713,33 @@ function testSubtraction() {
 //	start in work points outside tool, make loops and add if new
 //	tool, work..
 //	tool:0, 1, 2	work:3, 4, 5	meeting:6, 7
-//	polygons = ['8,-8 9,-8 9,-7', '7,-1 12,-8 7,-8']
+//	polygons = ['8,-9 9,-9 9,-7', '7,-1 12,-8 7,-8']
+	polygons = ['8,-8 9,-8 9,-7', '7,-1 12,-8 7,-8']
 //	polygons = ['10,-4 10,-5 8,-4.99999995', '7,-1 12,-5 7,-5']
 //	polygons = ['10,-4 9,-5 8,-4', '7,-1 12,-5 7,-5']
-//	polygons = ['8,-7 9,-9 9,-6', '7,-1 12,-8 7,-5']
-//	polygons = ['8,-4 10,-7 11,-5', '7,-1 12,-5 7,-8']
 //	polygons = ['7,-8 9,-3 14,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['14,-8 9,-3 7,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['14,-8 9,-3 7,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['7,-8 9,-5 14,-5.00000025', '7,-5 12,-5 7,-1']
-//	polygons = ['6,-7 7,-3 7,-5 9,-5 10,-5 11,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['5,-5.00000025 10,-5 12,-8', '7,-5 12,-5 7,-1']
-	polygons = ['8,-4 12,-5 12,-8', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-4 12,-5 12,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['8,-7 8,-4 11,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['8,-7 10,-5 11,-5', '7,-5 12,-5 7,-1']
 //	polygons = ['8,-7 10,-4 12,-6', '7,-5 12,-5 7,-1']
 //	polygons = ['8,-17 8,-7 12,-5', '7,-5 12,-5 7,-1']
 //	polygons = ['12,-7 12,-3 15,-5', '7,-5 12,-5 7,-1']
+//	polygons = ['8,-7 9,-9 9,-6', '7,-1 12,-8 7,-5']
+//	polygons = ['8,-4 10,-7 11,-5', '7,-1 12,-5 7,-8']
+//	polygons = ['6,-7 7,-3 7,-5 9,-5 10,-5 11,-8', '7,-5 12,-5 7,-1']
 //	polygons = ['8,-7 8,-5 9,-5 10,-5 11,-7', '7,-5 8,-5 9,-5 10,-5 12,-5 7,-1']
 	convertPointStringsToPointLists(polygons)
-	var polygon = polygons[0]
-	console.log('getPolygonInsideness(point, polygon)')
-	console.log(polygon)
-	console.log(getPolygonInsideness([10.5,-5], polygon))
-//	console.log(getPolygonInsideness([8,-7], polygon))
-//	console.log(getPolygonInsideness([8.1,-7], polygon))
-//	console.log(getIntersectionPortionsByRotated(ab[0][0], ab[1][0], cd[0], cd[1]))
-//	getIntersectionPortions(ab[0], ab[1], cd[0], cd[1])
-//	var meeting = getMeeting(1.0, 4.0, 2.0, [0.0, 0.0], [16.0, 8.0])
-//	console.log('meeting')
-//	console.log(meeting)
+	drawXYPolygons(polygons)
+	console.log('polygons')
+	console.log(polygons)
+//	console.log(getPolygonInsideness([8,-7], polygons[0]))
+//	console.log(getPolygonInsideness([8.1,-7], polygons[0]))
 	var subtractedPolygons = getOperatedPolygons('d', polygons[0], polygons[1])
+	console.log('subtractedPolygons')
 	console.log(subtractedPolygons)
 	drawXYPolygons(subtractedPolygons)
 }
@@ -591,30 +762,42 @@ function testTaper() {
 }
 
 function testTriangleMesh() {
+	console.log('testTriangleMesh')
+//	var pointString = '0,0,0 0,4,0 4,4,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 1,2,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 4,3,0 1,3,0 1,1,0 4,1,0 4,0,0'
 //	var pointString = '-10,-30,0 -10,0,0 -20,0,0 -20,-9,0 -20,-21,0 -20,-30,0'
 //	var pointString = '39,-30,0, 17,-30,0, 14,-23,0, 14,-11,0, 17,-4,0, 0,0,0, 0,-34,0, 2,-30,0, 2,-4,0, 12,-4,0, 12,-30,0, 2,-30,0'
 //	var pointString = '39,-30,0, 17,-30,0, 14,-23,0, 14,-11,0, 17,-4,0, 0,0,0, 0,-34,0, 2,-30,0, 2,-4,0, 12,-4,0, 12,-30,0, 2,-30,0'
-	var pointString = '34,0,95 34,39,95 30,39,95 30,17,95 23,14,95 11,14,95 4,17,95 4,39,95 0,39,95 0,0,95 34,0,95 30,2,95 4,2,95 4,12,95 30,12,95 30,2,95'
+//	var pointString = '34,0,95 34,39,95 30,39,95 30,17,95 23,14,95 11,14,95 4,17,95 4,39,95 0,39,95 0,0,95 34,0,95 30,2,95 4,2,95 4,12,95 30,12,95 30,2,95'
+//	var pointString = '-1.5,10.25 -2.5,10.45 -2.5,12.05 -1.5,12.25 1,12.25 1,-12.25 -1.5,-12.25 -2.5,-12.05 -2.5,-10.45 -1.5,-10.25 -1,-10.25 -1,-8.25 -8.333333333333334,-8.25 -8.333333333333334,-10.25 -7.833333333333334,-10.25 -6.833333333333334,-10.45 -6.833333333333334,-12.05 -7.833333333333334,-12.25 -10.833333333333334,-12.25 -11.833333333333334,-12.05 -11.833333333333334,-10.45 -10.833333333333334,-10.25 -10.333333333333334,-10.25 -10.333333333333334,-8.25 -17.666666666666668,-8.25 -17.666666666666668,-10.25 -17.166666666666668,-10.25 -16.166666666666668,-10.45 -16.166666666666668,-12.05 -17.166666666666668,-12.25 -20.166666666666668,-12.25 -21.166666666666668,-12.05 -21.166666666666668,-10.45 -20.166666666666668,-10.25 -19.666666666666668,-10.25 -19.666666666666668,-8.25 -27,-8.25 -27,-10.25 -26.5,-10.25 -25.5,-10.45 -25.5,-12.05 -26.5,-12.25 -29,-12.25 -29,-2.25 -4,-2.2500000000000018 -3,-2.450000000000002 -3,-4.050000000000002 -4,-4.250000000000002 -27,-4.25 -27,-6.25 -1,-6.25 -1,6.25 -27,6.25 -27,1.75 -4,1.7499999999999982 -3,1.549999999999998 -3,-0.05000000000000182 -4,-0.2500000000000018 -29,-0.25 -29,12.25 -26.5,12.25 -25.5,12.05 -25.5,10.45 -26.5,10.25 -27,10.25 -27,8.25 -19.666666666666668,8.25 -19.666666666666668,10.25 -20.166666666666668,10.25 -21.166666666666668,10.45 -21.166666666666668,12.05 -20.166666666666668,12.25 -17.166666666666668,12.25 -16.166666666666668,12.05 -16.166666666666668,10.45 -17.166666666666668,10.25 -17.666666666666668,10.25 -17.666666666666668,8.25 -10.333333333333334,8.25 -10.333333333333334,10.25 -10.833333333333334,10.25 -11.833333333333334,10.45 -11.833333333333334,12.05 -10.833333333333334,12.25 -7.833333333333334,12.25 -6.833333333333334,12.05 -6.833333333333334,10.45 -7.833333333333334,10.25 -8.333333333333334,10.25 -8.333333333333334,8.25 -1,8.25 -1,10.25'
+	var pointString = '14.5,-8.444 14.5,-7.556 14.721,-6.697 4.2997705206102536e-16,4.6655377184173457e-17 4.2997705206102536e-16,-39 95,-39 95,4.6655377184173457e-17 4.2997705206102536e-16,4.6655377184173457e-17 14.721,-6.697 15.15,-5.921 15.759,-5.276 16.509,-4.803 17.354,-4.532 18.239,-4.48 19.11,-4.651 19.91,-5.034 21.857,-6.668 21.857,-9.332 19.91,-10.966 19.11,-11.349 18.239,-11.52 17.354,-11.468 16.509,-11.197 15.759,-10.724 15.15,-10.079 14.721,-9.303 14.5,-8.444 11.857,-9.332 9.91,-10.966 9.11,-11.349 8.239,-11.52 7.353999999999999,-11.468 6.509,-11.197 5.759,-10.724 5.15,-10.079 4.721,-9.303 4.5,-8.444 4.5,-7.556 4.721,-6.697 5.15,-5.921 5.759,-5.276 6.509,-4.803 7.353999999999999,-4.532 8.239,-4.48 9.11,-4.651 9.91,-5.034 11.857,-6.668 11.857,-9.332'
 	var points = getPointsByString(pointString)
-	addXYsByY(points, -30)
-	multiplyXYZsByScalar(points, 0.2)
-//	drawXYPolygons([points])
-//	return
-	rotateXYZParametersByPoints(1, points)
 //	var facet = [4, 3, 2, 1, 0]
 //	var facet = [0, 1, 2, 3, 4, 5, 6, 7]
 //	var facet = [0, 1, 2, 3, 4, 5]
 //	var facet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-	var facet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+	var facet = []
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		facet.push(pointIndex)
+		points[pointIndex].push(0.0)
+	}
+	addXYsByXY(points, [0,0])
+	console.log('getPolygonByFacet(facet, points)')
+	console.log(getPolygonByFacet(facet, points))
+	multiplyXYZsByScalar(points, 0.5)
+	drawXYPolygon(getPolygonByFacet(facet, points), getRGB())
+//	rotateXYZParametersByPoints(1, points)
 	var triangleFacets = getXYZTriangleFacets(facet, points, new Array(points.length))
 	var triangles = getPolygonsByFacets(triangleFacets, points)
-	rotateXYZParametersByPoints(-1, points)
+//	rotateXYZParametersByPoints(-1, points)
 	console.log('triangles')
 	console.log(triangles)
 	console.log(points)
 	drawXYPolygons(triangles)
+	var lastTriangle = triangles[triangles.length - 1]
+	addXYsByXY(lastTriangle, [2, 0.0])
+//	drawXYPolygon(lastTriangle, getRGB())
 }
 
 function testVoxel() {
@@ -719,6 +902,7 @@ function createSVGTest() {
 	document.writeln('</defs>')
 	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,300,300)">')
 //	var before = new Date().getTime()
+//	testBend()
 //	testConnectedPolygons()
 //	testDrillByMesh()
 //	testDrillByPolygon()
@@ -726,14 +910,17 @@ function createSVGTest() {
 //	testEquation()
 //	testFace()
 //	testFacetSubtraction()
+//	testFillet()
 //	testInset()
 //	testLoop()
 //	testMeshBoolean()
+//	testOutline()
 //	testPixelBoolean()
 //	testPolygonBoolean()
 //	testPolygonJoining()
 //	testRemoveTooThinFacets()
 //	testScuplture()
+//	testSplitPoints()
 //	testSubtraction()
 //	testTaper()
 	testTriangleMesh()
