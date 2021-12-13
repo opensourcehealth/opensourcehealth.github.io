@@ -32,13 +32,15 @@
 <h3>Mesh</h3>
 <textarea id="meshArea" rows="10" cols="120"></textarea><br>
 <br>
+<script src="maparray.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
 <script src="codec.js"></script>
+<script src="evaluation.js"></script>
 <script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
-<script src="maparray.js"></script>
+<script src="lzstring.js"></script>
 <script src="matrix.js"></script>
 <script src="meta.js"></script>
 <script src="parsenumber.js"></script>
@@ -78,7 +80,7 @@
 //wrench/screwdriver, alteration machine
 //document.getElementById("wordArea").onkeydown = function(evt) {(evt) ? evt : window.event if (evt.keyCode == 13) {alert("e");}}
 //textArea.value.slice(0, textArea.selectionStart).split('\n').length - 1
-//deprecated ~ for replace, [ for group ending, [] for id, flip
+//deprecated flip
 /*
 lastKeyDownCode = null
 areaKeyDown = function(evt) {
@@ -109,49 +111,39 @@ function addToMeshArea(meshString) {
 	meshArea.value = meshArea.value + '\n' + meshString
 }
 
-function analyzeOutputMesh(attributeMap, meshGenerator, registry, statement) {
-	var attributeID = attributeMap.get('id')
-	registry.objectMap.set(attributeID, meshGenerator)
-	if (attributeMap.has('outputTriangleMesh')) {
-		if (attributeMap.get('outputTriangleMesh') == 'stl') {
-			addToMeshArea(getTriangleMeshString('stl', attributeID, getTriangleMesh(meshGenerator.getMesh())))
-		}
+//deprecated
+function analyzeOutputMesh(meshGenerator, registry, statement) {
+	var attributeMap = statement.attributeMap
+	var id = attributeMap.get('id')
+	registry.objectMap.set(id, meshGenerator)
+	alterMeshExcept(meshGenerator.getMesh(), registry, statement, statement.tag)
+	var date = getNullOrValue('date', registry.storageMap)
+	var project = getNullOrValue('project', registry.storageMap)
+	if (attributeMap.has('outputMesh')) {
+		addToMeshArea(getMeshString(date, attributeMap.get('outputMesh'), id, meshGenerator.getMesh(), project))
 	}
-	if (attributeMap.has('analysis')) {
-		var meshAnaysisMap = null
-		if (attributeMap.get('analysis')[0] == 't') {
-			meshAnaysisMap = getMeshAnalysis(getTriangleMesh(meshGenerator.getMesh()))
-		}
-		else {
-			if (attributeMap.get('analysis')[0] == 'p') {
-				meshAnaysisMap = getMeshAnalysis(meshGenerator.getMesh())
-			}
-		}
-		if (meshAnaysisMap != null) {
-			var analysisStatement = getStatement('analysis')
-			analysisStatement.attributeMap = meshAnaysisMap
-			analysisStatement.attributeMap.set('id', attributeID + '_analysis')
-			analysisStatement.parent = statement
-			statement.children.splice(-1, 0, analysisStatement)
-		}
+	if (attributeMap.has('outputTriangleMesh')) {
+		addToMeshArea(getTriangleMeshString(date, attributeMap.get('outputTriangleMesh'), id, meshGenerator.getMesh(), project))
 	}
 	if (attributeMap.has('view')) {
-		meshViewer.addMesh(attributeID, null)
+		if (getBooleanByStatementValue('view', registry, statement, attributeMap.get('view'))) {
+			meshViewer.addMesh(id, null)
+		}
 	}
 }
 
-function getGroupBoundingBox(caller, statement) {
+function getGroupBoundingBox(caller, registry, statement) {
 	var boundingBox = null
 	var descendants = []
 	addToDescendantsInsideFirst(descendants, statement)
 	for (var child of descendants) {
-		boundingBox = widenStatementBoundingBox(boundingBox, caller, child)
+		boundingBox = widenStatementBoundingBox(boundingBox, caller, registry, child)
 	}
 	return boundingBox
 }
 
-function getInsets(statement) {
-	var insets = getPointsByTag('insets', statement, 'polygon')
+function getInsets(registry, statement) {
+	var insets = getPointsByTag('insets', registry, statement, 'polygon')
 	if (insets == null) {
 		return [[1.0]]
 	}
@@ -169,37 +161,32 @@ function getMeshesByChildren(children, registry) {
 	return meshes
 }
 
-function getPolygonPoints(statement) {
-	return getPointsByTag('points', statement, 'polygon')
+function getPolygonsRecursively(registry, statement) {
+	return getPointListsRecursively('points', registry, statement, 'polygon')
 }
 
-function getPolygonsByChildren(children) {
-	var polygons = []
-	for (var child of children) {
-		var points = getPolygonPoints(child)
-		if (points != null) {
-			polygons.push(points)
-		}
-	}
-	return polygons
-}
-
-function getStratas(attributeMap) {
-	var stratas = getFloatLists(attributeMap, 'stratas')
-	if (stratas == null) {
-		return [[]]
-	}
-	if (stratas.length == 0) {
-		stratas.push([])
+function getStratas(registry, statement) {
+	var stratas = getFloatListsByStatement('stratas', registry, statement)
+	if (getIsEmpty(stratas)) {
+		return [null]
 	}
 	return stratas
 }
 
-function getTransform2DsByChildren(children) {
+function getTransform2DsByChildren(children, registry) {
 	var transform2DsByChildren = null
 	for (var child of children) {
-		var transform2Ds = getPointsByTag('transform2Ds', child, 'derive2D')
-		if (transform2Ds != null) {
+		var transform2Ds = getPointsByTag('transform2Ds', registry, child, 'derive2D')
+		if (!getIsEmpty(transform2Ds)) {
+			if (transform2DsByChildren == null) {
+				transform2DsByChildren = transform2Ds
+			}
+			else {
+				pushArray(transform2DsByChildren, transform2Ds)
+			}
+		}
+		var transform2Ds = getPointsByTag('transform2Ds', registry, child, 'transform2D')
+		if (!getIsEmpty(transform2Ds)) {
 			if (transform2DsByChildren == null) {
 				transform2DsByChildren = transform2Ds
 			}
@@ -211,21 +198,22 @@ function getTransform2DsByChildren(children) {
 	return transform2DsByChildren
 }
 
-function getWorkMesh(attributeMap, registry) {
+function getWorkMesh(registry, statement) {
+	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('work')) {
 		return null
 	}
-	var work = attributeMap.get('work')
-	if (!registry.objectMap.has(work)) {
+	var workID = attributeMap.get('work')
+	if (!registry.objectMap.has(workID)) {
 		return null
 	}
-	var workGenerator = registry.objectMap.get(work)
+	var workGenerator = registry.objectMap.get(workID)
 	if (workGenerator == null) {
 		return null
 	}
 	var workMesh = workGenerator.getMesh()
 	if (attributeMap.has('copy')) {
-		if (attributeMap.get('copy')[0] == 't') {
+		if (getBooleanByStatementValue('copy', registry, statement, attributeMap.get('copy'))) {
 			workMesh = getMeshCopy(workMesh)
 		}
 	}
@@ -248,24 +236,22 @@ function updateSVGArea() {
 	addToDescendantsOutsideFirst(descendants, svgStatement)
 	for (var statement of descendants) {
 		if (statement.tag != null) {
-			registry.idMap.set(getStatementID(registry, statement), statement)
+			getStatementID(registry, statement)
 		}
 	}
-	createDefault(svgStatement, registry)
-	processDescendantsByTagMap(registry, svgStatement, gTagMap)
+	createDefault(registry, svgStatement)
+	processDescendantsByTagMap(registry, svgStatement, gTagBeginMap)
+	processDescendantsByTagMap(registry, svgStatement, gTagCenterMap)
 	var descendants = [svgStatement]
 	addToDescendantsOutsideFirst(descendants, svgStatement)
 	var lineThickness = 10
-	var boundingBox = getGroupBoundingBox(null, svgStatement)
+	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
 	var height = lineThickness
 	var padding = 5
 	var width = lineThickness
 	if (boundingBox != null) {
 		height += boundingBox[1][1]
 		width += boundingBox[1][0] + lineThickness
-	}
-	if (registry.storageMap.has('group')) {
-		width += registry.storageMap.get('group').scaledBorder
 	}
 	height = Math.max(height, 300)
 	width = Math.max(width, 300)
@@ -291,12 +277,11 @@ function updateSVGArea() {
 	return svgString
 }
 
-var gTagMap = new Map()
-setProcessorMap(gAlterationProcessors, gTagMap)
-setProcessorMap(gConstructionProcessors, gTagMap)
-setProcessorMap(gGenerator2DProcessors, gTagMap)
-setProcessorMap(gGenerator3DProcessors, gTagMap)
-setProcessorMap(gMetaProcessors, gTagMap)
+var gTagBeginMap = new Map()
+var gTagCenterMap = new Map()
+gProcessors = gAlterationProcessors.concat(gConstructionProcessors).concat(gGenerator2DProcessors)
+gProcessors = gProcessors.concat(gGenerator3DProcessors).concat(gMetaProcessors)
+initializeProcessors(gProcessors)
 
 setTextArea('wordArea')
 update()
