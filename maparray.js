@@ -24,12 +24,7 @@ function addMapToMap(map, mapAddition) {
 	for (var entry of mapAddition) {
 		map.set(entry[0], entry[1])
 	}
-}
-
-function addValueToMapByKeys(keys, map, value) {
-	for (var key of keys) {
-		map.set(key, value)
-	}
+	return map
 }
 
 function compareAbsoluteElementTwoAscending(a, b) {
@@ -91,12 +86,37 @@ function compareSignedIntersectionAscending(a, b) {
 	return a[0] - b[0]
 }
 
+function copyKeysExcept(exceptionSet, mapFrom, mapTo) {
+	for (var key of mapFrom.keys()) {
+		if (!exceptionSet.has(key)) {
+			mapTo.set(key, mapFrom.get(key))
+		}
+	}
+}
+
 function getArrayArraysCopy(arrayArrays) {
 	var arrayArraysCopy = new Array(arrayArrays.length)
 	for (var arraysIndex = 0; arraysIndex < arrayArrays.length; arraysIndex++) {
 		arrayArraysCopy[arraysIndex] = getArraysCopy(arrayArrays[arraysIndex])
 	}
 	return arrayArraysCopy
+}
+
+function getArrayBySet(setForArray) {
+	var array = new Array(setForArray.size)
+	var index = 0
+	for (var element of setForArray) {
+		array[index] = element
+		index += 1
+	}
+	return array
+}
+
+function getArrayOrNullBySet(setForArray) {
+	if (setForArray.size == 0) {
+		return null
+	}
+	return getArrayBySet(setForArray)
 }
 
 function getArraysBySplittingStrings(strings, stringSeparator) {
@@ -126,7 +146,7 @@ function getArraysToString(arrays) {
 }
 
 function getIsEmpty(array) {
-	if (array == null) {
+	if (array == null || array == undefined) {
 		return true
 	}
 	return array.length == 0
@@ -154,6 +174,13 @@ function getNumberOfDifferences(arraysA, arraysB) {
 	return numberOfDifferences
 }
 
+function getNullOrValue(key, map) {
+	if (map.has(key)) {
+		return map.get(key)
+	}
+	return null
+}
+
 function getPushElement(arrayToAddTo, element) {
 	if (arrayToAddTo == null) {
 		return [element]
@@ -166,6 +193,14 @@ function notNullCheck(element) {
 	return element != null
 }
 
+function overwriteArray(elements, others) {
+	elements.length = others.length
+	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
+		elements[otherIndex] = others[otherIndex]
+	}
+	return elements
+}
+
 function pushArray(elements, others) {
 	var elementsLength = elements.length
 	var othersLength = others.length
@@ -174,6 +209,7 @@ function pushArray(elements, others) {
 		elements[elementsLength] = others[otherIndex]
 		elementsLength++
 	}
+	return elements
 }
 
 function removeNulls(elements) {
@@ -187,10 +223,29 @@ function removeNulls(elements) {
 	elements.length = withoutNullLength
 }
 
+function removeNullsBySet(elements, nullIndexSet) {
+	var withoutNullLength = 0
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		if (!nullIndexSet.has(elementIndex)) {
+			elements[withoutNullLength] = elements[elementIndex]
+			withoutNullLength += 1
+		}
+	}
+	elements.length = withoutNullLength
+}
+
 function removeRepeats(elements) {
 	for (var elementIndex = elements.length - 1; elementIndex > -1; elementIndex--) {
 		if (elements[elementIndex] == elements[(elementIndex + 1) % elements.length]) {
 			elements.splice(elementIndex, 1)
+		}
+	}
+}
+
+function replaceElements(elements, find, replacement) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		if (elements[elementIndex] == find) {
+			elements[elementIndex] = replacement
 		}
 	}
 }
