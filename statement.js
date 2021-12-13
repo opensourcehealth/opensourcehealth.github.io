@@ -1,10 +1,18 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+const gIDJoinWord = '_'
+
+function addClosingStatement(parent) {
+	var closingStatement = getStatement('</' + parent.tag + '>')
+	closingStatement.openingStatement = parent
+	closingStatement.parent = parent
+	parent.children.push(closingStatement)
+}
+
 function addToDescendantsInsideFirst(descendants, statement) {
-	var lengthLimit = 98765432
-	if (descendants.length >= lengthLimit) {
-		var warningText = 'Recursion limit of 98765432 of\naddToDescendantsInsideFirst reached, no further descendants will be added.'
-		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
+	if (descendants.length >= gLengthLimit) {
+		var warningText = 'Recursion limit of 9876543 of\naddToDescendantsInsideFirst reached, no further descendants will be added.'
+		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
 		warning(warningText, warningVariables)
 		return
 	}
@@ -17,10 +25,9 @@ function addToDescendantsInsideFirst(descendants, statement) {
 }
 
 function addToDescendantsOutsideFirst(descendants, statement) {
-	var lengthLimit = 98765432
-	if (descendants.length >= lengthLimit) {
-		var warningText = 'Recursion limit of 98765432 of\naddToDescendants reached, no further descendants will be added.'
-		var warningVariables = [lengthLimit, statement].concat(descendants.slice(0, 10))
+	if (descendants.length >= gLengthLimit) {
+		var warningText = 'Recursion limit of 9876543 of\naddToDescendants reached, no further descendants will be added.'
+		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
 		warning(warningText, warningVariables)
 		return
 	}
@@ -32,15 +39,26 @@ function addToDescendantsOutsideFirst(descendants, statement) {
 	}
 }
 
-function createDefault(documentRoot, registry) {
+function createDefault(registry, rootStatement) {
+	rootStatement.variableMap = new Map(gVariableMapEntries)
 	if (registry.idMap.has('_default')) {
 		return
 	}
 	var defaultStatement = getStatement('default')
-	documentRoot.children.splice(0, 0, defaultStatement)
-	defaultStatement.parent = documentRoot
+	rootStatement.children.splice(0, 0, defaultStatement)
+	defaultStatement.parent = rootStatement
 	defaultStatement.attributeMap.set('id', '_default')
 	registry.idMap.set('_default', defaultStatement)
+}
+
+function getConcatenatedUniqueID(id, registry, statement) {
+	for (var whileIndex = 1; whileIndex < gLengthLimit; whileIndex++) {
+		var check = id + gIDJoinWord + whileIndex.toString()
+		if (getIsIDUnique(check, registry, statement)) {
+			return check
+		}
+	}
+	return id
 }
 
 function getDocumentRoot(lines, tag) {
@@ -66,10 +84,7 @@ function getDocumentRoot(lines, tag) {
 			}
 			else {
 				if (statement.nestingIncrement == -1) {
-					if (lastParent.parent == null) {
-						warning('Warning, text has too many closing brackets, at lineIndex:', [lineIndex, lastParent, statement])
-					}
-					else {
+					if (lastParent.parent != null) {
 						lastParent = lastParent.parent
 						statement.openingStatement = statement.parent
 					}
@@ -80,14 +95,12 @@ function getDocumentRoot(lines, tag) {
 			}
 		}
 	}
-	for (var remainingIndex = 0; remainingIndex < 987654; remainingIndex++) {
+	for (var remainingIndex = 0; remainingIndex < gLengthLimit; remainingIndex++) {
+		addClosingStatement(lastParent)
 		if (lastParent.parent == null) {
 			return lastParent
 		}
 		lastParent = lastParent.parent
-		var closingStatement = getStatement('</' + lastParent.tag + '>')
-		closingStatement.openingStatement = lastParent
-		lastParent.children.push(closingStatement)
 	}
 	return null
 }
@@ -118,38 +131,12 @@ function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchS
 	return replacedTokens.join('')
 }
 
-function getIDReplaced(bracketString, increment, replacementMap, searchSuffix) {
-	if (bracketString.indexOf(']') == -1) {
-		return getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix)
-	}
-	var splitBracketStrings = bracketString.split(']')
-	var replacedStrings = []
-	for (var splitBracketString of splitBracketStrings) {
-		if (splitBracketString.length > 1) {
-			var tokens = splitBracketString.split('[')
-			if (tokens[0].length > 0) {
-				replacedStrings.push(tokens[0])
-			}
-			var lastToken = tokens[tokens.length - 1].replace(/ /g, '')
-			if (replacementMap.has(lastToken)) {
-				value = parseFloat(replacementMap.get(lastToken)) + increment
-				replacedStrings.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplaced, could not find id:\nin search string:'
-				warningVariables = [lastToken, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-	}
-	return replacedStrings.join('')
-}
-
 function getIsIDUnique(id, registry, statement) {
 	if (registry.idMap.has(id)) {
 		return false
 	}
 	statement.attributeMap.set('id', id)
+	registry.idMap.set(id, statement)
 	return true
 }
 
@@ -160,7 +147,7 @@ function getLineByStatement(passthrough, statement) {
 				return '</g>'
 			}
 			else {
-				if (statement.tag == passthrough) {
+				if (statement.openingStatement.tag == passthrough) {
 					return '</' + passthrough + '>'
 				}
 				return '</g>'
@@ -212,12 +199,15 @@ function getPassthroughLines(descendants, passthrough) {
 function getStatement(line) {
 	var children = null
 	var nestingIncrement = 0
+	if (line.endsWith('>') || line.endsWith('{')) {
+		line = line.slice(0, -1) + ' ' + line[line.length - 1]
+	}
 	var quoteSeparatedWords = getQuoteSeparatedWords(line)
 	var lastIndex = quoteSeparatedWords.length - 1
 	var tag = null
 	if (quoteSeparatedWords.length > 0) {
 		firstWord = quoteSeparatedWords[0]
-		if (firstWord.startsWith('</') || firstWord == ']' || firstWord == '}') {
+		if (firstWord.startsWith('</') || firstWord == '}') {
 			nestingIncrement = -1
 		}
 		else {
@@ -227,14 +217,14 @@ function getStatement(line) {
 			if (firstWord.length > 0) {
 				tag = getCapitalizedKey(firstWord)
 			}
-		}
-		if (quoteSeparatedWords.length > 1) {
-			var lastWord = quoteSeparatedWords[lastIndex]
-			if (lastWord == '>' || lastWord == '[' || lastWord == '{') {
-				nestingIncrement = 1
-			}
-			if (lastWord.endsWith('>') || lastWord == '[' || lastWord == '{') {
-				lastIndex -= 1
+			if (quoteSeparatedWords.length > 1) {
+				var lastWord = quoteSeparatedWords[lastIndex]
+				if (lastWord == '>' || lastWord == '{') {
+					nestingIncrement = 1
+				}
+				if (lastWord.endsWith('>') || lastWord == '{') {
+					lastIndex -= 1
+				}
 			}
 		}
 	}
@@ -267,50 +257,60 @@ function getStatement(line) {
 	return statement
 }
 
+function getStatementByException(exceptionSet, id, line, registry, rootStatement) {
+	var statement = getStatementByParent(id, line, registry, rootStatement)
+	exceptionSet.add('id')
+	copyKeysExcept(exceptionSet, rootStatement.attributeMap, statement.attributeMap)
+	return statement
+}
+
+function getStatementByParent(id, line, registry, parent) {
+	var statement = getStatement(line)
+	statement.parent = parent
+	getUniqueID(id, registry, statement)
+	parent.children.splice(-1, 0, statement)
+	return statement
+}
+
 function getStatementID(registry, statement) {
 	if (statement.attributeMap.has('id')) {
-		return statement.attributeMap.get('id')
+		var id = statement.attributeMap.get('id')
+		registry.idMap.set(id, statement)
+		return id
 	}
-	const idJoinWord = '_'
-	var statementID = statement.tag
-	if (getIsIDUnique(statementID, registry, statement)) {
-		return statementID
+	var id = statement.tag
+	if (getIsIDUnique(id, registry, statement)) {
+		return id
 	}
 	if (statement.attributeMap.has('work')) {
-		statementID += idJoinWord + statement.attributeMap.get('work')
+		id += gIDJoinWord + statement.attributeMap.get('work')
 	}
 	else {
 		var parentMap = statement.parent.attributeMap
 		if (parentMap.has('id')) {
-			statementID += idJoinWord + parentMap.get('id')
+			id += gIDJoinWord + parentMap.get('id')
 		}
 	}
-	if (getIsIDUnique(statementID, registry, statement)) {
-		return statementID
+	if (getIsIDUnique(id, registry, statement)) {
+		return id
 	}
 	if (statement.attributeMap.has('points')) {
 		var pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
-		statementID += idJoinWord + pointStrings.join(idJoinWord)
-		if (getIsIDUnique(statementID, registry, statement)) {
-			return statementID
+		id += gIDJoinWord + pointStrings.join(gIDJoinWord)
+		if (getIsIDUnique(id, registry, statement)) {
+			return id
 		}
 	}
 	var keys = 'cx cy x y r'.split(' ')
 	for (var key of keys) {
 		if (statement.attributeMap.has(key)) {
-			statementID += idJoinWord + key + statement.attributeMap.get(key)
-			if (getIsIDUnique(statementID, registry, statement)) {
-				return statementID
+			id += gIDJoinWord + key + statement.attributeMap.get(key)
+			if (getIsIDUnique(id, registry, statement)) {
+				return id
 			}
 		}
 	}
-	for (whileIndex = 1; whileIndex < 987654; whileIndex++) {
-		var check = statementID + idJoinWord + whileIndex.toString()
-		if (getIsIDUnique(check, registry, statement)) {
-			return check
-		}
-	}
-	return statementID
+	return getConcatenatedUniqueID(id, registry, statement)
 }
 
 function getTokens(delimeter, searchStrings) {
@@ -327,55 +327,35 @@ function getTokens(delimeter, searchStrings) {
 	return tokens
 }
 
-function getNextMonadForArithmeticOperator(character, monad) {
-	var nextMonad = getValueMonad(character)
-	if (nextMonad == null) {
-		return monad
+function getUniqueID(id, registry, statement) {
+	if (getIsIDUnique(id, registry, statement)) {
+		return id
 	}
-	nextMonad.previousMonad = monad
-	nextMonad.processCharacter(character)
-	return nextMonad
+	for (var whileIndex = 1; whileIndex < gLengthLimit; whileIndex++) {
+		var check = id + gIDJoinWord + whileIndex.toString()
+		if (getIsIDUnique(check, registry, statement)) {
+			return check
+		}
+	}
+	return id
 }
 
-function getResultUpdatePrevious(originalMonad) {
-	var monad = originalMonad
-	var value = originalMonad.getValue()
-	for (var whileIndex = 0; whileIndex < 9876543; whileIndex++) {
-		if (monad.previousMonad == null) {
-			originalMonad.previousMonad = monad.previousMonad
-			originalMonad.value = value
+function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
+	if (statement.attributeMap.has(key)) {
+		value = statement.attributeMap.get(key)
+		if (value.length > 0) {
 			return value
 		}
-		if (monad.previousMonad.precedenceLevel == 1) {
-			originalMonad.previousMonad = monad.previousMonad
-			originalMonad.value = value
-			return value
-		}
-		console.log('value')
-		console.log(value)
-		value = monad.previousMonad.getResult(value)
-		console.log(value)
-		console.log(monad.previousMonad)
-		monad = monad.previousMonad.previousMonad
 	}
-	return null
-}
-
-function getValueByEquation(defaultValue, equationString, key, registry, statement, tag) {
-	var monad = new StartMonad()
-	for (var character of equationString) {
-		monad = monad.getNextMonad(character)
-		console.log(monad)
+	var defaultKey = tag + '.' + key
+	var defaultStatement = registry.idMap.get('_default')
+	var attributeMap = defaultStatement.attributeMap
+	if (attributeMap.has(defaultKey)) {
+		return attributeMap.get(defaultKey)
 	}
-	console.log(monad)
-	return getResultUpdatePrevious(monad)
-}
-
-function getValueMonad(character) {
-	if (gValueMonadMap.has(character)) {
-		return new (gValueMonadMap.get(character))()
-	}
-	return null
+	var defaultString = defaultValue.toString()
+	attributeMap.set(defaultKey, defaultString)
+	return defaultString
 }
 
 function getWorkStatement(registry, statement) {
@@ -390,163 +370,18 @@ function getWorkStatement(registry, statement) {
 	return registry.idMap.get(workID)
 }
 
-gOperatorMonadMap = new Map([['+', AdditionMonad], [')', BracketCloseMonad], ['*', MultiplicationMonad], ['-', SubtractionMonad]])
-gValueMonadMap = new Map([['(', BracketOpenMonad]])
-addValueToMapByKeys(['-', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], gValueMonadMap, NumberMonad)
-
-function processCharacterForAdditionSubtraction(character, monad) {
-	if (monad.previousMonad.previousMonad == null) {
-		return
+function initializeProcessors(processors) {
+	for (var processor of processors) {
+		processor.initialize()
+		addToCapitalizationMap(processor.name)
 	}
-	console.log('monad.previousMonad.previousMonad.precedenceLevel')
-	console.log(monad.previousMonad.previousMonad.precedenceLevel)
-	if (monad.previousMonad.previousMonad.precedenceLevel < monad.precedenceLevel) {
-		getResultUpdatePrevious(monad.previousMonad)
-	}
-}
-
-function AdditionMonad() {
-	this.getNextMonad = function(character) {
-		return getNextMonadForArithmeticOperator(character, this)
-	}
-	this.getResult = function(value) {
-		return this.previousMonad.getValue() + value
-	}
-	this.precedenceLevel = 4
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-		processCharacterForAdditionSubtraction(character, this)
-	}
-}
-
-function BracketCloseMonad() {
-	this.getNextMonad = function(character) {
-		if (gOperatorMonadMap.has(character)) {
-			var nextMonad = new (gOperatorMonadMap.get(character))()
-			nextMonad.previousMonad = this
-			nextMonad.processCharacter(character)
-			return nextMonad
-		}
-		return this
-	}
-	this.getValue = function() {
-		return this.value
-	}
-	this.precedenceLevel = 1
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-		console.log('this.previousMonad')
-		console.log(this.previousMonad)
-		this.value = getResultUpdatePrevious(this.previousMonad)
-		this.previousMonad = this.previousMonad.previousMonad.previousMonad
-		console.log(this.previousMonad)
-		console.log(this.value)
-	}
-	this.value = null
-}
-
-function BracketOpenMonad() {
-	this.getNextMonad = function(character) {
-		return getNextMonadForArithmeticOperator(character, this)
-	}
-	this.getResult = function(value) {
-		return null
-	}
-	this.precedenceLevel = 1
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-	}
-}
-
-function MultiplicationMonad() {
-	this.getNextMonad = function(character) {
-		return getNextMonadForArithmeticOperator(character, this)
-	}
-	this.getResult = function(value) {
-		return this.previousMonad.getValue() * value
-	}
-	this.precedenceLevel = 3
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-	}
-}
-
-function NumberMonad() {
-	this.getNextMonad = function(character) {
-		if (gOperatorMonadMap.has(character)) {
-			var nextMonad = new (gOperatorMonadMap.get(character))()
-			nextMonad.previousMonad = this
-			nextMonad.processCharacter(character)
-			return nextMonad
-		}
-		this.processCharacter(character)
-		return this
-	}
-	this.getValue = function() {
-		if (this.value == null) {
-			this.value = parseFloat(this.valueString)
-		}
-		return this.value
-	}
-	this.precedenceLevel = null
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-		this.valueString += character
-	}
-	this.value = null
-	this.valueString = ''
-}
-
-function StartMonad() {
-	this.getNextMonad = function(character) {
-		var nextMonad = getValueMonad(character)
-		if (nextMonad == null) {
-			return this
-		}
-		nextMonad.processCharacter(character)
-		return nextMonad
-	}
-}
-
-function SubtractionMonad() {
-	this.getNextMonad = function(character) {
-		return getNextMonadForArithmeticOperator(character, this)
-	}
-	this.getResult = function(value) {
-		return this.previousMonad.getValue() - value
-	}
-	this.precedenceLevel = 4
-	this.previousMonad = null
-	this.processCharacter = function(character) {
-		processCharacterForAdditionSubtraction(character, this)
-	}
-}
-
-function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
-	if (statement.attributeMap.has(key)) {
-		value = statement.attributeMap.get(key)
-		if (value.length > 0) {
-			return statement.attributeMap.get(key)
-		}
-	}
-	var defaultKey = statement.tag + '.' + key
-	var defaultStatement = registry.idMap.get('_default')
-	var attributeMap = defaultStatement.attributeMap
-	if (attributeMap.has(defaultKey)) {
-		return attributeMap.get(defaultKey)
-	}
-	var defaultString = defaultValue.toString()
-	attributeMap.set(defaultKey, defaultString)
-	return defaultString
 }
 
 function processDescendants(registry, rootStatement, tagMap) {
 	var descendants = [rootStatement]
 	addToDescendantsInsideFirst(descendants, rootStatement)
 	for (var statement of descendants) {
-		if (tagMap.has(statement.tag)) {
-			tagMap.get(statement.tag)(registry, statement)
-		}
+		processStatementByTagMap(registry, statement, tagMap)
 	}
 }
 
@@ -554,30 +389,22 @@ function processDescendantsByTagMap(registry, rootStatement, tagMap) {
 	var descendants = [rootStatement]
 	addToDescendantsInsideFirst(descendants, rootStatement)
 	for (var statement of descendants) {
-		if (tagMap.has(statement.tag)) {
-			tagMap.get(statement.tag).processStatement(registry, statement)
-		}
+		processStatementByTagMap(registry, statement, tagMap)
 	}
 }
 
-function setProcessorMap(processors, tagMap) {
-	for (var processor of processors) {
-		tagMap.set(processor.name, processor)
-		addToCapitalizationMap(processor.name)
-		if (processor.optionMap != null) {
-			if (processor.optionMap.has('capitalized')) {
-				addToCapitalizationMapByPhrase(processor.optionMap.get('capitalized'))
-			}
-		}
+function processStatementByTagMap(registry, statement, tagMap) {
+	if (tagMap.has(statement.tag)) {
+		tagMap.get(statement.tag).processStatement(registry, statement)
 	}
 }
 
-function widenPolygonBoundingBox(boundingBox, caller, statement) {
-	var points = getPolygonPoints(statement)
+function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
+	var points = getPointsByKey('points', registry, statement)
 	if (points == null) {
 		return boundingBox
 	}
-	var transformedMatrix = getTransformed2DMatrix(caller, statement)
+	var transformedMatrix = getTransformed2DMatrix(caller, registry, statement)
 	for (var point of points) {
 		transform2DPoint(point, transformedMatrix)
 		if (boundingBox == null) {
@@ -590,9 +417,9 @@ function widenPolygonBoundingBox(boundingBox, caller, statement) {
 	return boundingBox
 }
 
-function widenStatementBoundingBox(boundingBox, caller, statement) {
-	if (statement.tag == 'polygon') {
-		return widenPolygonBoundingBox(boundingBox, caller, statement)
+function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
+	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
+		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
 	}
 	return boundingBox
 }
