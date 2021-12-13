@@ -4,19 +4,11 @@ function addFacetsAlongLoneEdges(facets) {
 	var arrowMap = new Map()
 	var arrowSet = new Set()
 	for (var facet of facets) {
-		for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-			var vertex = facet[vertexIndex]
-			var nextVertex = facet[(vertexIndex + 1) % facet.length]
-			arrowSet.add(vertex.toString() + ' ' + nextVertex.toString())
-		}
+		addFacetToLoneArrowSet(0, facet, arrowSet)
 	}
 	for (var arrow of arrowSet) {
 		var arrowStrings = arrow.split(' ')
-		var beginIndex = arrowStrings[0]
-		var endIndex = arrowStrings[1]
-		if (!arrowSet.has(endIndex + ' ' + beginIndex)) {
-			arrowMap.set(parseInt(endIndex), parseInt(beginIndex))
-		}
+		arrowMap.set(parseInt(arrowStrings[1]), parseInt(arrowStrings[0]))
 	}
 	addFacetsByIntegerArrowMap(arrowMap, facets)
 }
@@ -59,7 +51,7 @@ function addFacetsByIntegerArrowMap(arrowMap, facets) {
 	for (var key of arrowMap.keys()) {
 		if (arrowMap.get(key) != null) {
 			var facet = []
-			while (facet.length < 9876543) {
+			while (facet.length < gLengthLimit) {
 				var nextKey = arrowMap.get(key)
 				if (nextKey == null) {
 					facets.push(facet)
@@ -341,7 +333,7 @@ function getPolygonFacet(pointIndexStart, polygon3D) {
 	return polygonFacet
 }
 
-function getPolygonNodes(statement) {
+function getPolygonNodes(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (attributeMap == null) {
 		return null
@@ -374,7 +366,7 @@ function getPolygonNodes(statement) {
 		for (var parameterIndex = 0; parameterIndex < parameters.length; parameterIndex++) {
 			var parameter = parameters[parameterIndex]
 			if (parameter.length > 0) {
-				parameters[parameterIndex] = parseFloat(parameter)
+				parameters[parameterIndex] = getFloatByEquationIfNaN(registry, statement, parameter)
 			}
 			else {
 				if (oldPoint.length > parameterIndex) {
@@ -399,7 +391,7 @@ function getPolygonNodes(statement) {
 					break
 				}
 				else {
-					nodeParameters[parameterIndex] = parseInt(parameterString)
+					nodeParameters[parameterIndex] = getIntByEquationIfNaN(registry, statement, parameterString)
 				}
 			}
 			if (nodeParameters != null) {
@@ -629,15 +621,13 @@ function triangulateBentFacets(mesh) {
 }
 
 var gExtrusion = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'extrusion',
-	optionMap: null,
 	processStatement:function(registry, statement) {
-		var attributeMap = statement.attributeMap
-		if (!attributeMap.has('heights')) {
-			return
-		}
-		var heights = getFloats(attributeMap.get('heights'))
-		var polygons = getPolygonsByChildren(statement.children)
+		var heights = getHeights(registry, statement, this.name)
+		var polygons = getPolygonsRecursively(registry, statement)
 		var sections = [{layerIndex:0, polygons:polygons}]
 		for (var child of statement.children) {
 			if (child.tag == 'layer') {
@@ -645,7 +635,7 @@ var gExtrusion = {
 				if (child.attributeMap.has('layerIndex')) {
 					layerIndex = child.attributeMap.get('layerIndex')
 				}
-				sections.push({layerIndex:layerIndex, polygons:getPolygonsByChildren(child.children)})
+				sections.push({layerIndex:layerIndex, polygons:getPolygonsRecursively(registry, statement)})
 			}
 		}
 		sections.reverse()
@@ -662,38 +652,37 @@ var gExtrusion = {
 			layers.push(layer)
 		}
 		var isJoined = false
-		if (attributeMap.has('join')) {
-			if (attributeMap.get('join').toLowerCase() == 'true') {
+		if (statement.attributeMap.has('join')) {
+			if (statement.attributeMap.get('join').toLowerCase() == 'true') {
 				isJoined = true
 			}
 		}
 		var extrusion = new Extrusion(isJoined, layers, null)
-		analyzeOutputMesh(attributeMap, extrusion, registry, statement)
+		analyzeOutputMesh(extrusion, registry, statement)
 	}
 }
 
 var gPillar = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'pillar',
-	optionMap: null,
 	processStatement:function(registry, statement) {
-		var attributeMap = statement.attributeMap
 		var heights = getHeights(registry, statement, this.name)
-		var polygons = getPolygonsByChildren(statement.children)
+		var polygons = getPolygonsRecursively(registry, statement)
 		var pillar = new Pillar(polygons, heights, null)
-		analyzeOutputMesh(attributeMap, pillar, registry, statement)
+		analyzeOutputMesh(pillar, registry, statement)
 	}
 }
 
 var gScuplture = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'scuplture',
-	optionMap: null,
 	processStatement:function(registry, statement) {
-		var attributeMap = statement.attributeMap
-		if (!attributeMap.has('heights')) {
-			return
-		}
 		var connection = 's'
-		var heights = getFloats(attributeMap.get('heights'))
+		var heights = getHeights(registry, statement, this.name)
 		var layers = []
 		for (var child of statement.children) {
 			if (child.tag == 'layer') {
@@ -710,7 +699,7 @@ var gScuplture = {
 					grandchildren = layers[layerIndex].statement.children
 				}
 				for (var grandchild of grandchildren) {
-					var nodes = getPolygonNodes(grandchild)
+					var nodes = getPolygonNodes(registry, grandchild)
 					if (nodes != null) {
 						polynodes.push(nodes)
 					}
@@ -733,20 +722,21 @@ var gScuplture = {
 			}
 		}
 		var scuplture = new Scuplture(layers, null)
-		analyzeOutputMesh(attributeMap, scuplture, registry, statement)
+		analyzeOutputMesh(scuplture, registry, statement)
 	}
 }
 
 var gWedge = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
 	name: 'wedge',
-	optionMap: null,
 	processStatement:function(registry, statement) {
-		var attributeMap = statement.attributeMap
 		var heights = getHeights(registry, statement, this.name)
-		var insets = getInsets(statement)
-		var polygons = getPolygonsByChildren(statement.children)
+		var insets = getInsets(registry, statement)
+		var polygons = getPolygonsRecursively(registry, statement)
 		var wedge = new Wedge(heights, insets, polygons, null)
-		analyzeOutputMesh(attributeMap, wedge, registry, statement)
+		analyzeOutputMesh(wedge, registry, statement)
 	}
 }
 
