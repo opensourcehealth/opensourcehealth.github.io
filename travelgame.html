@@ -6,6 +6,28 @@
 </head>
 <link rel="icon" href="data:,">
 <body>
+<table style="width:60%">
+<tr>
+<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
+<td><button onclick="toggleEdit()" type="button">Edit</button><td>
+</tr>
+<tr>
+<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
+<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
+</tr>
+<tr>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
+<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+</tr>
+<tr>
+<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
+</tr>
+<tr>
+<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button><td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+</tr>
+</table>
 <table>
 <tr>
 <th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
@@ -17,7 +39,7 @@
 <a hidden="true" id="queryLink" href="index.html">Original Link</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <select id="pixelSelect" onchange ="pixelSelectChanged()"></select>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <select id="scaleSelect" onchange ="scaleSelectChanged()"></select><br>
-<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<textarea id="wordAreaID" rows="20" cols="120"></textarea><br>
 <br>
 <h3>XML</h3>
 <textarea id="xmlArea" rows="40" cols="120"></textarea><br>
@@ -30,6 +52,7 @@
 <script src="matrix.js"></script>
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
+<script src="polygon.js"></script>
 <script src="statement.js"></script>
 <script src="terrain.js"></script>
 <script src="terrainviewer.js"></script>
@@ -44,14 +67,8 @@
 //Asteroid, firestorm, volcano, flood, fish, plague, global warming, biodiversity
 //view from flight, aerovator
 
-function update() {
-	updateSVGArea()
-//	document.getElementById('paragraphText').innerHTML = xmlString
-	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
-}
-
 function updateSVGArea() {
-	var lines = getBracketReplacedLines('wordArea')
+	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
 	var storageMap = new Map()
 	storageMap.set('selectedEntity', null)
 	storageMap.set('selectedRegion', null)
@@ -81,17 +98,23 @@ function updateSVGArea() {
 		xmlStatement.children.splice(-1, 0, getStatement('terrainViewer'))
 	}
 	createDefault(registry, xmlStatement)
+	descendants = [xmlStatement]
+	addToDescendantsInsideFirst(descendants, xmlStatement)
 	processDescendantsByTagMap(registry, xmlStatement, gTagCenterMap)
-	var descendants = [xmlStatement]
+	descendants = [xmlStatement]
 	addToDescendantsOutsideFirst(descendants, xmlStatement)
 	var xmlLines = getPassthroughLines(descendants, 'xml')
 	var joinWord = getJoinWord()
 	var xmlString = xmlLines.join(joinWord)
-	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('xmlArea', xmlLines)
 	document.getElementById('xmlArea').value = xmlString
 	terrainViewer.start(registry.storageMap.get('terrainViewer.maximumHeight'))
 	return xmlString
+}
+
+function updateWordArea(wordString) {
+	updateSVGArea()
 }
 
 var gTagBeginMap = new Map()
@@ -99,7 +122,7 @@ var gTagCenterMap = new Map()
 gProcessors = gTerrainProcessors
 initializeProcessors(gProcessors)
 
-setTextArea('wordArea')
+setTextArea('wordAreaID')
 update()
 </script>
 </body>
