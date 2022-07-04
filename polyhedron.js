@@ -224,7 +224,6 @@ function addSplitIndexes(facetIndexStart, splitHeight, workMesh) {
 	var lineSet = new Set()
 	var outerFacetSplits = []
 	var points = workMesh.points
-	var splits = []
 	for (var facetIndex = facetIndexStart; facetIndex < facets.length; facetIndex++) {
 		var facet = facets[facetIndex]
 		facetSplits[facetSplitIndex] = {workFacet:facet}
@@ -246,6 +245,75 @@ function addSplitIndexes(facetIndexStart, splitHeight, workMesh) {
 			outerFacetSplits.push({workFacet:facet})
 		}
 	}
+	addSplitIndexesBySplits(facetSplits, outerFacetSplits, splitHeight, workMesh)
+}
+
+function addSplitIndexesByFacetSet(facetIndexSet, splitHeight, workMesh) {
+	var facets = workMesh.facets
+	var facetSplits = []
+	var lineSet = new Set()
+	var outerFacetSplits = []
+	var points = workMesh.points
+	for (var facetIndex of facetIndexSet) {
+		var facet = facets[facetIndex]
+		facetSplits.push({workFacet:facet})
+		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			var pointIndex = facet[vertexIndex]
+			var nextIndex = facet[(vertexIndex + 1) % facet.length]
+			if (!getIsAwayFromHeight(splitHeight, points[pointIndex][2], points[nextIndex][2])) {
+				lineSet.add(getEdgeKey(pointIndex, nextIndex))
+			}
+		}
+	}
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		if (!facetIndexSet.has(facetIndex)) {
+			var facet = facets[facetIndex]
+			if (facetSharesLine(facet, lineSet)) {
+				facetSplits.push({workFacet:facet})
+			}
+			else {
+				outerFacetSplits.push({workFacet:facet})
+			}
+		}
+	}
+	addSplitIndexesBySplits(facetSplits, outerFacetSplits, splitHeight, workMesh)
+}
+
+function addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh) {
+	if (getIsEmpty(splitHeights)) {
+		return
+	}
+	for (var splitHeight of splitHeights) {
+		addSplitIndexes(facetIndexStart, splitHeight, workMesh)
+	}
+}
+
+function addSplitIndexesByHeightsOnly(splitHeights, workMesh) {
+	if (getIsEmpty(splitHeights)) {
+		return
+	}
+	var facets = workMesh.facets
+	var points = workMesh.points
+	for (var splitHeight of splitHeights) {
+		var facetSplits = []
+		for (var facet of facets) {
+			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+				var pointIndex = facet[vertexIndex]
+				var nextIndex = facet[(vertexIndex + 1) % facet.length]
+				if (!getIsAwayFromHeight(splitHeight, points[pointIndex][2], points[nextIndex][2])) {
+					facetSplits.push({workFacet:facet})
+					break
+				}
+			}
+		}
+		addSplitIndexesBySplits(facetSplits, [], splitHeight, workMesh)
+	}
+}
+
+function addSplitIndexesBySplits(facetSplits, outerFacetSplits, splitHeight, workMesh) {
+	var facets = workMesh.facets
+	var points = workMesh.points
+	var splits = []
 	var xzPoints = getXZPointsByFacetSplits(facetSplits, points)
 	if (xzPoints == null) {
 		return
@@ -281,20 +349,11 @@ function addSplitIndexes(facetIndexStart, splitHeight, workMesh) {
 	}
 }
 
-function addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh) {
-	if (getIsEmpty(splitHeights)) {
-		return
-	}
-	for (var splitHeight of splitHeights) {
-		addSplitIndexes(facetIndexStart, splitHeight, workMesh)
-	}
-}
-
 function addToArrowsMap(arrowsMap, edges) {
 	var arrow = {beginKey:edges[0], endKey:edges[1]}
-	addArrayElementToMap(arrow, arrow.beginKey, arrowsMap)
+	addElementToMapArray(arrow, arrow.beginKey, arrowsMap)
 	arrow = {beginKey:edges[1], endKey:edges[0]}
-	addArrayElementToMap(arrow, arrow.beginKey, arrowsMap)
+	addElementToMapArray(arrow, arrow.beginKey, arrowsMap)
 }
 
 function addToPointToolMap(facetIntersections, inversePoints, outerZ, pointIndex, pointToolIndexMap, toolMeshPoints) {
@@ -419,7 +478,7 @@ function alterFacetsAddHorizontalsOld(
 				}
 			}
 			if (toolWorkString != null) {
-				addArrayElementToMap(toolWorkString, 'm,' + alongIndex[1], meetingToolWorkMap)
+				addElementToMapArray(toolWorkString, 'm,' + alongIndex[1], meetingToolWorkMap)
 			}
 		}
 	}
@@ -662,6 +721,16 @@ function facetSharesLine(facet, sharedLineSet) {
 	return false
 }
 
+function getClosedFacet(beginIndex, facet) {
+	var facetLengthPlus = facet.length + 1
+	var closedFacet = new Array(facetLengthPlus)
+	for (var keyIndex = 0; keyIndex < facetLengthPlus; keyIndex++) {
+		closedFacet[keyIndex] = facet[beginIndex % facet.length]
+		beginIndex += 1
+	}
+	return closedFacet
+}
+
 //deprecated
 function getCloseFacetSet(facetIntersections, mesh, targetIndex, targetPoint) {
 	var closeFacetSet = new Set()
@@ -693,15 +762,54 @@ function getCloseFacetSet(facetIntersections, mesh, targetIndex, targetPoint) {
 	return closeFacetSet
 }
 
+function getClosestConnectionByFacets(facets, points) {
+	var closestDistance = Number.MAX_VALUE
+	var connection = {firstVertexIndex:null, otherVertexIndex:null, otherFacetIndex:null}
+	var facetLengthMinus = facets.length - 1
+	var firstFacet = facets[0]
+	for (var firstVertexIndex = 0; firstVertexIndex < firstFacet.length; firstVertexIndex++) {
+		var firstPoint = points[firstFacet[firstVertexIndex]]
+		for (var polygonIndex = 0; polygonIndex < facetLengthMinus; polygonIndex++) {
+			var otherFacetIndex = polygonIndex + 1
+			var otherFacet = facets[otherFacetIndex]
+			for (var otherVertexIndex = 0; otherVertexIndex < otherFacet.length; otherVertexIndex++) {
+				var distance = getXYDistanceSquared(firstPoint, points[otherFacet[otherVertexIndex]])
+				if (distance < closestDistance) {
+					closestDistance = distance
+					connection.firstVertexIndex = firstVertexIndex
+					connection.otherVertexIndex = otherVertexIndex
+					connection.otherFacetIndex = otherFacetIndex
+				}
+			}
+		}
+	}
+	var firstPointIndex = firstFacet[connection.firstVertexIndex]
+	var otherFacet = facets[connection.otherFacetIndex]
+	var otherPointIndex = otherFacet[connection.otherVertexIndex]
+	var identicalVertexIndexes = getIdenticalVertexIndexes(firstFacet, firstPointIndex)
+	if (identicalVertexIndexes.length > 1) {
+		connection.firstVertexIndex = getOutsidestVertexIndex(firstFacet, identicalVertexIndexes, points[otherPointIndex], points)
+	}
+	identicalVertexIndexes = getIdenticalVertexIndexes(otherFacet, otherPointIndex)
+	if (identicalVertexIndexes.length > 1) {
+		connection.otherVertexIndex = getClosestVertexIndex(otherFacet, identicalVertexIndexes, points[firstPointIndex], points)
+	}
+	return connection
+}
+
 function getConnectedFacet(facets, points) {
 	while (facets.length > 1) {
-		var distanceArrays = getPolygonDistanceArraysByMesh(facets, points)
-		var connection = getClosestConnection(distanceArrays)
-		var firstFacet = getClosedFacet(connection.firstKeyIndex, facets[0])
-		facets[0] = firstFacet.concat(getClosedFacet(connection.otherKeyIndex, facets[connection.polygonIndexPlus]))
-		facets.splice(connection.polygonIndexPlus, 1)
+		var connection = getClosestConnectionByFacets(facets, points)
+		var firstFacet = getClosedFacet(connection.firstVertexIndex, facets[0])
+		facets[0] = firstFacet.concat(getClosedFacet(connection.otherVertexIndex, facets[connection.otherFacetIndex]))
+		facets.splice(connection.otherFacetIndex, 1)
 	}
 	return facets[0]
+}
+
+function getConnectedPolygon(polygons) {
+	var mesh = getMeshByPolygons(polygons)
+	return getPolygonByFacet(getConnectedFacet(mesh.facets, mesh.points), mesh.points)
 }
 
 function getCSVMeshString(date, id, mesh, project) {
@@ -902,13 +1010,33 @@ function getFacetByWorkMap(facet, workMap) {
 	return facet
 }
 
+function getFacetGroups(facets, points) {
+	var polygons = getPolygonsByFacets(facets, points)
+	var polygonIndexGroups = getPolygonIndexGroups(polygons)
+	var facetGroups = new Array(polygonIndexGroups.length)
+	for (var facetGroupIndex = 0; facetGroupIndex < facetGroups.length; facetGroupIndex++) {
+		var polygonIndexGroup = polygonIndexGroups[facetGroupIndex]
+		if (polygonIndexGroup.length == 1) {
+			facetGroups[facetGroupIndex] = [facets[polygonIndexGroup]]
+		}
+		else {
+			var facetGroup = new Array(polygonIndexGroup.length)
+			for (var polygonIndex = 0; polygonIndex < facetGroup.length; polygonIndex++) {
+				facetGroup[polygonIndex] = facets[polygonIndexGroup[polygonIndex]]
+			}
+			facetGroups[facetGroupIndex] = facetGroup
+		}
+	}
+	return facetGroups
+}
+
 function getFacetIntersections(strata, toolPolygon, workMesh) {
 	var facetIntersections = []
 	for (var facetIndex = 0; facetIndex < workMesh.facets.length; facetIndex++) {
 		var workFacet = workMesh.facets[facetIndex]
 		if (getIsFacetInStrata(workFacet, workMesh.points, strata)) {
 			var workPolygon = getPolygonByFacet(workFacet, workMesh.points)
-			if (getIsPolygonIntersecting(toolPolygon, workPolygon)) {
+			if (getIsPolygonIntersectingOrClose(toolPolygon, workPolygon)) {
 				var facetIntersection = {
 					facetIndex:facetIndex,
 					isClockwise:getIsClockwise(workPolygon),
@@ -941,6 +1069,16 @@ function getFacetIntersectionsCheckDirection(isBottomClockwise, isToolClockwise,
 		}
 	}
 	return facetIntersections
+}
+
+function getIdenticalVertexIndexes(facet, pointIndex) {
+	var identicalVertexIndexes = []
+	for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+		if (facet[vertexIndex] == pointIndex) {
+			identicalVertexIndexes.push(vertexIndex)
+		}
+	}
+	return identicalVertexIndexes
 }
 
 function getIsAFacetInStrata(facets, points, strata) {
@@ -1033,7 +1171,7 @@ function getJoinedCoplanarMesh(mesh) {
 			for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 				var nextIndex = (vertexIndex + 1) % facet.length
 				var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
-				addArrayElementToMap(facetIndex, edgeKey, facetsMap)
+				addElementToMapArray(facetIndex, edgeKey, facetsMap)
 			}
 		}
 	}
@@ -1132,7 +1270,7 @@ function getMeetings(facetIntersections, toolPolygon, workMesh) {
 				workDirection:pointBeginIndex < pointEndIndex,
 				workFacetLength:workFacet.length,
 				workVertexIndex:workVertexIndex}
-			addArrayElementToMap(arrow, getEdgeKey(pointBeginIndex, pointEndIndex), arrowsMap)
+			addElementToMapArray(arrow, getEdgeKey(pointBeginIndex, pointEndIndex), arrowsMap)
 		}
 	}
 	for (var toolPointIndex = 0; toolPointIndex < toolPolygon.length; toolPointIndex++) {
@@ -1241,7 +1379,7 @@ function getMeetingsByHeight(facetSplits, outerFacetSplits, splitHeight, workMes
 				workDirection:pointBeginIndex < pointEndIndex,
 				workFacetLength:workFacet.length,
 				workVertexIndex:workVertexIndex}
-			addArrayElementToMap(arrow, lineKey, arrowsMap)
+			addElementToMapArray(arrow, lineKey, arrowsMap)
 			meetingLineSet.add(lineKey)
 		}
 	}
@@ -1259,7 +1397,7 @@ function getMeetingsByHeight(facetSplits, outerFacetSplits, splitHeight, workMes
 					workDirection:pointBeginIndex < pointEndIndex,
 					workFacetLength:workFacet.length,
 					workVertexIndex:workVertexIndex}
-				addArrayElementToMap(arrow, lineKey, arrowsMap)
+				addElementToMapArray(arrow, lineKey, arrowsMap)
 			}
 		}
 	}
@@ -1345,8 +1483,8 @@ function getMeshAnalysis(mesh) {
 			}
 			var edgeKey = getEdgeKey(vertex.toString(), nextVertex.toString())
 			var arrow = vertex.toString() + ' ' + nextVertex.toString()
-			addArrayElementToMap(arrow, edgeKey, arrowsMap)
-			addArrayElementToMap(facetIndex, edgeKey, facetsMap)
+			addElementToMapArray(arrow, edgeKey, arrowsMap)
+			addElementToMapArray(facetIndex, edgeKey, facetsMap)
 		}
 	}
 	for (var facetIndexes of facetsMap.values()) {
@@ -1505,6 +1643,25 @@ function getNormalByFacet(facet, points) {
 
 function getNormalByFacetIfFlat(facet, points) {
 	return getNormalByPolygonIfFlat(getPolygonByFacet(facet, points))
+}
+
+function getOutsidestVertexIndex(facet, identicalVertexIndexes, otherPoint, points) {
+	var centerPoint = points[identicalVertexIndexes[0]]
+	var outsidestVertexIndex = null
+	var otherCenter = getXYSubtraction(otherPoint, centerPoint)
+	var maximumDotProduct = -Number.MAX_VALUE
+	for (var vertexIndex of identicalVertexIndexes) {
+		var beginPoint = points[facet[(vertexIndex - 1 + facet.length) % facet.length]]
+		var centerBegin = normalizeXY(getXYSubtraction(beginPoint, centerPoint))
+		var endPoint = points[facet[(vertexIndex + 1) % facet.length]]
+		var centerEnd = normalizeXY(getXYSubtraction(endPoint, centerPoint))
+		var dotProduct = getXYDotProduct(otherCenter, centerBegin) + getXYDotProduct(otherCenter, centerEnd)
+		if (dotProduct > maximumDotProduct) {
+			maximumDotProduct = dotProduct
+			outsidestVertexIndex = vertexIndex
+		}
+	}
+	return outsidestVertexIndex
 }
 
 function getPointAlongEdge(edge, points, z) {
@@ -1805,7 +1962,7 @@ function getXZPointsByFacetSplits(facetSplits, points) {
 		var normal = getNormalByFacet(facetSplit.workFacet, points)
 		if (normal != null) {
 			if (normal[1] < 0) {
-				proximityNormals.push([-normal[0], -normal[0], -normal[1]])
+				proximityNormals.push([normal[0], -normal[0], -normal[1]])
 			}
 			else {
 				proximityNormals.push([normal[0], normal[0], normal[1]])
@@ -1816,23 +1973,23 @@ function getXZPointsByFacetSplits(facetSplits, points) {
 		return null
 	}
 	proximityNormals.sort(compareFirstElementAscending)
+	for (var proximityNormal of proximityNormals) {
+		proximityNormal[0] = proximityNormal[1]
+		proximityNormal[1] = proximityNormal[2]
+	}
 	var proximityNormalZero = proximityNormals[0]
-	proximityNormals.push([-2 - proximityNormalZero[1], -proximityNormalZero[1], -proximityNormalZero[2]])
-	var largestGap = Math.abs(proximityNormals[1][0] - proximityNormals[0][0])
+	proximityNormals.push([-proximityNormalZero[0], -proximityNormalZero[1]])
+	var smallestDotProduct = getXYDotProduct(proximityNormalZero, proximityNormals[1])
 	var largestGapIndex = 0
 	for (var proximityIndex = 1; proximityIndex < proximityNormals.length - 1; proximityIndex++) {
-		var gap = Math.abs(proximityNormals[proximityIndex + 1][0] - proximityNormals[proximityIndex][0])
-		if (gap > largestGap) {
-			largestGap = gap
+		var dotProduct = getXYDotProduct(proximityNormals[proximityIndex], proximityNormals[proximityIndex + 1])
+		if (dotProduct < smallestDotProduct) {
+			smallestDotProduct = dotProduct
 			largestGapIndex = proximityIndex
 		}
 	}
-	var beginNormal = proximityNormals[largestGapIndex]
-	var endNormal = proximityNormals[largestGapIndex + 1]
-	var rotationVector = [beginNormal[1] - beginNormal[2], beginNormal[2] + beginNormal[1]]
-	addXY(rotationVector, [endNormal[1] + endNormal[2], endNormal[2] - endNormal[1]])
-	normalizeXY(rotationVector)
-	rotationVector[1] = -rotationVector[1]
+	var normalizedBisector = getNormalizedBisector(proximityNormals[largestGapIndex], proximityNormals[largestGapIndex + 1])
+	normalizedBisector[1] = -normalizedBisector[1]
 	var minimumX = Number.MAX_VALUE
 	for (var facetSplit of facetSplits) {
 		var facet = facetSplit.workFacet
@@ -1840,7 +1997,7 @@ function getXZPointsByFacetSplits(facetSplits, points) {
 			var pointIndex = facet[vertexIndex]
 			if (xzPoints[pointIndex] == undefined) {
 				var point = points[pointIndex]
-				var x = point[0] * rotationVector[0] - point[1] * rotationVector[1]
+				var x = point[0] * normalizedBisector[0] - point[1] * normalizedBisector[1]
 				xzPoints[pointIndex] = [x, point[2]]
 				minimumX = Math.min(minimumX, x)
 			}
