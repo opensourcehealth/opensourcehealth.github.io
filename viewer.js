@@ -1,7 +1,7 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function setTypeSelect(selectedIndex, types, typeSelectID) {
-	var typeSelect = document.getElementById(typeSelectID)
+function setTypeSelect(selectedIndex, types) {
+	var typeSelect = document.getElementById('typeSelectID')
 	var options = typeSelect.options
 	if (options.length > 0) {
 		return
@@ -14,10 +14,9 @@ function setTypeSelect(selectedIndex, types, typeSelectID) {
 	typeSelect.selectedIndex = selectedIndex
 }
 
-function setViewSelect(selectedIndex, views, viewSelectID) {
-	var viewSelect = document.getElementById(viewSelectID)
+function setViewSelect(selectedIndex, views) {
+	var viewSelect = document.getElementById('viewSelectID')
 	var options = viewSelect.options
-	viewSelect.hidden = false
 	for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
 		var view = views[viewIndex]
 		var option = null
@@ -37,11 +36,22 @@ function setViewSelect(selectedIndex, views, viewSelectID) {
 	viewSelect.selectedIndex = selectedIndex
 }
 
+function toggleView() {
+	toggleSessionBoolean('isViewHidden@')
+	updateView()
+}
+
 function typeSelectChanged() {
-	var typeSelect = document.getElementById(meshViewer.typeSelectID)
-	meshViewer.setType(typeSelect.selectedIndex)
+	meshViewer.setType(document.getElementById('typeSelectID').selectedIndex)
 	meshViewer.draw()
 }
+
+function updateView() {
+	var isViewHidden = !getSessionBoolean('isViewHidden@')
+	document.getElementById('typeSelectID').hidden = isViewHidden
+	document.getElementById('viewSelectID').hidden = isViewHidden
+}
+
 function viewerMouseDown(event) {
 	if (meshViewer.view == null) {
 		return
@@ -85,7 +95,7 @@ function viewerMouseUp(event) {
 }
 
 function viewSelectChanged() {
-	var viewSelect = document.getElementById(meshViewer.viewSelectID)
+	var viewSelect = document.getElementById('viewSelectID')
 	meshViewer.setView(viewSelect.selectedIndex)
 	meshViewer.draw()
 }
@@ -93,10 +103,10 @@ function viewSelectChanged() {
 
 var meshViewer = {
 	addMesh: function(id, matrix3D) {
-		if (!this.objectMap.has(id)) {
+		if (!this.generatorMap.has(id)) {
 			return
 		}
-		var mesh = this.objectMap.get(id).getMesh()
+		var mesh = this.generatorMap.get(id).getMesh()
 		if (mesh == null) {
 			return
 		}
@@ -118,7 +128,7 @@ var meshViewer = {
 		if (this.view == null) {
 			return
 		}
-		var mesh = this.objectMap.get(this.view.id).getMesh()
+		var mesh = this.generatorMap.get(this.view.id).getMesh()
 		if (this.type.indexOf('T') != -1) {
 			if (this.triangleMesh == null) {
 				this.triangleMesh = getTriangleMesh(mesh)
@@ -138,11 +148,16 @@ var meshViewer = {
 			}
 			zPolygon[0].sort(compareNumberDescending)
 			if (this.type[0] == 'S') {
-				var normal = getNormalByFacetIfFlat(facet, xyzs)
+				var normal = getNormalByFacet(facet, xyzs)
+//				var normal = getNormalByFacetIfFlat(facet, xyzs)
 				if (normal != null) {
 					if (normal[2] < 0.0) {
 						zPolygons.push(zPolygon)
 					}
+					else {
+					}
+				}
+				else {
 				}
 			}
 			else {
@@ -249,7 +264,7 @@ var meshViewer = {
 			this.context.moveTo(xy[0], xy[1])
 		}
 	},
-	setID: function(canvasID, objectMap, typeSelectID, viewSelectID) {
+	setID: function(canvasID, generatorMap) {
 		if (canvasID != this.canvasID) {
 			this.canvasID = canvasID
 			this.canvas = document.getElementById(canvasID)
@@ -258,14 +273,12 @@ var meshViewer = {
 			this.canvas.addEventListener('mouseout', viewerMouseOut)
 			this.canvas.addEventListener('mouseup', viewerMouseUp)
 		}
-		this.objectMap = objectMap
+		this.generatorMap = generatorMap
 		this.triangleMesh = null
 		this.types = ['Solid Polyhedral', 'Solid Triangular', 'Wireframe Polyhedral', 'Wireframe Triangular']
 		this.type = this.types[this.typeSelectedIndex]
-		this.typeSelectID = typeSelectID
 		this.view = null
 		this.views = []
-		this.viewSelectID = viewSelectID
 		this.mouseDown = null
 	},
 	setType: function(typeSelectedIndex) {
@@ -278,7 +291,7 @@ var meshViewer = {
 		if (this.view.rotationMatrix != null) {
 			return
 		}
-		var meshBoundingBox = getMeshBoundingBox(this.objectMap.get(this.viewID).getMesh())
+		var meshBoundingBox = getMeshBoundingBox(this.generatorMap.get(this.viewID).getMesh())
 		var meshExtent = getXYZSubtraction(meshBoundingBox[1], meshBoundingBox[0])
 		var scale = this.modelDiameter / getXYZLength(meshExtent)
 		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
@@ -293,14 +306,16 @@ var meshViewer = {
 	start: function(height) {
 		this.canvas.height = height
 		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
-		var isHidden = (this.views.length == 0)
-		document.getElementById(this.typeSelectID).hidden = isHidden
-		document.getElementById(this.viewSelectID).hidden = isHidden
+		var isDisabled = (this.views.length == 0)
+		document.getElementById(this.canvasID).hidden = isDisabled
+		document.getElementById('typeSelectID').disabled = isDisabled
+		document.getElementById('viewSelectID').disabled = isDisabled
+		updateView()
 		if (this.views.length == 0) {
 			return
 		}
 		this.context = this.canvas.getContext('2d')
-		this.context.fillStyle = 'white'
+		this.context.fillStyle = '#e0e0e0'
 		this.context.lineJoin = 'round'
 		this.halfHeight = this.canvas.height / 2
 		this.halfWidth = this.canvas.width / 2
@@ -311,7 +326,7 @@ var meshViewer = {
 		this.modelRadiusRing = this.modelRadiusCircle + this.textSpace
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
-		setTypeSelect(this.typeSelectedIndex, this.types, this.typeSelectID)
+		setTypeSelect(this.typeSelectedIndex, this.types)
 		this.views.sort(compareIDAscending)
 		for (var viewIndex = 0; viewIndex < this.views.length; viewIndex++) {
 			if (this.views[viewIndex].id == this.viewID) {
@@ -319,7 +334,7 @@ var meshViewer = {
 				break
 			}
 		}
-		setViewSelect(selectedIndex, this.views, this.viewSelectID)
+		setViewSelect(selectedIndex, this.views)
 		this.setView(selectedIndex)
 		this.setType(this.typeSelectedIndex)
 		this.draw()
