@@ -103,14 +103,12 @@ var terrainViewer = {
 								var bottomRight = getXYAddition(topLeft, [scaleMultiplier, scaleMultiplier])
 								boundingBox = [topLeft, bottomRight]
 							}
-							if (childLocation[0] >= boundingBox[0][0] && childLocation[0] < boundingBox[1][0]) {
-								if (childLocation[1] >= boundingBox[0][1] && childLocation[1] < boundingBox[1][1]) {
-									if (this.pixelMultiplier == 1) {
-										this.drawImageByScreenXY(child.filename, screenXY)
-									}
-									else {
-										this.drawRectangleByScreenXY(child.color, screenXY)
-									}
+							if (isPointInsideBoundingBox(boundingBox, childLocation)) {
+								if (this.pixelMultiplier == 1) {
+									this.drawImageByScreenXY(child.filename, screenXY)
+								}
+								else {
+									this.drawRectangleByScreenXY(child.color, screenXY)
 								}
 							}
 						}
@@ -300,7 +298,7 @@ var terrainViewer = {
 		this.sideArrows = new Array(4)
 		for (var polygonIndex = 0; polygonIndex < 4; polygonIndex++) {
 			var rotation = gRotations[polygonIndex]
-			this.sideArrows[polygonIndex] = addXYsByXY(getXYRotations(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
+			this.sideArrows[polygonIndex] = addXYs(getXYRotations(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
 		}
 		setPixelSelect(this.pixelMultiplierStrings, this.pixelSelectedIndex, this.pixelSelectID)
 		setScaleSelect(this.scaleStrings, this.scaleSelectedIndex, this.scaleSelectID)
