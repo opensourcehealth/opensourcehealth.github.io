@@ -8,10 +8,10 @@ function addFacetsToLoneArrowSet(beginIndex, facets, loneArrowSet) {
 }
 
 function addFacetToLoneArrowSet(beginIndex, facet, loneArrowSet) {
-	var endIndex = 1 - beginIndex
 	if (facet == null) {
 		return
 	}
+	var endIndex = 1 - beginIndex
 	for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 		var consecutiveStrings = [facet[vertexIndex].toString(), facet[(vertexIndex + 1) % facet.length].toString()]
 		var reverseKey = consecutiveStrings[endIndex] + ' ' + consecutiveStrings[beginIndex]
@@ -32,7 +32,7 @@ function drillByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMesh)
 	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
 	workMesh.points = inversePoints
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformedPolygons(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
 				drillByPolygon(splitHeights, strata, transformedPolygon, workMesh)
@@ -296,7 +296,7 @@ function sectionByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMes
 	var intersectionFacets = []
 	var originalFacets = getArraysCopy(workMesh.facets)
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformedPolygons(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
 				sectionByPolygon(intersectionFacets, originalFacets, splitHeights, strata, transformedPolygon, workMesh)
@@ -363,7 +363,7 @@ function weldByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMesh) 
 	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
 	workMesh.points = inversePoints
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformedPolygons(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
 				weldByPolygon(splitHeights, strata, transformedPolygon, workMesh)
@@ -397,23 +397,24 @@ function weldByPolygon(splitHeights, strata, toolPolygon, workMesh) {
 	addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh)
 }
 
-var gDrill = {
+var gDifference = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set('drill', this)
 	},
-	name: 'drill',
+	name: 'difference',
 	processStatement:function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
 			return
 		}
-		var polygons = getPolygonsRecursively(registry, statement)
+		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
 			return
 		}
 		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
 		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
 		var toolPillar = {polygons:polygons, stratas:stratas}
 		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
 		drillByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
@@ -434,25 +435,28 @@ var gEmboss = {
 		}
 		var isTop = getBooleanByDefault(true, 'top', registry, statement, this.name)
 		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
 		var toolMeshes = getMeshesByChildren(statement.children, registry)
+		for (var toolMesh of toolMeshes) {
+		}
 		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
 		embossMeshesByTransform2Ds(transformed3DMatrix, isTop, stratas, toolMeshes, transform2Ds, workMesh)
 		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
 	}
 }
 
-var gSection = {
+var gIntersection = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set('section', this)
 	},
-	name: 'section',
+	name: 'intersection',
 	processStatement:function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
 			return
 		}
-		var polygons = getPolygonsRecursively(registry, statement)
+		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
 			return
 		}
@@ -460,30 +464,31 @@ var gSection = {
 		var stratas = getStratas(registry, statement)
 		var toolPillar = {polygons:polygons, stratas:stratas}
 		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
 		sectionByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
 		setSplitIndexesAttribute(statement, workMesh)
 		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
 	}
 }
 
-var gWeld = {
+var gUnion = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set('weld', this)
 	},
-	name: 'weld',
+	name: 'union',
 	processStatement:function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
 			return
 		}
-		var polygons = getPolygonsRecursively(registry, statement)
+		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
 			return
 		}
 		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
 		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
 		var toolPillar = {polygons:polygons, stratas:stratas}
 		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
 		weldByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
@@ -492,4 +497,4 @@ var gWeld = {
 	}
 }
 
-var gConstructionProcessors = [gDrill, gEmboss, gSection, gWeld]
+var gConstructionProcessors = [gDifference, gEmboss, gIntersection, gUnion]
