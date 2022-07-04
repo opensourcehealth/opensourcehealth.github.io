@@ -1,10 +1,10 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 function addFillet(filletCenter, filletRotation, filletStart, numberOfFilletSides, points) {
-	points.push(getXYAddition(filletCenter, filletStart))
+	points.push(addXY(filletCenter.slice(0), filletStart))
 	for (var filletIndex = 1; filletIndex < numberOfFilletSides; filletIndex++) {
 		filletStart = getXYRotation(filletStart, filletRotation)
-		points.push(getXYAddition(filletCenter, filletStart))
+		points.push(addXY(filletCenter.slice(0), filletStart))
 	}
 }
 
@@ -15,10 +15,48 @@ function addRotationToCenterDirection(centerDirection) {
 	centerDirection.mirrorFromY = lineRotatedY + lineRotatedY
 }
 
+function addTo3DPointIndexSet(equations, pointIndexSet, points, polygons, registry, statement, stratas) {
+	if (getIsEmpty(equations) && pointIndexSet.size == 0 && getIsEmpty(polygons)) {
+		addElementsToSet(points, pointIndexSet)
+		return
+	}
+	if (equations != null) {
+		var variableMap = getVariableMapByStatement(statement)
+		for (var equation of equations) {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				variableMap.set('point', points[pointIndex].toString())
+				if (getValueByEquation(registry, statement, equation)) {
+					pointIndexSet.add(pointIndex)
+				}
+			}
+		}
+	}
+	if (getIsEmpty(polygons)) {
+		return getBoundedPointsBySet(pointIndexSet, points)
+	}
+	for (var polygon of polygons) {
+		var boundingBox = getBoundingBox(polygon)
+		for (var strata of stratas) {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				var point = points[pointIndex]
+				if (getIsInStrata(strata, point[2])) {
+					if (isPointInsideBoundingBox(boundingBox, point)) {
+						if (getIsPointInsidePolygon(point, polygon)) {
+							pointIndexSet.add(pointIndex)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+//deprecated
 function alterMeshExcept(mesh, registry, statement, tag) {
 	if (statement.attributeMap.has('alterations')) {
 		var alterations = statement.attributeMap.get('alterations').split(',').filter(lengthCheck)
 		for (var alteration of alterations) {
+			alteration = alteration.trim()
 			if (alteration != tag) {
 				if (gAlterMeshMap.has(alteration)) {
 					gAlterMeshMap.get(alteration).alterMesh(mesh, registry, statement)
@@ -28,53 +66,37 @@ function alterMeshExcept(mesh, registry, statement, tag) {
 	}
 }
 
-function expandMesh(expansionXY, expansionZ, matrix, topPortion, workMesh) {
-	if (workMesh == null) {
+function expandMesh(expansionBottom, expansionXY, expansionTop, matrix, mesh) {
+	if (mesh == null) {
 		return
 	}
 	if (expansionXY.length == 1) {
-		expansionXY = [expansionXY[0], expansionXY[0]]
+		expansionXY.push(expansionXY[0])
 	}
-	var points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), workMesh.points)
-	var explandedPoints = new Array(points.length)
-	var integerPreviousArrowsMap = getIntegerPreviousArrowsMap(workMesh.facets)
-	var minimumZ = Number.MAX_VALUE
-	var maximumZ = -Number.MAX_VALUE
-	for (var key of integerPreviousArrowsMap.keys()) {
-		var centerPoint = points[key]
-		var unitVectors = []
-		for (var pointIndexes of integerPreviousArrowsMap.get(key)) {
-			var unitVector = getXYZSubtraction(points[pointIndexes[0]], centerPoint)
-			var unitVectorLength = getXYZLength(unitVector)
-			if (unitVectorLength != 0.0) {
-				divideXYZByScalar(unitVector, unitVectorLength)
-				unitVector.push(points[pointIndexes[1]][2])
-				unitVectors.push(unitVector)
-			}
-		}
-		unitVectors.sort(compareAbsoluteElementTwoAscending)
-		unitVectors.length = 2
-		if (unitVectors[0][3] > unitVectors[1][3]) {
-			unitVectors.reverse()
-		}
-		explandedPoints[key] = getInsetPoint(unitVectors[0], centerPoint, unitVectors[1], expansionXY)
-		minimumZ = Math.min(minimumZ, centerPoint[2])
-		maximumZ = Math.max(maximumZ, centerPoint[2])
+	var facets = mesh.facets
+	mesh.points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), mesh.points)
+	var directionMapZ = getDirectionMapZ(facets, mesh.points)
+	var horizontalDirectionMap = directionMapZ.horizontalDirectionMap
+	for (var key of horizontalDirectionMap.keys()) {
+		addXY(mesh.points[key], getXYMultiplication(horizontalDirectionMap.get(key), expansionXY))
 	}
-	var deltaZ = maximumZ - minimumZ
-	var expandOverDeltaZ = expansionZ / deltaZ
-	var expansionCenterZ = maximumZ - topPortion * deltaZ
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		var z = explandedPoints[pointIndex][2]
-		explandedPoints[pointIndex][2] += (z - expansionCenterZ) * expandOverDeltaZ
+	var bottomOverDeltaZ = expansionBottom / directionMapZ.deltaZ
+	var topOverDeltaZ = expansionTop / directionMapZ.deltaZ
+	var zAddition = - directionMapZ.minimumZ * topOverDeltaZ - directionMapZ.maximumZ * bottomOverDeltaZ
+	var zMultiplier = topOverDeltaZ + bottomOverDeltaZ
+	for (var point of mesh.points) {
+		point[2] += point[2] * zMultiplier + zAddition
 	}
-	workMesh.points = getXYZsBy3DMatrix(matrix, explandedPoints)
+	mesh.points = getXYZsBy3DMatrix(matrix, mesh.points)
 }
 
 function getBoundedPoints2D(equations, points, polygons, registry, statement) {
+	if (getIsEmpty(equations) && getIsEmpty(polygons)) {
+		return points
+	}
 	var pointIndexSet = new Set()
 	if (equations != null) {
-		var variableMap = statement.parent.variableMap
+		var variableMap = getVariableMapByStatement(statement)
 		for (var equation of equations) {
 			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 				variableMap.set('point', points[pointIndex].toString())
@@ -86,49 +108,12 @@ function getBoundedPoints2D(equations, points, polygons, registry, statement) {
 	}
 	if (polygons != null) {
 		for (var polygon of polygons) {
-			var rectangle = getBoundingRectangle(polygon)
-			var minimum = rectangle[0]
-			var maximum = rectangle[1]
+			var boundingBox = getBoundingBox(polygon)
 			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 				var point = points[pointIndex]
-				if (point[0] >= minimum[0] && point[0] <= maximum[0] && point[1] >= minimum[1] && point[1] <= maximum[1]) {
+				if (isPointInsideBoundingBox(boundingBox, point)) {
 					if (getIsPointInsidePolygon(point, polygon)) {
 						pointIndexSet.add(pointIndex)
-					}
-				}
-			}
-		}
-	}
-	return getBoundedPointsBySet(pointIndexSet, points)
-}
-
-function getBoundedPoints3D(equations, pointIndexSet, points, polygons, registry, statement, stratas) {
-	if (equations != null) {
-		var variableMap = statement.parent.variableMap
-		for (var equation of equations) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				variableMap.set('point', points[pointIndex].toString())
-				if (getValueByEquation(registry, statement, equation)) {
-					pointIndexSet.add(pointIndex)
-				}
-			}
-		}
-	}
-	if (polygons == null) {
-		return getBoundedPointsBySet(pointIndexSet, points)
-	}
-	for (var polygon of polygons) {
-		var rectangle = getBoundingRectangle(polygon)
-		var minimum = rectangle[0]
-		var maximum = rectangle[1]
-		for (var strata of stratas) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (getIsInStrata(strata, point[2])) {
-					if (point[0] >= minimum[0] && point[0] <= maximum[0] && point[1] >= minimum[1] && point[1] <= maximum[1]) {
-						if (getIsPointInsidePolygon(point, polygon)) {
-							pointIndexSet.add(pointIndex)
-						}
 					}
 				}
 			}
@@ -181,6 +166,31 @@ function getCenterDirection(registry, statement) {
 	return {center:center, direction:divideXYByScalar(direction, directionLength)}
 }
 
+function getDirectionMapZ(facets, points) {
+	var horizontalDirectionMap = new Map()
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		var normal = getNormalByFacet(facets[facetIndex], points)
+		if (normal != null) {
+			var facet = facets[facetIndex]
+			for (var pointIndex of facet) {
+				addElementToMapArray(normal, pointIndex, horizontalDirectionMap)
+			}
+		}
+	}
+	var minimumZ = Number.MAX_VALUE
+	var maximumZ = -Number.MAX_VALUE
+	for (var key of horizontalDirectionMap.keys()) {
+		var z = points[key][2]
+		minimumZ = Math.min(minimumZ, z)
+		maximumZ = Math.max(maximumZ, z)
+		var unitVectors = horizontalDirectionMap.get(key)
+		unitVectors.sort(compareAbsoluteElementTwoAscending)
+		var addition = getXYAddition(normalizeXY(unitVectors[0]), normalizeXY(unitVectors[1]))
+		horizontalDirectionMap.set(key, multiplyXYByScalar(addition, 2.0 / getXYLengthSquared(addition)))
+	}
+	return {deltaZ:maximumZ - minimumZ, horizontalDirectionMap:horizontalDirectionMap , minimumZ:minimumZ, maximumZ:maximumZ}
+}
+
 function getFilletedPolygon(numberOfSides, polygon, radius) {
 	var filletedPolygon = []
 	var maximumAngle = gDoublePi / numberOfSides
@@ -217,7 +227,7 @@ function getFilletedPolygon(numberOfSides, polygon, radius) {
 			var beginTangent = getXYAddition(centerPoint, getXYMultiplicationByScalar(centerBegin, distanceToTangent))
 			var endTangent = getXYAddition(centerPoint, getXYMultiplicationByScalar(centerEnd, distanceToTangent))
 			var distanceToFilletCenter = filletRadius / perpendicular
-			var filletCenter = getXYAddition(centerPoint, getXYMultiplicationByScalar(centerVector, distanceToFilletCenter))
+			var filletCenter = addXY(centerPoint.slice(0), getXYMultiplicationByScalar(centerVector, distanceToFilletCenter))
 			var filletAngle = -cornerAngle / numberOfFilletSides
 			var filletRotation = getXYPolar(filletAngle)
 			var halfAngleRotation = getXYPolar(0.5 * filletAngle)
@@ -229,58 +239,36 @@ function getFilletedPolygon(numberOfSides, polygon, radius) {
 	return filletedPolygon
 }
 
-function getFilletedPolygons(numberOfSides, polygons, radius) {
-	var filletedPolygons = new Array(polygons.length)
-	for (var polygonsIndex = 0; polygonsIndex < polygons.length; polygonsIndex++) {
-		filletedPolygons[polygonsIndex] = getFilletedPolygon(numberOfSides, polygons[polygonsIndex], radius)
-	}
-	return filletedPolygons
-}
+//deprecated
 /*
-function getIntegerArrowsMap(facets) {
-	var integerArrowsMap = new Map()
-	for (var facet of facets) {
-		for (vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-			var beginIndex = facet[vertexIndex]
-			var endIndex = facet[(vertexIndex + 1) % facet.length]
-			addArrayElementToMap(endIndex, beginIndex, integerArrowsMap)
-		}
+function getInterpolatedIndexAlong(x, points) {
+	if (points.length == 1) {
+		return [0, 0.0]
 	}
-	return integerArrowsMap
-}
-*/
-function getIntegerPreviousArrowsMap(facets) {
-	var integerPreviousArrowsMap = new Map()
-	for (var facet of facets) {
-		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-			var beginIndex = facet[(vertexIndex - 1 + facet.length) % facet.length]
-			var centerIndex = facet[vertexIndex]
-			var endIndex = facet[(vertexIndex + 1) % facet.length]
-			addArrayElementToMap([endIndex, beginIndex], centerIndex, integerPreviousArrowsMap)
+	var beginPoint = points[0]
+	var beginPointX = beginPoint[0]
+	if (x <= beginPointX) {
+		var run = points[1][0] - beginPointX
+		if (run == 0.0) {
+			return [0, 0.0]
 		}
-	}
-	return integerPreviousArrowsMap
-}
-
-function getInterpolatedIndexAlong(x, values) {
-	if (values.length == 1) {
 		return [0, null]
 	}
-	if (x <= values[0][0]) {
+	if (x <= points[0][0]) {
 		return [0, null]
 	}
-	if (x >= values[values.length - 1][0]) {
-		return [values.length - 1, null]
+	var upperIndex = points.length - 1
+	if (x >= points[upperIndex][0]) {
+		return [upperIndex, null]
 	}
 	var lowerIndex = 0
-	var upperIndex = values.length - 1
 	for (var whileTestIndex = 0; whileTestIndex < gLengthLimit; whileTestIndex++) {
 		var difference = upperIndex - lowerIndex
 		if (difference < 2) {
-			return [lowerIndex, (x - values[lowerIndex][0]) / (values[upperIndex][0] - values[lowerIndex][0])]
+			return [lowerIndex, (x - points[lowerIndex][0]) / (points[upperIndex][0] - points[lowerIndex][0])]
 		}
 		var middleIndex = lowerIndex + Math.round(difference / 2)
-		if (x < values[middleIndex][0]) {
+		if (x < points[middleIndex][0]) {
 			upperIndex = middleIndex
 		}
 		else {
@@ -289,11 +277,53 @@ function getInterpolatedIndexAlong(x, values) {
 	}
 	return [0, null]
 }
-
-function getPointByCenterDirectionRotation(centerDirection, point) {
-	var pointRotated = getXYRotation(point, centerDirection.reverseRotation)
-	pointRotated[1] = centerDirection.mirrorFromY - pointRotated[1]
-	return getXYRotation(pointRotated, centerDirection.direction)
+*/
+function getInterpolationAlongBeginEnd(x, points) {
+	var beginPoint = points[0]
+	if (points.length == 1) {
+		return [0.0, 0, 0]
+	}
+	var beginPointX = beginPoint[0]
+	if (x <= beginPointX) {
+		var run = points[1][0] - beginPointX
+		if (run == 0.0) {
+			return [0.0, 0, 0]
+		}
+		var along = (x - beginPointX) / run
+		return [along, 0, 1]
+	}
+	var upperIndex = points.length - 1
+	var endPoint = points[upperIndex]
+	var endPointX = endPoint[0]
+	if (x >= endPointX) {
+		var run = endPointX - points[points.length - 2][0]
+		if (run == 0.0) {
+			return [0.0, upperIndex, 0]
+		}
+		var along = (endPointX - x) / run
+		return [along, upperIndex, points.length - 2]
+	}
+	var lowerIndex = 0
+	for (var whileTestIndex = 0; whileTestIndex < gLengthLimit; whileTestIndex++) {
+		var difference = upperIndex - lowerIndex
+		if (difference < 2) {
+			var lowerPoint = points[lowerIndex]
+			var run = points[upperIndex][0] - lowerPoint[0]
+			if (run == 0.0) {
+				return [0.0, lowerIndex, lowerIndex]
+			}
+			var along = (x - lowerPoint[0]) / run
+			return [along, lowerIndex, upperIndex]
+		}
+		var middleIndex = lowerIndex + Math.round(difference / 2)
+		if (x < points[middleIndex][0]) {
+			upperIndex = middleIndex
+		}
+		else {
+			lowerIndex = middleIndex
+		}
+	}
+	return null
 }
 
 function getPointsExcept(points, registry, statement, tag) {
@@ -310,9 +340,57 @@ function getPointsExcept(points, registry, statement, tag) {
 	return points
 }
 
+function mirrorByCenterDirectionRotation(centerDirection, point) {
+	rotate2D(point, centerDirection.reverseRotation)
+	point[1] = centerDirection.mirrorFromY - point[1]
+	return rotate2D(point, centerDirection.direction)
+}
+
 function setPointsExcept(points, registry, statement, tag) {
-	var points = getPointsExcept(points, registry, statement, tag)
-	statement.attributeMap.set('points', points.join(' '))
+	setPointsHD(getPointsExcept(points, registry, statement, tag), statement)
+}
+
+function splitMesh(equations, matrix, mesh, polygons, registry, splitHeights, statement) {
+	if (mesh == null || getIsEmpty(splitHeights)) {
+		return
+	}
+	mesh.points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), mesh.points)
+	var points = mesh.points
+	if (getIsEmpty(equations) && getIsEmpty(polygons)) {
+		addSplitIndexesByHeightsOnly(splitHeights, mesh)
+	}
+	else {
+		var facetIndexSet = new Set()
+		if (equations != null) {
+			var variableMap = getVariableMapByStatement(statement)
+			for (var equation of equations) {
+				for (var facetIndex = 0; facetIndex < mesh.facets.length; facetIndex++) {
+					var facet = mesh.facets[facetIndex]
+					for (var pointIndex of facet) {
+						variableMap.set('point', points[pointIndex].toString())
+						if (getValueByEquation(registry, statement, equation)) {
+							facetIndexSet.add(facetIndex)
+							break
+						}
+					}
+				}
+			}
+		}
+		if (polygons != null) {
+			for (var polygon of polygons) {
+				for (var facetIndex = 0; facetIndex < mesh.facets.length; facetIndex++) {
+					if (getIsPolygonIntersectingOrClose(polygon, getPolygonByFacet(mesh.facets[facetIndex], points))) {
+						facetIndexSet.add(facetIndex)
+						break
+					}
+				}
+			}
+		}
+		for (var splitHeight of splitHeights) {
+			addSplitIndexesByFacetSet(facetIndexSet, splitHeight, mesh)
+		}
+	}
+	mesh.points = getXYZsBy3DMatrix(matrix, mesh.points)
 }
 
 function taperMesh(matrix, maximumSpan, mesh, overhangAngle, sagAngle) {
@@ -346,8 +424,8 @@ function taperMesh(matrix, maximumSpan, mesh, overhangAngle, sagAngle) {
 	var sagSlope = -Math.tan(sagAngle)
 	var overhangSlope = Math.tan(0.5 * Math.PI - overhangAngle)
 	var approachRunOverRise = 1.0 / overhangSlope - 1.0 / sagSlope
-	var inset = Math.max(maximumInset / approachRunOverRise, maximumInset - 0.5 * maximumSpan)
-	var insetPolygon = getInsetPolygon([[inset]], highestPolygon)
+	var inset = -Math.max(maximumInset / approachRunOverRise, maximumInset - 0.5 * maximumSpan)
+	var insetPolygon = getOutsetPolygon([inset, inset], highestPolygon)
 	var height = overhangSlope * inset + highestFacetZ
 	var insetFacet = new Array(highestFacet.length)
 	var pointsLength = inversePoints.length
@@ -366,7 +444,7 @@ function taperMesh(matrix, maximumSpan, mesh, overhangAngle, sagAngle) {
 function transformPoints2DByEquation(amplitudes, basis2D, center, points, registry, statement, translationEquations) {
 	if (!getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
-			var variableMap = statement.parent.variableMap
+			var variableMap = getVariableMapByStatement(statement)
 			for (var point of points) {
 				variableMap.set('point', point.toString())
 				var value = getValueByEquation(registry, statement, translationEquation)
@@ -408,24 +486,15 @@ function transformPoints2DByEquation(amplitudes, basis2D, center, points, regist
 	for (var point of points) {
 		var centerPoint = getXYSubtraction(point, center)
 		var vectorProjection = getXYDotProduct(basis2D, centerPoint)
-		var indexAlong = getInterpolatedIndexAlong(vectorProjection, amplitudes)
-		var lowerAmplitude = amplitudes[indexAlong[0]]
-		var along = indexAlong[1]
-		var minimumAmplitudeLength = lowerAmplitude.length
-		if (along == null) {
-			for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
-				var interpolation = lowerAmplitude[dimensionIndex]
-				addXY(point, getXYMultiplicationByScalar(basis2Ds[dimensionIndex % 2], interpolation))
-			}
-		}
-		else {
-			var upperAmplitude = amplitudes[indexAlong[0] + 1]
-			minimumAmplitudeLength = Math.min(minimumAmplitudeLength, upperAmplitude.length)
-			var oneMinusAlong = 1.0 - along
-			for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
-				var interpolation = oneMinusAlong * lowerAmplitude[dimensionIndex] + along * upperAmplitude[dimensionIndex]
-				addXY(point, getXYMultiplicationByScalar(basis2Ds[dimensionIndex % 2], interpolation))
-			}
+		var interpolationAlong = getInterpolationAlongBeginEnd(vectorProjection, amplitudes)
+		var along = interpolationAlong[0]
+		var oneMinus = 1.0 - along
+		var lowerAmplitude = amplitudes[interpolationAlong[1]]
+		var upperAmplitude = amplitudes[interpolationAlong[2]]
+		var minimumAmplitudeLength = Math.min(lowerAmplitude.length, upperAmplitude.length)
+		for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
+			var interpolation = oneMinus * lowerAmplitude[dimensionIndex] + along * upperAmplitude[dimensionIndex]
+			addXY(point, getXYMultiplicationByScalar(basis2Ds[dimensionIndex % 2], interpolation))
 		}
 	}
 }
@@ -433,7 +502,7 @@ function transformPoints2DByEquation(amplitudes, basis2D, center, points, regist
 function transformPoints3DByEquation(amplitudes, basis3Ds, center, points, registry, statement, translationEquations) {
 	if (!getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
-			var variableMap = statement.parent.variableMap
+			var variableMap = getVariableMapByStatement(statement)
 			for (var point of points) {
 				variableMap.set('point', point.toString())
 				var value = getValueByEquation(registry, statement, translationEquation)
@@ -485,33 +554,43 @@ function transformPoints3DByEquation(amplitudes, basis3Ds, center, points, regis
 	for (var point of points) {
 		var centerPoint = getXYSubtraction(point, center)
 		var vectorProjection = getXYDotProduct(basis3Ds[0], centerPoint)
-		var indexAlong = getInterpolatedIndexAlong(vectorProjection, amplitudes)
-		var lowerAmplitude = amplitudes[indexAlong[0]]
-		var along = indexAlong[1]
-		var minimumAmplitudeLength = lowerAmplitude.length
-		if (along == null) {
-			for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
-				var interpolation = lowerAmplitude[dimensionIndex]
-				addXYZ(point, getXYZMultiplicationByScalar(basis3Ds[dimensionIndex % 3], interpolation))
-			}
-		}
-		else {
-			var upperAmplitude = amplitudes[indexAlong[0] + 1]
-			minimumAmplitudeLength = Math.min(minimumAmplitudeLength, upperAmplitude.length)
-			var oneMinusAlong = 1.0 - along
-			for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
-				var interpolation = oneMinusAlong * lowerAmplitude[dimensionIndex] + along * upperAmplitude[dimensionIndex]
-				addXYZ(point, getXYZMultiplicationByScalar(basis3Ds[dimensionIndex % 3], interpolation))
-			}
+		var interpolationAlong = getInterpolationAlongBeginEnd(vectorProjection, amplitudes)
+		var along = interpolationAlong[0]
+		var oneMinus = 1.0 - along
+		var lowerAmplitude = amplitudes[interpolationAlong[1]]
+		var upperAmplitude = amplitudes[interpolationAlong[2]]
+		var minimumAmplitudeLength = Math.min(lowerAmplitude.length, upperAmplitude.length)
+		for (var dimensionIndex = 1; dimensionIndex < minimumAmplitudeLength; dimensionIndex++) {
+			var interpolation = oneMinus * lowerAmplitude[dimensionIndex] + along * upperAmplitude[dimensionIndex]
+			addXYZ(point, getXYZMultiplicationByScalar(basis3Ds[dimensionIndex % 3], interpolation))
 		}
 	}
 }
 
+function wedgeMesh(inset, matrix, mesh) {
+	if (mesh == null) {
+		return
+	}
+	if (inset.length == 1) {
+		inset = [inset[0], inset[0]]
+	}
+	var facets = mesh.facets
+	mesh.points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), mesh.points)
+	var directionMapZ = getDirectionMapZ(facets, mesh.points)
+	var horizontalDirectionMap = directionMapZ.horizontalDirectionMap
+	var oneOverDeltaZ = 1.0 / directionMapZ.deltaZ
+	for (var key of horizontalDirectionMap.keys()) {
+		var centerPoint = mesh.points[key]
+		var insetAtZ = getXYMultiplicationByScalar(inset, (directionMapZ.minimumZ - centerPoint[2]) * oneOverDeltaZ)
+		mesh.points[key] = addXY(centerPoint.slice(0), getXYMultiplication(horizontalDirectionMap.get(key), insetAtZ))
+	}
+	mesh.points = getXYZsBy3DMatrix(matrix, mesh.points)
+}
+
 var gBend = {
 	alterMesh: function(mesh, registry, statement) {
-		var points = mesh.points
-		var boundaryEquations = getStringsByMap('boundaryEquations', statement.attributeMap)
-		var boundaryPolygons = getPolygonsRecursively(registry, statement)
+		var boundaryEquations = getEquations('boundary', statement)
+		var boundaryPolygons = getPolygonsHDRecursively(registry, statement)
 		var pointIndexSet = new Set()
 		if (statement.attributeMap.has('pointIndexes')) {
 			var pointIndexesString = statement.attributeMap.get('pointIndexes')
@@ -529,20 +608,24 @@ var gBend = {
 				}
 			}
 		}
+		var matrix = getChainMatrix3D(registry, statement)
 		var stratas = getStratas(registry, statement)
-		var boundedPoints = getBoundedPoints3D(boundaryEquations, pointIndexSet, points, boundaryPolygons, registry, statement, stratas)
-		if (getIsEmpty(boundedPoints)) {
+		var points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), mesh.points)
+		addTo3DPointIndexSet(boundaryEquations, pointIndexSet, points, boundaryPolygons, registry, statement, stratas)
+		if (pointIndexSet.size == 0) {
 			return
 		}
+		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
 		var amplitudes = getPointsByKey('amplitudes', registry, statement)
 		var basis3Ds = getFloatListsByStatement('basis3Ds', registry, statement)
 		var center = getFloatsByStatement('center', registry, statement)
-		var translationEquations = getStringsByMap('translationEquations', statement.attributeMap)
+		var translationEquations = getEquations('translation', statement)
 		transformPoints3DByEquation(amplitudes, basis3Ds, center, boundedPoints, registry, statement, translationEquations)
+		mesh.points = getXYZsBy3DMatrix(matrix, points)
 	},
 	getPoints: function(points, registry, statement) {
-		var boundaryEquations = getStringsByMap('boundaryEquations', statement.attributeMap)
-		var boundaryPolygons = getPolygonsRecursively(registry, statement)
+		var boundaryEquations = getEquations('boundary', statement)
+		var boundaryPolygons = getPolygonsHDRecursively(registry, statement)
 		var boundedPoints = getBoundedPoints2D(boundaryEquations, points, boundaryPolygons, registry, statement)
 		if (getIsEmpty(boundedPoints)) {
 			return points
@@ -550,7 +633,7 @@ var gBend = {
 		var amplitudes = getPointsByKey('amplitudes', registry, statement)
 		var basis2D = getFloatsByStatement('basis2D', registry, statement)
 		var center = getFloatsByStatement('center', registry, statement)
-		var translationEquations = getStringsByMap('translationEquations', statement.attributeMap)
+		var translationEquations = getEquations('translation', statement)
 		transformPoints2DByEquation(amplitudes, basis2D, center, boundedPoints, registry, statement, translationEquations)
 		return points
 	},
@@ -563,9 +646,9 @@ var gBend = {
 	processStatement:function(registry, statement) {
 		var workStatement = getWorkStatement(registry, statement)
 		if (workStatement != null) {
-			var workPoints = getPointsByKey('points', registry, workStatement)
+			var workPoints = getPointsHD(registry, workStatement)
 			if (workPoints != null) {
-				workStatement.attributeMap.set('points', this.getPoints(workPoints, registry, statement).join(' '))
+				setPointsHD(this.getPoints(workPoints, registry, statement), workStatement)
 			}
 		}
 		var workMesh = getWorkMesh(registry, statement)
@@ -573,7 +656,7 @@ var gBend = {
 			this.alterMesh(workMesh, registry, statement)
 			analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
 		}
-		var points = getPointsByKey('points', registry, statement)
+		var points = getPointsHD(registry, statement)
 		if (points == null) {
 			return
 		}
@@ -584,11 +667,15 @@ var gBend = {
 
 var gExpand = {
 	alterMesh: function(mesh, registry, statement) {
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var matrix = getChainMatrix3D(registry, statement)
 		var expansionXY = getFloatsByDefault([1.0], 'expansionXY', registry, statement, this.name)
+
+//deprecated
 		var expansionZ = getFloatByDefault(0.0, 'expansionZ', registry, statement, this.name)
-		var topPortion = getFloatByDefault(1.0, 'topPortion', registry, statement, this.name)
-		expandMesh(expansionXY, expansionZ, transformed3DMatrix, topPortion, mesh)
+
+		var expansionBottom = getFloatByDefault(0.0, 'expansionBottom', registry, statement, this.name)
+		var expansionTop = getFloatByDefault(expansionZ, 'expansionTop', registry, statement, this.name)
+		expandMesh(expansionBottom, expansionXY, expansionTop, matrix, mesh)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -619,19 +706,55 @@ var gFillet = {
 	processStatement:function(registry, statement) {
 		var workStatement = getWorkStatement(registry, statement)
 		if (workStatement != null) {
-			var workPoints = getPointsByKey('points', registry, workStatement)
+			var workPoints = getPointsHD(registry, workStatement)
 			if (workPoints != null) {
 				workPoints = this.getPoints(workPoints, registry, statement)
 				setPointsExcept(workPoints, registry, workStatement, this.name)
 			}
 		}
-		var points = getPointsByKey('points', registry, statement)
+		var points = getPointsHD(registry, statement)
 		if (points == null) {
 			return
 		}
 		statement.tag = 'polygon'
 		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement, this.name)
+	}
+}
+
+var gOutset = {
+	getPoints: function(points, registry, statement) {
+		var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
+		var marker = getPointsByKey('marker', registry, statement)
+		var radius = getPointByDefault([1.0, 1.0], 'radius', registry, statement, this.name)
+		return getOutsetPolygonByMarker(marker, markerAbsolute, radius, points)
+	},
+	initialize: function() {
+		gGetPointsMap.set(this.name, this)
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'outset',
+	processStatement:function(registry, statement) {
+		statement.tag = 'polygon'
+		var points = getPointsHD(registry, statement)
+		if (points == null) {
+			return
+		}
+		var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, this.name)
+		var clockwise = getBooleanByDefault(getIsClockwise(points), 'clockwise', registry, statement, this.name)
+		var markerAbsolute = getBooleanByDefault(false, 'markerAbsolute', registry, statement, this.name)
+		var marker = getPointsByKey('marker', registry, statement)
+		var radius = getPointByDefault([1.0, 1.0], 'radius', registry, statement, this.name)
+		var outsetPolygons = getOutsetPolygonsByDirection(checkIntersection, clockwise, marker, markerAbsolute, radius, points)
+		if (getIsEmpty(outsetPolygons)) {
+			setPointsExcept([], registry, statement, this.name)
+			return
+		}
+		if (outsetPolygons.length == 1) {
+			setPointsExcept(outsetPolygons[0], registry, statement, this.name)
+		}
+		addClosingStatementConvertToGroup(statement)
+		addPolygonsToGroup(outsetPolygons, registry, statement)
 	}
 }
 
@@ -642,11 +765,12 @@ var gMirror = {
 			return
 		}
 		addRotationToCenterDirection(centerDirection)
+		var matrix = getChainMatrix3D(registry, statement)
+		mesh.points = getXYZsBy3DMatrix(get3DInverseRotation(matrix), mesh.points)
 		for (var point of mesh.points) {
-			var mirrorPoint = getPointByCenterDirectionRotation(centerDirection, point)
-			mirrorPoint.push(point[2])
-			overwriteArray(point, mirrorPoint)
+			mirrorByCenterDirectionRotation(centerDirection, point)
 		}
+		mesh.points = getXYZsBy3DMatrix(matrix, mesh.points)
 		for (var facet of mesh.facets) {
 			facet.reverse()
 		}
@@ -656,7 +780,7 @@ var gMirror = {
 		if (centerDirection != null) {
 			addRotationToCenterDirection(centerDirection)
 			for (var point of points) {
-				overwriteArray(point, getPointByCenterDirectionRotation(centerDirection, point))
+				mirrorByCenterDirectionRotation(centerDirection, point)
 			}
 			points.reverse()
 		}
@@ -670,7 +794,7 @@ var gMirror = {
 	name: 'mirror',
 	processStatement:function(registry, statement) {
 		statement.tag = getValueByKeyDefault('polygon', 'tag', registry, statement, this.name)
-		var points = getPointsIncludingWork(registry, statement)
+		var points = getPointsHD(registry, statement)
 		if (points == null) {
 			return
 		}
@@ -698,36 +822,48 @@ var gMirror = {
 			}
 		}
 		addRotationToCenterDirection(centerDirection)
+		var pointZero = points[0]
+		var pointStart = points[mirrorStart]
+		if (getXYDistanceSquared(pointStart, mirrorByCenterDirectionRotation(centerDirection, pointStart.slice(0))) < gCloseSquared) {
+			mirrorStart -= 1
+		}
 		for (var pointIndex = mirrorStart; pointIndex > -1; pointIndex--) {
-			points.push(getPointByCenterDirectionRotation(centerDirection, points[pointIndex]))
+			var mirrorPoint = mirrorByCenterDirectionRotation(centerDirection, points[pointIndex].slice(0))
+			if (getXYDistanceSquared(pointZero, mirrorPoint) < gCloseSquared) {
+				break
+			}
+			points.push(mirrorPoint)
 		}
 		setPointsExcept(points, registry, statement, this.name)
 	}
 }
 
-var gInset = {
-	getPoints: function(points, registry, statement) {
-		return getInsetPolygon(getInsets(statement), points)
+var gSplit = {
+	alterMesh: function(mesh, registry, statement) {
+		var equations = getEquations('boundary', statement)
+		var polygons = getPolygonsHDRecursively(registry, statement)
+		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
+		splitMesh(equations, transformed3DMatrix, mesh, polygons, registry, splitHeights, statement)
 	},
 	initialize: function() {
-		gGetPointsMap.set(this.name, this)
+		gAlterMeshMap.set(this.name, this)
 		gTagCenterMap.set(this.name, this)
 	},
-	name: 'inset',
+	name: 'split',
 	processStatement:function(registry, statement) {
-		statement.tag = 'polygon'
-		var points = getPointsIncludingWork(registry, statement)
-		if (points == null) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh == null) {
 			return
 		}
-		points = this.getPoints(points, registry, statement)
-		setPointsExcept(points, registry, statement, this.name)
+		this.alterMesh(workMesh, registry, statement)
+		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
 	}
 }
 
 var gTaper = {
 	alterMesh: function(mesh, registry, statement) {
-		var transformed3DMatrix = getTransformed3DMatrix(null, registry, statement)
+		var transformed3DMatrix = getChainMatrix3D(registry, statement)
 		var overhangAngle = getFloatByDefault(40.0, 'overhangAngle', registry, statement, this.name)
 		var sagAngle = getFloatByDefault(15.0, 'sagAngle', registry, statement, this.name)
 		var maximumSpan = getFloatByDefault(1.0, 'maximumSpan', registry, statement, this.name)
@@ -748,6 +884,35 @@ var gTaper = {
 	}
 }
 
-var gAlterationProcessors = [gBend, gExpand, gFillet, gInset, gMirror, gTaper]
+var gWedge = {
+	alterMesh: function(mesh, registry, statement) {
+		var radius = getPointByDefault([1.0, 1.0], 'radius', registry, statement, this.name)
+		var matrix = getChainMatrix3D(registry, statement)
+		wedgeMesh(radius, matrix, mesh)
+	},
+	initialize: function() {
+		gAlterMeshMap.set(this.name, this)
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'wedge',
+	processStatement:function(registry, statement) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh != null) {
+			this.alterMesh(workMesh, registry, statement)
+			analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
+		}
+		var polygons = getPolygonsHDRecursively(registry, statement)
+		if (getIsEmpty(polygons)) {
+			return
+		}
+		var heights = getHeights(registry, statement, this.name)
+		var matrix = getChainMatrix3D(registry, statement)
+		var pillar = new Pillar(heights, matrix, polygons)
+		this.alterMesh(pillar.getMesh(), registry, statement)
+		analyzeOutputMesh(pillar, registry, statement)
+	}
+}
+
+var gAlterationProcessors = [gBend, gExpand, gFillet, gMirror, gOutset, gSplit, gTaper, gWedge]
 var gAlterMeshMap = new Map()
 var gGetPointsMap = new Map()
