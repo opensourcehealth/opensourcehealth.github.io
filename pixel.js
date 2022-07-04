@@ -115,7 +115,7 @@ function addSpacel(key, signedIntersectionsMap) {
 	var parameters = key.split(',');
 	var intersectionKey = parameters.slice(1).join(',')
 	var x = parseInt(parameters[0])
-	addArrayElementToMap(x, intersectionKey, signedIntersectionsMap)
+	addElementToMapArray(x, intersectionKey, signedIntersectionsMap)
 }
 
 function addTestPixels(pixelMap) {
@@ -278,15 +278,15 @@ function getPolygonsBoolean(existenceCondition, layerThickness, offsetMultiplier
 	var oneOverLayerThickness = 1.0 / layerThickness
 	var polygonsATransformed = getArrayArraysCopy(polygonsA)
 	var polygonsBTransformed = getArrayArraysCopy(polygonsB)
-	addXYArraysByY(polygonsATransformed, -offsetY)
-	addXYArraysByY(polygonsBTransformed, -offsetY)
+	addArrayArraysByY(polygonsATransformed, -offsetY)
+	addArrayArraysByY(polygonsBTransformed, -offsetY)
 	multiplyXYArraysByScalar(polygonsATransformed, oneOverLayerThickness)
 	multiplyXYArraysByScalar(polygonsBTransformed, oneOverLayerThickness)
 	var xyLatticeA = getXYLattice(polygonsATransformed)
 	var xyLatticeB = getXYLattice(polygonsBTransformed)
 	var xyLatticeBoolean = getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB)
 	var polygonsBoolean = getXYPolygonsByLattice(xyLatticeBoolean)
-	return addXYArraysByY(multiplyXYArraysByScalar(polygonsBoolean, layerThickness), offsetY)
+	return addArrayArraysByY(multiplyXYArraysByScalar(polygonsBoolean, layerThickness), offsetY)
 }
 
 function getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
@@ -363,9 +363,9 @@ function getSignedIntersectionsMapBySpacelMap(spacelMap) {
 function getXYLattice(xyPolygons) {
 	var xyLattice = new Array(2)
 	xyLattice[0] = getIntersectionPairsMap(xyPolygons)
-	swapXY(xyPolygons)
+	swapXYPolygons(xyPolygons)
 	xyLattice[1] = getIntersectionPairsMap(xyPolygons)
-	swapXY(xyPolygons)
+	swapXYPolygons(xyPolygons)
 	return xyLattice
 }
 
