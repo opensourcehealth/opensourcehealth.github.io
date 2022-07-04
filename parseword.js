@@ -39,6 +39,57 @@ function getBracketedEntry(bracketString) {
 	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
 }
 
+function getBracketSeparatedWords(line) {
+	var bracketLevel = 0
+	var quoteCharacter = null
+	var separatedWords = []
+	var start = 0
+	line = line.trim()
+	if (line.length < 2) {
+		return []
+	}
+	var characterZero = line[0]
+	if (gQuoteSet.has(characterZero) && characterZero == line[line.length - 1]) {
+		line = line.slice(1, -1)
+	}
+	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
+		var character = line[characterIndex]
+		if (quoteCharacter == null) {
+			if (gQuoteSet.has(character)) {
+				quoteCharacter = character
+			}
+			else {
+				if (character == '(') {
+					bracketLevel += 1
+				}
+				else {
+					if (character == ')') {
+						bracketLevel -= 1
+						if (bracketLevel == 0) {
+							var indexPlus = characterIndex + 1
+							var separatedWord = line.slice(start, indexPlus).trim()
+							if (separatedWord.length > 0) {
+								separatedWords.push(separatedWord)
+							}
+							start = indexPlus
+						}
+					}
+				}
+			}
+		}
+		else {
+			if (character == quoteCharacter) {
+				quoteCharacter = null
+			}
+		}
+	}
+	var separatedWord = line.slice(start).trim()
+	if (separatedWord.length > 0) {
+		separatedWords.push(separatedWord)
+	}
+	return separatedWords
+}
+
 function getCapitalizedKey(key) {
 	if (gCapitalizationMap.has(key.toLowerCase())) {
 		return gCapitalizationMap.get(key.toLowerCase())
@@ -65,60 +116,30 @@ function getLineWithEndspace(endWords, line) {
 		if (line.endsWith(endWord)) {
 			spaceThenEndWord = ' ' + endWord
 			if (!line.endsWith(spaceThenEndWord)) {
-				return line.slice(0, line.length - endWord.length) + spaceThenEndWord
+				return line.slice(0, -endWord.length) + spaceThenEndWord
 			}
 		}
 	}
 	return line
 }
 
-function getQuoteSeparatedWords(line) {
-	var quoteCharacter = null
-	var quoteSeparatedWords = []
-	var start = 0
-	if (line.indexOf('=') != -1) {
-		line = getLineWithEndspace(['/>', '>', '[', '{'], line)
-	}
-	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
-		var character = line[characterIndex]
-		if (quoteCharacter == null) {
-			if (gSpaceEqualSet.has(character)) {
-				var quoteSeparatedWord = line.slice(start, characterIndex)
-				if (quoteSeparatedWord.length > 0) {
-					quoteSeparatedWords.push(quoteSeparatedWord)
-				}
-				if (character == '=') {
-					quoteSeparatedWords.push(character)
-				}
-				start = characterIndex + 1
-			}
-			else {
-				if (gQuoteSet.has(character)) {
-					quoteCharacter = character
-				}
-			}
-		}
-		else {
-			if (character == quoteCharacter) {
-				quoteCharacter = null
-			}
-		}
-	}
-	quoteSeparatedWords.push(line.slice(start))
-	return quoteSeparatedWords
-}
-
 function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceReplacement) {
 	return originalString.slice(0, spliceIndex) + spliceReplacement + originalString.slice(spliceIndex + spliceRemoved)
 }
 
-function lengthCheck(word) {
-	return word.length > 0
+function getUnquotedText(text) {
+	if (text.length < 2) {
+		return text
+	}
+	if (gQuoteSet.has(text[0])) {
+		var textLengthMinus = text.length - 1
+		if (text[0] == text[textLengthMinus]) {
+			return text.slice(1, textLengthMinus)
+		}
+	}
+	return text
 }
 
-function getStringsByMap(key, map) {
-	if (map.has(key)) {
-		return map.get(key).split(',').filter(lengthCheck)
-	}
-	return null
+function lengthCheck(word) {
+	return word.length > 0
 }
