@@ -1,30 +1,32 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function addArrayElementToMap(element, key, mapToAddTo) {
-	if (mapToAddTo.has(key)) {
-		mapToAddTo.get(key).push(element)
-		return
-	}
-	mapToAddTo.set(key, [element])
-}
-
 function addElementListsToSet(elementLists, setToAddTo) {
 	for (var elements of elementLists) {
 		addElementsToSet(elements, setToAddTo)
 	}
 }
 
+function addElementToArrays(arrays, index, value) {
+	if (arrays[index] == undefined) {
+		arrays[index] = [value]
+	}
+	else {
+		arrays[index].push(value)
+	}
+}
+
+function addElementToMapArray(array, key, mapToAddTo) {
+	if (mapToAddTo.has(key)) {
+		mapToAddTo.get(key).push(array)
+		return
+	}
+	mapToAddTo.set(key, [array])
+}
+
 function addElementsToSet(elements, setToAddTo) {
 	for (var element of elements) {
 		setToAddTo.add(element)
 	}
-}
-
-function addMapToMap(map, mapAddition) {
-	for (var entry of mapAddition) {
-		map.set(entry[0], entry[1])
-	}
-	return map
 }
 
 function compareAbsoluteElementTwoAscending(a, b) {
@@ -86,10 +88,20 @@ function compareSignedIntersectionAscending(a, b) {
 	return a[0] - b[0]
 }
 
-function copyKeysExcept(exceptionSet, mapFrom, mapTo) {
+function copyMissingKeys(mapFrom, mapTo) {
+	for (var key of mapFrom.keys()) {
+		if (!mapTo.has(key)) {
+			mapTo.set(key, mapFrom.get(key))
+		}
+	}
+}
+
+function copyMissingKeysExcept(exceptionSet, mapFrom, mapTo) {
 	for (var key of mapFrom.keys()) {
 		if (!exceptionSet.has(key)) {
-			mapTo.set(key, mapFrom.get(key))
+			if (!mapTo.has(key)) {
+				mapTo.set(key, mapFrom.get(key))
+			}
 		}
 	}
 }
@@ -152,6 +164,13 @@ function getIsEmpty(array) {
 	return array.length == 0
 }
 
+function getIsLong(array, minimumLength) {
+	if (array == null || array == undefined) {
+		return false
+	}
+	return array.length >= minimumLength
+}
+
 function getNumberOfDifferences(arraysA, arraysB) {
 	var numberOfDifferences = 0
 	if (arraysA.length != arraysB.length) {
@@ -179,6 +198,14 @@ function getNullOrValue(key, map) {
 		return map.get(key)
 	}
 	return null
+}
+
+function getShortArrays(length, points) {
+	var shortArrays = new Array(points.length)
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		shortArrays[pointIndex] = points[pointIndex].slice(0, length)
+	}
+	return shortArrays
 }
 
 function getPushElement(arrayToAddTo, element) {
