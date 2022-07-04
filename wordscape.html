@@ -5,26 +5,51 @@
 	<title>Wordscape</title>
 </head>
 <body>
+<table style="width:60%">
+<tr>
+<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
+<td><button onclick="toggleEdit()" type="button">Edit</button><td>
+<td><button onclick="toggleView()" type="button">View</button><td>
+</tr>
+<tr>
+<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
+<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
+<td><select hidden="true" id="viewSelectID" onchange ="viewSelectChanged()"></select><td>
+</tr>
+<tr>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
+<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+<td><select hidden="true" id="typeSelectID" onchange ="typeSelectChanged()"></select></td>
+</tr>
+<tr>
+<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
+<td><select hidden="true"></select><td>
+</tr>
+<tr>
+<td><select hidden="true" id="loadASessionID" onchange ="loadASessionChanged()"></select><td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+<td><select hidden="true"></select><td>
+</tr>
+<tr>
+<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button></td>
+<td><select hidden="true"></select><td>
+<td><select hidden="true"></select><td>
+</tr>
+</table>
 <table>
 <tr>
 <th><p id="paragraphText"></p></th><th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
 </tr>
 </table>
-<table style="width:50%">
+<table>
 <tr>
 <td><button type="button" onclick="update()">Update</button><td>
-<td><select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select><td>
-<td><button hidden="false" id="newButton" onclick="windowNew()" type="button">New</button><td>
-<td><select hidden="true" id="viewSelect" onchange ="viewSelectChanged()"></select><td>
-</tr>
-<tr>
-<td><button hidden="true" type="button"></button><td>
 <td><select hidden="true"></select><td>
-<td><a hidden="true" id="queryLink" href="index.html">Original Link</a><td>
-<td><select hidden="true" id="typeSelect" onchange ="typeSelectChanged()"></select></td>
+<td><select hidden="true"></select><td>
 </tr>
 </table>
-<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<textarea id="wordAreaID" rows="20" cols="120"></textarea><br>
 <br>
 <h3>SVG</h3>
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
@@ -37,6 +62,7 @@
 <script src="construction.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
+<script src="filesaver.js"></script>
 <script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
@@ -115,7 +141,7 @@ function addToMeshArea(meshString) {
 function analyzeOutputMesh(meshGenerator, registry, statement) {
 	var attributeMap = statement.attributeMap
 	var id = attributeMap.get('id')
-	registry.objectMap.set(id, meshGenerator)
+	registry.generatorMap.set(id, meshGenerator)
 	alterMeshExcept(meshGenerator.getMesh(), registry, statement, statement.tag)
 	var date = getNullOrValue('date', registry.storageMap)
 	var project = getNullOrValue('project', registry.storageMap)
@@ -142,27 +168,15 @@ function getGroupBoundingBox(caller, registry, statement) {
 	return boundingBox
 }
 
-function getInsets(registry, statement) {
-	var insets = getPointsByTag('insets', registry, statement, 'polygon')
-	if (insets == null) {
-		return [[1.0]]
-	}
-	return insets
-}
-
 function getMeshesByChildren(children, registry) {
 	var meshes = []
 	for (var child of children) {
 		var attributeID = child.attributeMap.get('id')
-		if (registry.objectMap.has(attributeID)) {
-			meshes.push(registry.objectMap.get(attributeID).getMesh())
+		if (registry.generatorMap.has(attributeID)) {
+			meshes.push(registry.generatorMap.get(attributeID).getMesh())
 		}
 	}
 	return meshes
-}
-
-function getPolygonsRecursively(registry, statement) {
-	return getPointListsRecursively('points', registry, statement, 'polygon')
 }
 
 function getStratas(registry, statement) {
@@ -176,6 +190,8 @@ function getStratas(registry, statement) {
 function getTransform2DsByChildren(children, registry) {
 	var transform2DsByChildren = null
 	for (var child of children) {
+
+		// deprecated
 		var transform2Ds = getPointsByTag('transform2Ds', registry, child, 'derive2D')
 		if (!getIsEmpty(transform2Ds)) {
 			if (transform2DsByChildren == null) {
@@ -185,7 +201,8 @@ function getTransform2DsByChildren(children, registry) {
 				pushArray(transform2DsByChildren, transform2Ds)
 			}
 		}
-		var transform2Ds = getPointsByTag('transform2Ds', registry, child, 'transform2D')
+
+		var transform2Ds = getPointsByTag('matrix2Ds', registry, child, 'matrix2D')
 		if (!getIsEmpty(transform2Ds)) {
 			if (transform2DsByChildren == null) {
 				transform2DsByChildren = transform2Ds
@@ -204,10 +221,10 @@ function getWorkMesh(registry, statement) {
 		return null
 	}
 	var workID = attributeMap.get('work')
-	if (!registry.objectMap.has(workID)) {
+	if (!registry.generatorMap.has(workID)) {
 		return null
 	}
-	var workGenerator = registry.objectMap.get(workID)
+	var workGenerator = registry.generatorMap.get(workID)
 	if (workGenerator == null) {
 		return null
 	}
@@ -220,18 +237,13 @@ function getWorkMesh(registry, statement) {
 	return workMesh
 }
 
-function update() {
-	document.getElementById('meshArea').value = ''
-	var svgString = updateSVGArea()
-	document.getElementById('paragraphText').innerHTML = svgString
-	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
-}
-
-function updateSVGArea() {
-	var lines = getBracketReplacedLines('wordArea')
-	var registry = {idMap:new Map(), objectMap:new Map(), storageMap:new Map()}
-	meshViewer.setID('viewerCanvas', registry.objectMap, 'typeSelect', 'viewSelect')
+function updateSVGArea(lines) {
+	var registry = {idMap:new Map(), generatorMap:new Map(), storageMap:new Map()}
+	meshViewer.setID('viewerCanvas', registry.generatorMap)
 	var svgStatement = getDocumentRoot(lines, 'svg')
+	if (svgStatement == null) {
+		return ''
+	}
 	var descendants = [svgStatement]
 	addToDescendantsOutsideFirst(descendants, svgStatement)
 	for (var statement of descendants) {
@@ -240,9 +252,11 @@ function updateSVGArea() {
 		}
 	}
 	createDefault(registry, svgStatement)
+	descendants = [svgStatement]
+	addToDescendantsInsideFirst(descendants, svgStatement)
 	processDescendantsByTagMap(registry, svgStatement, gTagBeginMap)
 	processDescendantsByTagMap(registry, svgStatement, gTagCenterMap)
-	var descendants = [svgStatement]
+	descendants = [svgStatement]
 	addToDescendantsOutsideFirst(descendants, svgStatement)
 	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
@@ -270,11 +284,16 @@ function updateSVGArea() {
 	var svgLines = getPassthroughLines(descendants, 'svg')
 	var joinWord = getJoinWord()
 	var svgString = svgLines.join(joinWord)
-	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('svgArea', svgLines)
 	document.getElementById('svgArea').value = svgString
 	meshViewer.start(height + padding + padding)
 	return svgString
+}
+
+function updateWordArea(wordString) {
+	document.getElementById('meshArea').value = ''
+	document.getElementById('paragraphText').innerHTML = updateSVGArea(getBracketReplacedLinesByText(wordString))
 }
 
 var gTagBeginMap = new Map()
@@ -283,7 +302,7 @@ gProcessors = gAlterationProcessors.concat(gConstructionProcessors).concat(gGene
 gProcessors = gProcessors.concat(gGenerator3DProcessors).concat(gMetaProcessors)
 initializeProcessors(gProcessors)
 
-setTextArea('wordArea')
+setTextArea('wordAreaID')
 update()
 </script>
 </body>
