@@ -185,8 +185,8 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	var oneOverLayerThickness = 1.0 / layerThickness
 	var pointsATransformed = getArraysCopy(meshA.points)
 	var pointsBTransformed = getArraysCopy(meshB.points)
-	addXYZsByZ(pointsATransformed, -offsetZ)
-	addXYZsByZ(pointsBTransformed, -offsetZ)
+	addArraysByZ(pointsATransformed, -offsetZ)
+	addArraysByZ(pointsBTransformed, -offsetZ)
 	multiplyXYZsByScalar(pointsATransformed, oneOverLayerThickness)
 	multiplyXYZsByScalar(pointsBTransformed, oneOverLayerThickness)
 	var latticeA = getXYZLatticeByMesh({facets:meshA.facets, points:pointsATransformed})
@@ -194,7 +194,7 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	var latticeBoolean = getXYZLatticeBoolean(existenceCondition, signB, latticeA, latticeB)
 	var mesh = getMeshByXYZLattice(latticeBoolean)
 	mesh.points = getArraysCopy(mesh.points)
-	addXYZsByZ(multiplyXYZsByScalar(mesh.points, layerThickness), offsetZ)
+	addArraysByZ(multiplyXYZsByScalar(mesh.points, layerThickness), offsetZ)
 	return mesh
 }
 
