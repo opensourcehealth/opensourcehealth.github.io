@@ -5,29 +5,44 @@
 	<title>Javascript Evaluator</title>
 </head>
 <body>
+<table style="width:60%">
+<tr>
+<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
+<td><button onclick="toggleEdit()" type="button">Edit</button><td>
+</tr>
+<tr>
+<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
+<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
+</tr>
+<tr>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
+<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+</tr>
+<tr>
+<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
+</tr>
+<tr>
+<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button><td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+</tr>
+</table>
 <p id="paragraphText"></p>
 <p id="documentTitle"></p>
 <p id="documentText"></p>
-<button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
-<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
-<a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
-<textarea id="wordArea" rows="20" cols="120"></textarea><br>
+<textarea id="wordAreaID" rows="20" cols="120"></textarea><br>
+<button type="button" onclick="update()">Update</button>
 <h3>Evaluation Text</h3>
 <textarea id="evaluationArea" rows="40" cols="120"></textarea><br>
+<script src="maparray.js"></script>
 <script src="codec.js"></script>
 <script src="parseword.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function update() {
-	eval(updateEvaluationArea())
-	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
-}
-
 function updateEvaluationArea() {
 	var documentLine = null
-	var lines = getBracketReplacedLines('wordArea')
+	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
 	var evaluate = false
 	var evaluationLines = []
 	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -73,13 +88,17 @@ function updateEvaluationArea() {
 	var evaluationString = evaluationLines.join(joinWord)
 	var javascriptString = lines.join(joinWord)
 	document.getElementById('paragraphText').innerHTML = javascriptString
-	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('evaluationArea', evaluationLines)
 	document.getElementById('evaluationArea').value = evaluationString
 	return evaluationString
 }
 
-setTextArea('wordArea')
+function updateWordArea(wordString) {
+	eval(updateEvaluationArea())
+}
+
+setTextArea('wordAreaID')
 update()
 </script>
 </body>
