@@ -6,19 +6,39 @@
 	<title>Flexible BB Code Converter</title>
 </head>
 <body>
+<table style="width:60%">
+<tr>
+<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
+<td><button onclick="toggleEdit()" type="button">Edit</button><td>
+</tr>
+<tr>
+<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
+<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
+</tr>
+<tr>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
+<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+</tr>
+<tr>
+<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
+</tr>
+<tr>
+<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button><td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+</tr>
+</table>
 <h3>Convert Code</h3>
+<textarea id="codeArea" rows="15" cols="120"></textarea><br>
 <button type="button" onclick="convertToHTML()">BB Code to HTML</button>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <button type="button" onclick="convertToBBCode()">HTML to BB Code</button><br>
-<textarea id="codeArea" rows="15" cols="120"></textarea><br>
 <h3>Developer Area</h3>
+<textarea id="wordAreaID" rows="20" cols="120"></textarea><br>
 <button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<select hidden="true" id="querySelect" onchange ="querySelectChanged()"></select>
-<button hidden="true" id="newButton" onclick="windowNew()" type="button">New</button>
-<a hidden="true" id="queryLink" href="index.html">Original Link</a><br>
-<textarea id="wordArea" rows="20" cols="120"></textarea><br>
 <h3>Converters</h3>
 <textarea id="converterArea" rows="40" cols="120"></textarea><br>
+<script src="maparray.js"></script>
 <script src="codec.js"></script>
 <script src="help.js"></script>
 <script src="parseword.js"></script>
@@ -34,7 +54,7 @@ gConverterMaps = []
 
 function convertToBBCode() {
 	codeText = document.getElementById('codeArea').value
-	for (converterMap of gConverterMaps) {
+	for (var converterMap of gConverterMaps) {
 		codeText = getConvertedToBBCode(converterMap, codeText)
 	}
 	document.getElementById('codeArea').value = codeText
@@ -42,7 +62,7 @@ function convertToBBCode() {
 
 function convertToHTML() {
 	codeText = document.getElementById('codeArea').value
-	for (converterMap of gConverterMaps) {
+	for (var converterMap of gConverterMaps) {
 		codeText = getConvertedToHTML(converterMap, codeText)
 	}
 	document.getElementById('codeArea').value = codeText
@@ -64,7 +84,7 @@ function getConvertedToBBCode(converterMap, codeText) {
 	codeText = codeText.split('<p>').join('').split('</p>').join('')
 	var codeTokens = codeText.split(htmlTag)
 	var convertedTokens = []
-	for (codeToken of codeTokens) {
+	for (var codeToken of codeTokens) {
 		var convertedToken = codeToken
 		indexOfHTMLEndTag = codeToken.indexOf(htmlEndTag)
 		if (indexOfHTMLEndTag != -1) {
@@ -102,15 +122,10 @@ function getConvertedToHTML(converterMap, codeText) {
 	var codeTokens = codeText.split(bbTag)
 	var convertedTokens = []
 	if (!converterMap.has('bbInner') && !converterMap.has('bbKey')) {
-		for (codeToken of codeTokens) {
+		for (var codeToken of codeTokens) {
 			var convertedToken = codeToken
 			indexOfBBEndTag = codeToken.indexOf(bbEndTag)
-			if (indexOfBBEndTag == -1 && codeToken.length > 0) {
-				warningString = 'The tag:\nis unbalanced, so the html will be incorrect.'
-				warningString += ' The bbcode tags must be balanced before being converted.'
-				warning(warningString, [bbEndTag, codeToken])
-			}
-			else {
+			if (indexOfBBEndTag != -1) {
 				convertedToken = getReplacedByTag(']', '>', indexOfBBEndTag, codeToken, bbEndTag, htmlEndTag)
 			}
 			convertedTokens.push(convertedToken)
@@ -118,7 +133,7 @@ function getConvertedToHTML(converterMap, codeText) {
 		return convertedTokens.join(htmlTag)
 	}
 	if (!converterMap.has('bbInner') && converterMap.has('bbKey') && converterMap.has('htmlKey')) {
-		for (codeToken of codeTokens) {
+		for (var codeToken of codeTokens) {
 			var convertedToken = codeToken
 			indexOfBBEndTag = codeToken.indexOf(bbEndTag)
 			if (indexOfBBEndTag != -1) {
@@ -134,7 +149,7 @@ function getConvertedToHTML(converterMap, codeText) {
 				else {
 					warningString = 'The tag:\nis unbalanced, so the html will be incorrect.'
 					warningString += ' The bbcode tags must be balanced before being converted.'
-					warning(warningString, [bbEndTag, codeToken])
+					warning(warningString, [bbEndTag, codeToken, indexOfEqual, indexOfBeginBracket, ])
 				}
 			}
 			convertedTokens.push(convertedToken)
@@ -146,7 +161,7 @@ function getConvertedToHTML(converterMap, codeText) {
 
 function getLineFromMap(attributeMap) {
 	entryStrings = []
-	for (entry of attributeMap) {
+	for (var entry of attributeMap) {
 		entryStrings.push(entry[0] + ' = ' + entry[1])
 	}
 	return entryStrings.join('  ')
@@ -164,30 +179,29 @@ function getReplacedByTag(characterSearch, characterReplacement, endIndex, repla
 	return replaced.replace(tagSearch, tagReplacement)
 }
 
-function update() {
-	updateConverterArea()
-	setQueryStorage('newButton', 'querySelect', document.getElementById('wordArea').value)
-}
-
 function updateConverterArea() {
 	gConverterMaps = []
 	var documentLine = null
-	var lines = getBracketReplacedLines('wordArea')
+	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
 	var converterLines = []
-	for (line of lines) {
+	for (var line of lines) {
 		var tokens = line.trim().replace(/=/g, ' = ').split(' ').filter(lengthCheck)
 		var attributeMap = new Map(getAttributes(tokens))
 		gConverterMaps.push(attributeMap)
 		converterLines.push(getLineFromMap(attributeMap))
 	}
 	var converterString = converterLines.join(getJoinWord())
-	setNumberOfRows('wordArea', lines)
+	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('converterArea', converterLines)
 	document.getElementById('converterArea').value = converterString
 	return converterString
 }
 
-setTextArea('wordArea')
+function updateWordArea(wordString) {
+	updateConverterArea()
+}
+
+setTextArea('wordAreaID')
 update()
 </script>
 </body>
