@@ -54,8 +54,8 @@
 <h3>SVG</h3>
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
 <br>
-<h3>Mesh</h3>
-<textarea id="meshArea" rows="10" cols="120"></textarea><br>
+<h3>STL Input</h3>
+<textarea id="stlInputID" rows="4" cols="120"></textarea><br>
 <br>
 <script src="maparray.js"></script>
 <script src="alteration.js"></script>
@@ -125,121 +125,31 @@ wordArea.onkeydown = areaKeyDown
 wordArea.oninput = areaInput
 */
 
-function addToMeshArea(meshString) {
+function addToMeshArea(id, meshString) {
 	if (meshString == null) {
 		return
 	}
-	var meshArea = document.getElementById('meshArea')
-	if (meshArea.value == '') {
-		meshArea.value = meshString
-		return
+	var textAreaID = 'stl_output_' + id
+	var textArea = document.getElementById(textAreaID)
+	if (textArea == null) {
+		var heading = document.createElement('H3')
+		heading.appendChild(document.createTextNode('STL Output - ' + id))
+		document.body.appendChild(heading)
+		textArea = document.createElement('textarea')
+		textArea.cols = 120
+		textArea.id = textAreaID
+		textArea.rows = 4
+		textArea.value = meshString
+		document.body.appendChild(textArea)	
 	}
-	meshArea.value = meshArea.value + '\n' + meshString
-}
-
-//deprecated
-function analyzeOutputMesh(meshGenerator, registry, statement) {
-	var attributeMap = statement.attributeMap
-	var id = attributeMap.get('id')
-	registry.generatorMap.set(id, meshGenerator)
-	alterMeshExcept(meshGenerator.getMesh(), registry, statement, statement.tag)
-	var date = getNullOrValue('date', registry.storageMap)
-	var project = getNullOrValue('project', registry.storageMap)
-	if (attributeMap.has('outputMesh')) {
-		addToMeshArea(getMeshString(date, attributeMap.get('outputMesh'), id, meshGenerator.getMesh(), project))
+	else {
+		textArea.value = meshString
 	}
-	if (attributeMap.has('outputTriangleMesh')) {
-		addToMeshArea(getTriangleMeshString(date, attributeMap.get('outputTriangleMesh'), id, meshGenerator.getMesh(), project))
-	}
-	if (attributeMap.has('view')) {
-		if (getBooleanByStatementValue('view', registry, statement, attributeMap.get('view'))) {
-			meshViewer.addMesh(id, null)
-		}
-	}
-}
-
-function getGroupBoundingBox(caller, registry, statement) {
-	var boundingBox = null
-	var descendants = []
-	addToDescendantsInsideFirst(descendants, statement)
-	for (var child of descendants) {
-		boundingBox = widenStatementBoundingBox(boundingBox, caller, registry, child)
-	}
-	return boundingBox
-}
-
-function getMeshesByChildren(children, registry) {
-	var meshes = []
-	for (var child of children) {
-		var attributeID = child.attributeMap.get('id')
-		if (registry.generatorMap.has(attributeID)) {
-			meshes.push(registry.generatorMap.get(attributeID).getMesh())
-		}
-	}
-	return meshes
-}
-
-function getStratas(registry, statement) {
-	var stratas = getFloatListsByStatement('stratas', registry, statement)
-	if (getIsEmpty(stratas)) {
-		return [null]
-	}
-	return stratas
-}
-
-function getTransform2DsByChildren(children, registry) {
-	var transform2DsByChildren = null
-	for (var child of children) {
-
-		// deprecated
-		var transform2Ds = getPointsByTag('transform2Ds', registry, child, 'derive2D')
-		if (!getIsEmpty(transform2Ds)) {
-			if (transform2DsByChildren == null) {
-				transform2DsByChildren = transform2Ds
-			}
-			else {
-				pushArray(transform2DsByChildren, transform2Ds)
-			}
-		}
-
-		var transform2Ds = getPointsByTag('matrix2Ds', registry, child, 'matrix2D')
-		if (!getIsEmpty(transform2Ds)) {
-			if (transform2DsByChildren == null) {
-				transform2DsByChildren = transform2Ds
-			}
-			else {
-				pushArray(transform2DsByChildren, transform2Ds)
-			}
-		}
-	}
-	return transform2DsByChildren
-}
-
-function getWorkMesh(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('work')) {
-		return null
-	}
-	var workID = attributeMap.get('work')
-	if (!registry.generatorMap.has(workID)) {
-		return null
-	}
-	var workGenerator = registry.generatorMap.get(workID)
-	if (workGenerator == null) {
-		return null
-	}
-	var workMesh = workGenerator.getMesh()
-	if (attributeMap.has('copy')) {
-		if (getBooleanByStatementValue('copy', registry, statement, attributeMap.get('copy'))) {
-			workMesh = getMeshCopy(workMesh)
-		}
-	}
-	return workMesh
 }
 
 function updateSVGArea(lines) {
-	var registry = {idMap:new Map(), generatorMap:new Map(), storageMap:new Map()}
-	meshViewer.setID('viewerCanvas', registry.generatorMap)
+	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	meshViewer.setID('viewerCanvas', registry)
 	var svgStatement = getDocumentRoot(lines, 'svg')
 	if (svgStatement == null) {
 		return ''
@@ -256,8 +166,6 @@ function updateSVGArea(lines) {
 	addToDescendantsInsideFirst(descendants, svgStatement)
 	processDescendantsByTagMap(registry, svgStatement, gTagBeginMap)
 	processDescendantsByTagMap(registry, svgStatement, gTagCenterMap)
-	descendants = [svgStatement]
-	addToDescendantsOutsideFirst(descendants, svgStatement)
 	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
 	var height = lineThickness
@@ -281,7 +189,7 @@ function updateSVGArea(lines) {
 	if (!svgStatement.attributeMap.has('xmlns')) {
 		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
 	}
-	var svgLines = getPassthroughLines(descendants, 'svg')
+	var svgLines = getPassthroughLinesByStatement('svg', svgStatement)
 	var joinWord = getJoinWord()
 	var svgString = svgLines.join(joinWord)
 	setNumberOfRows('wordAreaID', lines)
@@ -292,7 +200,6 @@ function updateSVGArea(lines) {
 }
 
 function updateWordArea(wordString) {
-	document.getElementById('meshArea').value = ''
 	document.getElementById('paragraphText').innerHTML = updateSVGArea(getBracketReplacedLinesByText(wordString))
 }
 
