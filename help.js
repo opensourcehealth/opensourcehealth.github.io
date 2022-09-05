@@ -2,6 +2,15 @@
 
 var gAlertSet = new Set()
 
+function noticeByList(notices) {
+	if (notices.length == 0) {
+		return
+	}
+	for (var notice of notices) {
+		console.log(notice)
+	}
+}
+
 function warning(text, variables) {
 	var textLines = text.split('\n')
 	var maximumLength = Math.max(textLines.length, variables.length)
