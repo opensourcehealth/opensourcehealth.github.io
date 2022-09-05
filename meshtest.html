@@ -24,36 +24,49 @@
 
 var gLine = ''
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// change emboss to topTool and bottomTool
-// add group end statement automatically and remove -1 statements
-// reorganize svg addition to structure, then getStatementByID should get root
-// replace getStatement( with getStatementByParentTag( when possible
-// split individual facet, bevel, split if necessary, proportional
-// test chain3D, skip3D
+// upload
+// check meeting tolerance, emboss by insetting, then connecting, then setting points to original, then removing tiny facets
+// list polygons by normal if normal in analysis, view facet by normal
+// retrieve buckle
 // directional intervals
 // concatenate
-// input stl, view facet by normal
+// bevelZ
+// upload
+//
+// low priority
+// add noticeByList for tags outside of alteration, meta, generator2d
+// add notice for other missing and getStatementID whileIndex?
+// bug when difference polygon point is on facet
+// bug when adding without multiplying 1.0*attributeByID(cellHeight,'grid')+2!=attributeByID(cellHeight,'grid')+2
+// change remaining XY to 2D
+// use warningByList instead of warning
+// rename radius to inset or outset as applicable
+// delete model select when models dropped and disabled in viewer
+// replace null with undefined where appropriate especially when parsing
+//
+// maybe add notice and viewer point output
+// viewer new/delete/move
+// engrave: makes it possible to raise the edges
+// add skip3D option to copy
 // later when getting points, transform 2D if any then transform 3D if any
-// add transform to 3D
 // bug gridWidth=215.9 - 25.4 * (0.26 * 2) is different from 215.9 - 25.4 * 0.26 * 2
 // check why font has to be smaller to not wraparound
 // check expand when there are horizontal facets
+// delete a session
 // memories, add text change to line number to optionSelect key in codec > var key = query.slice(0, 10)
 // connect facets on point line in difference and union
 // make circle, similar to arcFromTo, then make new O and Q
-// add connection type for each polygon in sculpture layer
-// close to line in sculpture
+// make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
 // multiply or mirror polygons, polylines and construction
 // maybe add children to 2d list
+// maybe join emboss with union
+// maybe triangulateBentFacets vertically if possible
 // mirror bend
 // lathe
 // spline?
 // make mesh grid
-// 2d construction
-// nested arrays in evaluate, for example e=[[[1,2],3,4],5]
 // make viewer bigger with outside rotation handles
 // alphabetic encoding and compression
-// use warningByList instead of warning
 // spring or staple or hook or fastener
 // parabola, parabolic interpolation
 // triangulate non horizontal facets in differential inset or expansion
@@ -65,11 +78,10 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // __rectangle points=-2 10
 // string testBoundary=point[2] > 7.0 testTranslation=[point[0], 0.0, 0.0]
 // }
-// check polygonAnalysis when there is are lone edges in brick around top wedge
+// check polygonAnalysis when there are lone edges in brick around top wedge
 // deprecate all non 3d tags in links
 //
 // check linkMap in getMeshAnalysis, count empty intersection pairs
-// add warning for missing work and other missing and getStatementID whileIndex
 // operate and transform polygons in wordscape, maybe use true location instead of inverse for points in drillMesh
 // deprecate exclusiveIntersection
 // better colors
@@ -83,6 +95,7 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // getDirectedPolygon3D using vertex z if available
 // solids = [], solid = {meshes:[{name:, points:[], facets:[], matrix:4x4}], construction:"..", name, color, material}
 // construction -> + union, - difference, * intersection
+// rename xyz to 3D in pixel and voxel
 // getTriangularMesh, getPolyhedralMesh, getCarving, getStatement, get JSON
 // shape isLatticed, isPillar, mesh or pillar
 // else statement could check for previousStatement then set all the previousStatement of the siblings
@@ -103,7 +116,7 @@ function drawMesh(mesh) {
 		var polygon = new Array(facet.length)
 		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
 			polygon[keyIndex] = points[facet[keyIndex]]
-			polygon[keyIndex] = getXYZAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
+			polygon[keyIndex] = get3DAddition(polygon[keyIndex], [0.03 * (index % 3), 0.02 * (index % 5), 0.014 * (index % 7)])
 			z = polygon[keyIndex][2]
 		}
 		drawXYZPolygon(polygon, getRGB())
@@ -146,7 +159,7 @@ function drawVoxelMap(voxelMap) {
 				direction = gDirections[directionIndex]
 				var cTip = getXYPointStringByXYZ(xyz).split(',')
 				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.08' + rgbString)
-				var cDirection = getXYPointStringByXYZ(addXYZ(getXYZMultiplicationByScalar(direction, 0.3), parameters)).split(',')
+				var cDirection = getXYPointStringByXYZ(add3D(get3DMultiplicationByScalar(direction, 0.3), parameters)).split(',')
 				document.writeln('<circle cx="' + cDirection[0] + '" cy="' + cDirection[1] + '" r="0.04' + rgbString)
 			}
 		}
@@ -264,295 +277,20 @@ function testBend() {
 	console.log(points)
 }
 
-/* deprecated
-function insetPolyline(beginVector, endVector, polyline, radius) {
-	if (polyline.length < 2) {
-		return
-	}
-	for (var vertexIndex = polyline.length - 2; vertexIndex > -1; vertexIndex--) {
-		var point = polyline[vertexIndex]
-		var nextPoint = polyline[vertexIndex + 1]
-		if (point[0] == nextPoint[0] && point[1] == nextPoint[1]) {
-			polyline.splice(vertexIndex, 1)
-		}
-	}
-	var oldPolyline = getArraysCopy(polyline)
-	for (var vertexIndex = 1; vertexIndex < oldPolyline.length - 1; vertexIndex++) {
-		var centerPoint = oldPolyline[vertexIndex]
-		var centerBegin = normalizeXY(getXYSubtraction(oldPolyline[vertexIndex - 1], centerPoint))
-		var centerEnd = normalizeXY(getXYSubtraction(oldPolyline[vertexIndex + 1], centerPoint))
-		var outsetDelta = getXYAddition(centerBegin, centerEnd)
-		divideXYByScalar(outsetDelta, getXYDotProduct([centerEnd[1], -centerEnd[0]], outsetDelta))
-		addXY(polyline[vertexIndex], getXYMultiplication(outsetDelta, radius))
-	}
-	var centerPoint = oldPolyline[0]
-	var centerEnd = normalizeXY(getXYSubtraction(oldPolyline[1], centerPoint))
-	var dotProduct = getXYDotProduct([centerEnd[1], -centerEnd[0]], beginVector)
-	addXY(polyline[0], getXYMultiplication(divideXYByScalar(beginVector.slice(0), dotProduct), radius))
-	var centerPoint = oldPolyline[oldPolyline.length - 1]
-	var centerBegin = normalizeXY(getXYSubtraction(oldPolyline[oldPolyline.length - 2], centerPoint))
-	var dotProduct = getXYDotProduct([-centerBegin[1], centerBegin[0]], endVector)
-	addXY(polyline[polyline.length - 1], getXYMultiplication(divideXYByScalar(endVector.slice(0), dotProduct), radius))
-	return polyline
-}
-*/
-
-function getVertexIndexByPointIndex(facet, pointIndex) {
-	var vertexIndex = 0
-	for (; vertexIndex < facet.length; vertexIndex++) {
-		if (facet[vertexIndex] == pointIndex) {
-			return vertexIndex
-		}
-	}
-	return null
-}
-
-function getHorizontalIndexByFacet(facet, pointIndex, points) {
-	var horizontalIndex = null
-	var vertexIndex = getVertexIndexByPointIndex(facet, pointIndex)
-	var centerPoint = points[pointIndex]
-	var beginIndex = facet[(vertexIndex - 1 + facet.length) % facet.length]
-	var centerBegin = getXYZSubtraction(points[beginIndex], centerPoint)
-	var zBegin = Math.abs(centerBegin[2] / getXYZLength(centerBegin))
-	var endIndex = facet[(vertexIndex + 1) % facet.length]
-	var centerEnd = getXYZSubtraction(points[endIndex], centerPoint)
-	if (zBegin < Math.abs(centerEnd[2] / getXYZLength(centerEnd))) {
-		return beginIndex
-	}
-	return endIndex
-}
-
-function transferBetweensToGroup(betweens, betweenSet, facets, horizontalDirectionMap, pointIndex) {
-	for (var normalIndex of horizontalDirectionMap.get(pointIndex)) {
-		var facet = facets[normalIndex[3]]
-		var vertexIndex = getVertexIndexByPointIndex(facet, pointIndex)
-		var beginIndex = facet[(vertexIndex - 1 + facet.length) % facet.length]
-		if (betweenSet.has(beginIndex)) {
-			betweens.push(beginIndex)
-			betweenSet.delete(beginIndex)
-		}
-		var endIndex = facet[(vertexIndex + 1) % facet.length]
-		if (betweenSet.has(endIndex)) {
-			betweens.push(endIndex)
-			betweenSet.delete(endIndex)
-		}
-	}
-}
-
-function getJoinedMapByDirectionMap(facets, horizontalDirectionMap, pointIndexSet) {
-	var linkMap = new Map()
-	for (var pointIndex of pointIndexSet) {
-		for (var normalIndex of horizontalDirectionMap.get(pointIndex)) {
-			var facet = facets[normalIndex[3]]
-			var vertexIndex = getVertexIndexByPointIndex(facet, pointIndex)
-			var beginIndex = facet[(vertexIndex - 1 + facet.length) % facet.length]
-			if (pointIndexSet.has(beginIndex)) {
-				addToLinkMap(pointIndex, beginIndex, linkMap)
-			}
-			var endIndex = facet[(vertexIndex + 1) % facet.length]
-			if (pointIndexSet.has(endIndex)) {
-				addToLinkMap(pointIndex, endIndex, linkMap)
-			}
-		}
-	}
-	var joinedMap = new Map()
-	for (var pointIndex of pointIndexSet) {
-		addElementToMapArray(pointIndex, getLinkTop(pointIndex, linkMap), joinedMap)
-	}
-	return joinedMap
-}
-
-function getInterpolation2D(along, lower, upper) {
-	var oneMinus = 1.0 - along
-	return [oneMinus * lower[1] + along * upper[1], oneMinus * lower[2] + along * upper[2]]
-}
-
-function getBetweensByJoined(betweens, betweenSet, bevelMap, facets, horizontalDirectionMap, joined, radiusTop) {
-	var betweens = []
-	for (var pointIndex of joined) {
-		bevelMap.set(pointIndex, radiusTop)
-		transferBetweensToGroup(betweens, betweenSet, facets, horizontalDirectionMap, pointIndex)
-	}
-	for (var betweenIndex = 0; betweenIndex < betweens.length; betweenIndex++) {
-		transferBetweensToGroup(betweens, betweenSet, facets, horizontalDirectionMap, betweens[betweenIndex])
-	}
-	return betweens
-}
-
-function getWaypoints(radiuses) {
-	var waypoints = new Array(radiuses.length)
-	var radiusesZero = radiuses[0]
-	waypoints[0] = [0.0, radiusesZero[0], radiusesZero[1]]
-	for (var radiusIndex = 1; radiusIndex < radiuses.length; radiusIndex++) {
-		var radiusTop = radiuses[radiusIndex]
-		waypoints[radiusIndex] = [radiusTop[2], radiusTop[0], radiusTop[1]]
-	}
-	return waypoints
-}
-
-
-function bevelPoints(facets, pointIndexSet, points, radiusBottoms, radiusTops) {
-	var horizontalDirectionMap = new Map()
-	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		var normal = getNormalByFacet(facets[facetIndex], points)
-		if (normal != null) {
-			var facet = facets[facetIndex]
-			for (var pointIndex of facet) {
-				if (pointIndexSet.has(pointIndex)) {
-					normal.push(facetIndex)
-					for (var pointIndex of facet) {
-						addElementToMapArray(normal, pointIndex, horizontalDirectionMap)
-					}
-					break
-				}
-			}
-		}
-	}
-	var betweenSet = new Set()
-	var bottomSet = new Set()
-	var topSet = new Set()
-	for (var pointIndex of pointIndexSet) {
-		if (horizontalDirectionMap.has(pointIndex)) {
-			var furthestZ = 0.0
-			for (var normal of horizontalDirectionMap.get(pointIndex)) {
-				var z = normal[2]
-				if (Math.abs(z) > Math.abs(furthestZ)) {
-					furthestZ = z
-				}
-			}
-			if (furthestZ > 0.5) {
-				topSet.add(pointIndex)
-			}
-			else {
-				if (furthestZ < -0.5) {
-					bottomSet.add(pointIndex)
-				}
-				else {
-					betweenSet.add(pointIndex)
-				}
-			}
-		}
-	}
-	var bevelMap = new Map()
-	var oldBetweens = getArrayBySet(betweenSet)
-	if (!getIsEmpty(radiusBottoms)) {
-		var joinedMap = getJoinedMapByDirectionMap(facets, horizontalDirectionMap, bottomSet)
-		var waypoints = getWaypoints(radiusBottoms)
-		for (var joined of joinedMap.values()) {
-			var maximumZ = -Number.MAX_VALUE
-			for (var pointIndex of joined) {
-				maximumZ = Math.max(maximumZ, points[pointIndex][2])
-			}
-			var betweens = getBetweensByJoined(betweens, betweenSet, bevelMap, facets, horizontalDirectionMap, joined, radiusBottoms[0])
-			for (var between of betweens) {
-				var interpolationAlong = getInterpolationAlongBeginEnd(points[between][2] - maximumZ, waypoints)
-				var along = interpolationAlong[0]
-				if (along >= 0.0) {
-					bevelMap.set(between, getInterpolation2D(along, waypoints[interpolationAlong[1]], waypoints[interpolationAlong[2]]))
-				}
-			}
-		}
-	}
-	betweenSet.clear()
-	addElementsToSet(oldBetweens, betweenSet)
-	if (!getIsEmpty(radiusTops)) {
-		var joinedMap = getJoinedMapByDirectionMap(facets, horizontalDirectionMap, topSet)
-		var waypoints = getWaypoints(radiusTops)
-		for (var joined of joinedMap.values()) {
-			var minimumZ = Number.MAX_VALUE
-			for (var pointIndex of joined) {
-				minimumZ = Math.min(minimumZ, points[pointIndex][2])
-			}
-			var betweens = getBetweensByJoined(betweens, betweenSet, bevelMap, facets, horizontalDirectionMap, joined, radiusTops[0])
-			for (var between of betweens) {
-				var interpolationAlong = getInterpolationAlongBeginEnd(minimumZ - points[between][2], waypoints)
-				var along = interpolationAlong[0]
-				if (along >= 0.0) {
-					var interpolation = getInterpolation2D(along, waypoints[interpolationAlong[1]], waypoints[interpolationAlong[2]])
-					if (bevelMap.has(between)) {
-						multiplyXYByScalar(addXY(interpolation, bevelMap.get(between)), 0.5)
-					}
-					bevelMap.set(between, interpolation)
-				}
-			}
-		}
-	}
-	for (var pointIndex of pointIndexSet) {
-		if (bevelMap.has(pointIndex)) {
-			var unitVectors = horizontalDirectionMap.get(pointIndex)
-			unitVectors.sort(compareAbsoluteElementTwoAscending)
-			var horizontalIndexLink = getHorizontalIndexByFacet(facets[unitVectors[0][3]], pointIndex, points)
-			var horizontalIndexOpen = getHorizontalIndexByFacet(facets[unitVectors[1][3]], pointIndex, points)
-			var radius = bevelMap.get(pointIndex)
-			if (pointIndexSet.has(horizontalIndexLink) == pointIndexSet.has(horizontalIndexOpen)) {
-				var addition = getXYAddition(normalizeXY(unitVectors[0]), normalizeXY(unitVectors[1]))
-				var multiplication = getXYMultiplication(multiplyXYByScalar(addition, -2.0 / getXYLengthSquared(addition)), radius)
-				bevelMap.set(pointIndex, addXY(points[pointIndex].slice(0), multiplication))
-			}
-			else {
-				var normal = unitVectors[1]
-				if (pointIndexSet.has(horizontalIndexOpen)) {
-					oldIndex = horizontalIndexLink
-					horizontalIndexLink = horizontalIndexOpen
-					horizontalIndexOpen = oldIndex
-					normal = unitVectors[0]
-				}
-				normal = normal.slice(0, 2)
-				normalizeXY(normal)
-				var centerPoint = points[pointIndex]
-				var centerOpen = normalizeXY(getXYSubtraction(points[horizontalIndexOpen], centerPoint))
-				var linkCenter = normalizeXY(getXYSubtraction(centerPoint, points[horizontalIndexLink]))
-				var multiplication = getXYMultiplication(divideXYByScalar(centerOpen, getXYDotProduct(normal, linkCenter)), radius)
-				bevelMap.set(pointIndex, addXY(points[pointIndex].slice(0), multiplication))
-			}
-		}
-	}
-	for (var pointIndex of bevelMap.keys()) {
-		points[pointIndex] = bevelMap.get(pointIndex)
-	}
-}
-
 function testBevel() {
 	console.log('testBevel')
-	var mesh = getPillarMesh([0.0, 1.0, 2.0, 3.0], get3DUnitMatrix(), [[[0,0,0], [0,5,0], [2,6,0], [3,5,0], [4,0,0], [2,-2,0]]])
-	drawMesh(mesh)
-	var pointIndexSet = new Set()
-	addTo3DPointIndexSet(null, pointIndexSet, mesh.points, [[[-1,1], [-1,-5], [9,-5], [9,1]]], null, null, [null])
+	var bevels = [[0.0, 0.3], [1.2, 0.2]]
+	var boundaryEquations = null
+	var mesh = getPillarMesh([0.0, 6.0], getUnitMatrix3D(), [[[0,-1,0], [0,4,0], [2,5,0], [3,4,0], [4,-1,0], [2,-3,0]]])
+//	drawMesh(mesh)
+	var polygons = [[[-1,1], [-1,-5], [9,-5], [9,1]]]
+	var splitBevels = [[2.5, 0.4]]
+	splitMeshByBevels(boundaryEquations, 'testBevel', null, mesh, polygons, null, splitBevels, null)
+	var pointIndexSet = getPointIndexSet(boundaryEquations, [], mesh.points, polygons, mesh, null, null, [[-1,1]])
 	console.log(pointIndexSet)
 	console.log(mesh)
-	bevelPoints(mesh.facets, pointIndexSet, mesh.points, [[1.0, 1.0], [0.3, 0.3, 1.2]], [[1.0, 1.0], [0.8, 0.8, 1.2], [1.4, 1.4, 2.5]])
+	bevelPoints(bevels, null, mesh, pointIndexSet, mesh.points, splitBevels)
 	drawMesh(mesh)
-	return
-//	var pointString = '0,0,0 0,2,6 4,2,6 4,0,0'
-//	var pointString = '0,0,0 0,3,6 4,3,6 4,1,2 2,1,2 2,0,0'
-//	var pointString = '0,0,0 0,4,8 4,4,8 4,1,2 2,1,2 2,2,4 1,2,4 1,0,0'
-	var pointString = '-4,0,0 -4,4,8 -2,0,0 -2,4,8 0,0,0 0,4,8 4,4,8 4,1,2 2,1,2 2,2,4 1,2,4 1,0,0'
-	var points = getPointsByString(pointString)
-	var outerFacet = [0, 1, 3, 2]
-	var closeFacet = [2, 3, 5, 4]
-	var toolFacet = [4, 5, 6, 7, 8, 9, 10, 11]
-	var facets = [outerFacet, closeFacet, toolFacet]
-	drawXYPolygon(getPolygonByFacet(outerFacet, points), getRGB())
-	drawXYPolygon(getPolygonByFacet(closeFacet, points), getRGB())
-	drawXYPolygon(getPolygonByFacet(toolFacet, points), getRGB())
-	var workMesh = {facets:facets, points:points}
-	addSplitIndexesByHeights(2, [2, 3], workMesh)
-//	drawXYPolygon(splitPoints, getRGB())
-	console.log('splits')
-	console.log(workMesh)
-	console.log(outerFacet)
-	console.log(workMesh.splits)
-	drawMesh(workMesh)
-}
-
-function testConnectedPolygons() {
-	var pointString = '-2,-2 -2,9 12,-2 0,-1 0,7 10,-1 1,0 1,5 6,0 2,1 4,1 2,3 11,1 13,1 11,3'
-	var facets = []
-	var endFacets = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11], [12, 13, 14]]
-	var points = getPointsByString(pointString)
-	addInsideConnectedFacets(endFacets, facets, points)
-	var xyPolygons = getPolygonsByFacets(facets, points)
-	drawXYPolygons(xyPolygons)
 }
 
 function testDrillByMesh() {
@@ -561,26 +299,10 @@ function testDrillByMesh() {
 	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
 	var points = getPointsByString(pointString)
 	var centerPolygon = [[4, 1], [6, 1], [5, 3]]
-	var centerMesh = getPillarMesh([0.0, 1.0], get3DUnitMatrix(), [centerPolygon])
+	var centerMesh = getPillarMesh([0.0, 1.0], getUnitMatrix3D(), [centerPolygon])
 //	drawMesh(centerMesh)
 //	drawXYPolygon(centerPolygon, getRGB())
-	drillByMesh(centerMesh, null, get3DUnitMatrix(), {facets:facets, points:points})
-	drawXYZPolygons(getPolygonsByFacets(facets, points))
-}
-
-function testDrillByPolygon() {
-//	var basisXZ = get3DTransformByBasis([1.0, 0.0, 0.0, 0.0, 1.0, 0.0])
-	var basisXZ = get3DTransformByBasis([1.0, 0.0, 0.0, 0.0, 0.0, 1.0])
-	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 10,-1,2 0,7,2 0,-1,2 14,1,6 16,1,6 14,3,6'
-//	var pointString = '-2,-2,0 -2,7,0 7,8,0 12,-2,0 0,-1,1 0,7,1 10,-1,1 1,-1,5 1,5,5 7,-1,5 14,1,6 16,1,6 14,3,6'
-	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
-	var points = getPointsByString(pointString)
-	points = getXYZsBy3DMatrix(basisXZ, points)
-	var centerPolygon = [[2, 1], [4, 1], [3, 3]]
-	addXYs(centerPolygon, [2.0, 0.0])
-	drawXYPolygon(centerPolygon, getRGB())
-//	drillByPolygon(centerPolygon, null, basisXZ, {facets:facets, points:points})
-	drillByPolygon(centerPolygon, [-10, 2], basisXZ, {facets:facets, points:points})
+	drillByMesh(centerMesh, null, getUnitMatrix3D(), {facets:facets, points:points})
 	drawXYZPolygons(getPolygonsByFacets(facets, points))
 }
 
@@ -597,34 +319,45 @@ function testEquation() {
 //	var valueString = ' 1+2*3+4 '
 //	var valueString = ' getStringLength( testString ) '
 //	var valueString = ' ( 5 % 3 ) + getStringLength( testString ) '
-//	var valueString = ' getIntervalsIncludingEnd(0,3.5,1) '
+//	var valueString = ' intervals(0,3.5,1) '
 //	var valueString = ' testMap.value '
 //	var valueString = ' Math.sin(1) '
-//	var valueString = ' Polyline.sineWave(1) '
+//	var valueString = ' Polyline.sineWave(1,-2,0) '
+	var valueString = ' Polyline.sineWave(,,) '
 //	var valueString = ' testArray[0] '
+//	var valueString = ',2'
 //	var valueString = ' 1,2 '
+//	var valueString = ' [[3,5,7]] '
+//	var valueString = ' [[3,5], [7,9] ] '
 //	var valueString = ' [[3,5,7],[4,6,8]][0][1] '
 //	var valueString = ' [5*[2][0]] '
-	var valueString = ' -2e5 '
+//	var valueString = ' -2e5 '
+//	var valueString = 'zigzag(1,8)'
+//	var valueString = 'zigzag([2,3])'
+//	var valueString = 'zigzag([4,5],9)'
+//	var valueString = 'zigzag([[0,0], [1,3],[2,0],[3,4]], 0.17)'
+//	var valueString = 'zigzag([[[1,2],3,4],5])'
 	var mathMap = new Map([['min', Math.min], ['sin', Math.sin]])
 	var polylineMap = new Map([['sineWave', sineWave]])
 	var testMap = new Map([['value', '3']])
 	getStringLength.optionSet = gSetS
+	zigzag.optionSet = null
 	sineWave.optionSet = null
 	var variableMap = new Map([
-		['getIntervalsIncludingEnd', getIntervalsIncludingEnd],
+		['intervals', intervals],
 		['getStringLength', getStringLength],
 		['Polyline', polylineMap],
 		['Math', mathMap],
 		['test', '2'],
 		['testArray', '[3,4]'],
-		['testMap', testMap]])
+		['testMap', testMap],
+		['zigzag', zigzag]])
 	var parent = {parent:null, variableMap:variableMap}
 	var statement = {parent:parent}
 	var value = getValueByEquation(null, statement, valueString)
 	console.log('value')
 	console.log(value)
-	console.log(parseFloat('2e5'))
+//	console.log(parseFloat(valueString))
 }
 
 function testExpand() {
@@ -639,31 +372,32 @@ function testExpand() {
 	console.log(pillarMesh.points)
 	console.log(pillarMesh.facets)
 	var expansionXY = [1.6]
-	expandMesh(0.0, expansionXY, 1.0, get3DUnitMatrix(), pillarMesh)
+	expandMesh(0.0, expansionXY, 1.0, getUnitMatrix3D(), pillarMesh)
 //	drawMesh(pillarMesh)
-//	taperMesh(get3DUnitMatrix(), 2.0, 40.0, 15.5, pillarMesh)
+//	taperMesh(getUnitMatrix3D(), 2.0, 40.0, 15.5, pillarMesh)
 	drawMesh(pillarMesh)
 }
 
 function testExtrusion() {
 	console.log('testExtrusion')
-//	var line = 'g transforms=rotate3D(0,0,1,index*5) heights=0,1,2'
-//	var line = 'g transforms=rotate(index*9) heights=0,1,2'
-//	var line = 'g transforms=stair(0,-1,(2+1) 2,-3,4 4,-5,6)'
-//	var line = 'g transforms=path(0,-1,3 2,-3,4 4,-5,6)'
-//	var line = 'g transforms=path(0,-1,3 2,-3,4)'
-	var line = 'g transforms=rotateZ(30) translate(1,2,3) path(0,0,0 0,-.5,3 0,0,6)'
-//	var line = 'g transforms=path(0,0,0 0,-.5,3 0,0,6)'
-	var registry = {idMap:new Map(), generatorMap:new Map(), storageMap:new Map()}
-	var statement = getStatement(line)
-	console.log(getQuoteSeparatedSnippets(line))
+//	var value = 'g transforms=rotate3D(0,0,1,index*5) heights=0,1,2'
+//	var value = 'g transforms=rotate(index*9) heights=0,1,2'
+//	var value = 'g transforms=stair(0,-1,(2+1) 2,-3,4 4,-5,6)'
+//	var value = 'g transforms=path(0,-1,3 2,-3,4 4,-5,6)'
+//	var value = 'g transforms=path(0,-1,3 2,-3,4)'
+	var value = 'rotateZ(30) translate(1,2,3) path(0,0,0 0,-.5,3 0,0,6)'
+//	var value = 'g transforms=path(0,0,0 0,-.5,3 0,0,6)'
+	var parent = getStatementByParentTag(new Map(), 1, null, 'g')
+	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var statement = getStatementByParentTag(new Map([['transforms', value]]), 1, parent, 'g')
+	console.log(statement)
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transforms')))
 	var matrices = get3DMatrices(registry, statement, null)
 	var polygons = [[[0, 0], [0, 5], [10, 0]]]
 	console.log('matrices')
 	console.log(matrices)
 	console.log(statement)
-	var extrusionMesh = getExtrusionMesh(false, matrices, get3DUnitMatrix(), polygons)
+	var extrusionMesh = getExtrusionMesh(false, matrices, getUnitMatrix3D(), polygons)
 	console.log(extrusionMesh)
 	drawMesh(extrusionMesh)
 //	console.log(get3DMatrix(registry, statement))
@@ -686,7 +420,7 @@ function testFace() {
 //	drawLines(lines, pointMap)
 //	drawMesh(getMeshByTipMap(pointMap, tipMap))
 	mesh = getJoinedCoplanarMesh(getMeshByTipMap(pointMap, tipMap))
-	addXYs(mesh.points, [7, -6])
+	add2Ds(mesh.points, [7, -6])
 	drawMesh(mesh)
 	drawXYZPoints(mesh.points)
 
@@ -741,8 +475,8 @@ function testFacetSubtraction() {
 	var workMesh = {facets:facets, points:points}
 	console.log('workMesh facets')
 	console.log(facets.slice(0))
-//	sectionByPillar(get3DUnitMatrix(), null, toolPillar, null, workMesh)
-	drillByPillar(get3DUnitMatrix(), null, toolPillar, null, workMesh)
+//	sectionByPillar(getUnitMatrix3D(), null, toolPillar, null, workMesh)
+	drillByPillar('testFacetSubtraction', getUnitMatrix3D(), null, toolPillar, null, workMesh)
 	drawMesh(workMesh)
 //	drawMesh({facets:facets, points:points})
 	console.log('facets')
@@ -797,8 +531,8 @@ function testIntercircle() {
 	for (var intercircleLoop of intercircleLoops) {
 		console.log(intercircleLoop)
 //		drawXYPolygon(intercircleLoop, getRGB())
-//		var insetPolygon = getOutsetPolygonByMarker(false, null, [1.0, 1.0], intercircleLoop)
-		var insetPolygon = getOutsetPolygonByMarker(true, [[-1.2, 0], [0, 1.2], [1.2, 0]], [0.2, 0.2], intercircleLoop)
+		var insetPolygon =
+		getOutsetPolygonByMarker(null, null, true, [0.2, 0.2], intercircleLoop, [[-1.2, 0], [0, 1.2], [1.2, 0]], [0.2, 0.2])
 		console.log(insetPolygon)
 		drawXYPolygon(insetPolygon, getRGB())
 	}
@@ -838,12 +572,25 @@ function testLettering() {
 //	var branches = [branchA, branchB]
 //	var polylines = getCharacterPolylines('A')
 //	if (polylines != null) {
-//		var outlines = getOutlines(true, null, false, [0.1, 0.1], polylines)
 //		drawXYPolylines(polylines)
-//		drawXYPolygons(outlines)
 //	}
 	var letteringOutlines = getLetteringOutlines(1.2, 0.15, ' ABCDEF GHIJKLMNOPQRSTUVWXYZ ', 0.2)
 	drawXYPolygons(letteringOutlines)
+}
+
+function testLinkMap() {
+	console.log('testLinkMap')
+	var linkMap = new Map()
+	addToLinkMap(0, 1, linkMap)
+	addToLinkMap(1, 2, linkMap)
+	addToLinkMap(2, 3, linkMap)
+	addToLinkMap(3, 1, linkMap)
+	addToLinkMap(4, 5, linkMap)
+	addToLinkMap(5, 2, linkMap)
+	addToLinkMap(6, 5, linkMap)
+	console.log(linkMap)
+	var joinedMap = getJoinedMap(7, linkMap)
+	console.log(joinedMap)
 }
 
 /*
@@ -868,16 +615,16 @@ function testLoop() {
 function testMeshBoolean() {
 	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
 	var pointsA = getPointsByString(pointString)
-//	addXYs(pointsA, [0.00001, 0.0])
+//	add2Ds(pointsA, [0.00001, 0.0])
 //	addArraysByZ(pointsA, -0.01777)
-	multiplyXYsByScalar(pointsA, 2.0)
+	multiply2DsByScalar(pointsA, 2.0)
 	var meshA = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsA}
 	var lattice = getXYZLatticeByMesh(meshA)
 	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
 	var pointsB = getPointsByString(pointStringB)
-	addXYs(pointsB, [1, 0.0])
+	add2Ds(pointsB, [1, 0.0])
 //	addArraysByZ(pointsB, -0.000000000000001)
-	multiplyXYsByScalar(pointsB, 2.0)
+	multiply2DsByScalar(pointsB, 2.0)
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var offsetMultiplier = 0.0
 //	var offsetMultiplier = 0.49
@@ -913,16 +660,19 @@ function testOutline() {
 //	console.log('points')
 //	console.log(points)
 //		drawXYPolygon(points, getRGB())
-	var outlines = getOutlinesQuickly(null, true, [1, 1], branches)
-//	var outlines = getOutlinesQuickly([[-1.2, 0], [0, 1.2], [1.2, 0]], true, [1.4, 1.4], branches)
-//	var outlines = getOutlinesCheckIntersection([[-1.2, 0], [0, 1.2], [1.2, 0]], true, [.5, .5], branches)
-//	var outlines = getOutlinesQuickly([[-1.2, 0], [0, 1.2], [1.2, 0]], false, [0.2, 0.2], branches)
+	var outlines = getOutlinesQuickly([0.0, 0.0], [[0, 1.2]], true, [[1, 1], [0.5, 0.5]], branches, [[-1.2, 0], [0, 1.2], [1.2, 0]])
 		console.log(outlines)
 	drawXYPolygons(outlines)
 	for (var outline of outlines) {
 		console.log(outline)
 		drawXYPolygon(outline, getRGB())
 	}
+//	var polygon = [[0,0], [1,0], [2,1], [1,0]]
+//	var baseIndex = 0
+//	drawXYPolygon(polygon, getRGB())
+//	console.log('stringAlongMap')
+//	var stringAlongMap = getStringAlongMap(baseIndex, polygon)
+//	console.log(stringAlongMap)
 }
 
 function testOutset() {
@@ -935,15 +685,22 @@ function testOutset() {
 	var xyPolygon = getPointsByString(pointString)
 	drawXYPolygon(xyPolygon, getRGB())
 
-//	var outsetPolygons = getOutsetPolygonsByDirection(true, false, null, true, [.5,  .5], xyPolygon)
-//	drawXYPolygons(outsetPolygons)
-//	return
-
-	var outsetPolygon = getOutsetPolygonByMarker(null, false, [1.0, 1.0], xyPolygon)
+	var outsetPolygon = getOutsetPolygonByMarker(null, null, false, [[1.0, 1.0]], xyPolygon, null)
 //	var outsetPolygon = getOutsetPolygon([1.0, 1.0], xyPolygon)
 	console.log('outsetPolygon')
 	console.log(outsetPolygon)
 	drawXYPolygon(outsetPolygon, getRGB())
+}
+
+function testOverlap() {
+	console.log('testOverlap')
+	var polygons = [getPointsByString('0,0 0,2 10,2 10,0')]
+	polygons.push(getPointsByString('4,-4 4,6 6,6 6,-4'))
+	polygons.push(getPointsByString('0,4 0,5 8,5 8,4'))
+//	drawXYPolygons(polygons)
+	var overlappedPolygons = getOverlappedPolygons([0.5, 0.5], polygons)
+	console.log(overlappedPolygons)
+	drawXYPolygons(overlappedPolygons)
 }
 
 function testPixelBoolean() {
@@ -953,7 +710,7 @@ function testPixelBoolean() {
 	var tipMap = new Map()
 	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
 //	var xyPolygonA = [[0, -1], [0, 4], [6, -1]]
-	addXYs(xyPolygonA, [6, 0])
+	add2Ds(xyPolygonA, [6, 0])
 //	addTestPixels(pixelMap)
 //	createPixelTips(pixelMap)
 //	addPixelLines(pixelMap, lines, pointMap, tipMap)
@@ -964,7 +721,7 @@ function testPixelBoolean() {
 //	drawXYPolygon(xyPolygons[0], [255, 0, 0])
 //	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
 	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
-	addXYs(xyPolygonB, [10, 0])
+	add2Ds(xyPolygonB, [10, 0])
 //	var xyPolygonB = [[8.5,1.5], [8.5,3.5], [9.5,3.5], [9.5,1.5]]
 	var xyLatticeB = getXYLattice([xyPolygonB])
 //	console.log(xyLatticeB)
@@ -983,13 +740,13 @@ function testPixelBoolean() {
 
 function testPolygonBoolean() {
 	var xyPolygonA = [[0, 0], [4, 0], [0, 4]]
-	multiplyXYsByScalar(xyPolygonA, 2.0)
+	multiply2DsByScalar(xyPolygonA, 2.0)
 //	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
-//	addXYs(xyPolygonA, [6, 0])
+//	add2Ds(xyPolygonA, [6, 0])
 	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
-	addXYs(xyPolygonB, [1, 0])
-//	addXYs(xyPolygonB, [9, 0])
-	multiplyXYsByScalar(xyPolygonB, 2.0)
+	add2Ds(xyPolygonB, [1, 0])
+//	add2Ds(xyPolygonB, [9, 0])
+	multiply2DsByScalar(xyPolygonB, 2.0)
 //	drawXYPolygons([xyPolygonA])
 //	drawXYPolygons([xyPolygonB])
 	var layerThickness = 0.05
@@ -1026,11 +783,12 @@ function testPolygonJoining() {
 //	polygonKeyStrings = ['0,-1,0 -1,0,0 0,0,0', '0,-1,0 0,0,0 1,0,0', '-1,0,0 0,1,1 1,0,0 0,0,0']
 	var xyPolygonKeyStrings = ['-1,0 -1,2 0,2 1,1 2,2 3,2 4,1 5,2 6,2 6,0', '0,2 -1,2 -1,4 3,4 6,4 6,2 5,2 4,3 3,2 2,2 1,3']
 	var xyFacets = getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
+	drawXYPolygons(convertFacetsToPolygons(getArraysCopy(xyFacets)))
 	var joinedFacets = getJoinedFacets(xyFacets)
 	var joinedPolygons = convertXYPolygonsToXYZ(convertFacetsToPolygons(joinedFacets), 0)
 	var joinedMesh = getMeshByPolygons(joinedPolygons)
 	var connectedFacet = getConnectedFacet(joinedMesh.facets, joinedMesh.points)
-	drawMesh({facets:[connectedFacet], points:addXYs(joinedMesh.points, [0, -6])})
+	drawMesh({facets:[connectedFacet], points:add2Ds(joinedMesh.points, [0, -6])})
 }
 
 function testRemoveTooThinFacets() {
@@ -1043,13 +801,16 @@ function testRemoveTooThinFacets() {
 	var pointString = '0,0,0 1,0,0 2,0,0 3,2,0 3,0,0'
 	var points = getPointsByString(pointString)
 //	var facets = [[0, 1, 2, 3]]
-	var facets = [[0, 1, 2, 3, 4]]
+	var facets = [[0, 1, 2, 3, 4, 2]]
 	console.log('points')
 	console.log(points)
 	console.log(facets)
 	var mesh = {facets:facets, points:points}
+	drawMesh(mesh)
 	removeTooThinFacets(mesh)
 	console.log(facets)
+	addArraysByY(mesh.points, -5)
+	drawMesh(mesh)
 }
 
 function testRoad() {
@@ -1073,45 +834,40 @@ function testRoad() {
 	drawMesh(mesh)
 }
 
-function testScuplture() {
-	console.log('testScuplture')
+function testSculptureVertical() {
+	console.log('testSculptureVertical')
 	var pointString = '7,-1 12,-8 7,-5 7,-8'
+//	var pointString = '7,-1 12,-8 7,-5 7,-8'
 	var points = getPointsByString(pointString)
 	var gridMap = new Map()
 	var gridMultiplier = getGridMultiplier(gridMap, points)
 	var closestPoint = getClosestPoint(gridMap, gridMultiplier, [0.0, 0.0])
-	console.log('gridMultiplier')
-	console.log(gridMultiplier)
-	console.log(gridMap)
-	console.log(closestPoint)
+//	console.log('gridMultiplier')
+//	console.log(gridMultiplier)
+//	console.log(gridMap)
+//	console.log(closestPoint)
 	var layers = []
-	var polynodes = [
-		[{point:[0, 0]}, {point:[0, 5]}, {point:[10, 0]}],
-		[{point:[1, 1]}, {point:[1, 3]}, {point:[6, 1]}]]
-//		[{point:[1, 1-6]}, {point:[1, 3-6]}, {point:[6, 1-6]}]]
-	layers.push({connection:'s', height:0, polynodes:polynodes, transform3D:null})
-	polynodes = [
-		[{point:[0, 0], connections:null},
-//		{point:[0, 2], connections:null},
-		{point:[0, 5], connections:null},
-		{point:[10, 0], connections:null}],
-		[{point:[1, 1], connections:null},
-		{point:[1, 3], connections:null},
-		{point:[6, 1], connections:null}]]
-//		[{point:[1, 1-6], connections:null},
-//		{point:[1, 3-6], connections:null},
-//		{point:[6, 1-6], connections:null}]]
-	layers.push({connection:'p', height:2, polynodes:polynodes, transform3D:null})
-//	polynodes = [
-//		[{point:[0, 0], connections:null},
-//		{point:[0, 2], connections:null},
-//		{point:[10, 0], connections:null}]]
-//	layers.push({connection:'p', height:4, polynodes:polynodes, transform3D:null})
-	console.log(layers)
-	var scupltureMesh = getScupltureMesh(layers, get3DUnitMatrix())
-	console.log(layers)
-	console.log(scupltureMesh)
-	drawMesh(scupltureMesh)
+	var layersNew = []
+	var matrix3D = getUnitMatrix3D()
+	matrix3D[14] = 0.0
+	var topFacets = []
+	var polygons = [[[0,0], [0,4], [2,4], [2,0]], [[4,0], [4,4], [6,4], [6,0]]]
+//	var polygons = [[[0,0], [0,1], [0,3], [0,4], [2,4], [2,3], [2,1], [2,0]], [[4,0], [4,1], [4,3], [4,4], [6,4], [6,3], [6,1], [6,0]]]
+	layersNew.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
+	matrix3D = getUnitMatrix3D()
+	matrix3D[14] = 2.0
+	layersNew.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
+	matrix3D = getUnitMatrix3D()
+	matrix3D[14] = 4.0
+//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [10,5], [10,0]]], vertical:true})
+//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [7,5], [10,5]]], vertical:false})
+//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [10,4]]], vertical:false})
+	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [2,1], [4,1], [6,1], [6,0], [4,0], [2,0]]], vertical:true})
+//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [6,1], [6,0]]], vertical:true})
+	var meshNew = getSculptureMesh(layersNew, getUnitMatrix3D())
+	console.log(layersNew)
+	console.log(meshNew)
+	drawMesh(meshNew)
 }
 
 function testSplitPoints() {
@@ -1128,14 +884,28 @@ function testSplitPoints() {
 	drawXYPolygon(getPolygonByFacet(closeFacet, points), getRGB())
 	drawXYPolygon(getPolygonByFacet(toolFacet, points), getRGB())
 	var workMesh = {facets:facets, points:points}
-	addSplitIndexesByHeights(2, [2, 3], workMesh)
+	addSplitIndexes('testSplitPoints', [2, 3], workMesh)
 //	drawXYPolygon(splitPoints, getRGB())
 	console.log('splits')
 	console.log(workMesh)
 	console.log(outerFacet)
-	console.log(workMesh.splits)
 	drawMesh(workMesh)
 }
+
+function testSplitPolygon() {
+	console.log('testSplitPolygon')
+//	var pointString = '-4,0 -4,4 4,4 4,0'
+//	var pointString = '5,0 5,3 7,3 7,0'
+//	var polygon = getPointsByString(pointString)
+//	drawXYPolygon(polygon, getRGB())
+	var polygons = [getPointsByString('-4,0 -4,4 4,4 4,0'), getPointsByString('5,3 5,6 7,6 7,3')]
+//	var polygons = [polygon]
+	addSplitPolygonsByHeights(polygons, [1, 2])
+//	addSplitPolygonByHeight(polygon, polygons, 1)
+	console.log(polygons)
+	drawXYPolygons(polygons)
+}
+
 
 function testSubtraction() {
 	//tested by getSubtractionLoops, used by getSubtractionFaces
@@ -1188,24 +958,24 @@ function testTaper() {
 	var heights = [0.0, 1.0]
 	var mesh = {facets:[], points:[]}
 	addToPillarMesh(heights, mesh, polygon3D)
-	var pillarMesh = getPillarMesh(heights, [polygon3D], get3DUnitMatrix())
+	var pillarMesh = getPillarMesh(heights, [polygon3D], getUnitMatrix3D())
 //	drawMesh(pillarMesh)
 	console.log('pillarMesh points')
 	console.log(pillarMesh.points)
 	console.log(pillarMesh.facets)
-	taperMesh(get3DUnitMatrix(), 2.0, 40.0, 15.5, pillarMesh)
+	taperMesh(getUnitMatrix3D(), 2.0, 40.0, 15.5, pillarMesh)
 	drawMesh(pillarMesh)
 }
 
 function testTransform() {
 	console.log('testTransform')
-	var line = 'g transform="translate(2,(3))scale(1,2)"'
-	var registry = {idMap:new Map(), generatorMap:new Map(), storageMap:new Map()}
-	var statement = getStatement(line)
-	console.log(getQuoteSeparatedSnippets(line))
+	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, null, 'g')
+	var value = 'translate(2,(3))scale(1,2)'
+	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var statement = getStatementByParentTag(new Map([['transform', value]]), 1, parent, 'g')
 	console.log(statement.attributeMap)
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transform')))
-	var matrix = get2DMatrix(registry, statement)
+	var matrix = getMatrix2D(registry, statement)
 	console.log('matrix')
 	console.log(matrix)
 	console.log(statement)
@@ -1213,15 +983,15 @@ function testTransform() {
 
 function testTransforms() {
 	console.log('testTransforms')
-//	var line = 'g transforms=rotate3D(0,0,1,index*5) heights=0,1,2'
-//	var line = 'g transforms=rotate(index*9) heights=0,1,2'
-//	var line = 'g transforms=stair(0,-1,(2+1) 2,-3,4 4,-5,6)'
-//	var line = 'g transforms=path(0,-1,3 2,-3,4 4,-5,6)'
-//	var line = 'g transforms=path(0,-1,3 2,-3,4)'
-	var line = 'g transforms=path(0,0,0 0,-.5,3 0,0,6)'
-	var registry = {idMap:new Map(), generatorMap:new Map(), storageMap:new Map()}
-	var statement = getStatement(line)
-	console.log(getQuoteSeparatedSnippets(line))
+	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, null, 'g')
+//	var value = 'rotate3D(0,0,1,index*5) heights=0,1,2'
+//	var value = 'rotate(index*9) heights=0,1,2'
+//	var value = 'stair(0,-1,(2+1) 2,-3,4 4,-5,6)'
+//	var value = 'path(0,-1,3 2,-3,4 4,-5,6)'
+//	var value = 'path(0,-1,3 2,-3,4)'
+	var value = 'path(0,0,0 0,-.5,3 0,0,6)'
+	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var statement = getStatementByParentTag(new Map([['transforms', value]]), 1, parent, 'g')
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transforms')))
 	var matrices = get3DMatrices(registry, statement, null)
 	console.log('matrices')
@@ -1234,10 +1004,10 @@ function testTransforms() {
 	layers.push({connection:'s', height:2, matrix:matrices[1], polynodes:polynodes, transform3D:null})
 	polynodes = [[{point:[0, 0]}, {point:[0, 5]}, {point:[10, 0]}]]
 	layers.push({connection:'s', height:4, matrix:matrices[2], polynodes:polynodes, transform3D:null})
-	var scupltureMesh = getScupltureMesh(layers, get3DUnitMatrix())
+	var sculptureMesh = getSculptureMesh(layers, getUnitMatrix3D())
 	console.log(layers)
-	console.log(scupltureMesh)
-	drawMesh(scupltureMesh)
+	console.log(sculptureMesh)
+	drawMesh(sculptureMesh)
 }
 
 function testTriangleMesh() {
@@ -1261,13 +1031,13 @@ function testTriangleMesh() {
 		facet.push(pointIndex)
 		points[pointIndex].push(0.0)
 	}
-	addXYs(points, [0,0])
+	add2Ds(points, [0,0])
 	console.log('getPolygonByFacet(facet, points)')
 	console.log(getPolygonByFacet(facet, points))
-	multiplyXYZsByScalar(points, 0.5)
+	multiply3DsByScalar(points, 0.5)
 	drawXYPolygon(getPolygonByFacet(facet, points), getRGB())
 //	rotateXYZParametersByPoints(1, points)
-	var triangleFacets = getXYZTriangleFacets(facet, points, new Array(points.length))
+	var triangleFacets = get3DTriangleFacets(facet, points, new Array(points.length))
 	var triangles = getPolygonsByFacets(triangleFacets, points)
 //	rotateXYZParametersByPoints(-1, points)
 	console.log('triangles')
@@ -1275,7 +1045,7 @@ function testTriangleMesh() {
 	console.log(points)
 	drawXYPolygons(triangles)
 	var lastTriangle = triangles[triangles.length - 1]
-	addXYs(lastTriangle, [2, 0.0])
+	add2Ds(lastTriangle, [2, 0.0])
 //	drawXYPolygon(lastTriangle, getRGB())
 }
 
@@ -1324,7 +1094,7 @@ function testVoxelBoolean() {
 //	var pointStringB = '0,0,0 6,0,0 0,0,4 0,4,0'
 //	var pointStringB = '0,0,0 4,0,0 0,0,1 0,2,0'
 	var pointsB = getPointsByString(pointStringB)
-	addXYs(pointsB, [1, 0])
+	add2Ds(pointsB, [1, 0])
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var latticeB = getXYZLatticeByMesh(meshB)
 	var voxelMapB = getVoxelMapByXYZLattice(latticeB)
@@ -1370,7 +1140,6 @@ function createSVGTest() {
 	var before = new Date().getTime()
 //	testBend()
 //	testBevel()
-//	testConnectedPolygons()
 //	testDrillByMesh()
 //	testDrillByPolygon()
 //	testExpand()
@@ -1381,20 +1150,23 @@ function createSVGTest() {
 //	testFence()
 //	testFillet()
 //	testIntercircle()
-	testLength()
+//	testLength()
 //	testLettering()
+//	testLinkMap()
 //	testLoop()
 //	testMeshBoolean()
 //	testOutline()
 //	testOutset()
+//	testOverlap()
 //	testPixelBoolean()
 //	testPolygonBoolean()
 //	testPolygonGroups()
 //	testPolygonJoining()
 //	testRemoveTooThinFacets()
 //	testRoad()
-//	testScuplture()
+//	testSculptureVertical()
 //	testSplitPoints()
+	testSplitPolygon()
 //	testSubtraction()
 //	testTaper()
 //	testTransform()
