@@ -24,6 +24,11 @@
 <td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
 </tr>
 <tr>
+<td><select hidden="true" id="loadASessionID" onchange ="loadASessionChanged()"></select><td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+<td><select hidden="true"></select><td>
+</tr>
+<tr>
 <td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button><td>
 <td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
 </tr>
@@ -75,6 +80,7 @@ function updateSVGArea() {
 	var registry = {idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
 	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
 	var xmlStatement = getDocumentRoot(lines, 'xml')
+	console.log(xmlStatement)
 	var descendants = [xmlStatement]
 	addToDescendantsOutsideFirst(descendants, xmlStatement)
 	for (var statement of descendants) {
@@ -89,21 +95,19 @@ function updateSVGArea() {
 		}
 	}
 	if (!tagSet.has('region')) {
-		xmlStatement.children.splice(0, 0, getStatement('region'))
+		getStatementByParentTag(new Map(), 0, xmlStatement, 'region')
 	}
 	if (!tagSet.has('creature')) {
-		xmlStatement.children.splice(-2, 0, getStatement('creature'))
+		getStatementByParentTag(new Map(), 0, xmlStatement, 'creature')
 	}
 	if (!tagSet.has('terrainViewer')) {
-		xmlStatement.children.splice(-1, 0, getStatement('terrainViewer'))
+		getStatementByParentTag(new Map(), 0, xmlStatement, 'terrainViewer')
 	}
 	createDefault(registry, xmlStatement)
 	descendants = [xmlStatement]
 	addToDescendantsInsideFirst(descendants, xmlStatement)
 	processDescendantsByTagMap(registry, xmlStatement, gTagCenterMap)
-	descendants = [xmlStatement]
-	addToDescendantsOutsideFirst(descendants, xmlStatement)
-	var xmlLines = getPassthroughLines(descendants, 'xml')
+	var xmlLines = getPassthroughLinesByStatement('xml', xmlStatement)
 	var joinWord = getJoinWord()
 	var xmlString = xmlLines.join(joinWord)
 	setNumberOfRows('wordAreaID', lines)
