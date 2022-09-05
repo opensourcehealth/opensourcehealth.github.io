@@ -1,5 +1,9 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+function wordscapeViewerDraw() {
+	meshViewer.draw()
+}
+
 function setTypeSelect(selectedIndex, types) {
 	var typeSelect = document.getElementById('typeSelectID')
 	var options = typeSelect.options
@@ -56,19 +60,7 @@ function viewerMouseDown(event) {
 	if (meshViewer.view == null) {
 		return
 	}
-	meshViewer.mouseDown = [event.offsetX, event.offsetY]
-	meshViewer.isCircle = false
-	meshViewer.beginModelRingPath()
-	meshViewer.isRing = meshViewer.context.isPointInPath(event.offsetX, event.offsetY)
-	if (meshViewer.isRing) {
-		meshViewer.mouseDownNegative = meshViewer.getOffsetNormal(event)
-		meshViewer.mouseDownNegative[1] = -meshViewer.mouseDownNegative[1]
-	}
-	else {
-		meshViewer.beginModelCirclePath()
-		meshViewer.isCircle = meshViewer.context.isPointInPath(event.offsetX, event.offsetY)
-	}
-	meshViewer.view.lastRotationMatrix = meshViewer.view.rotationMatrix
+	meshViewer.mouseDown(event)
 }
 
 function viewerMouseMove(event) {
@@ -76,17 +68,22 @@ function viewerMouseMove(event) {
 }
 
 function viewerMouseOut(event) {
-	meshViewer.mouseDown = null
+	meshViewer.mouseDown2D = null
 	if (meshViewer.view == null) {
 		return
 	}
-	meshViewer.view.rotationMatrix = meshViewer.view.lastRotationMatrix
+	if (meshViewer.view.isMesh) {
+		meshViewer.view.rotationMatrix = meshViewer.view.lastRotationMatrix
+	}
 	meshViewer.draw()
 }
 
 function viewerMouseUp(event) {
-	meshViewer.mouseDown = null
+	meshViewer.mouseDown2D = null
 	if (meshViewer.view == null) {
+		return
+	}
+	if (!meshViewer.view.isMesh) {
 		return
 	}
 	meshViewer.mouseMoved(event)
@@ -102,15 +99,13 @@ function viewSelectChanged() {
 
 
 var meshViewer = {
+	addImage: function(filename, id) {
+		this.views.push({filename:filename, height:null, id:id, image:null, isMesh:false, polyline:[]})
+	},
 	addMesh: function(id, matrix3D) {
-		if (!this.generatorMap.has(id)) {
-			return
+		if (getWorkMeshByID(id, this.registry) != null) {
+			this.views.push({id:id, isMesh:true, matrix3D:matrix3D, mesh:null, rotationMatrix:null, triangleMesh:null})
 		}
-		var mesh = this.generatorMap.get(id).getMesh()
-		if (mesh == null) {
-			return
-		}
-		this.views.push({id:id, matrix3D:matrix3D, rotationMatrix:null})
 	},
 	beginModelCirclePath: function() {
 		this.context.beginPath()
@@ -124,23 +119,52 @@ var meshViewer = {
 		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusCircle, Math.PI + Math.PI, 0, true)
 		this.context.closePath()
 	},
+	drawViewImage: function(view) {
+		if (view.image == null) {
+			view.image = new Image()
+			view.image.src = view.filename
+		}
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
+		if (view.image.complete) {
+			if (view.height == null) {
+				var greatestDimension = Math.max(view.image.naturalHeight, view.image.naturalWidth)
+				var zoomRatio = 1.0 * this.canvas.width / greatestDimension
+				view.height = zoomRatio * view.image.naturalHeight
+				view.width = zoomRatio * view.image.naturalWidth
+				view.halfCanvasMinus = this.halfWidth - view.width / 2
+				view.canvasHeightMinus = this.canvas.height - view.height
+			}
+			this.context.drawImage(view.image, view.halfCanvasMinus, view.canvasHeightMinus, view.width, view.height)
+		}
+		else {
+			view.image.onload = wordscapeViewerDraw
+		}
+	},
 	draw: function() {
-		if (this.view == null) {
+		var view = this.view
+		if (view == null) {
 			return
 		}
-		var mesh = this.generatorMap.get(this.view.id).getMesh()
+		if (view.isMesh == false) {
+			this.drawViewImage(view)
+			return
+		}
+		if (view.mesh == null) {
+			view.mesh = getWorkMeshByID(view.id, this.registry)
+		}
+		var mesh = view.mesh
 		if (this.type.indexOf('T') != -1) {
-			if (this.triangleMesh == null) {
-				this.triangleMesh = getTriangleMesh(mesh)
+			if (view.triangleMesh == null) {
+				view.triangleMesh = getTriangleMesh(view.mesh)
 			}
-			mesh = this.triangleMesh
+			mesh = view.triangleMesh
 		}
 		var facets = mesh.facets
 		var zPolygons = []
-		var centerRotationMatrix = getMultiplied3DMatrix(this.view.rotationMatrix, this.view.scaleCenterMatrix)
+		var centerRotationMatrix = getMultiplied3DMatrix(view.rotationMatrix, view.scaleCenterMatrix)
 		centerRotationMatrix = getMultiplied3DMatrix(this.canvasCenterMatrix, centerRotationMatrix)
 		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-		var xyzs = getXYZsBy3DMatrix(centerRotationMatrix, mesh.points)
+		var xyzs = get3DsBy3DMatrix(centerRotationMatrix, mesh.points)
 		for (var facet of facets) {
 			var zPolygon = [new Array(facet.length), facet]
 			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
@@ -148,16 +172,9 @@ var meshViewer = {
 			}
 			zPolygon[0].sort(compareNumberDescending)
 			if (this.type[0] == 'S') {
-				var normal = getNormalByFacet(facet, xyzs)
-//				var normal = getNormalByFacetIfFlat(facet, xyzs)
-				if (normal != null) {
-					if (normal[2] < 0.0) {
-						zPolygons.push(zPolygon)
-					}
-					else {
-					}
-				}
-				else {
+//				if (getNormalByFacet(facet, xyzs)[2] < 0.0) {
+				if (getDoublePolygonArea(getPolygonByFacet(facet, xyzs)) > 0.0) {
+					zPolygons.push(zPolygon)
 				}
 			}
 			else {
@@ -167,7 +184,7 @@ var meshViewer = {
 		zPolygons.sort(compareArrayAscending)
 //		var widthOverLength = 6.0 / zPolygons.length
 		if (this.type[0] == 'S') {
-			this.context.lineWidth = 5.0
+			this.context.lineWidth = 2.0
 		}
 		else {
 			this.context.lineWidth = 1.0
@@ -215,7 +232,7 @@ var meshViewer = {
 		this.context.stroke()
 	},
 	getOffsetNormal: function(event) {
-		return normalizeXY([event.offsetX - this.halfWidth, event.offsetY - this.halfHeight])
+		return normalize2D([event.offsetX - this.halfWidth, event.offsetY - this.halfHeight])
 	},
 	initialize: function() {
 		this.canvasID = null
@@ -228,34 +245,77 @@ var meshViewer = {
 	lineToXY: function(xy) {
 		this.context.lineTo(xy[0], xy[1])
 	},
+	mouseDown: function(event) {
+		if (this.view == null) {
+			return
+		}
+		this.mouseDown2D = [event.offsetX, event.offsetY]
+		if (!this.view.isMesh) {
+			this.view.polyline.push(this.mouseDown2D)
+			var boundingBox = getBoundingBox(this.view.polyline)
+			var minimumPoint = boundingBox[0]
+			var size = get2DSubtraction(boundingBox[1], minimumPoint)
+			var maximumDimension = Math.max(Math.max(size[0], size[1]), 1.0)
+			var fittedString = ''
+			var multiplier = 100.0 / maximumDimension
+			for (var fittedIndex = 0; fittedIndex < this.view.polyline.length; fittedIndex++) {
+				var point = this.view.polyline[fittedIndex]
+				var x = multiplier * (point[0] - minimumPoint[0])
+				var y = multiplier * (boundingBox[1][1] - point[1])
+				fittedString += x.toFixed(1) + ',' + y.toFixed(1) + ' '
+			}
+			console.log(fittedString)
+			return
+		}
+		this.isCircle = false
+		this.beginModelRingPath()
+		this.isRing = this.context.isPointInPath(event.offsetX, event.offsetY)
+		if (this.isRing) {
+			this.mouseDownNegative = this.getOffsetNormal(event)
+			this.mouseDownNegative[1] = -this.mouseDownNegative[1]
+		}
+		else {
+			this.beginModelCirclePath()
+			this.isCircle = this.context.isPointInPath(event.offsetX, event.offsetY)
+		}
+		this.view.lastRotationMatrix = meshViewer.view.rotationMatrix
+	},
 	mouseMoved: function(event) {
 		if (this.view == null) {
 			return
 		}
-		if (this.mouseDown == null) {
+		if (!this.view.isMesh) {
+			this.context.clearRect(0, 0, this.canvas.width / 2, this.doubleTextSpace + 1)
+			this.context.font = '12px Arial'
+			this.context.strokeStyle = 'black'
+			this.context.strokeText('x :  ' + event.offsetX, this.textHeight / 2, this.textSpace)
+			this.context.strokeText('y :  ' + event.offsetY, this.textHeight / 2, this.doubleTextSpace)
+			return
+		}
+		if (this.mouseDown2D == null) {
 			this.drawModelControlPath(event)
 			return
 		}
-		var mouseMovement = [event.offsetX - this.mouseDown[0], event.offsetY - this.mouseDown[1]]
-		var movementLength = getXYLength(mouseMovement)
+		var mouseMovement = [event.offsetX - this.mouseDown2D[0], event.offsetY - this.mouseDown2D[1]]
+		var movementLength = get2DLength(mouseMovement)
 		if (movementLength == 0.0) {
 			return
 		}
 		if (this.isCircle) {
-			var movementNormal = divideXYByScalar(mouseMovement.slice(0), movementLength)
+			var movementNormal = divide2DByScalar(mouseMovement.slice(0), movementLength)
 			movementNormal[1] = -movementNormal[1]
-			this.view.rotationMatrix = getMultiplied3DMatrix(get3DMatrixRotatedByXY(movementNormal), this.view.lastRotationMatrix)
+			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(movementNormal), this.view.lastRotationMatrix)
 			var rotationY = this.rotationMultiplier * movementLength
-			this.view.rotationMatrix = getMultiplied3DMatrix(get3DTransformByRotateY([rotationY]), this.view.rotationMatrix)
+			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DByRotateY([rotationY]), this.view.rotationMatrix)
 			movementNormal[1] = -movementNormal[1]
-			this.view.rotationMatrix = getMultiplied3DMatrix(get3DMatrixRotatedByXY(movementNormal), this.view.rotationMatrix)
+			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(movementNormal), this.view.rotationMatrix)
 			this.draw()
 			return
 		}
 		if (this.isRing) {
 			var mouseMoveNormal = this.getOffsetNormal(event)
-			var rotationXY = getXYRotation(mouseMoveNormal, this.mouseDownNegative)
-			this.view.rotationMatrix = getMultiplied3DMatrix(get3DMatrixRotatedByXY(rotationXY), this.view.lastRotationMatrix)
+			var rotationXY = get2DRotation(mouseMoveNormal, this.mouseDownNegative)
+			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(rotationXY), this.view.lastRotationMatrix)
 			this.draw()
 		}
 	},
@@ -264,7 +324,7 @@ var meshViewer = {
 			this.context.moveTo(xy[0], xy[1])
 		}
 	},
-	setID: function(canvasID, generatorMap) {
+	setID: function(canvasID, registry) {
 		if (canvasID != this.canvasID) {
 			this.canvasID = canvasID
 			this.canvas = document.getElementById(canvasID)
@@ -273,13 +333,13 @@ var meshViewer = {
 			this.canvas.addEventListener('mouseout', viewerMouseOut)
 			this.canvas.addEventListener('mouseup', viewerMouseUp)
 		}
-		this.generatorMap = generatorMap
+		this.registry = registry
 		this.triangleMesh = null
 		this.types = ['Solid Polyhedral', 'Solid Triangular', 'Wireframe Polyhedral', 'Wireframe Triangular']
 		this.type = this.types[this.typeSelectedIndex]
 		this.view = null
 		this.views = []
-		this.mouseDown = null
+		this.mouseDown2D = null
 	},
 	setType: function(typeSelectedIndex) {
 		this.typeSelectedIndex = typeSelectedIndex
@@ -288,18 +348,20 @@ var meshViewer = {
 	setView: function(viewIndex) {
 		this.view = this.views[viewIndex]
 		this.viewID = this.view.id
+		if (!this.view.isMesh) {
+			return
+		}
 		if (this.view.rotationMatrix != null) {
 			return
 		}
-		var meshBoundingBox = getMeshBoundingBox(this.generatorMap.get(this.viewID).getMesh())
-		var meshExtent = getXYZSubtraction(meshBoundingBox[1], meshBoundingBox[0])
-		var scale = this.modelDiameter / getXYZLength(meshExtent)
-		var center = multiplyXYZByScalar(getXYZAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
-		var meshCenterMatrix = get3DTransformByTranslate3D([-center[0], -center[1], -center[2]])
+		var meshBoundingBox = getMeshBoundingBox(getWorkMeshByID(this.viewID, this.registry))
+		var meshExtent = get3DSubtraction(meshBoundingBox[1], meshBoundingBox[0])
+		var scale = this.modelDiameter / get3DLength(meshExtent)
+		var center = multiply3DByScalar(get3DAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
+		var meshCenterMatrix = getMatrix3DByTranslate3D([-center[0], -center[1], -center[2]])
 		// using 2.0 + Math.PI to get average of edge and center movement
-		var scaleMatrix = get3DTransformByScale3D([scale, -scale, scale])
-		this.triangleMesh = null
-		this.view.rotationMatrix = get3DUnitMatrix()
+		var scaleMatrix = getMatrix3DByScale3D([scale, -scale, scale])
+		this.view.rotationMatrix = getUnitMatrix3D()
 		this.view.scaleCenterMatrix = getMultiplied3DMatrix(scaleMatrix, meshCenterMatrix)
 		this.view.lastRotationMatrix = this.view.rotationMatrix
 	},
@@ -320,10 +382,10 @@ var meshViewer = {
 		this.halfHeight = this.canvas.height / 2
 		this.halfWidth = this.canvas.width / 2
 		this.canvasCenter = [this.halfWidth, this.halfHeight]
-		this.modelDiameter = (this.canvas.width - this.doubleTextSpace - this.doubleTextSpace)
-		this.canvasCenterMatrix = get3DTransformByTranslate3D(this.canvasCenter)
-		this.modelRadiusCircle = 0.5 * this.modelDiameter + this.textSpace
-		this.modelRadiusRing = this.modelRadiusCircle + this.textSpace
+		this.modelRadiusRing = 0.5 * this.canvas.width
+		this.modelRadiusCircle = this.modelRadiusRing - this.textSpace
+		this.modelDiameter = this.modelRadiusCircle + this.modelRadiusCircle - 0.5 * this.textSpace
+		this.canvasCenterMatrix = getMatrix3DByTranslate3D(this.canvasCenter)
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
 		setTypeSelect(this.typeSelectedIndex, this.types)
