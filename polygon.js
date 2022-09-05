@@ -235,7 +235,7 @@ function addMeetingsByPolygon(alongIndexesMap, meetings, toolPolygon, workPolygo
 							}
 						}
 						else {
-							meeting.point = getArrayMultiplicationByScalar(beginPoint, 1.0 - meeting.workAlong)
+							meeting.point = getArrayMultiplicationByScalar(workPolygon[workBeginIndex], 1.0 - meeting.workAlong)
 							addArray(meeting.point, getArrayMultiplicationByScalar(workPolygon[workEndIndex], meeting.workAlong))
 						}
 					}
