@@ -111,18 +111,6 @@ function getJoinWord() {
 	return '\n'
 }
 
-function getLineWithEndspace(endWords, line) {
-	for (var endWord of endWords) {
-		if (line.endsWith(endWord)) {
-			spaceThenEndWord = ' ' + endWord
-			if (!line.endsWith(spaceThenEndWord)) {
-				return line.slice(0, -endWord.length) + spaceThenEndWord
-			}
-		}
-	}
-	return line
-}
-
 function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceReplacement) {
 	return originalString.slice(0, spliceIndex) + spliceReplacement + originalString.slice(spliceIndex + spliceRemoved)
 }
