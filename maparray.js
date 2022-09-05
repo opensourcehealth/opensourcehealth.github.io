@@ -15,12 +15,12 @@ function addElementToArrays(arrays, index, value) {
 	}
 }
 
-function addElementToMapArray(array, key, mapToAddTo) {
+function addElementToMapArray(element, key, mapToAddTo) {
 	if (mapToAddTo.has(key)) {
-		mapToAddTo.get(key).push(array)
+		mapToAddTo.get(key).push(element)
 		return
 	}
-	mapToAddTo.set(key, [array])
+	mapToAddTo.set(key, [element])
 }
 
 function addElementsToSet(elements, setToAddTo) {
@@ -63,7 +63,7 @@ function compareFirstElementDescending(a, b) {
 }
 
 function compareFirstThirdElementAscending(a, b) {
-	if (a[0] == b[0]) {
+	if (Math.abs(a[0] - b[0]) < gClose) {
 		return a[2] - b[2]
 	}
 	return a[0] - b[0]
@@ -87,6 +87,25 @@ function compareSignedIntersectionAscending(a, b) {
 	}
 	return a[0] - b[0]
 }
+
+function copyKeysExcept(exceptionSet, mapFrom, mapTo) {
+	for (var key of mapFrom.keys()) {
+		if (!exceptionSet.has(key)) {
+			mapTo.set(key, mapFrom.get(key))
+		}
+	}
+}
+
+/*
+deprecated23
+function copySetKeys(copySet, mapFrom, mapTo) {
+	for (var key of mapFrom.keys()) {
+		if (copySet.has(key)) {
+			mapTo.set(key, mapFrom.get(key))
+		}
+	}
+}
+*/
 
 function copyMissingKeys(mapFrom, mapTo) {
 	for (var key of mapFrom.keys()) {
@@ -200,12 +219,14 @@ function getNullOrValue(key, map) {
 	return null
 }
 
-function getShortArrays(length, points) {
-	var shortArrays = new Array(points.length)
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		shortArrays[pointIndex] = points[pointIndex].slice(0, length)
+function getPushArray(elements, others) {
+	if (elements == null) {
+		return others
 	}
-	return shortArrays
+	if (others == null) {
+		return elements
+	}
+	return pushArray(elements, others)
 }
 
 function getPushElement(arrayToAddTo, element) {
@@ -214,6 +235,14 @@ function getPushElement(arrayToAddTo, element) {
 	}
 	arrayToAddTo.push(element)
 	return arrayToAddTo
+}
+
+function getShortArrays(length, points) {
+	var shortArrays = new Array(points.length)
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		shortArrays[pointIndex] = points[pointIndex].slice(0, length)
+	}
+	return shortArrays
 }
 
 function notNullCheck(element) {
@@ -269,6 +298,17 @@ function removeRepeats(elements) {
 	}
 }
 
+function removeShortArrays(arrays, length) {
+	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+		if (arrays[arrayIndex] != null) {
+			if (arrays[arrayIndex].length < length) {
+				arrays[arrayIndex] = null
+			}
+		}
+	}
+	removeNulls(arrays)
+}
+
 function replaceElements(elements, find, replacement) {
 	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
 		if (elements[elementIndex] == find) {
@@ -289,6 +329,19 @@ function setArraysToArraysUntil(elements, others, until) {
 			elements[elementIndex][parameterIndex] = others[elementIndex][parameterIndex]
 		}
 	}
+}
+
+function setMapIfMissing(key, map, value) {
+	if (!map.has(key)) {
+		map.set(key, value)
+	}
+}
+
+function setObjectAttribute(key, map, object, value) {
+	if (map.has(key)) {
+		value = map.get(key)(value)
+	}
+	return object[key] = value
 }
 
 function spliceArray(elements, index, others) {
