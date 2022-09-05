@@ -11,13 +11,13 @@ function getEntryLocation(childrenMaps, entryCenter, terrain) {
 	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
 		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
 			for (var x = 1 - shellIndex; x < shellIndex; x++) {
-				var entryLocation = getXYAddition(entryCenter, [x, signedShellIndex])
+				var entryLocation = get2DAddition(entryCenter, [x, signedShellIndex])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
 			}
 			for (var y = - shellIndex; y <= shellIndex; y++) {
-				var entryLocation = getXYAddition(entryCenter, [signedShellIndex, y])
+				var entryLocation = get2DAddition(entryCenter, [signedShellIndex, y])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
@@ -88,7 +88,7 @@ function Region(terrain) {
 		for (var mapIndex = this.childrenMaps.length; mapIndex < child.scaleIndex + 1; mapIndex++) {
 			this.childrenMaps.push(new Map())
 		}
-		addXY(child.location, this.entry)
+		add2D(child.location, this.entry)
 		child.location = getEntryLocation(this.childrenMaps, child.location, this.terrain)
 		var childrenMap = this.childrenMaps[child.scaleIndex]
 		var locationAtScale = this.terrain.getLocationAtScale(child.location, child.scaleIndex)
