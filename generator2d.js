@@ -8,16 +8,13 @@ var gLetteringSet = null
 function addPolygonsToGroup(polygons, registry, statement) {
 	var exceptionSet = new Set(['checkIntersection', 'markerAbsolute', 'marker', 'outset'])
 	var idStart = statement.attributeMap.get('id') + '_polygon_'
-	var endStatement = statement.children.pop()
 	for (var polygonIndex = 0; polygonIndex < polygons.length; polygonIndex++) {
 		var polygonStatement = getStatementByParentTag(new Map(), 0, statement, 'polygon')
-		getUniqueID(idStart + polygonIndex.toString(), registry, statement)
+		getUniqueID(idStart + polygonIndex.toString(), registry, polygonStatement)
 		copyMissingKeysExcept(exceptionSet, statement.attributeMap, polygonStatement.attributeMap)
-		statement.children.push(polygonStatement)
 		setPointsHD(polygons[polygonIndex], polygonStatement)
 		gPolygon.processStatement(registry, polygonStatement)
 	}
-	statement.children.push(endStatement)
 }
 
 function addPolylinesToGroup(polylines, registry, statement) {
@@ -25,25 +22,23 @@ function addPolylinesToGroup(polylines, registry, statement) {
 	for (var polylineIndex = 0; polylineIndex < polylines.length; polylineIndex++) {
 		var polylineStatement = getStatementByParentTag(new Map([['points', polylines[polylineIndex].join(' ')]]), 0, statement, 'polyline')
 		getUniqueID(idStart + polylineIndex.toString(), registry, polylineStatement)
-		statement.children.push(polylineStatement)
 	}
 }
 
-function addTextStatement(fontSize, idStart, registry, statement, text, textAnchor, textStructure, writableWidth, x, y) {
-	var textAttributeMap = new Map([['innerHTML', text], ['x', (x + textStructure.xOffset).toString()], ['y', y.toString()]])
-	var localFontSize = textStructure.fontSize
+function addTextStatement(anchor, fontSize, format, idStart, registry, statement, text, writableWidth, x, y) {
+	var textAttributeMap = new Map([['innerHTML', text], ['x', (x + format.xOffset).toString()], ['y', y.toString()]])
+	var localFontSize = format.fontSize
 	if (lineIsTooLong(writableWidth, localFontSize, text)) {
 		localFontSize = writableWidth / getTextLength(text)
 	}
 	if (localFontSize != fontSize) {
 		textAttributeMap.set('font-size', localFontSize.toString())
 	}
-	if (textAnchor != null) {
-		textAttributeMap.set('text-anchor', textAnchor)
+	if (anchor != null) {
+		textAttributeMap.set('text-anchor', anchor)
 	}
 	var textStatement = getStatementByParentTag(textAttributeMap, 0, statement, 'text')
-	getUniqueID(idStart + textStructure.sequenceWord, registry, textStatement)
-	statement.children.push(textStatement)
+	getUniqueID(idStart + format.name, registry, textStatement)
 }
 
 function cellX(registry, statement) {
@@ -118,28 +113,26 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('Z', [bottomLine, diagonalUp, topLine])
 }
 
-function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeight, statement, textStructure, writableWidth, x, xStart, y) {
-	sequenceWord = textStructure.sequenceWord
-	if (!attributeMap.has(sequenceWord)) {
+function getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y) {
+	var name = format.name
+	if (!attributeMap.has(name)) {
 		return y
 	}
 	var localLineHeight = lineHeight
-	if (textStructure.fontSize != fontSize) {
-		localLineHeight += textStructure.fontSize - fontSize
+	if (format.fontSize != fontSize) {
+		localLineHeight += format.fontSize - fontSize
 	}
-	var value = attributeMap.get(sequenceWord)
-	var variableValue = getVariableValue(value, statement)
-	if (variableValue != undefined) {
-		value = variableValue
-	}
-	var textAnchor = 'start'
-	if (textStructure.textAnchor != null) {
-		textAnchor = textStructure.textAnchor
+	var value = attributeMap.get(name)
+	value = getValueByDefault(value, getVariableValue(value, statement))
+	var anchor = 'start'
+	if (format.anchor != null) {
+		anchor = format.anchor
 	}
 	if (value[0] == '#') {
 		var line = ''
 		var lines = []
 		var valueWords = value.slice(1).split(' ').filter(lengthCheck)
+		writableWidth += format.margin - format.rightMargin
 		for (var valueWord of valueWords) {
 			if (valueWord[0] == '#') {
 				lines.push(line)
@@ -153,7 +146,7 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 						lines.push('')
 					}
 					else {
-						if (lineIsTooLong(writableWidth, textStructure.fontSize, valueWord)) {
+						if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
 							lines.push(valueWord)
 						}
 						else {
@@ -166,9 +159,9 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 			else {
 				if (line.length > 0) {
 					var checkLine = line + ' ' + valueWord
-					if (lineIsTooLong(writableWidth, textStructure.fontSize, checkLine)) {
+					if (lineIsTooLong(writableWidth, format.fontSize, checkLine)) {
 						lines.push(line)
-						if (lineIsTooLong(writableWidth, textStructure.fontSize, valueWord)) {
+						if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
 							lines.push(valueWord)
 						}
 						else {
@@ -180,7 +173,7 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 					}
 				}
 				else {
-					if (lineIsTooLong(writableWidth, textStructure.fontSize, valueWord)) {
+					if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
 						lines.push(valueWord)
 					}
 					else {
@@ -193,7 +186,7 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 			lines.push(line)
 		}
 		for (var line of lines) {
-			addTextStatement(fontSize, idStart, registry, statement, line, textAnchor, textStructure, writableWidth, xStart, y)
+			addTextStatement(anchor, fontSize, format, idStart, registry, statement, line, writableWidth, xStart, y)
 			y += localLineHeight
 		}
 		return y
@@ -210,7 +203,7 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 			for (var rowIndex = 0; rowIndex < rowEndRoundedUp; rowIndex++) {
 				if (totalRowIndex < columnWords.length) {
 					var word = columnWords[totalRowIndex]
-					addTextStatement(fontSize, idStart, registry, statement, word, textAnchor, textStructure, writableWidth, columnX, y)
+					addTextStatement(anchor, fontSize, format, idStart, registry, statement, word, writableWidth, columnX, y)
 					y += localLineHeight
 					totalRowIndex += 1
 				}
@@ -219,7 +212,7 @@ function getYAddSequenceWord(attributeMap, fontSize, idStart, registry, lineHeig
 		}
 		return y
 	}
-	addTextStatement(fontSize, idStart, registry, statement, value, textStructure.textAnchor, textStructure, writableWidth, x, y)
+	addTextStatement(format.anchor, fontSize, format, idStart, registry, statement, value, writableWidth, x, y)
 	return y + localLineHeight
 }
 
@@ -227,6 +220,11 @@ function getBox(registry, statement) {
 	var points = getPointsHD(registry, statement)
 	if (getIsEmpty(points)) {
 		return null
+	}
+	for (var point of points) {
+		if (point.length == 1) {
+			point.push(0.0)
+		}
 	}
 	var pointZero = points[0]
 	if (points.length == 1) {
@@ -254,13 +252,13 @@ function getBox(registry, statement) {
 function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
 	var betweenCharacter = 0.1 * fontHeight + strokeWidth
 	var halfHeight = fontHeight * 0.5
-	var fontMultiplier = [halfHeight, halfHeight]
 	var averageAdvance = halfHeight + betweenCharacter
-	var radius = strokeWidth / fontHeight
-	var radiusPoint = [radius, radius]
+	var fontMultiplier = [halfHeight, halfHeight]
 	var letteringOutlines = []
 	var maximumX = 0
 	var minimumX = null
+	var radius = strokeWidth / fontHeight
+	var outsets = [[radius, radius]]
 	var x = 0
 	if (gLetteringMap == null) {
 		createCharacterPolylineMap()
@@ -268,8 +266,8 @@ function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
 	for (var character of text) {
 		var polylines = gLetteringMap.get(character)
 		if (polylines != null) {
-			var outlines = getOutlines(gLetteringSet.has(character), null, false, radiusPoint, polylines)
-			multiplyXYArrays(outlines, fontMultiplier)
+			var outlines = getOutlines(null, null, gLetteringSet.has(character), true, outsets, polylines, null)
+			multiply2DArrays(outlines, fontMultiplier)
 			var boundingX = getBoundingXByPolygons(outlines)
 			x -= boundingX[0]
 			if (minimumX == null) {
@@ -321,6 +319,7 @@ function getTextLength(text) {
 			textLength += 0.62
 		}
 	}
+//	checkFlaw
 //	return textLength
 //	increased because of overlap in list description
 	return 1.1 * textLength
@@ -328,6 +327,18 @@ function getTextLength(text) {
 
 function lineIsTooLong(cellWidth, fontSize, line) {
 	return getTextLength(line) * fontSize > cellWidth
+}
+
+var gCircle = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'circle',
+	processStatement: function(registry, statement) {
+		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
+		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
+		var r = getFloatByDefault(1.0, 'r', registry, statement, this.name)
+	}
 }
 
 var gGrid = {
@@ -338,15 +349,16 @@ var gGrid = {
 	},
 	name: 'grid',
 	processStatement: function(registry, statement) {
+		statement.tag = 'g'
 		var attributeMap = statement.attributeMap
 		var columns = getIntByDefault(1, 'columns', registry, statement, this.name)
-		var corner = getBooleanByDefault(true, 'corner', registry, statement, this.name)
+		var cornerMultiplier = getFloatByDefault(1.0, 'corner', registry, statement, this.name)
 		var rows = getIntByDefault(1, 'rows', registry, statement, this.name)
 		var gridHeight = getFloatByDefault(100.0, 'gridHeight', registry, statement, this.name)
 		var gridWidth = getFloatByDefault(100.0, 'gridWidth', registry, statement, this.name)
-		var inside = getBooleanByDefault(true, 'inside', registry, statement, this.name)
+		var insideMultiplier = getFloatByDefault(1.0, 'inside', registry, statement, this.name)
 		var lineLength = getFloatByDefault(2.0, 'lineLength', registry, statement, this.name)
-		var outside = getBooleanByDefault(true, 'outside', registry, statement, this.name)
+		var outsideMultiplier = getFloatByDefault(1.0, 'outside', registry, statement, this.name)
 		var cellHeight = gridHeight / rows
 		var cellWidth = gridWidth / columns
 		attributeMap.set('cellColumn', '0')
@@ -359,54 +371,68 @@ var gGrid = {
 		attributeMap.set('rows', rows.toString())
 		var groupMap = new Map(attributeMap)
 		attributeMap.delete('style')
-		if (!corner && !inside && !outside) {
+		if (cornerMultiplier * insideMultiplier * outsideMultiplier == 0.0) {
 			return
 		}
 		var groupStatement = getStatementByParentTag(groupMap, 1, statement, 'group')
 		getUniqueID('gridGroup', registry, groupStatement)
-		statement.parent.children.splice(-1, 0, groupStatement)
 		var polylines = []
 		var x = 0.0
 		var y = 0.0
-		if (corner) {
-			polylines.push([[0, 0], [lineLength, 0]])
-			polylines.push([[gridWidth - lineLength, 0], [gridWidth, 0]])
-			polylines.push([[0, gridHeight], [lineLength, gridHeight]])
-			polylines.push([[gridWidth - lineLength, gridHeight], [gridWidth, gridHeight]])
-			polylines.push([[0, 0], [0, lineLength]])
-			polylines.push([[gridWidth, 0], [gridWidth, lineLength]])
-			polylines.push([[0, gridHeight - lineLength], [0, gridHeight]])
-			polylines.push([[gridWidth, gridHeight - lineLength], [gridWidth, gridHeight]])
+		if (cornerMultiplier != 0.0) {
+			var cornerLength = lineLength * cornerMultiplier
+			polylines.push([[0, 0], [cornerMultiplier, 0]])
+			polylines.push([[gridWidth - cornerMultiplier, 0], [gridWidth, 0]])
+			polylines.push([[0, gridHeight], [cornerMultiplier, gridHeight]])
+			polylines.push([[gridWidth - cornerMultiplier, gridHeight], [gridWidth, gridHeight]])
+			polylines.push([[0, 0], [0, cornerMultiplier]])
+			polylines.push([[gridWidth, 0], [gridWidth, cornerMultiplier]])
+			polylines.push([[0, gridHeight - cornerMultiplier], [0, gridHeight]])
+			polylines.push([[gridWidth, gridHeight - cornerMultiplier], [gridWidth, gridHeight]])
 		}
-		if (inside) {
-			var halfLineLength = 0.5 * lineLength
+		if (insideMultiplier != 0.0) {
+			var insideLength = lineLength * insideMultiplier
 			y = 0.0
 			for (var yIndex = 1; yIndex < rows; yIndex++) {
 				y += cellHeight
 				x = 0.0
 				for (var xIndex = 1; xIndex < columns; xIndex++) {
 					x += cellWidth
-					polylines.push([[x - halfLineLength, y], [x + halfLineLength, y]])
-					polylines.push([[x, y - halfLineLength], [x, y + halfLineLength]])
+					polylines.push([[x - insideLength, y], [x + insideLength, y]])
+					polylines.push([[x, y - insideLength], [x, y + insideLength]])
 				}
 			}
 		}
-		if (outside) {
-			x = 0.0
+		if (outsideMultiplier != 0.0) {
+			var outsideLength = lineLength * insideMultiplier
+			var x = 0.0
 			for (var xIndex = 1; xIndex < columns; xIndex++) {
 				x += cellWidth
-				polylines.push([[x, 0], [x, lineLength]])
-				polylines.push([[x, gridHeight - lineLength], [x, gridHeight]])
+				polylines.push([[x, 0], [x, outsideLength]])
+				polylines.push([[x, gridHeight - outsideLength], [x, gridHeight]])
+				polylines.push([[x - outsideLength, 0], [x + outsideLength, 0]])
+				polylines.push([[x - outsideLength, gridHeight], [x + outsideLength, gridHeight]])
 			}
 			y = 0.0
 			for (var yIndex = 1; yIndex < rows; yIndex++) {
 				y += cellHeight
-				polylines.push([[0, y], [lineLength, y]])
-				polylines.push([[gridWidth - lineLength, y], [gridWidth, y]])
+				polylines.push([[0, y], [outsideLength, y]])
+				polylines.push([[gridWidth - outsideLength, y], [gridWidth, y]])
+				polylines.push([[0, y - outsideLength], [0, y + outsideLength]])
+				polylines.push([[gridWidth, y - outsideLength], [gridWidth, y + outsideLength]])
 			}
 		}
 		addPolylinesToGroup(polylines, registry, groupStatement)
-		addClosingStatement(groupStatement)
+	}
+}
+
+var gImage = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'image',
+	processStatement: function(registry, statement) {
+		getPointsExcept(null, registry, statement, this.name)
 	}
 }
 
@@ -422,9 +448,10 @@ var gLettering = {
 		var textAlign = getFloatByDefault(0.0, 'textAlign', registry, statement, this.name)
 		var outlines = getLetteringOutlines(fontHeight, strokeWidth, text, textAlign)
 		if (outlines.length == 0) {
+			noticeByList(['No outlines could be generated for lettering in generator2d.', statement])
 			return
 		}
-		addClosingStatementConvertToGroup(statement)
+		convertToGroup(statement)
 		addPolygonsToGroup(outlines, registry, statement)
 	}
 }
@@ -464,69 +491,44 @@ var gList = {
 		variableMap.set('_listMargin', margin.toString())
 		variableMap.set('_listX', x.toString())
 		var yStart = getFloatByDefault(5.0, 'y', registry, statement, this.name)
-		var sequenceYs = null
-		if (variableMap.has('_listSequenceYs')) {
-			sequenceYs = variableMap.get('_listSequenceYs')
+		var formatFunctionMap = new Map([['fontSize', parseFloat], ['xOffset', parseFloat], ['y', parseFloat]])
+		var formats = null
+		if (variableMap.has('_listFormats')) {
+			formats = variableMap.get('_listFormats')
 		}	
-		if (attributeMap.has('sequence')) {
-			sequenceYs = []
-			var sequenceWords = attributeMap.get('sequence').split(' ').filter(lengthCheck)
-			var sequence = null
-			for (var sequenceWord of sequenceWords) {
-				if (sequenceWord.length > 0) {
-					if (gIntegerSet.has(sequenceWord[0])) {
-						sequence = []
-						sequenceYs.push({sequence:sequence, yStart:parseFloat(sequenceWord)})
-					}
-					else {
-						var sequenceAttributes = sequenceWord.split(',')
-						var textStructure = {fontSize:fontSize, sequenceWord:sequenceAttributes[0], textAnchor:null, xOffset:0.0}
-						if (sequenceAttributes.length > 1) {
-							if (sequenceAttributes[1].length > 0) {
-								textStructure.fontSize = parseFloat(sequenceAttributes[1])
-							}
-						}
-						if (sequenceAttributes.length > 2) {
-							if (sequenceAttributes[2].length > 0) {
-								textStructure.textAnchor = sequenceAttributes[2]
-							}
-						}
-						if (sequenceAttributes.length > 3) {
-							if (sequenceAttributes[3].length > 0) {
-								textStructure.xOffset = parseFloat(sequenceAttributes[3])
-							}
-						}
-						if (sequence == null) {
-							sequence = [textStructure]
-							sequenceYs.push({sequence:sequence, yStart:yStart})
-						}
-						else {
-							sequence.push(textStructure)
+		if (attributeMap.has('formats')) {
+			formats = []
+			var formatWords = attributeMap.get('formats').split(' ').filter(lengthCheck)
+			for (var formatWord of formatWords) {
+				if (formatWord.length > 0) {
+					var formatAttributes = formatWord.split(';')
+					var format = {anchor:null, fontSize:fontSize, margin:margin, rightMargin:margin, xOffset:0.0}
+					formats.push(format)
+					for (var formatAttribute of formatAttributes) {
+						var formatEntry = formatAttribute.split(':')
+						if (formatEntry[1].length > 0) {
+							setObjectAttribute(formatEntry[0], formatFunctionMap, format, formatEntry[1])
 						}
 					}
 				}
 			}
 		}
-		if (sequenceYs == null) {
+		if (formats == null) {
+			noticeByList(['No formats could be found for list in generator2d.', statement])
 			return
 		}
-		variableMap.set('_listSequenceYs', sequenceYs)
+		variableMap.set('_listFormats', formats)
 		var writableWidth = cellWidth - margin - margin
 		var xStart = x - 0.5 * writableWidth
-		if (statement.children.length > 0) {
-			if (statement.children[statement.children.length - 1].nestingIncrement == -1) {
-				statement.children.pop()
-			}
-		}
 		var idStart = statement.attributeMap.get('id') + '_'
-		for (var sequenceY of sequenceYs) {
-			var y = sequenceY.yStart
-			for (var textStructure of sequenceY.sequence) {
-				y = getYAddSequenceWord(
-				attributeMap, fontSize, idStart, registry, lineHeight, statement, textStructure, writableWidth, x, xStart, y)
+		var y = yStart
+		for (var format of formats) {
+			if (format.y != undefined) {
+				y = format.y
 			}
+			y = getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y)
 		}
-		addClosingStatementConvertToGroup(statement)
+		convertToGroup(statement)
 	}
 }
 
@@ -544,13 +546,25 @@ var gOutline = {
 				polylines.push(polygon)
 			}
 		}
+		var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
 		var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, this.name)
 		var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
 		var marker = getPointsByKey('marker', registry, statement)
-		var radius = getPointByDefault([1.0, 1.0], 'radius', registry, statement, this.name)
-		var outlines = getOutlines(checkIntersection, marker, markerAbsolute, radius, polylines)
-		statement.tag = 'g'
-		if (!getIsEmpty(outlines)) {
+		var baseMarker = getPointsByKey('baseMarker', registry, statement)
+		var tipMarker = getPointsByKey('tipMarker', registry, statement)
+		if (getIsEmpty(baseMarker)) {
+			baseMarker = marker
+		}
+		if (getIsEmpty(tipMarker)) {
+			tipMarker = marker
+		}
+		var outsets = getOutsets(registry, statement)
+		var outlines = getOutlines(baseLocation, baseMarker, checkIntersection, markerAbsolute, outsets, polylines, tipMarker)
+		if (getIsEmpty(outlines)) {
+			noticeByList(['No outlines could be found for outline in generator2d.', statement])
+		}
+		else{
+			convertToGroup(statement)
 			addPolygonsToGroup(outlines, registry, statement)
 		}
 	}
@@ -564,6 +578,7 @@ var gPolygon = {
 	processStatement: function(registry, statement) {
 		var points = getPointsHD(registry, statement)
 		if (points == null) {
+			noticeByList(['No points could be found for polygon in generator2d.', statement])
 			return
 		}
 		setPointsExcept(points, registry, statement, this.name)
@@ -578,6 +593,7 @@ var gPolyline = {
 	processStatement: function(registry, statement) {
 		var points = getPointsHD(registry, statement)
 		if (points == null) {
+			noticeByList(['No points could be found for polyline in generator2d.', statement])
 			return
 		}
 		setPointsExcept(points, registry, statement, this.name)
@@ -593,8 +609,31 @@ var gRectangle = {
 		statement.tag = 'polygon'
 		var points = getBox(registry, statement)
 		if (getIsEmpty(points)) {
+			noticeByList(['No points could be found for rectangle in generator2d.', statement])
 			return
 		}
+		setPointsExcept(points, registry, statement, this.name)
+	}
+}
+
+var gRegularPolygon = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'regularPolygon',
+	processStatement: function(registry, statement) {
+		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
+		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
+		var radius = getFloatByDefault(1.0, 'r', registry, statement, this.name)
+		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
+		var angleIncrement = gDoublePi / sides
+		var points = new Array(sides)
+		var angle = 0.0
+		for (var vertexIndex = 0; vertexIndex < sides; vertexIndex++) {
+			points[vertexIndex] = [cx + Math.sin(angle) * radius, cy + Math.cos(angle) * radius]
+			angle += angleIncrement
+		}
+		statement.tag = 'polygon'
 		setPointsExcept(points, registry, statement, this.name)
 	}
 }
@@ -608,6 +647,7 @@ var gScreen = {
 		statement.tag = 'polygon'
 		var box = getBox(registry, statement)
 		if (getIsEmpty(box)) {
+			noticeByList(['No box could be generated for screen in generator2d.', statement])
 			return
 		}
 		var overhangAngle = getFloatByDefault(40.0, 'overhangAngle', registry, statement, this.name) * gRadiansPerDegree
@@ -649,32 +689,30 @@ var gVerticalHole = {
 		var radius = getFloatByDefault(1.0, 'r', registry, statement, this.name)
 		var sagAngle = getFloatByDefault(15.0, 'sagAngle', registry, statement, this.name) * gRadiansPerDegree
 		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
-		points = []
-		beginAngle = Math.PI / 2.0 - overhangAngle
-		endAngle = 1.5 * Math.PI + overhangAngle
-		maximumIncrement = 2.0 * Math.PI / sides
-		deltaAngle = endAngle - beginAngle
-		arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * overhangAngle)
-		angleIncrement = deltaAngle / arcSides
-		halfAngleIncrement = 0.5 * angleIncrement
+		var points = []
+		var beginAngle = Math.PI / 2.0 - overhangAngle
+		var endAngle = 1.5 * Math.PI + overhangAngle
+		var maximumIncrement = 2.0 * Math.PI / sides
+		var deltaAngle = endAngle - beginAngle
+		var arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * overhangAngle)
+		var angleIncrement = deltaAngle / arcSides
+		var halfAngleIncrement = 0.5 * angleIncrement
 		beginAngle -= halfAngleIncrement
 		endAngle += halfAngleIncrement + 0.001 * overhangAngle
-		outerRadius = radius / Math.cos(0.5 * angleIncrement)
-		for (pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
-			x = cx + Math.sin(pointAngle) * outerRadius
-			y = cy + Math.cos(pointAngle) * outerRadius
-			points.push([x, y])
+		var outerRadius = radius / Math.cos(0.5 * angleIncrement)
+		for (var pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
+			points.push([cx + Math.sin(pointAngle) * outerRadius, cy + Math.cos(pointAngle) * outerRadius])
 		}
-		topY = cy + radius
-		deltaBegin = getXYSubtraction(points[0], points[1])
-		sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
-		segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
-		approachRunOverRise = sagRunOverRise - segmentRunOverRise
-		topMinusSegment = topY - points[0][1]
-		topX = topMinusSegment * segmentRunOverRise + points[0][0]
-		aboveMinusTopY = (topX - cx) / approachRunOverRise
-		sagDeltaX = aboveMinusTopY * sagRunOverRise
-		aboveY = topY + aboveMinusTopY
+		var topY = cy + radius
+		var deltaBegin = get2DSubtraction(points[0], points[1])
+		var sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
+		var segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
+		var approachRunOverRise = sagRunOverRise - segmentRunOverRise
+		var topMinusSegment = topY - points[0][1]
+		var topX = topMinusSegment * segmentRunOverRise + points[0][0]
+		var aboveMinusTopY = (topX - cx) / approachRunOverRise
+		var sagDeltaX = aboveMinusTopY * sagRunOverRise
+		var aboveY = topY + aboveMinusTopY
 		points[0] = [cx + sagDeltaX, aboveY]
 		points[points.length - 1] = [cx - sagDeltaX, aboveY]
 		for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
@@ -686,4 +724,5 @@ var gVerticalHole = {
 	}
 }
 
-var gGenerator2DProcessors = [gGrid, gLettering, gList, gOutline, gPolygon, gPolyline, gRectangle, gScreen, gText, gVerticalHole]
+var gGenerator2DProcessors = [
+gCircle, gGrid, gImage, gLettering, gList, gOutline, gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
