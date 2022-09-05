@@ -1,12 +1,5 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function addFacetsToLoneArrowSet(beginIndex, facets, loneArrowSet) {
-	for (var facet of facets) {
-		addFacetToLoneArrowSet(beginIndex, facet, loneArrowSet)
-	}
-	return loneArrowSet
-}
-
 function addFacetToLoneArrowSet(beginIndex, facet, loneArrowSet) {
 	if (facet == null) {
 		return
@@ -24,27 +17,44 @@ function addFacetToLoneArrowSet(beginIndex, facet, loneArrowSet) {
 	}
 }
 
-function drillByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMesh) {
+function addMeshesRecursively(depth, meshes, registry, statement) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in addMeshesRecursively reached, no further statements will be added.'
+		warningByList([warningText, statement, gRecursionLimit])
+		return
+	}
+	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	if (mesh != null) {
+		meshes.push(mesh)
+	}
+	depth += 1
+	for (var child of statement.children) {
+		addMeshesRecursively(depth, meshes, registry, child)
+	}
+	return meshes
+}
+
+function differenceByPillar(id, matrix, splitHeights, toolPillar, matrix2Ds, workMesh) {
 	if (getIsEmpty(toolPillar.polygons)) {
 		return
 	}
 	var originalPoints = workMesh.points
-	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
+	var inversePoints = get3DsBy3DMatrix(getInverseRotation3D(matrix), originalPoints)
 	workMesh.points = inversePoints
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByMatrix3Ds(toolPolygon, matrix2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
-				drillByPolygon(splitHeights, strata, transformedPolygon, workMesh)
+				differenceByPolygon(id, splitHeights, strata, transformedPolygon, workMesh)
 			}
 		}
 	}
 	workMesh.points = originalPoints
-	pushArray(workMesh.points, getXYZsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
+	pushArray(workMesh.points, get3DsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
 	removeUnfacetedPoints(workMesh)
 }
 
-function drillByPolygon(splitHeights, strata, toolPolygon, workMesh) {
+function differenceByPolygon(id, splitHeights, strata, toolPolygon, workMesh) {
 	var toolDirected = getDirectedPolygon(false, toolPolygon)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
 	var missingArrowSet = getMissingArrowSet(facetIntersections)
@@ -55,15 +65,16 @@ function drillByPolygon(splitHeights, strata, toolPolygon, workMesh) {
 		removeUnpairedFacet(true, facetIntersectionIndex, facetIntersections)
 	}
 	var meetings = getMeetings(facetIntersections, toolDirected, workMesh)
-	sortRemoveMeetingsByFacetIntersections(facetIntersections)
+	sortRemoveMeetingsByFacetIntersections(facetIntersections, meetings)
 	for (var facetIntersection of facetIntersections) {
 		alterFacetsAddHorizontals(facetIntersection, facetIntersections, meetings, 'd', strata, toolDirected, workMesh)
 	}
-	var workMap = getDrillWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
+	var workMap = getDifferenceWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
 	var toolMap = getToolMap(facetIntersections, workMesh.points, toolDirected)
+	removeShortArrays(workMesh.facets, 3)
 	var facetIndexStart = workMesh.facets.length
 	addFacetsByToolWorkMaps(workMesh.facets, toolMap, workMap)
-	addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh)
+	addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh)
 }
 
 function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
@@ -104,9 +115,9 @@ function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
 		var maximumZ = -Number.MAX_VALUE
 		var minimumZ = Number.MAX_VALUE
 		for (var facetIntersection of facetIntersections) {
-			if (facetIntersection.isClockwise != isTop && facetIntersection.isPartlyHorizontal) {
+			if (facetIntersection.isClockwise != isTop && !facetIntersection.isVertical) {
 				for (var point of toolDirected) {
-					if (getIsPointInsidePolygon(point, facetIntersection.workPolygon)) {
+					if (getIsPointInsidePolygonOrClose(point, facetIntersection.workPolygon)) {
 						var z = getZByPointPolygon(point, facetIntersection.workPolygon)
 						maximumZ = Math.max(maximumZ, z)
 						minimumZ = Math.min(minimumZ, z)
@@ -117,7 +128,7 @@ function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
 		var closeFacetIntersections = []
 		for (var facetIntersectionIndex = 0; facetIntersectionIndex < facetIntersections.length; facetIntersectionIndex++) {
 			var facetIntersection = facetIntersections[facetIntersectionIndex]
-			if (facetIntersection.isClockwise == isTop || !facetIntersection.isPartlyHorizontal) {
+			if (facetIntersection.isClockwise == isTop || facetIntersection.isVertical) {
 				for (var point of facetIntersection.workPolygon) {
 					if (point[2] > maximumZ || point[2] < minimumZ) {
 						closeFacetIntersections.push(facetIntersection)
@@ -129,12 +140,12 @@ function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
 		}
 		removeNulls(facetIntersections)
 		var meetings = getMeetings(facetIntersections, toolDirected, workMesh)
-		sortRemoveMeetingsByFacetIntersections(facetIntersections)
+		sortRemoveMeetingsByFacetIntersections(facetIntersections, meetings)
 		var arrowAlongMap = new Map()
 		for (var facetIntersection of facetIntersections) {
 			var alongIndexesMap = facetIntersection.alongIndexesMap
 			for (var nodeKey of alongIndexesMap.keys()) {
-				var nodeStrings = nodeKey.split(',')
+				var nodeStrings = nodeKey.split(' ')
 				if (nodeStrings[0] == 'w') {
 					var facet = workMesh.facets[facetIntersection.facetIndex]
 					var beginIndex = parseInt(nodeStrings[1])
@@ -225,7 +236,8 @@ function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
 				toolFacet[pointIndexIndex] = pointToolIndexMap.get(pointIndex)
 			}
 		}
-		var workMap = getDrillWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
+		removeShortArrays(workMesh.facets, 3)
+		var workMap = getDifferenceWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
 		for (var toolFacetIndex = 0; toolFacetIndex < toolMeshFacets.length; toolFacetIndex++) {
 			var toolFacet = toolMeshFacets[toolFacetIndex]
 			if (toolFacetIndex != xyFacetIndex) {
@@ -235,33 +247,33 @@ function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
 	}
 }
 
-function embossMeshesByTransform2Ds(matrix, isTop, stratas, toolMeshes, transform2Ds, workMesh) {
-	if (toolMeshes == null) {
+function embossMeshesByTransform2Ds(matrix2Ds, matrix3D, isTop, stratas, toolMeshes, workMesh) {
+	if (getIsEmpty(toolMeshes)) {
 		return
 	}
 	var originalPoints = workMesh.points
-	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
+	var inversePoints = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), originalPoints)
 	workMesh.points = inversePoints
 	for (var toolMesh of toolMeshes) {
-		if (transform2Ds == null) {
+		if (getIsEmpty(matrix2Ds)) {
 			embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh)
 		}
 		else {
 			var toolMeshPoints = getArraysCopy(toolMesh.points)
-			for (var transform of transform2Ds) {
+			for (var matrix2D of matrix2Ds) {
 				setArraysToArraysUntil(toolMesh.points, toolMeshPoints, 2)
-				transform2DPoints(toolMesh.points, transform)
+				transform2DPoints(matrix2D, toolMesh.points)
 				embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh)
 			}
 			setArraysToArraysUntil(toolMesh.points, toolMeshPoints, 2)
 		}
 	}
-	pushArray(originalPoints, getXYZsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
+	pushArray(originalPoints, get3DsBy3DMatrix(matrix3D, inversePoints.slice(originalPoints.length, inversePoints.length)))
 	workMesh.points = originalPoints
 	removeUnfacetedPoints(workMesh)
 }
 
-function getDrillWorkMap(facetIntersections, facets, loneArrowSet, originalFacetLength) {
+function getDifferenceWorkMap(facetIntersections, facets, loneArrowSet, originalFacetLength) {
 	for (var facetIntersection of facetIntersections) {
 		var facet = facets[facetIntersection.facetIndex]
 		addFacetToLoneArrowSet(0, facet, loneArrowSet)
@@ -272,12 +284,58 @@ function getDrillWorkMap(facetIntersections, facets, loneArrowSet, originalFacet
 	return getWorkMapByArrowSet(loneArrowSet)
 }
 
+function getMeshesByChildren(children, registry) {
+	var meshes = []
+	for (var child of children) {
+		var mesh = getWorkMeshByID(child.attributeMap.get('id'), registry)
+		if (mesh != null) {
+			meshes.push(mesh)
+		}
+	}
+	return meshes
+}
+
+function getMeshesByKey(key, registry, statement) {
+	if (!statement.attributeMap.has(key)) {
+		return []
+	}
+	var ids = statement.attributeMap.get(key).replace(/,/g, ' ').split(' ').filter(lengthCheck)
+	var meshes = []
+	for (var id of ids) {
+		if (registry.idMap.has(id)) {
+			addMeshesRecursively(0, meshes, registry, registry.idMap.get(id))
+		}
+	}
+	return meshes
+}
+
 function getMissingArrowSet(facetIntersections) {
 	var missingArrowSet = new Set()
 	for (var facetIntersection of facetIntersections) {
-		addFacetToLoneArrowSet(1, facetIntersection.workFacet, missingArrowSet)
+		addFacetToLoneArrowSet(1, facetIntersection.facet, missingArrowSet)
 	}
 	return missingArrowSet
+}
+
+function getOverlappedPolygons(outset, polygons) {
+	if (polygons.length < 2) {
+		return polygons
+	}
+	var overlappedPolygons = [polygons[0]]
+	var outsetPolygons = [getOutsetPolygon(outset, polygons[0])]
+	for (var polygonIndex = 1; polygonIndex < polygons.length; polygonIndex++) {
+		pushArray(overlappedPolygons, getSubtractedPolygons(outsetPolygons, [polygons[polygonIndex]]))
+		outsetPolygons.push(getOutsetPolygon(outset, polygons[polygonIndex]))
+	}
+	return overlappedPolygons
+}
+
+function getStratas(registry, statement) {
+	var stratas = getFloatListsByStatement('stratas', registry, statement)
+	if (getIsEmpty(stratas)) {
+		return [null]
+	}
+	return stratas
 }
 
 function getWorkMapByArrowSet(arrowSet) {
@@ -289,27 +347,37 @@ function getWorkMapByArrowSet(arrowSet) {
 	return workMap
 }
 
-function sectionByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMesh) {
+function getWorkPolygons(registry, statement) {
+	var workStatement = getWorkStatement(registry, statement)
+	if (workStatement == null) {
+		return []
+	}
+	var workPolygons = getPolygonsHDRecursively(registry, workStatement)
+	removeShortArrays(workPolygons, 3)
+	return workPolygons
+}
+
+function sectionByPillar(id, matrix, splitHeights, toolPillar, matrix2Ds, workMesh) {
 	var originalPoints = workMesh.points
-	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
+	var inversePoints = get3DsBy3DMatrix(getInverseRotation3D(matrix), originalPoints)
 	workMesh.points = inversePoints
 	var intersectionFacets = []
 	var originalFacets = getArraysCopy(workMesh.facets)
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByMatrix3Ds(toolPolygon, matrix2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
-				sectionByPolygon(intersectionFacets, originalFacets, splitHeights, strata, transformedPolygon, workMesh)
+				sectionByPolygon(id, intersectionFacets, originalFacets, splitHeights, strata, transformedPolygon, workMesh)
 			}
 		}
 	}
 	workMesh.facets = intersectionFacets
 	workMesh.points = originalPoints
-	pushArray(workMesh.points, getXYZsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
+	pushArray(workMesh.points, get3DsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
 	removeUnfacetedPoints(workMesh)
 }
 
-function sectionByPolygon(intersectionFacets, originalFacets, splitHeights, strata, toolPolygon, workMesh) {
+function sectionByPolygon(id, intersectionFacets, originalFacets, splitHeights, strata, toolPolygon, workMesh) {
 	workMesh.facets = getArraysCopy(originalFacets)
 	var toolDirected = getDirectedPolygon(true, toolPolygon)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
@@ -320,7 +388,7 @@ function sectionByPolygon(intersectionFacets, originalFacets, splitHeights, stra
 		removeUnpairedFacet(true, facetIntersectionIndex, facetIntersections)
 	}
 	var meetings = getMeetings(facetIntersections, toolDirected, workMesh)
-	sortRemoveMeetingsByFacetIntersections(facetIntersections)
+	sortRemoveMeetingsByFacetIntersections(facetIntersections, meetings)
 	for (var facetIntersection of facetIntersections) {
 		alterFacetsAddHorizontals(facetIntersection, facetIntersections, meetings, 'i', strata, toolDirected, workMesh)
 	}
@@ -333,49 +401,40 @@ function sectionByPolygon(intersectionFacets, originalFacets, splitHeights, stra
 			workMesh.facets[facetIndex] = null
 		}
 	}
+	var workMap = getDifferenceWorkMap(originalFacetIntersections, workMesh.facets, new Set(), originalFacetLength)
 	var toolMap = getToolMap(facetIntersections, workMesh.points, toolDirected)
-	var workMap = getDrillWorkMap(originalFacetIntersections, workMesh.facets, new Set(), originalFacetLength)
+	removeShortArrays(workMesh.facets, 3)
 	var facetIndexStart = workMesh.facets.length
 	addFacetsByToolWorkMaps(workMesh.facets, toolMap, workMap)
-	addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh)
+	addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh)
 	for (var facet of workMesh.facets) {
-		if (!getIsEmpty(facet)) {
+		if (getIsLong(facet, 3)) {
 			intersectionFacets.push(facet)
 		}
 	}
 }
 
-function setSplitIndexesAttribute(statement, workMesh) {
-	if (workMesh.splits == undefined) {
-		return
-	}
-	if (workMesh.splits.length > 0) {
-		workMesh.splits.sort(compareNumberAscending)
-		statement.attributeMap.set('splits', workMesh.splits.toString())
-	}
-}
-
-function weldByPillar(matrix, splitHeights, toolPillar, transform2Ds, workMesh) {
+function weldByPillar(id, matrix, splitHeights, toolPillar, matrix2Ds, workMesh) {
 	if (getIsEmpty(toolPillar.polygons)) {
 		return
 	}
 	var originalPoints = workMesh.points
-	var inversePoints = getXYZsBy3DMatrix(get3DInverseRotation(matrix), originalPoints)
+	var inversePoints = get3DsBy3DMatrix(getInverseRotation3D(matrix), originalPoints)
 	workMesh.points = inversePoints
 	for (var toolPolygon of toolPillar.polygons) {
-		var transformedPolygons = getTransformed2DPointsByTransforms(toolPolygon, transform2Ds)
+		var transformedPolygons = getTransformed2DPointsByMatrix3Ds(toolPolygon, matrix2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
-				weldByPolygon(splitHeights, strata, transformedPolygon, workMesh)
+				weldByPolygon(id, splitHeights, strata, transformedPolygon, workMesh)
 			}
 		}
 	}
 	workMesh.points = originalPoints
-	pushArray(workMesh.points, getXYZsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
+	pushArray(workMesh.points, get3DsBy3DMatrix(matrix, inversePoints.slice(originalPoints.length, inversePoints.length)))
 	removeUnfacetedPoints(workMesh)
 }
 
-function weldByPolygon(splitHeights, strata, toolPolygon, workMesh) {
+function weldByPolygon(id, splitHeights, strata, toolPolygon, workMesh) {
 	var toolDirected = getDirectedPolygon(true, toolPolygon)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
 	var missingArrowSet = getMissingArrowSet(facetIntersections)
@@ -386,40 +445,60 @@ function weldByPolygon(splitHeights, strata, toolPolygon, workMesh) {
 		removeUnpairedFacet(false, facetIntersectionIndex, facetIntersections)
 	}
 	var meetings = getMeetings(facetIntersections, toolDirected, workMesh)
-	sortRemoveMeetingsByFacetIntersections(facetIntersections)
+	sortRemoveMeetingsByFacetIntersections(facetIntersections, meetings)
 	for (var facetIntersection of facetIntersections) {
 		alterFacetsAddHorizontals(facetIntersection, facetIntersections, meetings, 'd', strata, toolDirected, workMesh)
 	}
-	var workMap = getDrillWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
+	var workMap = getDifferenceWorkMap(originalFacetIntersections, workMesh.facets, missingArrowSet, originalFacetLength)
 	var toolMap = getToolMap(facetIntersections, workMesh.points, toolDirected)
 	var facetIndexStart = workMesh.facets.length
 	addFacetsByToolWorkMaps(workMesh.facets, toolMap, workMap)
-	addSplitIndexesByHeights(facetIndexStart, splitHeights, workMesh)
+	addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh)
 }
 
 var gDifference = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+
+		//deprecated23
 		gTagCenterMap.set('drill', this)
+
 	},
 	name: 'difference',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			return
-		}
+		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
+			noticeByList(['No tool polygons could be found for difference in construction.', statement])
 			return
 		}
-		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
-		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getChainMatrix3D(registry, statement)
-		var toolPillar = {polygons:polygons, stratas:stratas}
-		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		drillByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
-		setSplitIndexesAttribute(statement, workMesh)
-		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
+		if (!statement.attributeMap.get('work')) {
+			noticeByList(['No work could be found for difference in construction.', statement])
+			return
+		}
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh != null) {
+			var matrix3D = getChainMatrix3D(registry, statement)
+			var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+			var stratas = getStratas(registry, statement)
+			var toolPillar = {polygons:polygons, stratas:stratas}
+			var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+			differenceByPillar(statement.attributeMap.get('id'), matrix3D, splitHeights, toolPillar, matrix2Ds, workMesh)
+			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+			return
+		}
+		var workPolygons = getWorkPolygons(registry, statement)
+		if (workPolygons.length == 0) {
+			noticeByList(['No work polygon could be found for difference in construction.', statement])
+			return
+		}
+		deleteStatementsByTagDepth(0, registry, statement, 'polygon')
+		var workPolygons = getSubtractedPolygons(polygons, workPolygons)
+		if (getIsEmpty(workPolygons)) {
+			noticeByList(['No polygons remained after difference operation in construction.', polygons, workPolygon, statement])
+			return
+		}
+		addPolygonsToGroup(workPolygons, registry, statement)
 	}
 }
 
@@ -429,72 +508,135 @@ var gEmboss = {
 	},
 	name: 'emboss',
 	processStatement:function(registry, statement) {
+		convertToGroup(statement)
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
 			return
 		}
 		var isTop = getBooleanByDefault(true, 'top', registry, statement, this.name)
+		var matrix3D = getChainMatrix3D(registry, statement)
 		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getChainMatrix3D(registry, statement)
+		var bottomMeshes = getMeshesByKey('bottomTools', registry, statement)
+		var topMeshes = getMeshesByKey('topTools', registry, statement)
 		var toolMeshes = getMeshesByChildren(statement.children, registry)
-		for (var toolMesh of toolMeshes) {
+		if (isTop) {
+			pushArray(topMeshes, toolMeshes)
 		}
-		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		embossMeshesByTransform2Ds(transformed3DMatrix, isTop, stratas, toolMeshes, transform2Ds, workMesh)
-		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
+		else {
+			pushArray(bottomMeshes, toolMeshes)
+		}
+		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+		embossMeshesByTransform2Ds(matrix2Ds, matrix3D, false, stratas, bottomMeshes, workMesh)
+		embossMeshesByTransform2Ds(matrix2Ds, matrix3D, true, stratas, topMeshes, workMesh)
+		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
 	}
 }
 
 var gIntersection = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+
+		//deprecated23
 		gTagCenterMap.set('section', this)
+
 	},
 	name: 'intersection',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			return
-		}
+		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
-		if (getIsEmpty(polygons)) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh != null) {
+			if (getIsEmpty(polygons)) {
+				noticeByList(['No tool polygons could be found for intersection in construction.', statement])
+				return
+			}
+			var matrix3D = getChainMatrix3D(registry, statement)
+			var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+			var stratas = getStratas(registry, statement)
+			var toolPillar = {polygons:polygons, stratas:stratas}
+			var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+			sectionByPillar(statement.attributeMap.get('id'), matrix3D, splitHeights, toolPillar, matrix2Ds, workMesh)
+			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
 			return
 		}
-		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
-		var stratas = getStratas(registry, statement)
-		var toolPillar = {polygons:polygons, stratas:stratas}
-		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		var transformed3DMatrix = getChainMatrix3D(registry, statement)
-		sectionByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
-		setSplitIndexesAttribute(statement, workMesh)
-		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
+		pushArray(polygons, getWorkPolygons(registry, statement))
+		if (polygons.length == 0) {
+			noticeByList(['No work or tool polygon could be found for intersection in construction.', statement])
+			return
+		}
+		deleteStatementsByTagDepth(0, registry, statement, 'polygon')
+		var intersectedPolygons = getIntersectedPolygons(polygons)
+		if (getIsEmpty(intersectedPolygons)) {
+			noticeByList(['No polygons remained after intersection operation in construction.', polygons, statement])
+			return
+		}
+		addPolygonsToGroup(intersectedPolygons, registry, statement)
+	}
+}
+
+var gOverlap = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'overlap',
+	processStatement: function(registry, statement) {
+		convertToGroup(statement)
+		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
+		pushArray(polygons, getWorkPolygons(registry, statement))
+		if (polygons.length == 0) {
+			noticeByList(['No work or tool polygon could be found for overlap in construction.', statement])
+			return
+		}
+		var outset = getPointByDefault([1.0, 1.0], 'outset', registry, statement, this.name)
+		var overlappedPolygons = getOverlappedPolygons(outset, polygons)
+		if (overlappedPolygons.length == 0) {
+			noticeByList(['No polygons remained after overlap operation in construction.', polygons, statement])
+			return
+		}
+		addPolygonsToGroup(overlappedPolygons, registry, statement)
 	}
 }
 
 var gUnion = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
+
+		//deprecated23
 		gTagCenterMap.set('weld', this)
+
 	},
 	name: 'union',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			return
-		}
+		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
-		if (getIsEmpty(polygons)) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh != null) {
+			if (getIsEmpty(polygons)) {
+				noticeByList(['No tool polygons could be found for union in construction.', statement])
+				return
+			}
+			var matrix3D = getChainMatrix3D(registry, statement)
+			var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+			var stratas = getStratas(registry, statement)
+			var toolPillar = {polygons:polygons, stratas:stratas}
+			var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+			weldByPillar(statement.attributeMap.get('id'), matrix3D, splitHeights, toolPillar, matrix2Ds, workMesh)
+			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
 			return
 		}
-		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
-		var stratas = getStratas(registry, statement)
-		var transformed3DMatrix = getChainMatrix3D(registry, statement)
-		var toolPillar = {polygons:polygons, stratas:stratas}
-		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		weldByPillar(transformed3DMatrix, splitHeights, toolPillar, transform2Ds, workMesh)
-		setSplitIndexesAttribute(statement, workMesh)
-		analyzeOutputMesh(new Mesh(getMeshCopy(workMesh)), registry, statement)
+		pushArray(polygons, getWorkPolygons(registry, statement))
+		if (polygons.length == 0) {
+			noticeByList(['No work or tool polygon could be found for union in construction.', statement])
+			return
+		}
+		deleteStatementsByTagDepth(0, registry, statement, 'polygon')
+		var joinedPolygons = getJoinedPolygons(polygons)
+		if (joinedPolygons.length == 0) {
+			noticeByList(['No polygons remained after union operation in construction.', polygons, statement])
+			return
+		}
+		addPolygonsToGroup(joinedPolygons, registry, statement)
 	}
 }
 
-var gConstructionProcessors = [gDifference, gEmboss, gIntersection, gUnion]
+var gConstructionProcessors = [gDifference, gEmboss, gIntersection, gOverlap, gUnion]
