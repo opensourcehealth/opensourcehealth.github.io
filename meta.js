@@ -3,13 +3,16 @@
 const gAlterationsDisplay = ['alterations', 'display']
 const gAlterationsSet = new Set(gAlterationsDisplay)
 const gLowerCharacterSet = new Set('abcdefghijklmnopqrstuvwxyz_'.split(''))
-const gPointsWorkSet = new Set(['points', 'pointsHD', 'work'])
+const gIDTransformWork = ['id', 'transform', 'transform3D', 'work']
+const gIDPointsTransformWorkSet = new Set(gIDTransformWork.concat(['points', 'pointsHD']))
+const gAlterationsDisplayIDTransformWorkSet = new Set(gAlterationsDisplay.concat(gIDTransformWork))
 const gSetR = new Set(['r'])
 const gSetS = new Set(['s'])
 const gSetRS = new Set(['r', 's'])
 
 function addCSVToMeshArea(id, mesh, registry) {
-	addToMeshArea(getCSVMeshString(getNullOrValue('date', registry.storageMap), id, mesh, getNullOrValue('project', registry.storageMap)))
+	var meshString = getCSVMeshString(getNullOrValue('date', registry.storageMap), id, mesh, getNullOrValue('project', registry.storageMap))
+	addToMeshArea(id, meshString)
 }
 
 function addFunctionToVariableEntries(functionToAdd, optionSet) {
@@ -29,17 +32,20 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	}
 	var statement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, parent, workStatement.tag)
 	getUniqueID(parent.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, statement)
-	copyMissingKeysExcept(gAlterationsSet, workStatement.attributeMap, statement.attributeMap)
-	parent.children.push(statement)
-	if (statement.nestingIncrement == 1) {
-		for (var child of workStatement.children) {
-			addStatementRecursively(depth + 1, statement, registry, child)
-		}
+	copyMissingKeysExcept(gAlterationsDisplayIDTransformWorkSet, workStatement.attributeMap, statement.attributeMap)
+	createMeshCopy(registry, statement, workStatement)
+	var work2DMatrix = getMatrix2D(registry, workStatement)
+	if (work2DMatrix != null) {
+		statement.attributeMap.set('transform', 'matrix(' + work2DMatrix.toString() + ')')
+	}
+	depth += 1
+	for (var child of workStatement.children) {
+		addStatementRecursively(depth, statement, registry, child)
 	}
 }
 
 function addSTLToMeshArea(id, mesh) {
-	addToMeshArea(getSTLMeshString(id, mesh))
+	addToMeshArea(id, getSTLMeshString(id, mesh))
 }
 
 function addVariableObjectToEntries(map, variableObject) {
@@ -56,33 +62,10 @@ function addVariableObjectToEntries(map, variableObject) {
 	return map
 }
 
-function alterChildrenRecursively(children, depth, registry, rootStatement) {
-	if (depth > gRecursionLimit) {
-		var warningText = 'Recursion limit of 1,000 in alterChildrenRecursively reached, no further statements will be processed.'
-		warningByList([warningText, children, gRecursionLimit])
-		return
-	}
-	if (getIsEmpty(children)) {
-		return
-	}
-	depth += 1
-	for (var child of children) {
-		alterChildrenRecursively(child.children, depth, registry, rootStatement)
-		copyMissingKeysExcept(gPointsWorkSet, rootStatement.attributeMap, child.attributeMap)
-		alterStatementPoints(registry, child)
-	}
-}
-
 function alterStatementPoints(registry, statement) {
-	var id = statement.attributeMap.get('id')
-	if (registry.generatorMap.has(id)) {
-		var meshGenerator = registry.generatorMap.get(id)
-		if (meshGenerator != null) {
-			var mesh = meshGenerator.getMesh()
-			if (mesh != null) {
-				alterMeshExcept(mesh, registry, statement, statement.tag)
-			}
-		}
+	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	if (mesh != null) {
+		alterMeshExcept(mesh, registry, statement, statement.tag)
 		return
 	}
 	var points = getPointsHD(registry, statement)
@@ -115,12 +98,12 @@ function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numb
 		}
 	}
 	var to = [getValueByDefault(1.0, toX), getValueByDefault(0.0, toY)]
-	var fromTo = subtractXY(to.slice(0), from)
-	var fromToLength = getXYLength(fromTo)
+	var fromTo = subtract2D(to.slice(0), from)
+	var fromToLength = get2DLength(fromTo)
 	if (fromToLength == 0.0) {
 		return []
 	}
-	var center = multiplyXYByScalar(addXY(from.slice(0), to), 0.5)
+	var center = multiply2DByScalar(add2D(from.slice(0), to), 0.5)
 	var isClockwise = getValueByDefault(true, isClockwise)
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var halfFromToLength = 0.5 * fromToLength
@@ -138,14 +121,14 @@ function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numb
 		var halfAngle = 0.5 * angle
 		var right = [fromTo[1], -fromTo[0]]
 		var perpendicularAngle = 0.5 * Math.PI - halfAngle
-		multiplyXYByScalar(right, 0.5 * Math.tan(perpendicularAngle))
+		multiply2DByScalar(right, 0.5 * Math.tan(perpendicularAngle))
 		if (isInverted) {
-			subtractXY(center, right)
+			subtract2D(center, right)
 		}
 		else {
-			addXY(center, right)
+			add2D(center, right)
 		}
-		radius = Math.sqrt(halfFromToLength * halfFromToLength + getXYLengthSquared(right))
+		radius = Math.sqrt(halfFromToLength * halfFromToLength + get2DLengthSquared(right))
 	}
 
 	var fromAngle = Math.atan2(center[1] - from[1], from[0] - center[0])
@@ -165,7 +148,7 @@ function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numb
 	var angleIncrement = angleDifference / numberOfArcSides
 	for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
 		fromAngle += angleIncrement
-		arcFromToRadius.push(addXY(getXYPolarByRadius(fromAngle, radius), center))
+		arcFromToRadius.push(add2D(get2DPolarByRadius(fromAngle, radius), center))
 	}
 	arcFromToRadius.push(to)
 	return arcFromToRadius
@@ -175,12 +158,12 @@ function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numb
 function arcFromToCenter(fromX, fromY, toX, toY, radius, isClockwise, numberOfSides) {
 	var from = [getValueByDefault(-1.0, fromX), getValueByDefault(0.0, fromY)]
 	var to = [getValueByDefault(1.0, toX), getValueByDefault(0.0, toY)]
-	var fromTo = subtractXY(to.slice(0), from)
-	var fromToLength = getXYLength(fromTo)
+	var fromTo = subtract2D(to.slice(0), from)
+	var fromToLength = get2DLength(fromTo)
 	if (fromToLength == 0.0) {
 		return []
 	}
-	var center = multiplyXYByScalar(addXY(from.slice(0), to), 0.5)
+	var center = multiply2DByScalar(add2D(from.slice(0), to), 0.5)
 	var isClockwise = getValueByDefault(true, isClockwise)
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var halfFromToLength = 0.5 * fromToLength
@@ -189,13 +172,13 @@ function arcFromToCenter(fromX, fromY, toX, toY, radius, isClockwise, numberOfSi
 	}
 	else {
 		if (radius > halfFromToLength) {
-			multiplyXYByScalar(fromTo, Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength)
+			multiply2DByScalar(fromTo, Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength)
 			var right = [fromTo[1], -fromTo[0]]
 			if (isClockwise) {
-				addXY(center, right)
+				add2D(center, right)
 			}
 			else {
-				subtractXY(center, right)
+				subtract2D(center, right)
 			}
 		}
 		else {
@@ -215,7 +198,7 @@ function arcFromToCenter(fromX, fromY, toX, toY, radius, isClockwise, numberOfSi
 	var angleIncrement = angleDifference / numberOfArcSides
 	for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
 		fromAngle += angleIncrement
-		arcFromToCenter[pointIndex] = addXY(getXYPolarByRadius(fromAngle, radius), center)
+		arcFromToCenter[pointIndex] = add2D(get2DPolarByRadius(fromAngle, radius), center)
 	}
 	return arcFromToCenter
 }
@@ -244,12 +227,12 @@ function arcFromToRadius(registry, statement, fromX, fromY, toX, toY, radius, is
 		}
 	}
 	var to = [getValueByDefault(1.0, toX), getValueByDefault(0.0, toY)]
-	var fromTo = subtractXY(to.slice(0), from)
-	var fromToLength = getXYLength(fromTo)
+	var fromTo = subtract2D(to.slice(0), from)
+	var fromToLength = get2DLength(fromTo)
 	if (fromToLength == 0.0) {
 		return []
 	}
-	var center = multiplyXYByScalar(addXY(from.slice(0), to), 0.5)
+	var center = multiply2DByScalar(add2D(from.slice(0), to), 0.5)
 	var isClockwise = getValueByDefault(true, isClockwise)
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var halfFromToLength = 0.5 * fromToLength
@@ -258,13 +241,13 @@ function arcFromToRadius(registry, statement, fromX, fromY, toX, toY, radius, is
 	}
 	else {
 		if (Math.abs(radius) > halfFromToLength) {
-			multiplyXYByScalar(fromTo, Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength)
+			multiply2DByScalar(fromTo, Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength)
 			var right = [fromTo[1], -fromTo[0]]
 			if (isClockwise && radius > 0.0) {
-				addXY(center, right)
+				add2D(center, right)
 			}
 			else {
-				subtractXY(center, right)
+				subtract2D(center, right)
 			}
 			radius = Math.abs(radius)
 		}
@@ -287,7 +270,7 @@ function arcFromToRadius(registry, statement, fromX, fromY, toX, toY, radius, is
 	var angle = fromAngle
 	for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
 		angle += angleIncrement
-		arcFromToRadius.push(addXY(getXYPolarByRadius(angle, radius), center))
+		arcFromToRadius.push(add2D(get2DPolarByRadius(angle, radius), center))
 	}
 	arcFromToRadius.push(to)
 	return arcFromToRadius
@@ -308,24 +291,24 @@ function arcTo(registry, statement, toX, toY, numberOfSides) {
 	var to = [getValueByDefault(1.0, toX), getValueByDefault(0.0, toY)]
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var beginPoint = points[points.length - 2]
-	var fromBegin = normalizeXY(getXYSubtraction(beginPoint, from))
+	var fromBegin = normalize2D(get2DSubtraction(beginPoint, from))
 	var rotation = [fromBegin[1], fromBegin[0]]
-	var fromRotated = getXYRotation(from, rotation)
-	var toRotated = getXYRotation(to, rotation)
-	var midpointRotated = getXYMultiplicationByScalar(getXYAddition(fromRotated, toRotated), 0.5)
-	var midpointFromRotated = normalizeXY(getXYSubtraction(fromRotated, midpointRotated))
+	var fromRotated = get2DRotation(from, rotation)
+	var toRotated = get2DRotation(to, rotation)
+	var midpointRotated = get2DMultiplicationByScalar(get2DAddition(fromRotated, toRotated), 0.5)
+	var midpointFromRotated = normalize2D(get2DSubtraction(fromRotated, midpointRotated))
 	if (midpointFromRotated[0] == 0.0) {
 		return [[to]]
 	}
 	var xIntercept = midpointRotated[0] + midpointFromRotated[1] * (midpointRotated[1] - fromRotated[1]) / midpointFromRotated[0]
-	var center = getXYRotation([xIntercept, fromRotated[1]], [rotation[0], -rotation[1]])
+	var center = get2DRotation([xIntercept, fromRotated[1]], [rotation[0], -rotation[1]])
 	var radius = Math.abs(fromRotated[0] - xIntercept)
 	var fromAngle = Math.atan2(center[1] - from[1], from[0] - center[0])
 	var toAngle = Math.atan2(center[1] - to[1], to[0] - center[0])
 	if (toAngle < fromAngle) {
 		toAngle += gDoublePi
 	}
-	if (getXYDotProduct(fromBegin, [Math.sin(fromAngle), Math.cos(fromAngle)]) < 0.0) {
+	if (get2DDotProduct(fromBegin, [Math.sin(fromAngle), Math.cos(fromAngle)]) < 0.0) {
 		fromAngle += gDoublePi
 	}
 	var angleDifference = toAngle - fromAngle
@@ -334,7 +317,7 @@ function arcTo(registry, statement, toX, toY, numberOfSides) {
 	var angleIncrement = angleDifference / numberOfArcSides
 	for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
 		fromAngle += angleIncrement
-		arcTo.push(addXY(getXYPolarByRadius(fromAngle, radius), center))
+		arcTo.push(add2D(get2DPolarByRadius(fromAngle, radius), center))
 	}
 	arcTo.push(to)
 	return arcTo
@@ -377,13 +360,74 @@ function border(registry, statement, id) {
 	return 10.0
 }
 
+function copyAlterRecursively(depth, registry, rootStatement, statement) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in copyAlterRecursively reached, no further statements will be added.'
+		warningByList([warningText, statement, gRecursionLimit])
+		return
+	}
+	depth += 1
+	for (var child of statement.children) {
+		copyAlterRecursively(depth, registry, rootStatement, child)
+	}
+	copyKeysExcept(gIDPointsTransformWorkSet, rootStatement.attributeMap, statement.attributeMap)
+	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	if (mesh != null) {
+		transform3DPoints(getChainMatrix3D(registry, statement), mesh.points)
+	}
+	alterStatementPoints(registry, statement)
+}
+
 function copyStatementRecursively(registry, statement, workStatement) {
-	if (workStatement.nestingIncrement == 1) {
-		statement.nestingIncrement = 1
-		for (var child of workStatement.children) {
-			addStatementRecursively(0, statement, registry, child)
+	copyMissingKeysExcept(gAlterationsDisplayIDTransformWorkSet, workStatement.attributeMap, statement.attributeMap)
+	createMeshCopy(registry, statement, workStatement)
+	var work2DMatrix = getChainSkipMatrix2D(registry, workStatement)
+	if (work2DMatrix != null) {
+		var statement2DMatrix = getMatrix2D(registry, statement)
+		if (statement2DMatrix != null) {
+			work2DMatrix = getMultiplied2DMatrix(statement2DMatrix, work2DMatrix)
+		}
+		statement.attributeMap.set('transform', 'matrix(' + work2DMatrix.toString() + ')')
+	}
+	for (var child of workStatement.children) {
+		addStatementRecursively(0, statement, registry, child)
+	}
+}
+
+function createMeshCopy(registry, statement, workStatement) {
+	var mesh = getWorkMeshByID(workStatement.attributeMap.get('id'), registry)
+	if (mesh != null) {
+		registry.meshMap.set(statement.attributeMap.get('id'), getMeshCopy(mesh))
+	}
+}
+
+function getDistanceSquaredToStatement(location, registry, statement) {
+	var points = getPointsHD(registry, statement)
+	var workMesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	if (workMesh != null) {
+		points = workMesh.points
+	}
+	if (getIsEmpty(points)) {
+		return Number.MAX_VALUE
+	}
+	var closestDistance = Number.MAX_VALUE
+	for (var point of points) {
+		var distance = getArrayDistanceSquared(location, point)
+		if (distance < closestDistance) {
+			closestDistance = distance
 		}
 	}
+	return closestDistance
+}
+
+function getGroupBoundingBox(caller, registry, statement) {
+	var boundingBox = null
+	var descendants = []
+	addToDescendantsInsideFirst(descendants, statement)
+	for (var child of descendants) {
+		boundingBox = widenStatementBoundingBox(boundingBox, caller, registry, child)
+	}
+	return boundingBox
 }
 
 function getGroupBoundingBoxByArguments(id, registry, statement) {
@@ -404,6 +448,203 @@ function getIntervalsIncludingEnd(begin, end, increment) {//deprecated
 	intervals[intervals.length - 1] = end
 	return intervals
 }
+
+function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
+	var matrix2Ds = getPointsByKey(getSuffixedString('matrix2Ds', suffix), registry, statement)
+	if (matrix2Ds == null) {
+		matrix2Ds = []
+	}
+	var suffixedPlanes = getSuffixedString('planes', suffix)
+	var planes = getPointsByKey(suffixedPlanes, registry, statement)
+	if (planes != null) {
+		for (var plane of planes) {
+			matrix2Ds.push(getMatrix2DByPlane(plane))
+		}
+		attributeMap.set(suffixedPlanes, planes.join(' '))
+	}
+	var suffixedPolars = getSuffixedString('polars', suffix)
+	var polars = getPointsByKey(suffixedPolars, registry, statement)
+	if (polars != null) {
+		for (var polar of polars) {
+			matrix2Ds.push(getMatrix2DByPolar(polar))
+		}
+		attributeMap.set(suffixedPolars, polars.join(' '))
+	}
+	var workPoints = null
+	if (suffix == null) {
+		var workStatement = getWorkStatement(registry, statement)
+		if (workStatement != null) {
+			workPoints = getPointsHD(registry, workStatement)
+		}
+	}
+	var suffixedPolygon = getSuffixedString('polygon', suffix)
+	var polygon = getPointsByKey(suffixedPolygon, registry, statement)
+	var suffixedPolyline = getSuffixedString('polyline', suffix)
+	var polyline = getPointsByKey(getSuffixedString('polyline', suffix), registry, statement)
+	if (workPoints != null) {
+		if (workStatement.tag == 'polygon') {
+			polygon = getPushArray(polygon, workPoints)
+		}
+		else {
+			if (workStatement.tag == 'polyline') {
+				polyline= getPushArray(polygon, workPoints)
+			}
+		}
+	}
+	var suffixedScalePortion = getSuffixedString('scalePortion', suffix)
+	var scalePortion = getFloatsByStatement(suffixedScalePortion, registry, statement)
+	if (!getIsEmpty(scalePortion)) {
+		if (scalePortion.length == 1) {
+			scalePortion.push(scalePortion[0])
+		}
+		attributeMap.set(suffixedScalePortion, scalePortion.join(','))
+	}
+	if (polygon != null) {
+		for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
+			var nextIndex = (pointIndex + 1) % polygon.length
+			matrix2Ds.push(getMatrix2DBySegmentPortion(polygon[pointIndex], polygon[nextIndex], scalePortion))
+		}
+		attributeMap.set(suffixedPolygon, polygon.join(' '))
+	}
+	if (polyline != null) {
+		for (var pointIndex = 0; pointIndex < polyline.length - 1; pointIndex++) {
+			matrix2Ds.push(getMatrix2DBySegmentPortion(polyline[pointIndex], polyline[pointIndex + 1], scalePortion))
+		}
+		attributeMap.set(suffixedPolyline, polyline.join(' '))
+	}
+	var suffixedScale = getSuffixedString('scale', suffix)
+	var scale = getFloatsByStatement(suffixedScale, registry, statement)
+	if (matrix2Ds.length > 0) {
+		if (!getIsEmpty(scale)) {
+			if (scale.length == 1) {
+				scale.push(scale[0])
+			}
+			for (var matrix2D of matrix2Ds) {
+				matrix2D[0] *= scale[0]
+				matrix2D[1] *= scale[0]
+				matrix2D[2] *= scale[1]
+				matrix2D[3] *= scale[1]
+			}
+			attributeMap.set(suffixedScale, scale.join(','))
+		}
+	}
+	return matrix2Ds
+}
+
+function getMatrix3DsByChildren(children, registry) {
+	var matrix3DsByChildren = []
+	for (var child of children) {
+		matrix3Ds = getPointsByTag('matrix3Ds', registry, child, 'matrix3D')
+		matrix3DsByChildren = getPushArray(matrix3DsByChildren, matrix3Ds)
+	}
+	return matrix3DsByChildren
+}
+
+function getMatrix3DsBySuffix(attributeMap, registry, statement, suffix) {
+	var matrix3Ds = getPointsByKey(getSuffixedString('matrix3Ds', suffix), registry, statement)
+	if (matrix3Ds == null) {
+		matrix3Ds = []
+	}
+	var suffixedPlanes = getSuffixedString('planes', suffix)
+	var planes = getPointsByKey(suffixedPlanes, registry, statement)
+	if (planes != null) {
+		for (var plane of planes) {
+			matrix3Ds.push(getMatrix3DByTranslate3D(plane))
+		}
+		attributeMap.set(suffixedPlanes, planes.join(' '))
+	}
+	var suffixedPolars = getSuffixedString('polars', suffix)
+	var polars = getPointsByKey(suffixedPolars, registry, statement)
+	if (polars != null) {
+		for (var polar of polars) {
+			matrix3Ds.push(getMatrix3DByPolar(polar))
+		}
+		attributeMap.set(suffixedPolars, polars.join(' '))
+	}
+	var workPoints = null
+	if (suffix == null) {
+		var workStatement = getWorkStatement(registry, statement)
+		if (workStatement != null) {
+			workPoints = getPointsHD(registry, workStatement)
+		}
+	}
+	var suffixedPolygon = getSuffixedString('polygon', suffix)
+	var polygon = getPointsByKey(suffixedPolygon, registry, statement)
+	var suffixedPolyline = getSuffixedString('polyline', suffix)
+	var polyline = getPointsByKey(getSuffixedString('polyline', suffix), registry, statement)
+	if (workPoints != null) {
+		if (workStatement.tag == 'polygon') {
+			polygon = getPushArray(polygon, workPoints)
+		}
+		else {
+			if (workStatement.tag == 'polyline') {
+				polyline= getPushArray(polygon, workPoints)
+			}
+		}
+	}
+	var suffixedScalePortion = getSuffixedString('scalePortion', suffix)
+	var scalePortion = getFloatsByStatement(suffixedScalePortion, registry, statement)
+	if (!getIsEmpty(scalePortion)) {
+		if (scalePortion.length == 1) {
+			scalePortion.push(scalePortion[0])
+		}
+		attributeMap.set(suffixedScalePortion, scalePortion.join(','))
+	}
+	if (polygon != null) {
+		for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
+			var nextIndex = (pointIndex + 1) % polygon.length
+			matrix3Ds.push(getMatrix3DBySegmentPortion(polygon[pointIndex], polygon[nextIndex], scalePortion))
+		}
+		attributeMap.set(suffixedPolygon, polygon.join(' '))
+	}
+	if (polyline != null) {
+		for (var pointIndex = 0; pointIndex < polyline.length - 1; pointIndex++) {
+			matrix3Ds.push(getMatrix3DBySegmentPortion(polyline[pointIndex], polyline[pointIndex + 1], scalePortion))
+		}
+		attributeMap.set(suffixedPolyline, polyline.join(' '))
+	}
+	var suffixedScale = getSuffixedString('scale', suffix)
+	var scale = getFloatsByStatement(suffixedScale, registry, statement)
+	if (matrix3Ds.length > 0) {
+		if (!getIsEmpty(scale)) {
+			if (scale.length == 1) {
+				scale.push(scale[0])
+			}
+			if (scale.length == 2) {
+				scale.push(scale[1])
+			}
+			for (var matrix3D of matrix3Ds) {
+				matrix3D[0] *= scale[0]
+				matrix3D[1] *= scale[0]
+				matrix3D[2] *= scale[0]
+				matrix3D[4] *= scale[1]
+				matrix3D[5] *= scale[1]
+				matrix3D[6] *= scale[1]
+				matrix3D[8] *= scale[2]
+				matrix3D[9] *= scale[2]
+				matrix3D[10] *= scale[2]
+			}
+			attributeMap.set(suffixedScale, scale.join(','))
+		}
+	}
+	return matrix3Ds
+}
+
+//deprecated23
+/*
+function getOutsideTangent(center, intersection, radius, reverse) {
+	var centerIntersection = get2DSubtraction(intersection, center)
+	var centerIntersectionLength = get2DLength(centerIntersection)
+	divide2DByScalar(centerIntersection, centerIntersectionLength)
+	var oppositeLength = Math.sqrt(centerIntersectionLength * centerIntersectionLength - radius * radius)
+	var centerIntersectionRight = [centerIntersection[1], -centerIntersection[0]]
+	if (reverse) {
+		multiply2DByScalar(centerIntersectionRight, -1.0)
+	}
+	var tangent = get2DAddition(center, get2DMultiplicationByScalar(centerIntersection, radius * radius / centerIntersectionLength))
+	return add2D(tangent, get2DMultiplicationByScalar(centerIntersectionRight, radius * oppositeLength / centerIntersectionLength))
+}
+*/
 
 function getPoint(registry, statement, name, x, y, z) {
 	var pointArgumentsLength = arguments.length - 3
@@ -432,27 +673,37 @@ function getPolar(length, inputAngle) {
 	if (inputAngle != undefined) {
 		angle = inputAngle * gRadiansPerDegree
 	}
-	return getXYPolarByRadius(angle, length)
+	return get2DPolarByRadius(angle, length)
 }
 
 function getStatementByID(registry, statement, id) {
-	if (id != undefined) {
-		if (id.length > 0) {
-			for (var character of id) {
-				if (character != '.') {
-					if (registry.idMap.has(id)) {
-						return registry.idMap.get(id)
-					}
-					break
-				}
+	if (id == undefined) {
+		return statement
+	}
+	id = id.trim()
+	if (id.length == 0) {
+		return statement
+	}
+	if (id[0] == ('/')) {
+		for (var depth = 0; depth < gRecursionLimit; depth++) {
+			if (statement.parent == null) {
+				return statement
 			}
-			for (var character of id) {
-				if (statement.parent == null) {
-					return statement
-				}
-				statement = statement.parent
-			}
+			statement = statement.parent
 		}
+		return statement
+	}
+	if (id[0] != ('.')) {
+		if (registry.idMap.has(id)) {
+			return registry.idMap.get(id)
+		}
+		return statement
+	}
+	for (var character of id) {
+		if (statement.parent == null) {
+			return statement
+		}
+		statement = statement.parent
 	}
 	return statement
 }
@@ -466,98 +717,6 @@ function getSuffixedString(root, suffix) {
 		return root
 	}
 	return root + suffix
-}
-
-function getTransform2DsBySuffix(attributeMap, registry, statement, suffix) {
-	var transform2Ds = getPointsByKey(getSuffixedString('transform2Ds', suffix), registry, statement)
-	if (transform2Ds == null) {
-		transform2Ds = []
-	}
-	var suffixedPlanes = getSuffixedString('planes', suffix)
-	var planes = getPointsByKey(suffixedPlanes, registry, statement)
-	if (planes != null) {
-		for (var plane of planes) {
-			transform2Ds.push(get2DTransformByPlane(plane))
-		}
-		attributeMap.set(suffixedPlanes, planes.join(' '))
-	}
-	var suffixedPolars = getSuffixedString('polars', suffix)
-	var polars = getPointsByKey(suffixedPolars, registry, statement)
-	if (polars != null) {
-		for (var polar of polars) {
-			transform2Ds.push(get2DTransformByPolar(polar))
-		}
-		attributeMap.set(suffixedPolars, polars.join(' '))
-	}
-	var workPoints = null
-	if (suffix == null) {
-		var workStatement = getWorkStatement(registry, statement)
-		if (workStatement != null) {
-			workPoints = getPointsHD(registry, workStatement)
-		}
-	}
-	var suffixedPolygon = getSuffixedString('polygon', suffix)
-	var polygon = getPointsByKey(suffixedPolygon, registry, statement)
-	var suffixedPolyline = getSuffixedString('polyline', suffix)
-	var polyline = getPointsByKey(getSuffixedString('polyline', suffix), registry, statement)
-	if (workPoints != null) {
-		if (workStatement.tag == 'polygon') {
-			if (polygon == null) {
-				polygon = workPoints
-			}
-			else {
-				pushArray(polygon, workPoints)
-			}
-		}
-		else {
-			if (workStatement.tag == 'polyline') {
-				if (polyline == null) {
-					polyline = workPoints
-				}
-				else {
-					pushArray(polyline, workPoints)
-				}
-			}
-		}
-	}
-	var suffixedScalePortion = getSuffixedString('scalePortion', suffix)
-	var scalePortion = getFloatsByStatement(suffixedScalePortion, registry, statement)
-	if (!getIsEmpty(scalePortion)) {
-		if (scalePortion.length == 1) {
-			scalePortion.push(scalePortion[0])
-		}
-		attributeMap.set(suffixedScalePortion, scalePortion.join(','))
-	}
-	if (polygon != null) {
-		for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
-			var nextIndex = (pointIndex + 1) % polygon.length
-			transform2Ds.push(get2DTransformBySegmentPortion(polygon[pointIndex], polygon[nextIndex], scalePortion))
-		}
-		attributeMap.set(suffixedPolygon, polygon.join(' '))
-	}
-	if (polyline != null) {
-		for (var pointIndex = 0; pointIndex < polyline.length - 1; pointIndex++) {
-			transform2Ds.push(get2DTransformBySegmentPortion(polyline[pointIndex], polyline[pointIndex + 1], scalePortion))
-		}
-		attributeMap.set(suffixedPolyline, polyline.join(' '))
-	}
-	var suffixedScale = getSuffixedString('scale', suffix)
-	var scale = getFloatsByStatement(suffixedScale, registry, statement)
-	if (transform2Ds.length > 0) {
-		if (!getIsEmpty(scale)) {
-			if (scale.length == 1) {
-				scale.push(scale[0])
-			}
-			for (var transform2D of transform2Ds) {
-				transform2D[0] *= scale[0]
-				transform2D[2] *= scale[0]
-				transform2D[1] *= scale[1]
-				transform2D[3] *= scale[1]
-			}
-			attributeMap.set(suffixedScale, scale.join(','))
-		}
-	}
-	return transform2Ds
 }
 
 function intervals(begin, end, increment, includeEnd) {
@@ -621,6 +780,25 @@ function setAttributeByID(registry, statement, key, id, value) {
 	return getStatementByID(registry, statement, id).attributeMap.set(key, value)
 }
 
+function setClosestStatementRecursively(closestDistanceStatement, depth, location, registry, statement) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in getClosestStatementRecursively reached, no further statements will be searched.'
+		warningByList([warningText, statement, gRecursionLimit])
+		return
+	}
+	var distance = getDistanceSquaredToStatement(location, registry, statement)
+	if (distance < closestDistanceStatement.distance) {
+		closestDistanceStatement.distance = distance
+		closestDistanceStatement.statement = statement
+	}
+	depth += 1
+	if (getWorkMeshByID(statement.attributeMap.get('id'), registry) == null) {
+		for (var child of statement.children) {
+			setClosestStatementRecursively(closestDistanceStatement, depth, location, registry, child)
+		}
+	}
+}
+
 function sineWave(amplitude, begin, end, numberOfCycles, phase, along, numberOfSegments) {
 	var amplitude = getValueByDefault(1.0, amplitude)
 	var begin = getValueByDefault(-2.0, begin)
@@ -669,11 +847,11 @@ function toward(point, distance, x, y) {
 	var x = getValueByDefault(0.0, x)
 	var y = getValueByDefault(0.0, y)
 	var xyPoint = [x - point[0], y - point[1]]
-	xyPointLength = getXYLength(xyPoint)
+	xyPointLength = get2DLength(xyPoint)
 	if (xyPointLength == 0.0) {
 		return point
 	}
-	return getXYAddition(point, multiplyXYByScalar(xyPoint, distance / xyPointLength))
+	return get2DAddition(point, multiply2DByScalar(xyPoint, distance / xyPointLength))
 }
 
 function workMesh(registry, statement, propertyName) {
@@ -688,16 +866,143 @@ function workMesh(registry, statement, propertyName) {
 	if (work.endsWith("'") || work.endsWith('"')) {
 		work = work.slice(0, -1)
 	}
-	var workGenerator = registry.generatorMap.get(work)
-	if (workGenerator == null) {
+	var workMesh = getWorkMeshByID(work, registry)
+	if (workMesh == null) {
 		return null
 	}
-	var workMesh = workGenerator.getMesh()
 	if (workMesh[propertyName] == undefined) {
 		return null
 	}
 	return workMesh[propertyName].toString()
 }
+
+function zigzag(polyline, radiusMultiplier, numberOfSides) {
+	if (polyline.length < 3) {
+		return polyline
+	}
+	var numberOfSides = getValueByDefault(24, numberOfSides)
+	var radiusMultiplier = getValueByDefault(0.2, radiusMultiplier)
+	var centerIntersections = new Array(polyline.length)
+	centerIntersections[0] = {intersection:polyline[0]}
+	centerIntersections[polyline.length - 1] = {intersection:polyline[polyline.length - 1]}
+	var zigzagPolyline = [polyline[0]]
+	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
+		var beginPoint = polyline[vertexIndex - 1]
+		var centerPoint = polyline[vertexIndex]
+		var centerBegin = get2DSubtraction(beginPoint, centerPoint)
+		var centerBeginLength = get2DLength(centerBegin)
+		var endPoint = polyline[vertexIndex + 1]
+		var centerEnd = get2DSubtraction(endPoint, centerPoint)
+		var centerEndLength = get2DLength(centerEnd)
+		var intersection = get2DMultiplicationByScalar(centerBegin, 0.5)
+		add2D(intersection, centerPoint)
+		divide2DByScalar(centerBegin, centerBeginLength)
+		divide2DByScalar(centerEnd, centerEndLength)
+		centerIntersections[vertexIndex] = {
+		centerBegin:centerBegin, centerBeginLength:centerBeginLength,
+		centerEnd:centerEnd, centerEndLength:centerEndLength, centerPoint:centerPoint, intersection:intersection}
+	}
+	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
+		var centerIntersection = centerIntersections[vertexIndex]
+		var centerPoint = centerIntersection.centerPoint
+		var middleBegin = get2DAddition(centerIntersection.centerBegin, centerIntersection.centerEnd)
+		normalize2D(middleBegin)
+		var beginEndDistance = Math.min(1.0, get2DDistance(centerIntersection.centerBegin, centerIntersection.centerEnd))
+		beginEndDistance *= radiusMultiplier
+		var right = [middleBegin[1], -middleBegin[0]]
+		var dotProduct = get2DDotProduct(right, centerIntersection.centerBegin)
+		if (dotProduct < 0.0) {
+			multiply2DByScalar(right, -1)
+		}
+		var left = get2DMultiplicationByScalar(right, -1.0)
+		multiply2DByScalar(left, centerIntersection.centerEndLength * beginEndDistance)
+		multiply2DByScalar(right, centerIntersection.centerBeginLength * beginEndDistance)
+		var rightPoint = get2DAddition(centerPoint, right)
+		var rightBefore = get2DSubtraction(centerIntersection.intersection, rightPoint)
+		var leftPoint = get2DAddition(centerPoint, left)
+		var leftAfter = get2DSubtraction(centerIntersections[vertexIndex + 1].intersection, leftPoint)
+		var quarterNumberOfSides = Math.ceil(numberOfSides * 0.25)
+		for (var pointIndex = quarterNumberOfSides - 1; pointIndex > 0; pointIndex--) {
+			var along = pointIndex / quarterNumberOfSides
+			var combinedPoint = get2DAddition(rightPoint, get2DMultiplicationByScalar(rightBefore, along))
+			var alongRight = get2DAddition(centerPoint, get2DMultiplicationByScalar(right, along))
+			add2D(multiply2DByScalar(combinedPoint, along), multiply2DByScalar(alongRight, 1.0 - along))
+			zigzagPolyline.push(combinedPoint)
+		}
+		zigzagPolyline.push(centerPoint)
+		for (var pointIndex = 1; pointIndex < quarterNumberOfSides; pointIndex++) {
+			var along = pointIndex / quarterNumberOfSides
+			var combinedPoint = get2DAddition(leftPoint, get2DMultiplicationByScalar(leftAfter, along))
+			var alongLeft = get2DAddition(centerPoint, get2DMultiplicationByScalar(left, along))
+			add2D(multiply2DByScalar(combinedPoint, along), multiply2DByScalar(alongLeft, 1.0 - along))
+			zigzagPolyline.push(combinedPoint)
+		}
+	}
+	zigzagPolyline.push(polyline[polyline.length - 1])
+	return zigzagPolyline
+}
+
+//deprecated23
+/*
+function zigzagArc(polyline, radiusMultiplier, numberOfSides) {
+	if (polyline.length < 3) {
+		return polyline
+	}
+	var numberOfSides = getValueByDefault(24, numberOfSides)
+	var radiusMultiplier = getValueByDefault(0.25, radiusMultiplier)
+	var radiusVectors = new Array(polyline.length)
+	radiusVectors[0] = {radius:0.0}
+	radiusVectors[polyline.length - 1] = {intersection:polyline[polyline.length - 1], radius:0.0}
+	var zigzagPolyline = [polyline[0]]
+	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
+		var beginPoint = polyline[vertexIndex - 1]
+		var centerPoint = polyline[vertexIndex]
+		var centerBegin = get2DSubtraction(beginPoint, centerPoint)
+		var centerBeginLength = get2DLength(centerBegin)
+		var endPoint = polyline[vertexIndex + 1]
+		var centerEnd = get2DSubtraction(endPoint, centerPoint)
+		var centerEndLength = get2DLength(centerEnd)
+		var radius = Math.min(centerBeginLength, centerEndLength) * radiusMultiplier
+		var intersection = get2DMultiplicationByScalar(centerBegin, radius / (radius + radiusVectors[vertexIndex - 1].radius))
+		add2D(intersection, centerPoint)
+		divide2DByScalar(centerBegin, centerBeginLength)
+		divide2DByScalar(centerEnd, centerEndLength)
+		radiusVectors[vertexIndex] = {
+		centerBegin:centerBegin, centerBeginLength:centerBeginLength,
+		centerEnd:centerEnd, centerEndLength:centerEndLength, centerPoint:centerPoint, intersection:intersection, radius:radius}
+	}
+	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
+		var radiusVector = radiusVectors[vertexIndex]
+		var centerPoint = radiusVector.centerPoint
+		var middleBegin = get2DAddition(radiusVector.centerBegin, radiusVector.centerEnd)
+		normalize2D(middleBegin)
+		var reverse = radiusVector.centerBegin[0] * -middleBegin[1] + radiusVector.centerBegin[1] * middleBegin[0] > 0.0
+		var radius = radiusVector.radius
+		var center = get2DAddition(centerPoint, multiply2DByScalar(middleBegin, radius))
+		var from = getOutsideTangent(center, radiusVector.intersection, radius, reverse)
+		var to = getOutsideTangent(center, radiusVectors[vertexIndex + 1].intersection, radius, !reverse)
+		var beginAngle = getInteriorAngle(from, centerPoint, radius)
+		var totalAngle = beginAngle + getInteriorAngle(to, centerPoint, radius)
+		var fromAngle = Math.atan2(center[1] - from[1], from[0] - center[0])
+		var toAngle = Math.atan2(center[1] - to[1], to[0] - center[0])
+		var numberOfArcSides = Math.ceil(numberOfSides * totalAngle / gDoublePi)
+		var angleIncrement = totalAngle / numberOfArcSides
+		var addBegin = add2D(get2DPolarByRadius(fromAngle+beginAngle, radius), center)
+		var minusBegin = add2D(get2DPolarByRadius(fromAngle-beginAngle, radius), center)
+		if (get2DDistanceSquared(addBegin, centerPoint) > get2DDistanceSquared(minusBegin, centerPoint)) {
+			angleIncrement = -angleIncrement
+		}
+		zigzagPolyline.push(from)
+		for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
+			fromAngle += angleIncrement
+			zigzagPolyline.push(add2D(get2DPolarByRadius(fromAngle, radius), center))
+		}
+		zigzagPolyline.push(to)
+	}
+	zigzagPolyline.push(polyline[polyline.length - 1])
+	return zigzagPolyline
+}
+*/
 
 var gAbstract = {
 	initialize: function() {
@@ -705,10 +1010,10 @@ var gAbstract = {
 	},
 	name: 'abstract',
 	processStatement: function(registry, statement) {
+		statement.tag = 'g'
 		var attributeMap = statement.attributeMap
-		if (!attributeMap.has('skip2D')) {
-			attributeMap.set('skip2D', 'true')
-		}
+		setMapIfMissing('skip2D', attributeMap, 'true')
+		setMapIfMissing('skip3D', attributeMap, 'true')
 		var flipY = getFloatByStatement('flipY', registry, statement)
 		if (flipY != null) {
 			scaleString = 'scale(' + flipY + ',' + (-flipY) + ')'
@@ -742,7 +1047,7 @@ var gAbstract = {
 		gAbstractID = null
 		if (attributeMap.has('id')) {
 			gAbstractID = attributeMap.get('id')
-			if (gAbstractID != 'untitled' && gAbstractID != gProject) {
+			if (gAbstractID != 'untitled' && gAbstractID != 'abstract' && gAbstractID != gProject) {
 				titleStrings.push(gAbstractID)
 				registry.storageMap.set('abstractID', gAbstractID)
 			}
@@ -767,34 +1072,53 @@ var gCopy = {
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		if (!attributeMap.has('work')) {
+			noticeByList(['No work attribute in copy in meta.', statement])
 			return
 		}
 		var workID = attributeMap.get('work')
 		if (!registry.idMap.has(workID)) {
+			noticeByList(['No work could be found for copy in meta.', workID, statement])
 			return
 		}
 		var workStatement = registry.idMap.get(workID)
-		var alterationsTransformSet = new Set(gAlterationsDisplay.concat(['transform', 'transform3D']))
-		copyMissingKeysExcept(alterationsTransformSet, workStatement.attributeMap, statement.attributeMap)
+		var location = getFloatsByStatement('location', registry, statement)
+		if (location != null) {
+			var closestDistanceStatement = {distance:Number.MAX_VALUE, statement:null}
+			setClosestStatementRecursively(closestDistanceStatement, 0, location, registry, workStatement)
+			workStatement = closestDistanceStatement.statement
+			if (workStatement == null) {
+				noticeByList(['No objects to find closest to location in copy in meta.', workStatement, statement])
+				return
+			}
+		}
 		if (statement.nestingIncrement == 0) {
+			statement.nestingIncrement = workStatement.nestingIncrement
 			statement.tag = workStatement.tag
 			copyStatementRecursively(registry, statement, workStatement)
-			alterStatementPoints(registry, statement)
-			alterChildrenRecursively(statement.children, 0, registry, statement)
+			copyAlterRecursively(0, registry, statement, statement)
 			return
 		}
-		var transform2Ds = getTransform2DsByChildren(statement.children, registry)
-		if (getIsEmpty(transform2Ds)) {
-			warningByList(['No matrix2Ds in gCopy', statement])
+		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+		var matrix3Ds = getMatrix3DsByChildren(statement.children, registry)
+		if (getIsEmpty(matrix2Ds) && getIsEmpty(matrix3Ds)) {
+			noticeByList(['No matrix2Ds or matrix3Ds in gCopy', statement])
 			return
 		}
-		var endStatement = statement.children.pop()
-		for (var transform2D of transform2Ds) {
-			addStatementRecursively(0, statement, registry, workStatement)
-			var transformedMap = statement.children[statement.children.length - 1].attributeMap
-			transformedMap.set('transform', 'matrix(' + transform2D.toString() + ')')
+		statement.tag = 'g'
+		for (var matrix2D of matrix2Ds) {
+			var matrixStatement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, statement, workStatement.tag)
+			getUniqueID(statement.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, matrixStatement)
+			matrixStatement.attributeMap.set('transform', 'matrix(' + matrix2D.toString() + ')')
+			copyStatementRecursively(registry, matrixStatement, workStatement)
+			copyAlterRecursively(0, registry, statement, matrixStatement)
 		}
-		statement.children.push(endStatement)
+		for (var matrix3D of matrix3Ds) {
+			var matrixStatement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, statement, workStatement.tag)
+			getUniqueID(statement.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, matrixStatement)
+			matrixStatement.attributeMap.set('transform3D', 'matrix(' + matrix3D.toString() + ')')
+			copyStatementRecursively(registry, matrixStatement, workStatement)
+			copyAlterRecursively(0, registry, statement, matrixStatement)
+		}
 	}
 }
 
@@ -810,12 +1134,15 @@ var gCSV = {
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
-			return
+			noticeByList(['No workMesh could be found for csv in meta.', statement])
 		}
-		addCSVToMeshArea(statement.attributeMap.get('work'), workMesh, registry)
+		else {
+			addCSVToMeshArea(statement.attributeMap.get('work'), workMesh, registry)
+		}
 	}
 }
 
+//deprecated23
 var gDelete = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
@@ -837,7 +1164,8 @@ var gGroup = {
 	},
 	name: 'group',
 	processStatement: function(registry, statement) {
-		get2DMatrix(registry, statement)
+		statement.tag = 'g'
+		getMatrix2D(registry, statement)
 	}
 }
 
@@ -850,31 +1178,63 @@ var gMatrix2D = {
 	name: 'matrix2D',
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
-		var transform2Ds = getTransform2DsBySuffix(attributeMap, registry, statement, null)
-		if (transform2Ds.length == 0) {
+		var matrix2Ds = getMatrix2DsBySuffix(attributeMap, registry, statement, null)
+		if (matrix2Ds.length == 0) {
 			return
 		}
 		for (var depth = 1; depth < gRecursionLimit; depth++) {
-			var depthTransform2Ds = getTransform2DsBySuffix(attributeMap, registry, statement, '_' + depth.toString())
+			var depthTransform2Ds = getMatrix2DsBySuffix(attributeMap, registry, statement, '_' + depth.toString())
 			if (depthTransform2Ds.length == 0) {
 				break
 			}
 			else {
 				var count = 0
-				var newTransform2Ds = new Array(depthTransform2Ds.length * transform2Ds.length)
+				var newTransform2Ds = new Array(depthTransform2Ds.length * matrix2Ds.length)
 				for (var depthTransform2D of depthTransform2Ds) {
-					for (var transform2D of transform2Ds) {
-						newTransform2Ds[count] = getMultiplied2DMatrix(depthTransform2D, transform2D)
+					for (var matrix2D of matrix2Ds) {
+						newTransform2Ds[count] = getMultiplied2DMatrix(depthTransform2D, matrix2D)
 						count++
 					}
 				}
-				transform2Ds = newTransform2Ds
+				matrix2Ds = newTransform2Ds
 			}
 		}
-		attributeMap.set('matrix2Ds', transform2Ds.join(' '))
+		attributeMap.set('matrix2Ds', matrix2Ds.join(' '))
 
-		//deprecated
-		attributeMap.set('transform2Ds', transform2Ds.join(' '))
+		//deprecated23
+		attributeMap.set('transform2Ds', matrix2Ds.join(' '))
+	}
+}
+
+var gMatrix3D = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'matrix3D',
+	processStatement: function(registry, statement) {
+		var attributeMap = statement.attributeMap
+		var matrix3Ds = getMatrix3DsBySuffix(attributeMap, registry, statement, null)
+		if (matrix3Ds.length == 0) {
+			return
+		}
+		for (var depth = 1; depth < gRecursionLimit; depth++) {
+			var depthMatrix3Ds = getMatrix3DsBySuffix(attributeMap, registry, statement, '_' + depth.toString())
+			if (depthMatrix3Ds.length == 0) {
+				break
+			}
+			else {
+				var count = 0
+				var newMatrix3Ds = new Array(depthMatrix3Ds.length * matrix3Ds.length)
+				for (var depthMatrix3D of depthMatrix3Ds) {
+					for (var matrix3D of matrix3Ds) {overlap
+						newMatrix3Ds[count] = getMultiplied3DMatrix(depthMatrix3D, matrix3D)
+						count++
+					}
+				}
+				matrix3Ds = newMatrix3Ds
+			}
+		}
+		attributeMap.set('matrix3Ds', matrix3Ds.join(' '))
 	}
 }
 
@@ -883,11 +1243,8 @@ var gPolygonAnalysis = {
 		if (mesh == null) {
 			return
 		}
-		var analysisStatement = getStatement('polygonAnalysis')
-		analysisStatement.attributeMap = getMeshAnalysis(mesh)
+		var analysisStatement = getStatementByParentTag(getMeshAnalysis(mesh), 0, statement, 'polygonAnalysis')
 		analysisStatement.attributeMap.set('id', statement.attributeMap.get('id') + '_polygonAnalysis')
-		analysisStatement.parent = statement
-		statement.children.splice(-1, 0, analysisStatement)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -896,7 +1253,10 @@ var gPolygonAnalysis = {
 	name: 'polygonAnalysis',
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
+		if (workMesh == null) {
+			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
+		}
+		else {
 			statement.attributeMap = getMeshAnalysis(workMesh)
 		}
 	}
@@ -908,6 +1268,7 @@ var gRow = {
 	},
 	name: 'row',
 	processStatement: function(registry, statement) {
+		convertToGroup(statement)
 		if (!statement.attributeMap.has('cells')) {
 			return
 		}
@@ -917,28 +1278,36 @@ var gRow = {
 			if (cells.length > 0) {
 				var groupStatement = statement
 				if (cells.length > 1) {
-					groupStatement = getStatement('g {')
-					groupStatement.parent = statement
+					groupStatement = getStatementByParentTag(new Map(), 1, statement, 'g')
 					getStatementID(registry, groupStatement)
-					statement.children.push(groupStatement)
 				}
 				for (var cell of cells) {
 					if (registry.idMap.has(cell)) {
 						var workStatement = registry.idMap.get(cell)
-						var child = getStatement(workStatement.tag)
-						child.parent = groupStatement
+						var child = getStatementByParentTag(new Map(), workStatement.nestingIncrement, groupStatement, workStatement.tag)
 						getStatementID(registry, child)
-						groupStatement.children.push(child)
 						copyMissingKeysExcept(gAlterationsSet, workStatement.attributeMap, child.attributeMap)
 						copyStatementRecursively(registry, child, workStatement)
+						copyAlterRecursively(0, registry, statement, child)
 					}
-				}
-				if (cells.length > 1) {
-					addClosingStatement(groupStatement)
 				}
 			}
 		}
-		addClosingStatementConvertToGroup(statement)
+	}
+}
+
+var gSTLInput = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'stlInput',
+	processStatement: function(registry, statement) {
+		var stlInputString = document.getElementById('stlInputID').value
+		var id = statement.attributeMap.get('id')
+		var mesh = getMeshBySTL(id, stlInputString)
+		if (mesh != null) {
+			analyzeOutputMesh(mesh, registry, statement)
+		}
 	}
 }
 
@@ -953,10 +1322,9 @@ var gSTL = {
 	name: 'stl',
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			return
+		if (workMesh != null) {
+			addSTLToMeshArea(statement.attributeMap.get('work'), workMesh)
 		}
-		addSTLToMeshArea(statement.attributeMap.get('work'), workMesh)
 	}
 }
 
@@ -982,6 +1350,7 @@ var gTable = {
 	},
 	name: 'table',
 	processStatement: function(registry, statement) {
+		statement.tag = 'g'
 		var step = getFloatsByDefault([10.0], 'step', registry, statement, this.name)
 		if (step.length == 1) {
 			step.push(step[0])
@@ -1018,11 +1387,8 @@ var gTable = {
 
 var gTriangleAnalysis = {
 	alterMesh: function(mesh, registry, statement) {
-		var analysisStatement = getStatement('triangleAnalysis')
-		analysisStatement.attributeMap = getMeshAnalysis(getTriangleMesh(mesh))
+		var analysisStatement = getStatementByParentTag(getMeshAnalysis(getTriangleMesh(mesh)), 0, statement, 'triangleAnalysis')
 		analysisStatement.attributeMap.set('id', statement.attributeMap.get('id') + '_triangleAnalysis')
-		analysisStatement.parent = statement
-		statement.children.splice(-1, 0, analysisStatement)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -1031,8 +1397,14 @@ var gTriangleAnalysis = {
 	name: 'triangleAnalysis',
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh == null) {
+			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
+		}
+		else {
+			statement.attributeMap = getMeshAnalysis(workMesh)
+		}
 		if (workMesh != null) {
-			statement.attributeMap = getMeshAnalysis(getTriangleMesh(mesh))
+			statement.attributeMap = getMeshAnalysis(getTriangleMesh(workMesh))
 		}
 	}
 }
@@ -1075,7 +1447,8 @@ var gVar = {
 		addFunctionToVariableEntries(setAttributeByID, gSetRS)
 		addFunctionToVariableEntries(topByID, gSetRS)
 		addFunctionToVariableEntries(toward, null)
-		addFunctionToVariableEntries(workMesh, gSetRS)
+		addFunctionToVariableEntries(zigzag, null)
+		addFunctionToVariableEntries(arcFromToCenter, null)
 		gVariableMapEntries.push(['Array', addVariableObjectToEntries(new Map(), Array)])
 		gVariableMapEntries.push(['Date', addVariableObjectToEntries(new Map(), Date)])
 		gVariableMapEntries.push(['Math', addVariableObjectToEntries(new Map(), Math)])
@@ -1108,8 +1481,21 @@ var gView = {
 	alterMesh: function(mesh, registry, statement) {
 		meshViewer.addMesh(statement.attributeMap.get('id'), null)
 	},
+	getPoints: function(points, registry, statement) {
+		if (statement.tag != 'image') {
+			return points
+		}
+		if (statement.attributeMap.has('href')) {
+			meshViewer.addImage(statement.attributeMap.get('href'), statement.attributeMap.get('id'))
+		}
+		else {
+			noticeByList(['No href for image in meta.', statement])
+		}
+		return points
+	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
+		gGetPointsMap.set(this.name, this)
 		gTagCenterMap.set(this.name, this)
 	},
 	name: 'view',
@@ -1127,10 +1513,10 @@ var gWindow = {
 	},
 	name: 'window',
 	processStatement: function(registry, statement) {
-		if (!statement.attributeMap.has('skip2D')) {
-			statement.attributeMap.set('skip2D', 'true')
-		}
-		get2DMatrix(registry, statement)
+		statement.tag = 'g'
+		setMapIfMissing('skip2D', statement.attributeMap, 'true')
+		setMapIfMissing('skip3D', statement.attributeMap, 'true')
+		getMatrix2D(registry, statement)
 	}
 }
 
@@ -1141,8 +1527,10 @@ var gMetaProcessors = [
 	gDelete,
 	gGroup,
 	gMatrix2D,
+	gMatrix3D,
 	gPolygonAnalysis,
 	gRow,
+	gSTLInput,
 	gSTL,
 	gString,
 	gTable,
