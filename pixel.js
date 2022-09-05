@@ -39,7 +39,7 @@ function addPixelLine(key, lines, pixelMap, pointMap, root, rotationIndex, tipMa
 				return
 			}
 		}
-		addXY(next, gXYDirections[tipIndex])
+		add2D(next, gXYDirections[tipIndex])
 		key = next.join(',')
 		if (pixelMap.has(key)) {
 			tips = pixelMap.get(key)
@@ -134,8 +134,8 @@ function createPixelTips(pixelMap) {
 		pixel = entry[1]
 		for (rotationIndex = 0; rotationIndex < 4; rotationIndex++) {
 			direction = gXYDirections[rotationIndex]
-			if (!pixelMap.has(getXYAddition(root, direction).join(','))) {
-				pixel[rotationIndex] = getXYAddition(root, getXYMultiplication(distance, direction))
+			if (!pixelMap.has(get2DAddition(root, direction).join(','))) {
+				pixel[rotationIndex] = get2DAddition(root, get2DMultiplication(distance, direction))
 			}
 		}
 	}
@@ -280,13 +280,13 @@ function getPolygonsBoolean(existenceCondition, layerThickness, offsetMultiplier
 	var polygonsBTransformed = getArrayArraysCopy(polygonsB)
 	addArrayArraysByY(polygonsATransformed, -offsetY)
 	addArrayArraysByY(polygonsBTransformed, -offsetY)
-	multiplyXYArraysByScalar(polygonsATransformed, oneOverLayerThickness)
-	multiplyXYArraysByScalar(polygonsBTransformed, oneOverLayerThickness)
+	multiply2DArraysByScalar(polygonsATransformed, oneOverLayerThickness)
+	multiply2DArraysByScalar(polygonsBTransformed, oneOverLayerThickness)
 	var xyLatticeA = getXYLattice(polygonsATransformed)
 	var xyLatticeB = getXYLattice(polygonsBTransformed)
 	var xyLatticeBoolean = getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB)
 	var polygonsBoolean = getXYPolygonsByLattice(xyLatticeBoolean)
-	return addArrayArraysByY(multiplyXYArraysByScalar(polygonsBoolean, layerThickness), offsetY)
+	return addArrayArraysByY(multiply2DArraysByScalar(polygonsBoolean, layerThickness), offsetY)
 }
 
 function getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
