@@ -60,7 +60,7 @@ function addVoxelLine(crossDimension, key, lines, voxelMap, planar, pointMap, ro
 				return
 			}
 		}
-		addXYZ(next, gDirections[tipIndex])
+		add3D(next, gDirections[tipIndex])
 		key = next.join(',')
 		if (voxelMap.has(key)) {
 			tips = voxelMap.get(key)
@@ -153,8 +153,8 @@ function createTips(voxelMap) {
 		var voxel = entry[1]
 		for (rotationIndex = 0; rotationIndex < 6; rotationIndex++) {
 			var direction = gDirections[rotationIndex]
-			if (!voxelMap.has(getXYZAddition(root, direction).join(','))) {
-				voxel[rotationIndex] = getXYZAddition(root, getXYZMultiplication(distance, direction))
+			if (!voxelMap.has(get3DAddition(root, direction).join(','))) {
+				voxel[rotationIndex] = get3DAddition(root, get3DMultiplication(distance, direction))
 			}
 		}
 	}
@@ -187,14 +187,14 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	var pointsBTransformed = getArraysCopy(meshB.points)
 	addArraysByZ(pointsATransformed, -offsetZ)
 	addArraysByZ(pointsBTransformed, -offsetZ)
-	multiplyXYZsByScalar(pointsATransformed, oneOverLayerThickness)
-	multiplyXYZsByScalar(pointsBTransformed, oneOverLayerThickness)
+	multiply3DsByScalar(pointsATransformed, oneOverLayerThickness)
+	multiply3DsByScalar(pointsBTransformed, oneOverLayerThickness)
 	var latticeA = getXYZLatticeByMesh({facets:meshA.facets, points:pointsATransformed})
 	var latticeB = getXYZLatticeByMesh({facets:meshB.facets, points:pointsBTransformed})
 	var latticeBoolean = getXYZLatticeBoolean(existenceCondition, signB, latticeA, latticeB)
 	var mesh = getMeshByXYZLattice(latticeBoolean)
 	mesh.points = getArraysCopy(mesh.points)
-	addArraysByZ(multiplyXYZsByScalar(mesh.points, layerThickness), offsetZ)
+	addArraysByZ(multiply3DsByScalar(mesh.points, layerThickness), offsetZ)
 	return mesh
 }
 
@@ -444,16 +444,6 @@ function getMeshByXYZLattice(xyzLattice) {
 	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
 	var mesh = getMeshByTipMap(pointMap, tipMap)
-//	drawVoxelMap(voxelMap)
-//	console.log('voxelMap')
-//	console.log(voxelMap)
-//	for (var entry of voxelMap) {
-//		var keyStrings = entry[0].split(',')
-//		if (keyStrings[0] == '0') {
-//	console.log(keyStrings)
-//	console.log(entry[1])
-//		}
-//	}
 	return getJoinedCoplanarMesh(mesh)
 }
 
