@@ -2,16 +2,31 @@
 
 const gIDJoinWord = '_'
 
-function addClosingStatement(parent) {
-	var closingStatement = getStatement('</' + parent.tag + '>')
-	closingStatement.parent = parent
-	parent.children.push(closingStatement)
-}
-
-function addClosingStatementConvertToGroup(parent) {
-	addClosingStatement(parent)
-	parent.tag = 'g'
-	parent.nestingIncrement = 1
+function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in addPassthroughLines reached, no further statements will be added.'
+		warningByList([warningText, statement, gRecursionLimit])
+		return
+	}
+	depth += 1
+	passthroughNesting.lines.push('  '.repeat(Math.max(0, passthroughNesting.nesting - 1)) + getLineByStatement(passthrough, statement))
+	if (statement.nestingIncrement == 1) {
+		passthroughNesting.nesting += 1
+	}
+	for (var child of statement.children) {
+		addPassthroughLines(depth, passthrough, passthroughNesting, child)
+	}
+	if (statement.nestingIncrement == 1) {
+		passthroughNesting.nesting -= 1
+		var passthroughLine = '  '.repeat(Math.max(0, passthroughNesting.nesting - 1))
+		if (statement.tag == passthrough) {
+			passthroughLine += '</' + passthrough + '>'
+		}
+		else {
+			passthroughLine += '</' + statement.tag + '>'
+		}
+		passthroughNesting.lines.push(passthroughLine)
+	}
 }
 
 function addToDescendantsInsideFirst(descendants, statement) {
@@ -44,15 +59,19 @@ function addToDescendantsOutsideFirst(descendants, statement) {
 	}
 }
 
+function convertToGroup(statement) {
+	statement.tag = 'g'
+	statement.nestingIncrement = 1
+}
+
 function createDefault(registry, rootStatement) {
 	rootStatement.variableMap = new Map(gVariableMapEntries)
 	if (registry.idMap.has('_default')) {
 		return
 	}
-	var defaultStatement = getStatement('default')
-	rootStatement.children.splice(0, 0, defaultStatement)
+	var defaultStatement = getStatementByParentTag(new Map([['id', '_default']]), 0, null, 'default')
 	defaultStatement.parent = rootStatement
-	defaultStatement.attributeMap.set('id', '_default')
+	rootStatement.children.splice(0, 0, defaultStatement)
 	registry.idMap.set('_default', defaultStatement)
 }
 
@@ -108,22 +127,23 @@ function getConcatenatedUniqueID(id, registry, statement) {
 
 function getDocumentRoot(lines, tag) {
 	var lastParent = null
-	for (lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		var statement = getStatement(lines[lineIndex])
+	for (var line of lines) {
+		var statement = getStatement(line)
 		if (lastParent == null) {
 			if (statement.tag != null) {
-				if (statement.tag != tag || statement.nestingIncrement != 1) {
-					statement.parent = getStatement(tag + ' {')
+				if (statement.tag != tag) {
+					statement.parent = getStatementByParentTag(new Map(), 1, null, tag)
 					statement.parent.children.push(statement)
 				}
-				lastParent = statement
-				if (statement.nestingIncrement != 1) {
+				if (statement.nestingIncrement == 1) {
+					lastParent = statement
+				}
+				else {
 					lastParent = statement.parent
 				}
 			}
 		}
 		else {
-			var addChild = statement.tag != null
 			statement.parent = lastParent
 			if (statement.nestingIncrement == 1) {
 				lastParent = statement
@@ -132,11 +152,10 @@ function getDocumentRoot(lines, tag) {
 				if (statement.nestingIncrement == -1) {
 					if (lastParent.parent != null) {
 						lastParent = lastParent.parent
-						addChild = true
 					}
 				}
 			}
-			if (addChild) {
+			if (statement.tag != null) {
 				statement.parent.children.push(statement)
 			}
 		}
@@ -145,7 +164,6 @@ function getDocumentRoot(lines, tag) {
 		return null
 	}
 	for (var remainingIndex = 0; remainingIndex < gLengthLimit; remainingIndex++) {
-		addClosingStatement(lastParent)
 		if (lastParent.parent == null) {
 			return lastParent
 		}
@@ -192,24 +210,11 @@ function getIsIDUnique(id, registry, statement) {
 function getLineByStatement(passthrough, statement) {
 	var firstWord = statement.tag
 	if (firstWord == null) {
-		if (statement.nestingIncrement == -1) {
-			if (statement.parent == null) {
-				return '</g>'
-			}
-			else {
-				if (statement.parent.tag == passthrough) {
-					return '</' + passthrough + '>'
-				}
-				return '</g>'
-			}
-		}
-		else {
-			return ''
-		}
+		return ''
 	}
-	if (firstWord != passthrough && statement.nestingIncrement == 1) {
-		firstWord = 'g'
-	}
+//	if (firstWord != passthrough && statement.nestingIncrement == 1) {
+//		firstWord = 'g'
+//	}
 	var attributeWords = ['<' + firstWord]
 	for (var entry of statement.attributeMap) {
 		var value = entry[1]
@@ -241,19 +246,10 @@ function getLineByStatement(passthrough, statement) {
 	return attributeLine + ' ' + lineClosing
 }
 
-function getPassthroughLines(descendants, passthrough) {
-	var nesting = 0
-	var passthroughLines = []
-	for (var statement of descendants) {
-		var passthroughLine = getLineByStatement(passthrough, statement)
-		var indentationEnd = nesting - (statement.nestingIncrement < 0)
-		for (var indentationIndex = 1; indentationIndex < indentationEnd; indentationIndex++) {
-			passthroughLine = '  ' + passthroughLine
-		}
-		passthroughLines.push(passthroughLine)
-		nesting += statement.nestingIncrement
-	}
-	return passthroughLines
+function getPassthroughLinesByStatement(passthrough, statement) {
+	var passthroughNesting = {lines:[], nesting:0}
+	addPassthroughLines(0, passthrough, passthroughNesting, statement)
+	return passthroughNesting.lines
 }
 
 function getQuoteSeparatedSnippets(line) {
@@ -290,64 +286,57 @@ function getQuoteSeparatedSnippets(line) {
 }
 
 function getStatement(line) {
+	line = line.trim()
+	if (line.startsWith('</') || line.startsWith('}')) {
+		return getStatementByParentTag(null, -1, null, null)
+	}
+	if (line.length < 2) {
+		return getStatementByParentTag(null, 0, null, null)
+	}
+	var lastCharacter = line[line.length - 1]
 	var nestingIncrement = 0
-	if (line.indexOf('=') != -1) {
-		line = getLineWithEndspace(['/>', '>', '[', '{'], line)
+	var sliceBegin = line[0] == '<'
+	var sliceEnd = line.length
+	if (lastCharacter == '>' || lastCharacter == '{') {
+		if (line[line.length - 2] == '/') {
+			sliceEnd -= 2
+		}
+		else {
+			sliceEnd -= 1
+			nestingIncrement = 1
+		}
+	}
+	line = line.slice(sliceBegin, sliceEnd).trim()
+	var tag = line
+	var indexOfSpace = line.indexOf(' ')
+	if (indexOfSpace != -1) {
+		tag = tag.slice(0, indexOfSpace)
+	}
+	if (tag.length == 0) {
+		return getStatementByParentTag(null, 0, null, null)
+	}
+	line = line.slice(indexOfSpace + 1).trim()
+	var innerHTML = null
+	if (tag == 'text') {
+		var lastIndexOfGreaterThan = line.lastIndexOf('>')
+		if (lastIndexOfGreaterThan != -1) {
+			if (line.endsWith('<')) {
+				innerHTML = line.slice(lastIndexOfGreaterThan + 1, -1)
+			}
+			else {
+				innerHTML = line.slice(lastIndexOfGreaterThan + 1)
+			}
+			line = line.slice(0, lastIndexOfGreaterThan).trim()
+		}
 	}
 	var quoteSeparatedSnippets = getQuoteSeparatedSnippets(line)
-	var lastIndex = quoteSeparatedSnippets.length - 1
-	var tag = null
-	if (quoteSeparatedSnippets.length > 0) {
-		firstWord = quoteSeparatedSnippets[0]
-		if (firstWord.startsWith('</') || firstWord == '}') {
-			nestingIncrement = -1
-		}
-		else {
-			if (firstWord.startsWith('<')) {
-				firstWord = firstWord.slice(1)
-			}
-			if (firstWord.length > 0) {
-				tag = getCapitalizedKey(firstWord)
-			}
-			if (quoteSeparatedSnippets.length > 1) {
-				var lastWord = quoteSeparatedSnippets[lastIndex]
-				if (lastWord == '>' || lastWord == '{') {
-					nestingIncrement = 1
-				}
-				if (lastWord.endsWith('>') || lastWord == '{') {
-					lastIndex -= 1
-				}
-			}
-		}
+	var tag = getCapitalizedKey(tag)
+	if (quoteSeparatedSnippets.length == 0) {
+		return getStatementByParentTag(new Map(), nestingIncrement, null, tag)
 	}
-	var attributes = getAttributes(quoteSeparatedSnippets.slice(1, lastIndex + 1))
-	if (tag == 'text') {
-		if (attributes.length > 0) {
-			var lastAttribute = attributes[attributes.length - 1]
-			var lastAttributeWord = lastAttribute[1]
-			var lessThanIndex = lastAttributeWord.indexOf('<')
-			var greaterThanIndex = lastAttributeWord.indexOf('>')
-			if (lessThanIndex != -1 && greaterThanIndex != -1) {
-				lastAttribute[1] = lastAttributeWord.slice(0, greaterThanIndex).trim()
-				if (greaterThanIndex < lessThanIndex) {
-					attributes.push(['innerHTML', lastAttributeWord.slice(greaterThanIndex + 1, lessThanIndex)])
-				}
-			}
-		}
-		else {
-			for (var snippetIndex = quoteSeparatedSnippets.length - 1; snippetIndex > 0; snippetIndex--) {
-				var snippet = quoteSeparatedSnippets[snippetIndex]
-				if (snippet.startsWith('>')) {
-					var text = quoteSeparatedSnippets.slice(snippetIndex).join(' ')
-					var lessThanIndex = text.indexOf('<')
-					if (lessThanIndex != -1) {
-						attributes.push(['innerHTML', text.slice(1, lessThanIndex)])
-					}
-					break
-				}
-			}
-		}
-		nestingIncrement = 0
+	var attributes = getAttributes(quoteSeparatedSnippets)
+	if (innerHTML != null) {
+		attributes.push(['innerHTML', innerHTML])
 	}
 	for (var attribute of attributes) {
 		keyStrings = attribute[0].split('.')
@@ -370,7 +359,12 @@ function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
 	if (tag != null) {
 		children = []
 	}
-	return {attributeMap:attributeMap, children:children, nestingIncrement:nestingIncrement, parent:parent, tag:tag, variableMap:null}
+	var statement =
+	{attributeMap:attributeMap, children:children, nestingIncrement:nestingIncrement, parent:parent, tag:tag, variableMap:null}
+	if (parent != null) {
+		parent.children.push(statement)
+	}
+	return statement
 }
 
 function getStatementID(registry, statement) {
@@ -503,10 +497,11 @@ function getWorkStatement(registry, statement) {
 	return registry.idMap.get(workID)
 }
 
+//deprecated24 getWorkStatements might be useful for function other than delete
 function getWorkStatements(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('work')) {
-		return null
+		return []
 	}
 	var workIDs = attributeMap.get('work').replace(/,/g, ' ').split(' ').filter(lengthCheck)
 	var workStatements = []
@@ -553,9 +548,9 @@ function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
 	if (points == null) {
 		return boundingBox
 	}
-	var transformedMatrix = getTransformed2DMatrix(caller, registry, statement)
-	if (transformedMatrix != null) {
-		transform2DPoints(points, transformedMatrix)
+	var matrix2DUntil = getMatrix2DUntil(caller, registry, statement)
+	if (matrix2DUntil != null) {
+		transform2DPoints(matrix2DUntil, points)
 	}
 	for (var point of points) {
 		if (boundingBox == null) {
@@ -570,7 +565,7 @@ function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
 
 function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
 	if (statement.tag == 'group' || statement.tag == 'g') {
-		get2DMatrix(registry, statement)
+		getMatrix2D(registry, statement)
 	}
 	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
 		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
