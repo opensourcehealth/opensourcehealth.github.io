@@ -224,6 +224,9 @@ function BracketCloseMonad() {
 		if (this.previousMonad.previousMonad.precedenceLevel == 1) {
 			result = getArrayByMonad(this.previousMonad, registry, statement)
 		}
+		else {
+			result = [result]
+		}
 		this.value = this.previousMonad.previousMonad.getResult(registry, statement, result)
 		this.previousMonad = this.previousMonad.previousMonad.previousMonad
 	}
@@ -254,16 +257,10 @@ function BracketOpenFunctionMonad() {
 		var argumentLength = this.functionInformation.length
 		if (this.functionInformation.optionSet != null) {
 			if (this.functionInformation.optionSet.has('r')) {
-				if (Array.isArray(value)) {
-					return this.functionInformation.apply(null, [registry, statement].concat(value))
-				}
-				return this.functionInformation(registry, statement, value)
+				return this.functionInformation.apply(null, [registry, statement].concat(value))
 			}
 		}
-		if (Array.isArray(value)) {
-			return this.functionInformation.apply(null, value)
-		}
-		return this.functionInformation(value)
+		return this.functionInformation.apply(null, value)
 	}
 	this.monadMap = gValueMonadMap
 	this.precedenceLevel = 21
@@ -556,7 +553,7 @@ function SquareCloseMonad() {
 		if (this.value != null) {
 			return
 		}
-		if (this.previousMonad.precedenceLevel == 20) {
+		if (this.previousMonad.constructor.name == 'SquareOpenArrayMonad') {
 			this.value = []
 			return
 		}
