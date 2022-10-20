@@ -11,13 +11,13 @@ function getEntryLocation(childrenMaps, entryCenter, terrain) {
 	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
 		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
 			for (var x = 1 - shellIndex; x < shellIndex; x++) {
-				var entryLocation = get2DAddition(entryCenter, [x, signedShellIndex])
+				var entryLocation = getAddition2D(entryCenter, [x, signedShellIndex])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
 			}
 			for (var y = - shellIndex; y <= shellIndex; y++) {
-				var entryLocation = get2DAddition(entryCenter, [signedShellIndex, y])
+				var entryLocation = getAddition2D(entryCenter, [signedShellIndex, y])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
