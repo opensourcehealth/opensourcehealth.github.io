@@ -78,7 +78,7 @@ var terrainViewer = {
 		var screenXY = [this.pixelBeginX, null]
 		for (; screenXY[0] < this.pixelEndX; screenXY[0] += 1) {
 			for (screenXY[1] = this.pixelBeginY; screenXY[1] < this.pixelEndY; screenXY[1] += 1) {
-				var screenLocation = get2DAddition(locationAtScale, screenXY)
+				var screenLocation = getAddition2D(locationAtScale, screenXY)
 				var pixelSlides = this.terrain.getPixelSlides(this.scaleSelectedIndex, this.pixelMultiplier, screenLocation, screenXY)
 				for (var pixelSlide of pixelSlides) {
 					if (pixelSlide.startsWith('#')) {
@@ -99,8 +99,8 @@ var terrainViewer = {
 							var childLocation = child.location
 							if (boundingBox == null) {
 								var scaleMultiplier = this.terrain.scaleMultipliers[this.scaleSelectedIndex]
-								var topLeft = get2DMultiplicationByScalar(screenLocation, scaleMultiplier)
-								var bottomRight = get2DAddition(topLeft, [scaleMultiplier, scaleMultiplier])
+								var topLeft = getMultiplication2DScalar(screenLocation, scaleMultiplier)
+								var bottomRight = getAddition2D(topLeft, [scaleMultiplier, scaleMultiplier])
 								boundingBox = [topLeft, bottomRight]
 							}
 							if (isPointInsideBoundingBox(boundingBox, childLocation)) {
@@ -198,8 +198,8 @@ var terrainViewer = {
 		for (var sideArrowIndex = 0; sideArrowIndex < 4; sideArrowIndex++) {
 			this.pathByPolygon(this.sideArrows[sideArrowIndex])
 			if (this.context.isPointInPath(event.offsetX, event.offsetY)) {
-				var rotationMultiplied = get2DMultiplicationByScalar(gRotations[sideArrowIndex], this.pixelMultiplier)
-				multiply2DByScalar(rotationMultiplied, this.terrain.scaleMultipliers[this.scaleSelectedIndex])
+				var rotationMultiplied = getMultiplication2DScalar(gRotations[sideArrowIndex], this.pixelMultiplier)
+				multiply2DScalar(rotationMultiplied, this.terrain.scaleMultipliers[this.scaleSelectedIndex])
 				add2D(this.location, rotationMultiplied)
 				this.draw()
 				return
@@ -212,10 +212,10 @@ var terrainViewer = {
 			return
 		}
 		var increment = [event.offsetX - this.pixelCorner[0], this.pixelCorner[1] - event.offsetY]
-		divide2DByScalar(increment, this.imageHeight / this.pixelMultiplier)
+		divide2DScalar(increment, this.imageHeight / this.pixelMultiplier)
 		increment[0] = Math.floor(increment[0])
 		increment[1] = Math.ceil(increment[1])
-		multiply2DByScalar(increment, this.terrain.scaleMultipliers[this.scaleSelectedIndex])
+		multiply2DScalar(increment, this.terrain.scaleMultipliers[this.scaleSelectedIndex])
 		add2D(this.location, increment)
 		this.draw()
 	},
@@ -397,13 +397,13 @@ function Terrain(terrainString) {
 				minorParcelY = nextParcelY - 1
 			}
 			var centerParameters = this.getTerrainParameters([nextParcelX, nextParcelY], nextDepth)
-			var nextParameters = get3DMultiplicationByScalar(centerParameters, 9.0)
-			var minorParameters = get3DMultiplicationByScalar(this.getTerrainParameters([minorParcelX, nextParcelY], nextDepth), 3.0)
+			var nextParameters = getMultiplication3DScalar(centerParameters, 9.0)
+			var minorParameters = getMultiplication3DScalar(this.getTerrainParameters([minorParcelX, nextParcelY], nextDepth), 3.0)
 			add3D(nextParameters, minorParameters)
-			var minorParameters = get3DMultiplicationByScalar(this.getTerrainParameters([nextParcelX, minorParcelY], nextDepth), 3.0)
+			var minorParameters = getMultiplication3DScalar(this.getTerrainParameters([nextParcelX, minorParcelY], nextDepth), 3.0)
 			add3D(nextParameters, minorParameters)
 			add3D(nextParameters, this.getTerrainParameters([minorParcelX, minorParcelY], nextDepth))
-			multiply3DByScalar(nextParameters, 1.0 / 16.0)
+			multiply3DScalar(nextParameters, 1.0 / 16.0)
 			add3D(terrainParameters, nextParameters)
 			for (var centerParameterIndex = 3; centerParameterIndex < centerParameters.length; centerParameterIndex++) {
 				var centerParameter = centerParameters[centerParameterIndex]
