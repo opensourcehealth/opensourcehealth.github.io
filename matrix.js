@@ -5,12 +5,6 @@ const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
 
-function add2D(xy, xyAddition) {
-	xy[0] += xyAddition[0]
-	xy[1] += xyAddition[1]
-	return xy
-}
-
 function add2DArrays(arrays, xy) {
 	for (var array of arrays) {
 		add2Ds(array, xy)
@@ -18,25 +12,16 @@ function add2DArrays(arrays, xy) {
 	return arrays
 }
 
-function add2Ds(xys, xy) {
-	for (var element of xys) {
-		element[0] += xy[0]
-		element[1] += xy[1]
+function add2Ds(elements, point) {
+	for (var element of elements) {
+		add2D(element, point)
 	}
-	return xys
+	return elements
 }
 
-function add3D(xyz, xyzAddition) {
-	xyz[0] += xyzAddition[0]
-	xyz[1] += xyzAddition[1]
-	xyz[2] += xyzAddition[2]
-	return xyz
-}
-
-function addArray(elements, elementsAddition) {
-	var minimumLength = Math.min(elements.length, elementsAddition.length)
-	for (var elementIndex = 0; elementIndex < minimumLength; elementIndex++) {
-		elements[elementIndex] += elementsAddition[elementIndex]
+function add3Ds(elements, point) {
+	for (var element of elements) {
+		add3D(element, point)
 	}
 	return elements
 }
@@ -94,19 +79,6 @@ function addPointToMatrix3D(matrix, point) {
 	return matrix
 }
 
-function divide2DByScalar(xy, scalarDivisor) {
-	xy[0] /= scalarDivisor
-	xy[1] /= scalarDivisor
-	return xy
-}
-
-function divide3DByScalar(xyz, scalarDivisor) {
-	xyz[0] /= scalarDivisor
-	xyz[1] /= scalarDivisor
-	xyz[2] /= scalarDivisor
-	return xyz
-}
-
 function getArrayDistanceSquared(arrayA, arrayB) {
 	var distanceSquared = 0.0
 	for (var arrayIndex = 0; arrayIndex < arrayA.length; arrayIndex++) {
@@ -114,10 +86,6 @@ function getArrayDistanceSquared(arrayA, arrayB) {
 		distanceSquared += delta * delta
 	}
 	return distanceSquared
-}
-
-function get2DAddition(xyA, xyB) {
-	return [xyA[0] + xyB[0], xyA[1] + xyB[1]]
 }
 
 function get2DByMatrix3D(point, matrix) {
@@ -135,46 +103,6 @@ function get2DByPortion(portionA, xyA, xyB) {
 	return [portionA * xyA[0] + portionB * xyB[0], portionA * xyA[1] + portionB * xyB[1]]
 }
 
-function get2DDistance(xyA, xyB) {
-	return Math.sqrt(get2DDistanceSquared(xyA, xyB))
-}
-
-function get2DDistanceSquared(xyA, xyB) {
-	return get2DLengthSquared(get2DSubtraction(xyA, xyB))
-}
-
-function get2DDivisionByScalar(xyA, scalarDivider) {
-	return [xyA[0] / scalarDivider, xyA[1] / scalarDivider]
-}
-
-function get2DDotProduct(xyA, xyB) {
-	return xyA[0] * xyB[0] + xyA[1] * xyB[1]
-}
-
-function get2DLength(xy) {
-	return Math.sqrt(get2DLengthSquared(xy))
-}
-
-function get2DLengthSquared(xy) {
-	return xy[0] * xy[0] + xy[1] * xy[1]
-}
-
-function get2DMultiplication(xyA, xyB) {
-	return [xyA[0] * xyB[0], xyA[1] * xyB[1]]
-}
-
-function get2DMultiplicationByScalar(xyA, scalarMultiplier) {
-	return [xyA[0] * scalarMultiplier, xyA[1] * scalarMultiplier]
-}
-
-function get2DPolar(angle) {
-	return [Math.cos(angle), -Math.sin(angle)]
-}
-
-function get2DPolarByRadius(angle, radius) {
-	return [radius * Math.cos(angle), radius * -Math.sin(angle)]
-}
-
 function get2DRotation(xy, xyRotator) {
 	return [xy[0] * xyRotator[0] - xy[1] * xyRotator[1], xy[0] * xyRotator[1] + xy[1] * xyRotator[0]]
 }
@@ -185,14 +113,6 @@ function get2DRotations(xys, xyRotator) {
 		xyRotations[xyIndex] = get2DRotation(xys[xyIndex], xyRotator)
 	}
 	return xyRotations
-}
-
-function get2DSubtraction(xyA, xyB) {
-	return [xyA[0] - xyB[0], xyA[1] - xyB[1]]
-}
-
-function get3DAddition(xyzA, xyzB) {
-	return [xyzA[0] + xyzB[0], xyzA[1] + xyzB[1], xyzA[2] + xyzB[2]];
 }
 
 function get3DBy3DMatrix(matrix, point) {
@@ -211,30 +131,6 @@ function get3DByKey(key) {
 	return [parseFloat(parameters[0]), parseFloat(parameters[1]), parseFloat(parameters[2])]
 }
 
-function get3DDistanceSquared(xyA, xyB) {
-	return get3DLengthSquared(get3DSubtraction(xyA, xyB))
-}
-
-function get3DDotProduct(xyzA, xyzB) {
-	return xyzA[0] * xyzB[0] + xyzA[1] * xyzB[1] + xyzA[2] * xyzB[2]
-}
-
-function get3DLength(xyz) {
-	return Math.sqrt(get3DLengthSquared(xyz))
-}
-
-function get3DLengthSquared(xyz) {
-	return xyz[0] * xyz[0] + xyz[1] * xyz[1] + xyz[2] * xyz[2]
-}
-
-function get3DMultiplication(xyzA, xyzB) {
-	return [xyzA[0] * xyzB[0], xyzA[1] * xyzB[1], xyzA[2] * xyzB[2]]
-}
-
-function get3DMultiplicationByScalar(xyzA, scalarMultiplier) {
-	return [xyzA[0] * scalarMultiplier, xyzA[1] * scalarMultiplier, xyzA[2] * scalarMultiplier]
-}
-
 function get3DsBy3DMatrix(matrix, points) {
 	if (matrix == null) {
 		return points
@@ -246,22 +142,10 @@ function get3DsBy3DMatrix(matrix, points) {
 	return xyzs
 }
 
-function get3DSubtraction(xyzA, xyzB) {
-	return [xyzA[0] - xyzB[0], xyzA[1] - xyzB[1], xyzA[2] - xyzB[2]];
-}
-
-function getArrayMultiplicationByScalar(elements, scalarMultiplier) {
-	var arrayMultiplication = new Array(elements.length)
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		arrayMultiplication[elementIndex] = elements[elementIndex] * scalarMultiplier
-	}
-	return arrayMultiplication
-}
-
 function getArraysMultiplicationByScalar(elementLists, scalarMultiplier) {
 	var arraysMultiplication = new Array(elementLists.length)
 	for (var elementListIndex = 0; elementListIndex < elementLists.length; elementListIndex++) {
-		arraysMultiplication[elementListIndex] = getArrayMultiplicationByScalar(elementLists[elementListIndex], scalarMultiplier)
+		arraysMultiplication[elementListIndex] = getMultiplicationArrayScalar(elementLists[elementListIndex], scalarMultiplier)
 	}
 	return arraysMultiplication
 }
@@ -270,19 +154,9 @@ function getBrightness256(brightness) {
 	return Math.floor(255.0 * ((brightness) % 1.0))
 }
 
-//cross(A, B) = [ a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1 ]
-function getCrossProduct(a, b) {
-	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-}
-
-//cross(A, B) = [ a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1 ]
-function getCrossProductZ(a, b) {
-	return a[0] * b[1] - a[1] * b[0]
-}
-
 //use getRelativeDirection for ordering because getDirectionalProximity loses accuracy close to the x axis
 function getDirectionalProximity(xyA, xyB) {
-	var dotProduct = get2DDotProduct(xyA, xyB)
+	var dotProduct = dotProduct2D(xyA, xyB)
 	if (xyA[0] * xyB[1] <= xyA[1] * xyB[0]) {
 		return dotProduct
 	}
@@ -294,7 +168,7 @@ function getFloats(floats) {
 }
 
 function getInteriorAngle(begin, end, radius) {
-	var halfDistance = 0.5 * get2DDistance(begin, end)
+	var halfDistance = 0.5 * distance2D(begin, end)
 	if (halfDistance > radius) {
 		noticeByList(['halfDistance is greater than radius in getInteriorAngle in matrix.', begin, end, radius])
 	}
@@ -369,11 +243,11 @@ function getMatrices3DByPath(points) {
 		}
 	}
 	if (points.length == 1) {
-		return [getMatrix3DByTranslate3D(points[0])]
+		return [getMatrix3DByTranslate(points[0])]
 	}
 	var vectors = new Array(points.length - 1)
 	for (var pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
-		vectors[pointIndex] = normalize3D(get3DSubtraction(points[pointIndex + 1], points[pointIndex]))
+		vectors[pointIndex] = normalize3D(getSubtraction3D(points[pointIndex + 1], points[pointIndex]))
 	}
 	var matrices = new Array(points.length)
 	var oldVector = vectors[0]
@@ -397,7 +271,7 @@ function getMatrices3DByStair(points) {
 //	3 7 11 15
 	var matrices = new Array(points.length)
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		matrices[pointIndex] = getMatrix3DByTranslate3D(points[pointIndex])
+		matrices[pointIndex] = getMatrix3DByTranslate(points[pointIndex])
 	}
 	return matrices
 }
@@ -517,7 +391,7 @@ function getMatrix2DBySegment(beginPoint, endPoint) {
 //	b d f		1 3 5
 	latestMatrix[4] = beginPoint[0]
 	latestMatrix[5] = beginPoint[1]
-	var subtraction = get2DSubtraction(endPoint, beginPoint)
+	var subtraction = getSubtraction2D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 	latestMatrix[2] = -subtraction[1]
@@ -629,10 +503,10 @@ function getMatrix3DByBasis(points) {
 	latestMatrix[4] = y[0]
 	latestMatrix[5] = y[1]
 	latestMatrix[6] = y[2]
-	var crossProduct = getCrossProduct(x, y)
-	latestMatrix[8] = crossProduct[0]
-	latestMatrix[9] = crossProduct[1]
-	latestMatrix[10] = crossProduct[2]
+	var product = crossProduct(x, y)
+	latestMatrix[8] = product[0]
+	latestMatrix[9] = product[1]
+	latestMatrix[10] = product[2]
 	if (points.length < 3) {
 		return latestMatrix
 	}
@@ -648,14 +522,14 @@ function getMatrix3DByBasis(points) {
 }
 
 function getMatrix3DByPair(a, b) {
-	var cos = get3DDotProduct(a, b)
-	var crossProduct = getCrossProduct(a, b)
-	var sin = get3DLength(crossProduct)
+	var cos = dotProduct3D(a, b)
+	var product = crossProduct(a, b)
+	var sin = length3D(product)
 	if (sin == 0.0) {
 		return getUnitMatrix3D()
 	}
-	divide3DByScalar(crossProduct, sin)
-	return getMatrix3DByVectorCosSin([crossProduct[0], crossProduct[1], crossProduct[2], cos, sin])
+	divide3DScalar(product, sin)
+	return getMatrix3DByVectorCosSin([product[0], product[1], product[2], cos, sin])
 }
 
 function getMatrix3DByPerspective(floats) {
@@ -884,7 +758,7 @@ function getMatrix3DBySegment(beginPoint, endPoint) {
 	latestMatrix[12] = beginPoint[0]
 	latestMatrix[13] = beginPoint[1]
 	latestMatrix[14] = beginPoint[2]
-	var subtraction = get3DSubtraction(endPoint, beginPoint)
+	var subtraction = getSubtraction3D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 //	latestMatrix[2] = subtraction[2]
@@ -931,7 +805,7 @@ function getMatrix3DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 	return latestMatrix
 }
 
-function getMatrix3DByTranslate3D(floats) {
+function getMatrix3DByTranslate(floats) {
 	return addPointToMatrix3D(getUnitMatrix3D(), floats)
 }
 
@@ -1095,11 +969,11 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 }
 
 function getNormalizedBisector(a2D, b2D) {
-	var bisector = get2DAddition(a2D, b2D)
+	var bisector = getAddition2D(a2D, b2D)
 	if (bisector[0] == 0.0 && bisector[1] == 0.0) {
 		bisector = [a2D[1], -a2D[0]]
 	}
-	return divide2DByScalar(bisector, get2DLength(bisector))
+	return divide2DScalar(bisector, length2D(bisector))
 }
 
 function getPositiveModulo(x) {
@@ -1165,7 +1039,7 @@ function getUnitMatrix3D() {
 }
 
 function getUnitMidpoint3D(a, b) {
-	return normalize3D(multiply3DByScalar(get3DAddition(a, b), 0.5))
+	return normalize3D(multiply3DScalar(getAddition3D(a, b), 0.5))
 }
 
 function invert3D(xyz) {
@@ -1175,10 +1049,22 @@ function invert3D(xyz) {
 	return xyz
 }
 
-function multiply2D(xyA, xyB) {
-	xyA[0] *= xyB[0]
-	xyA[1] *= xyB[1]
-	return xyA
+function isUnitMatrix(matrix) {
+	if (matrix.length == 6) {
+		return isUnitMatrix2D(matrix)
+	}
+	if (matrix.length == 16) {
+		return isUnitMatrix3D(matrix)
+	}
+	return false
+}
+
+function isUnitMatrix2D(matrix2D) {
+	return arrayIsClose(matrix3D, gUnitMatrix2D)
+}
+
+function isUnitMatrix3D(matrix3D) {
+	return arrayIsClose(matrix3D, gUnitMatrix3D)
 }
 
 function multiply2DArrays(xyArrays, xyB) {
@@ -1193,12 +1079,6 @@ function multiply2DArraysByScalar(xyArrays, multiplier) {
 		multiply2DsByScalar(xys, multiplier)
 	}
 	return xyArrays
-}
-
-function multiply2DByScalar(xy, scalarMultiplier) {
-	xy[0] *= scalarMultiplier
-	xy[1] *= scalarMultiplier
-	return xy
 }
 
 function multiply2Ds(xys, xyB) {
@@ -1216,25 +1096,11 @@ function multiply2DsByScalar(xys, multiplier) {
 	return xys
 }
 
-function multiply3D(xyz, xyzMultiplier) {
-	xyz[0] *= xyzMultiplier[0]
-	xyz[1] *= xyzMultiplier[1]
-	xyz[2] *= xyzMultiplier[2]
-	return xyz
-}
-
 function multiply3DArraysByScalar(xyzArrays, multiplier) {
 	for (var xyzs of xyzArrays) {
 		multiply3DsByScalar(xyzs, multiplier)
 	}
 	return xyzArrays
-}
-
-function multiply3DByScalar(xyz, scalarMultiplier) {
-	xyz[0] *= scalarMultiplier
-	xyz[1] *= scalarMultiplier
-	xyz[2] *= scalarMultiplier
-	return xyz
 }
 
 function multiply3DsByScalar(xyzs, multiplier) {
@@ -1253,13 +1119,6 @@ function multiplyArrayArraysByIndex(arrayArrays, multiplier, index) {
 	return arrayArrays
 }
 
-function multiplyArrayByScalar(elements, scalarMultiplier) {
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		elements[elementIndex] *= scalarMultiplier
-	}
-	return elements
-}
-
 function multiplyArraysByIndex(arrays, multiplier, index) {
 	for (var array of arrays) {
 		array[index] *= multiplier
@@ -1268,17 +1127,17 @@ function multiplyArraysByIndex(arrays, multiplier, index) {
 }
 
 function normalize2D(xy) {
-	var xyLength = get2DLength(xy)
+	var xyLength = length2D(xy)
 	if (xyLength > 0.0) {
-		divide2DByScalar(xy, xyLength)
+		divide2DScalar(xy, xyLength)
 	}
 	return xy
 }
 
 function normalize3D(xyz) {
-	var xyzLength = get3DLength(xyz)
+	var xyzLength = length3D(xyz)
 	if (xyzLength > 0.0) {
-		divide3DByScalar(xyz, xyzLength)
+		divide3DScalar(xyz, xyzLength)
 	}
 	return xyz
 }
@@ -1304,31 +1163,29 @@ function rotate3DsByBasis(rotationBasis, xyzs, xyRotator) {
 	}
 }
 
-function subtract2D(xyA, xyB) {
-	xyA[0] -= xyB[0]
-	xyA[1] -= xyB[1]
-	return xyA
-}
-
-function subtract3D(xyzA, xyzB) {
-	xyzA[0] -= xyzB[0]
-	xyzA[1] -= xyzB[1]
-	return xyzA
-}
-
-function transform2DPoint(matrix, point) {
+function transform2DPoint(matrix2D, point) {
 	originalX = point[0]
 //	a c e		0 2 4
 //	b d f		1 3 5
-	point[0] = point[0] * matrix[0] + point[1] * matrix[2] + matrix[4]
-	point[1] = originalX * matrix[1] + point[1] * matrix[3] + matrix[5]
+	point[0] = point[0] * matrix2D[0] + point[1] * matrix2D[2] + matrix2D[4]
+	point[1] = originalX * matrix2D[1] + point[1] * matrix2D[3] + matrix2D[5]
 }
 
-function transform2DPoints(matrix, points) {
+function transform2DPoints(matrix2D, points) {
 	for (var point of points) {
-		transform2DPoint(matrix, point)
+		transform2DPoint(matrix2D, point)
 	}
 	return points
+}
+
+function transform2DOr3DPoints(matrix, points) {
+	if (matrix.length == 6) {
+		transform2DPoints(matrix, points)
+		return
+	}
+	if (matrix.length == 16) {
+		transform3DPoints(matrix, points)
+	}
 }
 
 function transform3DPoints(matrix3D, points) {
@@ -1338,7 +1195,8 @@ function transform3DPoints(matrix3D, points) {
 }
 
 function widenBoundingBox(boundingBox, point) {
-	for (var parameterIndex = 0; parameterIndex < point.length; parameterIndex++) {
+	var minimumIndex = Math.min(boundingBox[0].length, point.length)
+	for (var parameterIndex = 0; parameterIndex < minimumIndex; parameterIndex++) {
 		boundingBox[0][parameterIndex] = Math.min(boundingBox[0][parameterIndex], point[parameterIndex])
 		boundingBox[1][parameterIndex] = Math.max(boundingBox[1][parameterIndex], point[parameterIndex])
 	}
@@ -1367,7 +1225,9 @@ var g3DTransformMap = new Map([
 	['scaleX', getMatrix3DByScaleX],
 	['scaleY', getMatrix3DByScaleY],
 	['scaleZ', getMatrix3DByScaleZ],
-	['translate', getMatrix3DByTranslate3D],
+	['translate', getMatrix3DByTranslate],
 	['translateX', getMatrix3DByTranslateX],
 	['translateY', getMatrix3DByTranslateY],
 	['translateZ', getMatrix3DByTranslateZ]])
+var gUnitMatrix2D = getUnitMatrix2D()
+var gUnitMatrix3D = getUnitMatrix3D()
