@@ -29,6 +29,18 @@ function addElementsToSet(elements, setToAddTo) {
 	}
 }
 
+function arrayIsClose(elements, others) {
+	if (elements.length != others.length) {
+		return false
+	}
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		if (Math.abs(elements[elementIndex] - others[elementIndex]) > gClose) {
+			return false
+		}
+	}
+	return true
+}
+
 function compareAbsoluteElementTwoAscending(a, b) {
 	return Math.abs(a[2]) - Math.abs(b[2])
 }
@@ -133,6 +145,19 @@ function getArrayArraysCopy(arrayArrays) {
 	return arrayArraysCopy
 }
 
+function getArrayByElements(elements, until, value) {
+	value = getValueByDefault(0.0, value)
+	until = getValueByDefault(elements.length, until)
+	elements = getArrayByValue(elements)
+	if (elements.length < until) {
+		elements.length = until
+	}
+	for (var elementIndex = 0; elementIndex < until; elementIndex++) {
+		elements[elementIndex] = getValueByDefault(value, elements[elementIndex])
+	}
+	return elements
+}
+
 function getArrayBySet(setForArray) {
 	var array = new Array(setForArray.size)
 	var index = 0
@@ -141,6 +166,13 @@ function getArrayBySet(setForArray) {
 		index += 1
 	}
 	return array
+}
+
+function getArrayByValue(value) {
+	if (Array.isArray(value)) {
+		return value
+	}
+	return [value]
 }
 
 function getArrayOrNullBySet(setForArray) {
@@ -237,6 +269,14 @@ function getPushElement(arrayToAddTo, element) {
 	return arrayToAddTo
 }
 
+function getSequence(length) {
+	var sequence = new Array(length)
+	for (var index = 0; index < length; index++) {
+		sequence[index] = index
+	}
+	return sequence
+}
+
 function getShortArrays(length, points) {
 	var shortArrays = new Array(points.length)
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
@@ -245,16 +285,34 @@ function getShortArrays(length, points) {
 	return shortArrays
 }
 
+function getValueByDefault(defaultValue, value) {
+	if (value == undefined) {
+		return defaultValue
+	}
+	return value
+}
+
 function notNullCheck(element) {
 	return element != null
 }
 
-function overwriteArray(elements, others) {
-	elements.length = others.length
-	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
-		elements[otherIndex] = others[otherIndex]
+function overwriteArray(elements, sources) {
+	elements.length = sources.length
+	for (var sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+		elements[sourceIndex] = sources[sourceIndex]
 	}
-	return elements
+}
+
+function overwriteArraysUntil(elementArrays, sourceArrays, until) {
+	for (var sourceArrayIndex = 0; sourceArrayIndex < sourceArrays.length; sourceArrayIndex++) {
+		overwriteArrayUntil(elementArrays[sourceArrayIndex], sourceArrays[sourceArrayIndex], until)
+	}
+}
+
+function overwriteArrayUntil(elements, sources, until) {
+	for (var sourceIndex = 0; sourceIndex < until; sourceIndex++) {
+		elements[sourceIndex] = sources[sourceIndex]
+	}
 }
 
 function pushArray(elements, others) {
@@ -323,14 +381,6 @@ function reverseArray(elements) {
 	}
 }
 
-function setArraysToArraysUntil(elements, others, until) {
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		for (var parameterIndex = 0; parameterIndex < until; parameterIndex++) {
-			elements[elementIndex][parameterIndex] = others[elementIndex][parameterIndex]
-		}
-	}
-}
-
 function setMapIfMissing(key, map, value) {
 	if (!map.has(key)) {
 		map.set(key, value)
@@ -342,6 +392,19 @@ function setObjectAttribute(key, map, object, value) {
 		value = map.get(key)(value)
 	}
 	return object[key] = value
+}
+
+function setUndefinedElementsToArray(elements, sources) {
+	var minimumLength = Math.min(elements.length, sources.length)
+	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
+		elements[parameterIndex] = getValueByDefault(sources[parameterIndex], elements[parameterIndex])
+	}
+}
+
+function setUndefinedElementsToValue(elements, value) {
+	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
+		elements[parameterIndex] = getValueByDefault(value, elements[parameterIndex])
+	}
 }
 
 function spliceArray(elements, index, others) {
