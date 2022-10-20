@@ -64,6 +64,12 @@ function convertToGroup(statement) {
 	statement.nestingIncrement = 1
 }
 
+function convertToGroupIfParent(statement) {
+	if (statement.nestingIncrement == 1) {
+		statement.tag = 'g'
+	}
+}
+
 function createDefault(registry, rootStatement) {
 	rootStatement.variableMap = new Map(gVariableMapEntries)
 	if (registry.idMap.has('_default')) {
@@ -457,6 +463,9 @@ function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
 	if (value != null) {
 		return value
 	}
+	if (defaultValue == null || defaultValue == undefined) {
+		return undefined
+	}
 	var defaultString = defaultValue.toString()
 	var keyValueString = key + ':' + defaultString
 	if (defaultMap.has(tag)) {
@@ -497,13 +506,16 @@ function getWorkStatement(registry, statement) {
 	return registry.idMap.get(workID)
 }
 
-//deprecated24 getWorkStatements might be useful for function other than delete
-function getWorkStatements(registry, statement) {
+function getWorkIDs(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('work')) {
 		return []
 	}
-	var workIDs = attributeMap.get('work').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+	return attributeMap.get('work').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+}
+
+function getWorkStatements(registry, statement) {
+	var workIDs = getWorkIDs(registry, statement)
 	var workStatements = []
 	for (var workID of workIDs) {
 		workID = workID.trim()
@@ -568,6 +580,11 @@ function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
 		getMatrix2D(registry, statement)
 	}
 	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
+		if (statement.attributeMap.has('display')) {
+			if (statement.attributeMap.get('display') == 'none') {
+				return boundingBox
+			}
+		}
 		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
 	}
 	return boundingBox
