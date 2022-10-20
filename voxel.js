@@ -444,7 +444,7 @@ function getMeshByXYZLattice(xyzLattice) {
 	addVoxelLines(0, voxelMap, lines, pointMap, tipMap)
 	addVoxelLines(1, voxelMap, lines, pointMap, tipMap)
 	var mesh = getMeshByTipMap(pointMap, tipMap)
-	return getJoinedCoplanarMesh(mesh)
+	return getPolygonateMesh(mesh)
 }
 
 function getVoxel(key, voxelMap) {
