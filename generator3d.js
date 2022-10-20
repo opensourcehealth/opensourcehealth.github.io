@@ -146,7 +146,7 @@ function addHolesToFence(bottoms, mesh, overhangAngle, thickness, tops, width) {
 		var top = tops[topIndex]
 		var nextTop = tops[nextIndex]
 		var bottom = Math.max(bottoms[topIndex], bottoms[nextIndex])
-		var outerTopRight = [get2DDistance(top, nextTop), Math.min(top[2], nextTop[2])]
+		var outerTopRight = [distance2D(top, nextTop), Math.min(top[2], nextTop[2])]
 		var innerLeft = thickness
 		if (topIndex > 0) {
 			innerLeft *= 0.5
@@ -217,22 +217,26 @@ function addToPillarMesh(heights, mesh, polygon3DGroup) {
 
 function addToSlopedConnectionFacet(connectionFacet, oldTopFacets, point, points) {
 	var closestIndex = null
+	var closestTopFacetIndex = null
 	var closestVertexIndex = null
 	var leastDistanceSquared = Number.MAX_VALUE
 	for (var topFacetIndex = 0; topFacetIndex < oldTopFacets.length; topFacetIndex++) {
 		var topFacet = oldTopFacets[topFacetIndex]
 		for (var vertexIndex = 0; vertexIndex < topFacet.length; vertexIndex++) {
 			var pointIndex = topFacet[vertexIndex]
-			var distanceSquared = get2DDistanceSquared(point, points[pointIndex])
+			var distanceSquared = distanceSquared2D(point, points[pointIndex])
 			if (distanceSquared < leastDistanceSquared) {
 				leastDistanceSquared = distanceSquared
 				closestIndex = pointIndex
+				closestTopFacetIndex = topFacetIndex
 				closestVertexIndex = vertexIndex
 			}
 		}
 	}
-	connectionFacet.push(
-	{low:closestIndex, high:points.length, topFacet:topFacet, topFacetIndex:topFacetIndex, vertexIndex:closestVertexIndex})
+	if (closestTopFacetIndex == null) {
+		return
+	}
+	connectionFacet.push({low:closestIndex, high:points.length, topFacetIndex:closestTopFacetIndex, vertexIndex:closestVertexIndex})
 }
 
 function addToVerticalConnectionFacet(connectionFacet, facets, oldArrowMap, oldGridMap, point, pointLayerMap, points, previousLayer) {
@@ -317,17 +321,17 @@ function convertPlankToRoad(betweens, centers, curve, matrix, mesh, registry, st
 	var insetDeltas = new Array(centers.length)
 	for (var vertexIndex = 1; vertexIndex < centersLengthMinus; vertexIndex++) {
 		var centerPoint = centers[vertexIndex]
-		var centerBegin = normalize2D(get2DSubtraction(centers[(vertexIndex - 1 + centers.length) % centers.length], centerPoint))
-		var centerEnd = normalize2D(get2DSubtraction(centers[(vertexIndex + 1) % centers.length], centerPoint))
+		var centerBegin = normalize2D(getSubtraction2D(centers[(vertexIndex - 1 + centers.length) % centers.length], centerPoint))
+		var centerEnd = normalize2D(getSubtraction2D(centers[(vertexIndex + 1) % centers.length], centerPoint))
 		insetDeltas[vertexIndex] = getInsetDelta(centerBegin, centerEnd)
 	}
-	var centerEnd = normalize2D(get2DSubtraction(centers[1], centers[0]))
+	var centerEnd = normalize2D(getSubtraction2D(centers[1], centers[0]))
 	insetDeltas[0] = [centerEnd[1], -centerEnd[0]]
-	var centerBegin = normalize2D(get2DSubtraction(centers[centersLengthMinus], centers[centers.length - 2]))
+	var centerBegin = normalize2D(getSubtraction2D(centers[centersLengthMinus], centers[centers.length - 2]))
 	insetDeltas[centersLengthMinus] = [centerBegin[1], -centerBegin[0]]
 	for (var centerIndex = 0; centerIndex < centers.length; centerIndex++) {
 		var center = centers[centerIndex]
-		var insetRight = get2DMultiplicationByScalar(insetDeltas[centerIndex], 0.5 * center[2])
+		var insetRight = getMultiplication2DScalar(insetDeltas[centerIndex], 0.5 * center[2])
 		lefts[centerIndex] = [center[0] - insetRight[0], center[1] - insetRight[1]]
 		rights[centerIndex] = [center[0] + insetRight[0], center[1] + insetRight[1]]
 	}
@@ -365,13 +369,13 @@ function convertPlankToFence(betweens, bottoms, curve, matrix, mesh, registry, s
 	var topsLengthMinus = tops.length - 1
 	for (var vertexIndex = 1; vertexIndex < topsLengthMinus; vertexIndex++) {
 		var centerPoint = tops[vertexIndex]
-		var centerBegin = normalize2D(get2DSubtraction(tops[(vertexIndex - 1 + tops.length) % tops.length], centerPoint))
-		var centerEnd = normalize2D(get2DSubtraction(tops[(vertexIndex + 1) % tops.length], centerPoint))
+		var centerBegin = normalize2D(getSubtraction2D(tops[(vertexIndex - 1 + tops.length) % tops.length], centerPoint))
+		var centerEnd = normalize2D(getSubtraction2D(tops[(vertexIndex + 1) % tops.length], centerPoint))
 		insetDeltas[vertexIndex] = getInsetDelta(centerBegin, centerEnd)
 	}
-	var centerEnd = normalize2D(get2DSubtraction(tops[1], tops[0]))
+	var centerEnd = normalize2D(getSubtraction2D(tops[1], tops[0]))
 	insetDeltas[0] = [centerEnd[1], -centerEnd[0]]
-	var centerBegin = normalize2D(get2DSubtraction(tops[topsLengthMinus], tops[tops.length - 2]))
+	var centerBegin = normalize2D(getSubtraction2D(tops[topsLengthMinus], tops[tops.length - 2]))
 	insetDeltas[topsLengthMinus] = [centerBegin[1], -centerBegin[0]]
 	//y>z -z>y
 	for (var point of mesh.points) {
@@ -396,8 +400,8 @@ function convertPlankToFence(betweens, bottoms, curve, matrix, mesh, registry, s
 		point[2] *= oneMinusAlong * tops[xIndex][2] + along * tops[nextIndex][2]
 		point[2] += oneMinusAlong * bottoms[xIndex] + along * bottoms[nextIndex]
 		var minusY = -point[1] - value
-		var inset = get2DAddition(tops[xIndex], get2DMultiplicationByScalar(insetDeltas[xIndex], minusY))
-		var nextInset = get2DAddition(tops[nextIndex], get2DMultiplicationByScalar(insetDeltas[nextIndex], minusY))
+		var inset = getAddition2D(tops[xIndex], getMultiplication2DScalar(insetDeltas[xIndex], minusY))
+		var nextInset = getAddition2D(tops[nextIndex], getMultiplication2DScalar(insetDeltas[nextIndex], minusY))
 		point[0] = oneMinusAlong * inset[0] + along * nextInset[0]
 		point[1] = oneMinusAlong * inset[1] + along * nextInset[1]
 	}
@@ -502,29 +506,11 @@ function getPlankMesh(heights, id, length) {
 	return mesh
 }
 
-function getPolygon3D(polygon, z) {
-	if (getIsEmpty(polygon)) {
-		return polygon
-	}
-	if (polygon[0].length > 2) {
-		return polygon
-	}
-	var polygon3D = new Array(polygon.length)
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var vertex = polygon[vertexIndex]
-		polygon3D[vertexIndex] = [vertex[0], vertex[1], z]
-	}
-	return polygon3D
-}
-
 function getSculptureMesh(layers, matrix3D) {
-	if (layers.length < 2) {
-		return {facets:[], points:[]}
-	}
 	var facets = []
 	var oldArrowMap = new Map()
 	var oldGridMap = new Map()
-	var oldTopFacets = []
+	var oldTopFacetsDirections = [[], []]
 	var pointLayerMap = new Map()
 	var points = []
 	var layer = layers[0]
@@ -532,6 +518,7 @@ function getSculptureMesh(layers, matrix3D) {
 	layer.index = 0
 	for (var polygon of layer.polygons) {
 		layer.pointIndexes = []
+		var isClockwise = getIsClockwise(polygon)
 		var polygon3D = getPolygon3D(polygon, 0.0)
 		var topFacet = []
 		for (var point of polygon3D) {
@@ -541,7 +528,7 @@ function getSculptureMesh(layers, matrix3D) {
 			layer.pointIndexes.push(points.length)
 			points.push(point)
 		}
-		oldTopFacets.push(topFacet)
+		oldTopFacetsDirections[1 * isClockwise].push(topFacet)
 	}
 	for (var layerIndex = 1; layerIndex < layers.length; layerIndex++) {
 		var arrowMap = new Map()
@@ -555,8 +542,11 @@ function getSculptureMesh(layers, matrix3D) {
 			layer.polygons = getArrayArraysCopy(previousLayer.polygons)
 		}
 		var topFacets = []
+		var topFacetsDirections = [[], []]
 		for (var polygon of layer.polygons) {
 			var connectionFacet = []
+			var isClockwise = getIsClockwise(polygon)
+			var oldTopFacets = oldTopFacetsDirections[1 * isClockwise]
 			var topFacet = []
 			if (layer.vertical) {
 				var alongIndexesMap = new Map()
@@ -571,9 +561,9 @@ function getSculptureMesh(layers, matrix3D) {
 					if (alongIndexesMap.has(key)) {
 						var alongIndexes = alongIndexesMap.get(key)
 						for (var alongIndexIndex = alongIndexes.length - 1; alongIndexIndex > -1; alongIndexIndex--) {
-							var alongIndex = alongIndexes[alongIndexIndex]
-							if (alongIndex[0] != 0.0) {
-								polygon.splice(vertexIndex + 1, 0, meetings[alongIndex[1]].point)
+							var meeting = meetings[alongIndexes[alongIndexIndex][1]]
+							if (!meeting.isWorkNode) {
+								polygon.splice(vertexIndex + 1, 0, meeting.point)
 							}
 						}
 					}
@@ -609,13 +599,14 @@ function getSculptureMesh(layers, matrix3D) {
 					var nextConnection = connectionFacet[(connectionIndex + 1) % connectionFacet.length]
 					var facet = [nextConnection.low]
 					if (connection.topFacetIndex == nextConnection.topFacetIndex) {
-						var topFacetLength = connection.topFacet.length
+						var oldTopFacet = oldTopFacets[connection.topFacetIndex]
+						var topFacetLength = oldTopFacet.length
 						for (var extraIndex = 0; extraIndex < topFacetLength; extraIndex++) {
 							var totalIndex = (nextConnection.vertexIndex - extraIndex + topFacetLength) % topFacetLength
 							if (totalIndex == connection.vertexIndex) {
 								break
 							}
-							facet.push(connection.topFacet[(totalIndex - 1 + topFacetLength) % topFacetLength])
+							facet.push(oldTopFacet[(totalIndex - 1 + topFacetLength) % topFacetLength])
 						}
 					}
 					else {
@@ -628,10 +619,11 @@ function getSculptureMesh(layers, matrix3D) {
 				}
 			}
 			topFacets.push(topFacet)
+			topFacetsDirections[1 * isClockwise].push(topFacet)
 		}
 		oldArrowMap = arrowMap
 		oldGridMap = gridMap
-		oldTopFacets = topFacets
+		oldTopFacetsDirections = topFacetsDirections
 	}
 	addFacetsAlongLoneEdges(facets, layers, pointLayerMap, points)
 	for (var layer of layers) {
@@ -654,10 +646,8 @@ function getWorkMesh(registry, statement) {
 	if (workMesh == null) {
 		return null
 	}
-	if (attributeMap.has('copy')) {
-		if (getBooleanByStatementValue('copy', registry, statement, attributeMap.get('copy'))) {
-			workMesh = getMeshCopy(workMesh)
-		}
+	if (getBooleanByDefault(false, 'copy', registry, statement, statement.tag)) {
+		workMesh = getMeshCopy(workMesh)
 	}
 	return workMesh
 }
@@ -667,6 +657,26 @@ function getWorkMeshByID(id, registry) {
 		return null
 	}
 	return registry.meshMap.get(id)
+}
+
+function getWorkMeshes(registry, statement) {
+	var attributeMap = statement.attributeMap
+	if (!attributeMap.has('work')) {
+		return []
+	}
+	var workIDs = attributeMap.get('work').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+	var shouldCopy = getBooleanByDefault(false, 'copy', registry, statement, statement.tag)
+	var workMeshes = []
+	for (var workID of workIDs) {
+		var workMesh = getWorkMeshByID(workID, registry)
+		if (workMesh != null) {
+			if (shouldCopy) {
+				workMesh = getMeshCopy(workMesh)
+			}
+			workMeshes.push(workMesh)
+		}
+	}
+	return workMeshes
 }
 
 function removeClosePoints(mesh) {
@@ -725,10 +735,11 @@ function removeTooThinFacets(mesh) {
 					facets.splice(facetIndex, 1)
 				}
 				else {
-					facets[facetIndex] = separateFacets[0]
-					for (var separateIndex = 1; separateIndex < separateFacets.length; separateIndex++) {
-						facets.push(separateFacets[separateIndex])
+					var joinedFacet = separateFacets[0]
+					if (separateFacets.length > 1) {
+						joinedFacet = getConnectedFacet(separateFacets, points)
 					}
+					facets[facetIndex] = joinedFacet
 				}
 				break
 			}
@@ -777,9 +788,13 @@ var gExtrusion = {
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
 		var isJoined = getBooleanByDefault(false, 'join', registry, statement, this.name)
-		var matrices = get3DMatrices(registry, statement, null)
+		var matrices = get3DMatricesAndZeroHeight(registry, statement, null)
 		var matrix = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
+		if (getIsEmpty(polygons)) {
+			noticeByList(['No polygons could be found for extrusion in generator3d.', statement])
+			return
+		}
 		analyzeOutputMesh(getExtrusionMesh(isJoined, matrices, matrix, polygons), registry, statement)
 	}
 }
@@ -822,6 +837,10 @@ var gPillar = {
 		var heights = getHeights(registry, statement, this.name)
 		var matrix = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
+		if (getIsEmpty(polygons)) {
+			noticeByList(['No polygons could be found for pillar in generator3d.', statement])
+			return
+		}
 		analyzeOutputMesh(getPillarMesh(heights, matrix, polygons), registry, statement)
 	}
 }
@@ -869,20 +888,46 @@ var gSculpture = {
 	},
 	name: 'sculpture',
 	processStatement:function(registry, statement) {
-		statement.tag = 'g'
+		convertToGroupIfParent(statement)
 		var vertical = true
+		var layerMap = new Map()
 		var layers = []
-		var matrices = get3DMatrices(registry, statement, null)
 		for (var child of statement.children) {
 			if (child.tag == 'layer') {
-				if (layers.length >= matrices.length) {
-					break
-				}
 				var polygons = getPolygonsHDRecursively(registry, child)
-				vertical = getBooleanByDefault(vertical, 'vertical', registry, child, 'layer')
-				layers.push({matrix3D:matrices[layers.length], polygons:polygons, vertical:vertical})
-				child.tag = 'g'
+				var childMatrices = get3DMatrices(registry, child, null)
+				if (child.attributeMap.has('vertical')) {
+					vertical = getBooleanByStatement('vertical', registry, child)
+				}
+				var id = child.attributeMap.get('id')
+				var workIDs = getWorkIDs(registry, child)
+				for (var count = 0; count < childMatrices.length; count++) {
+					var layer = null
+					if (workIDs.length > 0) {
+						var layerID = workIDs[count % workIDs.length]
+						if (layerMap.has(layerID)) {
+							var oldLayer = layerMap.get(layerID)
+							layer = {polygons:oldLayer.polygons, vertical:oldLayer.vertical}
+						}
+						else {
+							noticeByList(['No layer could be found for sculpture in generator3d.', layerID, child, statement])
+						}
+					}
+					else {
+						layer = {polygons:polygons, vertical:vertical}
+					}
+					if (layer != null) {
+						layer.matrix3D = childMatrices[count]
+						layerMap.set(id, layer)
+						layers.push(layer)
+					}
+				}
+				convertToGroupIfParent(child)
 			}
+		}
+		if (layers.length < 2) {
+			noticeByList(['Less than 2 layers could be found for sculpture in generator3d.', statement])
+			return
 		}
 		var matrix3D = getChainMatrix3D(registry, statement)
 		analyzeOutputMesh(getSculptureMesh(layers, matrix3D), registry, statement)
