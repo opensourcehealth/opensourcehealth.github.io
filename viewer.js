@@ -1,9 +1,5 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function wordscapeViewerDraw() {
-	meshViewer.draw()
-}
-
 function setTypeSelect(selectedIndex, types) {
 	var typeSelect = document.getElementById('typeSelectID')
 	var options = typeSelect.options
@@ -97,6 +93,10 @@ function viewSelectChanged() {
 	meshViewer.draw()
 }
 
+function wordscapeViewerDraw() {
+	meshViewer.draw()
+}
+
 
 var meshViewer = {
 	addImage: function(filename, id) {
@@ -118,27 +118,6 @@ var meshViewer = {
 		this.context.moveTo(this.halfWidth + this.modelRadiusCircle, this.halfHeight)
 		this.context.arc(this.halfWidth, this.halfHeight, this.modelRadiusCircle, Math.PI + Math.PI, 0, true)
 		this.context.closePath()
-	},
-	drawViewImage: function(view) {
-		if (view.image == null) {
-			view.image = new Image()
-			view.image.src = view.filename
-		}
-		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
-		if (view.image.complete) {
-			if (view.height == null) {
-				var greatestDimension = Math.max(view.image.naturalHeight, view.image.naturalWidth)
-				var zoomRatio = 1.0 * this.canvas.width / greatestDimension
-				view.height = zoomRatio * view.image.naturalHeight
-				view.width = zoomRatio * view.image.naturalWidth
-				view.halfCanvasMinus = this.halfWidth - view.width / 2
-				view.canvasHeightMinus = this.canvas.height - view.height
-			}
-			this.context.drawImage(view.image, view.halfCanvasMinus, view.canvasHeightMinus, view.width, view.height)
-		}
-		else {
-			view.image.onload = wordscapeViewerDraw
-		}
 	},
 	draw: function() {
 		var view = this.view
@@ -204,6 +183,21 @@ var meshViewer = {
 				this.context.fill()
 			}
 		}
+		this.context.font = '12px Arial'
+		this.context.lineWidth = 0.8
+		this.context.strokeStyle = 'black'
+		this.context.strokeText('Size', this.extentStart, this.textSpace)
+		this.context.strokeText('Range', this.rangeStart, this.textSpace)
+		var meshBoundingBox = view.meshBoundingBox
+		this.drawDimensionRange('X', meshBoundingBox[0][0], meshBoundingBox[1][0], 2 * this.textSpace)
+		this.drawDimensionRange('Y', meshBoundingBox[0][1], meshBoundingBox[1][1], 3 * this.textSpace)
+		this.drawDimensionRange('Z', meshBoundingBox[0][2], meshBoundingBox[1][2], 4 * this.textSpace)
+	},
+	drawDimensionRange: function(character, minimum, maximum, y) {
+		var dimension = maximum - minimum
+		this.context.strokeText(character + ' : ', this.textHeight / 2, y)
+		this.context.strokeText(dimension.toFixed(), this.extentStart, y)
+		this.context.strokeText(minimum.toFixed() + ', ' + maximum.toFixed(), this.rangeStart, y)
 	},
 	drawModelControlPath: function(event) {
 		this.beginModelCirclePath()
@@ -226,6 +220,27 @@ var meshViewer = {
 		this.context.strokeStyle = 'black'
 		this.context.stroke()
 	},
+	drawViewImage: function(view) {
+		if (view.image == null) {
+			view.image = new Image()
+			view.image.src = view.filename
+		}
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height)
+		if (view.image.complete) {
+			if (view.height == null) {
+				var greatestDimension = Math.max(view.image.naturalHeight, view.image.naturalWidth)
+				var zoomRatio = 1.0 * this.canvas.width / greatestDimension
+				view.height = zoomRatio * view.image.naturalHeight
+				view.width = zoomRatio * view.image.naturalWidth
+				view.halfCanvasMinus = this.halfWidth - view.width / 2
+				view.canvasHeightMinus = this.canvas.height - view.height
+			}
+			this.context.drawImage(view.image, view.halfCanvasMinus, view.canvasHeightMinus, view.width, view.height)
+		}
+		else {
+			view.image.onload = wordscapeViewerDraw
+		}
+	},
 	erasePath: function() {
 		this.context.lineWidth = 3
 		this.context.strokeStyle = 'white'
@@ -237,6 +252,8 @@ var meshViewer = {
 	initialize: function() {
 		this.canvasID = null
 		this.textHeight = 12
+		this.extentStart = 2 * this.textHeight
+		this.rangeStart = 6 * this.textHeight
 		this.textSpace = this.textHeight * 3 / 2
 		this.doubleTextSpace = this.textSpace + this.textSpace
 		this.viewID = null
@@ -254,7 +271,7 @@ var meshViewer = {
 			this.view.polyline.push(this.mouseDown2D)
 			var boundingBox = getBoundingBox(this.view.polyline)
 			var minimumPoint = boundingBox[0]
-			var size = get2DSubtraction(boundingBox[1], minimumPoint)
+			var size = getSubtraction2D(boundingBox[1], minimumPoint)
 			var maximumDimension = Math.max(Math.max(size[0], size[1]), 1.0)
 			var fittedString = ''
 			var multiplier = 100.0 / maximumDimension
@@ -297,12 +314,12 @@ var meshViewer = {
 			return
 		}
 		var mouseMovement = [event.offsetX - this.mouseDown2D[0], event.offsetY - this.mouseDown2D[1]]
-		var movementLength = get2DLength(mouseMovement)
+		var movementLength = length2D(mouseMovement)
 		if (movementLength == 0.0) {
 			return
 		}
 		if (this.isCircle) {
-			var movementNormal = divide2DByScalar(mouseMovement.slice(0), movementLength)
+			var movementNormal = divide2DScalar(mouseMovement.slice(0), movementLength)
 			movementNormal[1] = -movementNormal[1]
 			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(movementNormal), this.view.lastRotationMatrix)
 			var rotationY = this.rotationMultiplier * movementLength
@@ -355,19 +372,19 @@ var meshViewer = {
 			return
 		}
 		var meshBoundingBox = getMeshBoundingBox(getWorkMeshByID(this.viewID, this.registry))
-		var meshExtent = get3DSubtraction(meshBoundingBox[1], meshBoundingBox[0])
-		var scale = this.modelDiameter / get3DLength(meshExtent)
-		var center = multiply3DByScalar(get3DAddition(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
-		var meshCenterMatrix = getMatrix3DByTranslate3D([-center[0], -center[1], -center[2]])
+		var scale = this.modelDiameter / length3D(getSubtraction3D(meshBoundingBox[1], meshBoundingBox[0]))
+		var center = multiply3DScalar(getAddition3D(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
+		var meshCenterMatrix = getMatrix3DByTranslate([-center[0], -center[1], -center[2]])
 		// using 2.0 + Math.PI to get average of edge and center movement
 		var scaleMatrix = getMatrix3DByScale3D([scale, -scale, scale])
+		this.view.meshBoundingBox = meshBoundingBox
 		this.view.rotationMatrix = getUnitMatrix3D()
 		this.view.scaleCenterMatrix = getMultiplied3DMatrix(scaleMatrix, meshCenterMatrix)
 		this.view.lastRotationMatrix = this.view.rotationMatrix
 	},
 	start: function(height) {
 		this.canvas.height = height
-		this.canvas.width = height - this.doubleTextSpace - this.doubleTextSpace
+		this.canvas.width = height - 4.5 * this.doubleTextSpace
 		var isDisabled = (this.views.length == 0)
 		document.getElementById(this.canvasID).hidden = isDisabled
 		document.getElementById('typeSelectID').disabled = isDisabled
@@ -385,7 +402,8 @@ var meshViewer = {
 		this.modelRadiusRing = 0.5 * this.canvas.width
 		this.modelRadiusCircle = this.modelRadiusRing - this.textSpace
 		this.modelDiameter = this.modelRadiusCircle + this.modelRadiusCircle - 0.5 * this.textSpace
-		this.canvasCenterMatrix = getMatrix3DByTranslate3D(this.canvasCenter)
+		this.heightMinusRadius = this.halfHeight - this.modelRadiusRing
+		this.canvasCenterMatrix = getMatrix3DByTranslate(this.canvasCenter)
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var selectedIndex = 0
 		setTypeSelect(this.typeSelectedIndex, this.types)
