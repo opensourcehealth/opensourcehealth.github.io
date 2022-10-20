@@ -57,12 +57,14 @@
 <h3>STL Input</h3>
 <textarea id="stlInputID" rows="4" cols="120"></textarea><br>
 <br>
+<script src="arraymath.js"></script>
 <script src="maparray.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
 <script src="filesaver.js"></script>
+<script src="function.js"></script>
 <script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
@@ -71,24 +73,21 @@
 <script src="meta.js"></script>
 <script src="parsenumber.js"></script>
 <script src="parseword.js"></script>
+<script src="pixel.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
 <script src="statement.js"></script>
 <script src="viewer.js"></script>
+<script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
-//subtraction xyz
 //change exterior to voxel and pixel
-//layers=[{transform, [polygon]}], closed, plane
-//test basis, transform in pillar
 //verticalHole should be widdershins, all widdershins should be reversed when making a mesh when on outside
-//analyze volume and surface area
 //view transform3D
 //hidden lines
 //sculpture mosaics=[{transform,[surfacets]}], closed surfacet={indegons, bottom, top} indegon can be indexed x,y,z;index,id,polygonIndex
 //slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
-//test transform3D
 //combination id=a+b-c#d!#e*f/g ** h on vertex
 //add circles and rect to bounding box
 //check backslash quote in quoteSeparated
@@ -97,7 +96,6 @@
 //set descendants depth with statement
 //extrusion sort closest before splicing if they are both on same edge arrowindexsetmap only needed with thin shapes
 //transform3D extrusionPath(heights, polyline, polygon, polyplane)
-//maybe outputTriangleMesh stl=id, nextID..
 //mirror line y and vector, polyrect
 //setLocal, setGlobal, if switch case else, for
 //outset, shell, tile, venturi, helix, unlimited, terrain, road
@@ -125,25 +123,25 @@ wordArea.onkeydown = areaKeyDown
 wordArea.oninput = areaInput
 */
 
-function addToMeshArea(id, meshString) {
-	if (meshString == null) {
+function addOutputArea(text, title) {
+	if (getIsEmpty(text)) {
 		return
 	}
-	var textAreaID = 'stl_output_' + id
+	var textAreaID = 'output_area_' + title
 	var textArea = document.getElementById(textAreaID)
 	if (textArea == null) {
 		var heading = document.createElement('H3')
-		heading.appendChild(document.createTextNode('STL Output - ' + id))
+		heading.appendChild(document.createTextNode('Output - ' + title))
 		document.body.appendChild(heading)
 		textArea = document.createElement('textarea')
 		textArea.cols = 120
 		textArea.id = textAreaID
 		textArea.rows = 4
-		textArea.value = meshString
+		textArea.value = text
 		document.body.appendChild(textArea)	
 	}
 	else {
-		textArea.value = meshString
+		textArea.value = text
 	}
 }
 
@@ -174,9 +172,9 @@ function updateSVGArea(lines) {
 	if (boundingBox != null) {
 		height += boundingBox[1][1]
 		width += boundingBox[1][0] + lineThickness
+		height = Math.max(height, 300)
+		width = Math.max(width, 300)
 	}
-	height = Math.max(height, 300)
-	width = Math.max(width, 300)
 	if (!svgStatement.attributeMap.has('height')) {
 		svgStatement.attributeMap.set('height', height.toFixed())
 	}
