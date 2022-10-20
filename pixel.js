@@ -134,8 +134,8 @@ function createPixelTips(pixelMap) {
 		pixel = entry[1]
 		for (rotationIndex = 0; rotationIndex < 4; rotationIndex++) {
 			direction = gXYDirections[rotationIndex]
-			if (!pixelMap.has(get2DAddition(root, direction).join(','))) {
-				pixel[rotationIndex] = get2DAddition(root, get2DMultiplication(distance, direction))
+			if (!pixelMap.has(getAddition2D(root, direction).join(','))) {
+				pixel[rotationIndex] = getAddition2D(root, getMultiplication2D(distance, direction))
 			}
 		}
 	}
