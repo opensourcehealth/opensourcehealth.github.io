@@ -3,6 +3,7 @@
 const gBracketSpaceSet = new Set(['(', ')', ' '])
 const gClose = 0.0000001
 const gCloseSquared = gClose * gClose
+const gDegreesPerRadian = 180.0 / Math.PI
 const gDoublePi = Math.PI + Math.PI
 const gHashMultiplier = 1.0 / 65537
 const gHashRemainderMultiplier = (1.0 - (65536.0 * gHashMultiplier)) / 65536.0
@@ -44,6 +45,35 @@ function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists,
 }
 
 function get3DMatrices(registry, statement, tag) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	var attributeMap = statement.attributeMap
+	var matrices = null
+	if (attributeMap.has('heights')) {
+		var heights = getFloatsUpdateByStatementValue(registry, statement, attributeMap.get('heights'))[0]
+		if (!getIsEmpty(heights)) {
+			var matrices = new Array(heights.length)
+			for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
+				matrices[heightIndex] = getUnitMatrix3D()
+				matrices[heightIndex][14] = heights[heightIndex]
+			}
+			statement.attributeMap.set('heights', heights.toString())
+		}
+	}
+	if (!attributeMap.has('transforms')) {
+		return matrices
+	}
+	var separatedWords = getBracketSeparatedWords(attributeMap.get('transforms'))
+	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
+		matrices = get3DMatricesByEntry(matrices, registry, separatedWords, statement, wordIndex)
+	}
+	attributeMap.set('transforms', separatedWords.join(' '))
+	return matrices
+}
+
+function get3DMatricesAndZeroHeight(registry, statement, tag) {
 //	0 4 8  12
 //	1 5 9  13
 //	2 6 10 14
@@ -102,7 +132,7 @@ function get3DMatricesByEntry(matrices, registry, separatedWords, statement, wor
 	}
 	if (g3DMatricesMap.has(transformType)) {
 		var points = getPointsByValue(registry, statement, entry[1])
-		separatedWords[wordIndex] = transformType + '(' + getFloatListsString(points) + ')'
+		separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
 		return g3DMatricesMap.get(transformType)(points)
 	}
 	return matrices
@@ -132,7 +162,7 @@ function get3DMatrix(registry, statement) {
 			}
 			if (g3DPointTransformMap.has(transformType)) {
 				var points = get3DPoints(registry, statement, entry[1])
-				separatedWords[wordIndex] = transformType + '(' + getFloatListsString(points) + ')'
+				separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
 				var bracketMatrix = g3DPointTransformMap.get(transformType)(points)
 				if (matrix == null) {
 					matrix = bracketMatrix
@@ -145,6 +175,36 @@ function get3DMatrix(registry, statement) {
 	}
 	attributeMap.set('transform3D', separatedWords.join(' '))
 	return matrix
+}
+
+function get3DPointByStatement(key, registry, statement) {
+	if (!statement.attributeMap.has(key)) {
+		return undefined
+	}
+	var value = statement.attributeMap.get(key)
+	if (value.length == 0) {
+		return undefined
+	}
+	var update = false
+	if (gXYZMap.has(value[0])) {
+		value = gXYZMap.get(value[0])
+		update = true
+	}
+	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
+	var floats = floatsUpdate[0]
+	var pointString = floats.toString()
+	if (update || floatsUpdate[1]) {
+		statement.attributeMap.set(key, pointString)
+	}
+	if (pointString.length == 0) {
+		return undefined
+	}
+	var originalLength = floats.length
+	for (var arrayIndex = originalLength; arrayIndex < 3; arrayIndex++) {
+		floats.push(0.0)
+		statement.attributeMap.set(key, floats.toString())
+	}
+	return floats
 }
 
 function get3DPoints(registry, statement, value) {
@@ -316,7 +376,7 @@ function getChainSkipMatrix3D(registry, statement) {
 				return transformedMatrix
 			}
 		}
-		var skip3D = statement.tag == 'abstract' || statement.tag == 'window'
+		var skip3D = false
 		if (statement.attributeMap.has('skip3D')) {
 			skip3D = getBooleanByStatementValue('skip3D', registry, statement, statement.attributeMap.get('skip3D'))
 		}
@@ -402,7 +462,7 @@ function getFloatListsByStatement(key, registry, statement) {
 	if (statement.attributeMap.has(key)) {
 		var floatListsUpdate = getFloatListsUpdateByStatementValue(registry, false, statement, statement.attributeMap.get(key))
 		if (floatListsUpdate[1]) {
-			statement.attributeMap.set(key, getFloatListsString(floatListsUpdate[0]))
+			statement.attributeMap.set(key, floatListsUpdate[0].join(' '))
 		}
 		return floatListsUpdate[0]
 	}
@@ -438,6 +498,7 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 	var variableMap = getVariableMapByStatement(statement.parent)
 	var update = false
 	variableMap.set('_points', points)
+	variableMap.set('_values', values)
 	for (var floatListIndex = 0; floatListIndex < values.length; floatListIndex++) {
 		var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, values[floatListIndex])
 		var floats = floatsUpdate[0]
@@ -473,14 +534,6 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 	return [points, update]
 }
 
-function getFloatListsString(floatLists) {
-	var floatStrings = new Array(floatLists.length)
-	for (var floatStringIndex = 0; floatStringIndex < floatStrings.length; floatStringIndex++) {
-		floatStrings[floatStringIndex] = floatLists[floatStringIndex].toString()
-	}
-	return floatStrings.join(' ')
-}
-
 function getFloatsByDefault(defaultValue, key, registry, statement, tag) {
 	var value = getValueByKeyDefault(defaultValue, key, registry, statement, tag)
 	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
@@ -502,7 +555,7 @@ function getFloatsByStatement(key, registry, statement) {
 }
 
 function getFloatsUpdateByStatementValue(registry, statement, value) {
-	if (value.length == 0) {
+	if (getIsEmpty(value)) {
 		return [undefined, false]
 	}
 	if (value.indexOf('(') != -1) {
@@ -512,23 +565,35 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 		}
 		return [[value], true]
 	}
-	var floats = value.split(',')
+	var floats = []
+	var floatWords = value.split(',')
 	var update = false
-	for (var floatIndex = 0; floatIndex < floats.length; floatIndex++) {
-		var float = floats[floatIndex]
-		if (float.length == 0) {
-			float = undefined
+	for (var floatWord of floatWords) {
+		if (floatWord.length == 0) {
+			floats.push(undefined)
 		}
 		else {
-			if (isNaN(float)) {
-				float = getValueByEquation(registry, statement, float)
+			if (isNaN(floatWord)) {
+				var equationValue = getValueByEquation(registry, statement, floatWord)
+				if (getIsEmpty(equationValue)) {
+					var noticeDescription = 'No equationValue could be found for getFloatsUpdateByStatementValue in parsenumber.'
+					noticeByList([noticeDescription, floatWord, value, statement])
+					floats.push(undefined)
+				}
+				else {
+					if (Array.isArray(equationValue)) {
+						pushArray(floats, equationValue)
+					}
+					else {
+						floats.push(equationValue)
+					}
+				}
 				update = true
 			}
 			else {
-				float = parseFloat(float)
+				floats.push(parseFloat(floatWord))
 			}
 		}
-		floats[floatIndex] = float
 	}
 	return [floats, update]
 }
@@ -700,9 +765,8 @@ function getPointByDefault(defaultValue, key, registry, statement, tag) {
 }
 
 function getPointsByDefault(defaultValue, key, registry, statement, tag) {
-	var floatListsString = getFloatListsString(defaultValue)
-	var points = getPointsByValue(registry, statement, getValueByKeyDefault(floatListsString, key, registry, statement, tag))
-	statement.attributeMap.set(key, getFloatListsString(points))
+	var points = getPointsByValue(registry, statement, getValueByKeyDefault(defaultValue.join(' '), key, registry, statement, tag))
+	statement.attributeMap.set(key, points.join(' '))
 	return points
 }
 
@@ -757,21 +821,28 @@ function getRotatedLow24Bit(a, rotation)
 
 function getString(value) {
 	if (Array.isArray(value)) {
-		if (value.length > 0) {
-			if (Array.isArray(value[0])) {
-				return getFloatListsString(value)
-			}
-		}
+		return getStringByArray(0, value)
 	}
 	return value.toString()
 }
 
-//deprecated25 because function get(value=0) should work on all browsers by then
-function getValueByDefault(defaultValue, value) {
-	if (value == undefined) {
-		return defaultValue
+function getStringByArray(depth, elements) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in getStringByArray in parsenumber reached, no further arrays will be added.'
+		warningByList([warningText, elements, gRecursionLimit])
+		return
 	}
-	return value
+	depth += 1
+	var betweens = []
+	for (var element of elements) {
+		if (Array.isArray(element)) {
+			betweens.push(getStringByArray(depth, element))
+		}
+		else {
+			betweens.push(element.toString())
+		}
+	}
+	return '[' + betweens.join(',') + ']'
 }
 
 function getVariableMapByStatement(statement) {
@@ -794,6 +865,13 @@ function getVariableValue(key, statement) {
 		}
 	}
 	return undefined
+}
+
+function roundFloats(floats, places) {
+	for (var floatIndex = 0; floatIndex < floats; floatIndex++) {
+		floats[floatIndex] = parseFloat(parameter.toFixed(places))
+	}
+	return floats
 }
 
 function setPointsHD(points, statement) {
