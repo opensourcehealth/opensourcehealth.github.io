@@ -147,8 +147,8 @@ function getArrayArraysCopy(arrayArrays) {
 
 function getArrayByElements(elements, until, value) {
 	value = getValueByDefault(0.0, value)
-	until = getValueByDefault(elements.length, until)
 	elements = getArrayByValue(elements)
+	until = getValueByDefault(elements.length, until)
 	if (elements.length < until) {
 		elements.length = until
 	}
@@ -255,9 +255,6 @@ function getPushArray(elements, others) {
 	if (elements == null) {
 		return others
 	}
-	if (others == null) {
-		return elements
-	}
 	return pushArray(elements, others)
 }
 
@@ -283,6 +280,16 @@ function getShortArrays(length, points) {
 		shortArrays[pointIndex] = points[pointIndex].slice(0, length)
 	}
 	return shortArrays
+}
+
+function getStartIndex(elements) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		var nextIndex = (elementIndex + 1) % elements.length
+		if (elements[elementIndex] == null && elements[nextIndex] != null) {
+			return nextIndex
+		}
+	}
+	return null
 }
 
 function getValueByDefault(defaultValue, value) {
@@ -316,6 +323,9 @@ function overwriteArrayUntil(elements, sources, until) {
 }
 
 function pushArray(elements, others) {
+	if (others == null || others == undefined) {
+		return elements
+	}
 	var elementsLength = elements.length
 	var othersLength = others.length
 	elements.length = elementsLength + othersLength
@@ -375,7 +385,7 @@ function replaceElements(elements, find, replacement) {
 	}
 }
 
-function reverseArray(elements) {
+function reverseArrays(elements) {
 	for (var element of elements) {
 		element.reverse()
 	}
