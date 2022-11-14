@@ -640,22 +640,15 @@ var gRectangle = {
 			noticeByList(['No points could be found for rectangle in generator2d.', statement])
 			return
 		}
-		if (!getBooleanByDefault(true, 'clockwise', registry, statement, this.name)) {
-			points.reverse()
-		}
 		setPointsExcept(points, registry, statement)
 	}
 }
 
-var gRegulon = {
+var gRegularPolygon = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
-
-		//deprecated23
-		gTagCenterMap.set('regularPolygon', this)
-
 	},
-	name: 'regulon',
+	name: 'regularPolygon',
 	processStatement: function(registry, statement) {
 		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
 		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
@@ -762,4 +755,4 @@ var gVerticalHole = {
 }
 
 var gGenerator2DProcessors = [
-gCircle, gGrid, gImage, gLettering, gList, gOutline, gPolygon, gPolyline, gRectangle, gRegulon, gScreen, gText, gVerticalHole]
+gCircle, gGrid, gImage, gLettering, gList, gOutline, gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
