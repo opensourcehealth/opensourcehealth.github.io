@@ -331,7 +331,7 @@ var meshViewer = {
 		}
 		if (this.isRing) {
 			var mouseMoveNormal = this.getOffsetNormal(event)
-			var rotationXY = get2DRotation(mouseMoveNormal, this.mouseDownNegative)
+			var rotationXY = getRotation2DVector(mouseMoveNormal, this.mouseDownNegative)
 			this.view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(rotationXY), this.view.lastRotationMatrix)
 			this.draw()
 		}
