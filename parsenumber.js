@@ -18,9 +18,31 @@ const gRadiansPerDegree = Math.PI / 180.0
 const gRecursionLimit = 1000
 const gXYZMap = new Map([['x', '1,0,0'], ['y', '0,1,0'], ['z', '0,0,1']])
 
+function addMatrices3DByWord(matrices3D, registry, statement, word) {
+	var entry = getBracketedEntry(word)
+	if (entry == null) {
+		return
+	}
+	var transformType = entry[0]
+	if (g2DTransformMap.has(transformType)) {
+		var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
+		matrices3D.push(getMatrix3DBy2D(g2DTransformMap.get(transformType)(floats)))
+		return
+	}
+	if (g3DTransformMap.has(transformType)) {
+		var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
+		matrices3D.push(g3DTransformMap.get(transformType)(floats))
+		return
+	}
+	if (g3DMatricesMap.has(transformType)) {
+		var points = getPointsByValue(registry, statement, entry[1])
+		pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
+	}
+}
+
 function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists, registry, statement, tag) {
 	if (depth > gRecursionLimit) {
-		var warningText = 'Recursion limit of 100 in addToPointLists reached, no further pointLists will be added.'
+		var warningText = 'Recursion limit of 100 in addToChainPointListsHDByDepth reached, no further pointLists will be added.'
 		var warningVariables = [gRecursionLimit, statement].concat(pointLists.slice(0, 10))
 		warning(warningText, warningVariables)
 		return
@@ -44,98 +66,30 @@ function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists,
 	}
 }
 
-function get3DMatrices(registry, statement, tag) {
-//	0 4 8  12
-//	1 5 9  13
-//	2 6 10 14
-//	3 7 11 15
-	var attributeMap = statement.attributeMap
-	var matrices = null
-	if (attributeMap.has('heights')) {
-		var heights = getFloatsUpdateByStatementValue(registry, statement, attributeMap.get('heights'))[0]
-		if (!getIsEmpty(heights)) {
-			var matrices = new Array(heights.length)
-			for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
-				matrices[heightIndex] = getUnitMatrix3D()
-				matrices[heightIndex][14] = heights[heightIndex]
+function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagStatements, registry, statement, tag) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1000 in addToTagStatementsRecursivelyByDepth reached, no further tagStatements will be added.'
+		var warningVariables = [gRecursionLimit, statement].concat(tagStatements.slice(0, 10))
+		warning(warningText, warningVariables)
+		return
+	}
+	if (statement.attributeMap != null && statement.tag == tag) {
+		var points = getPointsHD(registry, statement)
+		if (getIsLong(points, minimumLength)) {
+			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
+			if (chainMatrix2D != null) {
+				transform2DPoints(chainMatrix2D, points)
 			}
-			statement.attributeMap.set('heights', heights.toString())
+			tagStatements.push({points:points, statement:statement})
 		}
 	}
-	if (!attributeMap.has('transforms')) {
-		return matrices
+	if (statement.children == null) {
+		return
 	}
-	var separatedWords = getBracketSeparatedWords(attributeMap.get('transforms'))
-	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
-		matrices = get3DMatricesByEntry(matrices, registry, separatedWords, statement, wordIndex)
+	depth += 1
+	for (var child of statement.children) {
+		addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagStatements, registry, child, tag)
 	}
-	attributeMap.set('transforms', separatedWords.join(' '))
-	return matrices
-}
-
-function get3DMatricesAndZeroHeight(registry, statement, tag) {
-//	0 4 8  12
-//	1 5 9  13
-//	2 6 10 14
-//	3 7 11 15
-	var attributeMap = statement.attributeMap
-	var matrices = null
-	if (attributeMap.has('heights')) {
-		var heights = getHeights(registry, statement, tag)
-		var matrices = new Array(heights.length)
-		for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
-			matrices[heightIndex] = getUnitMatrix3D()
-			matrices[heightIndex][14] = heights[heightIndex]
-		}
-	}
-	if (!attributeMap.has('transforms')) {
-		return matrices
-	}
-	var separatedWords = getBracketSeparatedWords(attributeMap.get('transforms'))
-	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
-		matrices = get3DMatricesByEntry(matrices, registry, separatedWords, statement, wordIndex)
-	}
-	attributeMap.set('transforms', separatedWords.join(' '))
-	return matrices
-}
-
-function get3DMatricesByEntry(matrices, registry, separatedWords, statement, wordIndex) {
-	var entry = getBracketedEntry(separatedWords[wordIndex])
-	if (entry == null) {
-		return matrices
-	}
-	var transformType = entry[0]
-	if (g2DTransformMap.has(transformType)) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var index = 0; index < matrices.length; index++) {
-			variableMap.set('index', index.toString())
-			var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-			if (index == 1) {
-				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
-			}
-			var bracketMatrix = getMatrix3DBy2D(g2DTransformMap.get(transformType)(floats))
-			matrices[index] = getMultiplied3DMatrix(bracketMatrix, matrices[index])
-		}
-		return matrices
-	}
-	if (g3DTransformMap.has(transformType)) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var index = 0; index < matrices.length; index++) {
-			variableMap.set('index', index.toString())
-			var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-			if (index == 1) {
-				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
-			}
-			var bracketMatrix = g3DTransformMap.get(transformType)(floats)
-			matrices[index] = getMultiplied3DMatrix(bracketMatrix, matrices[index])
-		}
-	}
-	if (g3DMatricesMap.has(transformType)) {
-		var points = getPointsByValue(registry, statement, entry[1])
-		separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
-		return g3DMatricesMap.get(transformType)(points)
-	}
-	return matrices
 }
 
 function get3DMatrix(registry, statement) {
@@ -256,7 +210,7 @@ function getBooleanByStatement(key, registry, statement) {
 	if (statement.attributeMap.has(key)) {
 		return getBooleanByStatementValue(key, registry, statement, statement.attributeMap.get(key))
 	}
-	return null
+	return undefined
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
@@ -694,6 +648,64 @@ function getIntsUpdateByStatementValue(registry, statement, value) {
 	return [ints, update]
 }
 
+function getMatrices3D(registry, statement, tag) {
+	if (statement.attributeMap.has('heights')) {
+		var heights = getFloatsUpdateByStatementValue(registry, statement, statement.attributeMap.get('heights'))[0]
+		if (!getIsEmpty(heights)) {
+			return getMatrices3DByHeights(heights, registry, statement)
+		}
+	}
+	return getMatrices3DByHeights([], registry, statement)
+}
+
+function getMatrices3DAndZeroHeight(registry, statement, tag) {
+	if (statement.attributeMap.has('heights')) {
+		var heights = getHeights(registry, statement, tag)
+		if (!getIsEmpty(heights)) {
+			return getMatrices3DByHeights(heights, registry, statement)
+		}
+	}
+	return getMatrices3DByHeights([], registry, statement)
+}
+
+function getMatrices3DByHeights(heights, registry, statement) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	var attributeMap = statement.attributeMap
+	var matrices3D = new Array(heights.length)
+	for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
+		matrices3D[heightIndex] = getUnitMatrix3D()
+		matrices3D[heightIndex][14] = heights[heightIndex]
+	}
+	statement.attributeMap.set('heights', heights.toString())
+	if (!attributeMap.has('transforms')) {
+		return matrices3D
+	}
+	var transformMatrices3D = getMatrices3DByValue(registry, statement, attributeMap.get('transforms'))
+	matrices3D.length = Math.max(matrices3D.length, transformMatrices3D.length)
+	for (var matrix3DIndex = 0; matrix3DIndex < matrices3D.length; matrix3DIndex++) {
+		if (matrices3D[matrix3DIndex] == undefined) {
+			matrices3D[matrix3DIndex] = transformMatrices3D[matrix3DIndex]
+		}
+		else {
+			matrices3D[matrix3DIndex] = getMultiplied3DMatrix(matrices3D[matrix3DIndex], transformMatrices3D[matrix3DIndex])
+		}
+	}
+	attributeMap.set('transforms', matrices3D.join(' '))
+	return matrices3D
+}
+
+function getMatrices3DByValue(registry, statement, value) {
+	var matrices3D = []
+	var separatedWords = getBracketSeparatedWords(value)
+	for (var separatedWord of separatedWords) {
+		addMatrices3DByWord(matrices3D, registry, statement, separatedWord)
+	}
+	return matrices3D
+}
+
 function getMatrix2D(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('transform')) {
@@ -807,6 +819,12 @@ function getPointsHD(registry, statement) {
 
 function getPolygonsHDRecursively(registry, statement) {
 	return getChainPointListsHDRecursively(statement, 3, registry, statement, 'polygon')
+}
+
+function getPolygonStatementsRecursively(registry, statement) {
+	var polygonStatements = []
+	addToTagStatementsRecursivelyByDepth(statement, 0, 3, polygonStatements, registry, statement, 'polygon')
+	return polygonStatements
 }
 
 function getRotated32Bit(a, rotation)
