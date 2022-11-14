@@ -39,6 +39,12 @@ function addArrayArraysByY(arrays, y) {
 	return arrays
 }
 
+function addArrays(elements, point, until) {
+	for (var element of elements) {
+		addArray(element, point, until)
+	}
+	return elements
+}
 
 function addArraysByIndex(arrays, addition, index) {
 	for (var array of arrays) {
@@ -79,15 +85,6 @@ function addPointToMatrix3D(matrix, point) {
 	return matrix
 }
 
-function getArrayDistanceSquared(arrayA, arrayB) {
-	var distanceSquared = 0.0
-	for (var arrayIndex = 0; arrayIndex < arrayA.length; arrayIndex++) {
-		var delta = arrayA[arrayIndex] - arrayB[arrayIndex]
-		distanceSquared += delta * delta
-	}
-	return distanceSquared
-}
-
 function get2DByMatrix3D(point, matrix) {
 //	0 4 8  12
 //	1 5 9  13
@@ -98,19 +95,15 @@ function get2DByMatrix3D(point, matrix) {
 	return [x, y]
 }
 
-function get2DByPortion(portionA, xyA, xyB) {
+function get2DByPortion(portionA, a2D, b2D) {
 	var portionB = 1.0 - portionA
-	return [portionA * xyA[0] + portionB * xyB[0], portionA * xyA[1] + portionB * xyB[1]]
-}
-
-function get2DRotation(xy, xyRotator) {
-	return [xy[0] * xyRotator[0] - xy[1] * xyRotator[1], xy[0] * xyRotator[1] + xy[1] * xyRotator[0]]
+	return [portionA * a2D[0] + portionB * b2D[0], portionA * a2D[1] + portionB * b2D[1]]
 }
 
 function get2DRotations(xys, xyRotator) {
 	var xyRotations = new Array(xys.length)
 	for (var xyIndex = 0; xyIndex < xys.length; xyIndex++) {
-		xyRotations[xyIndex] = get2DRotation(xys[xyIndex], xyRotator)
+		xyRotations[xyIndex] = getRotation2DVector(xys[xyIndex], xyRotator)
 	}
 	return xyRotations
 }
@@ -155,12 +148,12 @@ function getBrightness256(brightness) {
 }
 
 //use getRelativeDirection for ordering because getDirectionalProximity loses accuracy close to the x axis
-function getDirectionalProximity(xyA, xyB) {
-	var dotProduct = dotProduct2D(xyA, xyB)
-	if (xyA[0] * xyB[1] <= xyA[1] * xyB[0]) {
+function getDirectionalProximity(a2D, b2D) {
+	var dotProduct = dotProduct2D(a2D, b2D)
+	if (a2D[0] * b2D[1] <= a2D[1] * b2D[0]) {
 		return dotProduct
 	}
-	return - 3.0 - dotProduct
+	return -3.0 - dotProduct
 }
 
 function getFloats(floats) {
@@ -906,6 +899,18 @@ function getMatrix3DRotatedBy2D(xyRotator) {
 	return latestMatrix
 }
 
+function getMidpoint2D(a2D, b2D) {
+	return multiply2DScalar(getAddition2D(a2D, b2D), 0.5)
+}
+
+function getMidpoint3D(a3D, b3D) {
+	return multiply3DScalar(getAddition3D(a3D, b3D), 0.5)
+}
+
+function getMidpointArray(elements, others, until) {
+	return multiplyArrayScalar(getAdditionArray(elements, others, until), 0.5)
+}
+
 function getMultiplied2DMatrix(matrixA, matrixB) {
 //	a c e		0 2 4
 //	b d f		1 3 5
@@ -968,12 +973,17 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 	return rowStrings.join('\n')
 }
 
-function getNormalizedBisector(a2D, b2D) {
-	var bisector = getAddition2D(a2D, b2D)
-	if (bisector[0] == 0.0 && bisector[1] == 0.0) {
-		bisector = [a2D[1], -a2D[0]]
+function getNormalizedBisector(centerBegin2D, centerEnd2D) {
+	var bisector = getAddition2D(centerBegin2D, centerEnd2D)
+	var bisectorLength = length2D(bisector)
+	if (bisectorLength == 0.0) {
+		return [centerEnd2D[1], -centerEnd2D[0]]
 	}
-	return divide2DScalar(bisector, length2D(bisector))
+	return divide2DScalar(bisector, bisectorLength)
+}
+
+function getNormalizedBisectorByBeginCenterEnd(beginPoint, centerPoint, endPoint) {
+	return getNormalizedBisector(getSubtraction2D(beginPoint, centerPoint), getSubtraction2D(endPoint, centerPoint))
 }
 
 function getPositiveModulo(x) {
@@ -1038,8 +1048,8 @@ function getUnitMatrix3D() {
 	return [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 }
 
-function getUnitMidpoint3D(a, b) {
-	return normalize3D(multiply3DScalar(getAddition3D(a, b), 0.5))
+function getUnitMidpoint3D(a3D, b3D) {
+	return normalize3D(getMidpoint3D(a3D, b3D))
 }
 
 function invert3D(xyz) {
@@ -1067,9 +1077,9 @@ function isUnitMatrix3D(matrix3D) {
 	return arrayIsClose(matrix3D, gUnitMatrix3D)
 }
 
-function multiply2DArrays(xyArrays, xyB) {
+function multiply2DArrays(xyArrays, b2D) {
 	for (var xys of xyArrays) {
-		multiply2Ds(xys, xyB)
+		multiply2Ds(xys, b2D)
 	}
 	return xyArrays
 }
@@ -1081,9 +1091,9 @@ function multiply2DArraysByScalar(xyArrays, multiplier) {
 	return xyArrays
 }
 
-function multiply2Ds(xys, xyB) {
+function multiply2Ds(xys, b2D) {
 	for (var xy of xys) {
-		multiply2D(xy, xyB)
+		multiply2D(xy, b2D)
 	}
 	return xys
 }
@@ -1140,13 +1150,6 @@ function normalize3D(xyz) {
 		divide3DScalar(xyz, xyzLength)
 	}
 	return xyz
-}
-
-function rotate2D(point, rotator) {
-	var x = point[0] * rotator[0] - point[1] * rotator[1]
-	point[1] = point[0] * rotator[1] + point[1] * rotator[0]
-	point[0] = x
-	return point
 }
 
 function rotate3DByBasis(rotationBasis, xyz, xyRotator) {
@@ -1231,3 +1234,183 @@ var g3DTransformMap = new Map([
 	['translateZ', getMatrix3DByTranslateZ]])
 var gUnitMatrix2D = getUnitMatrix2D()
 var gUnitMatrix3D = getUnitMatrix3D()
+
+
+
+
+
+/*
+abstract date=22.07.14 flipY=3 project=Antenna skip2D=true{
+default id=_default fillet=sides:12
+
+var antennaHeight=19 back=208 clipHalfWidth=21/2 crossHeight=50 crossHalfwidth=95 directorSpacing=136.3 gap=0.7 holeRadius=1.5 inset=4 ridgeWidth=4 sideThickness=4 slotHeight=4 slotInset=1 smoothLength=14 springThickness=2 stemHalfwidth=22 stopperBack=12 stopperBackInset=10 toothPeakAlong=0.4 top=15 wedgeHalfWidth=7
+
+var clipBack=136+stopperBack clipFront=68+stopperBack crossFront=back-crossHeight filletRadius=1.5*inset floor1=top/3 halfInset=inset/2 halfSpringThickness=springThickness/2 holeRadiusGap=holeRadius+gap quarterInset=inset/4 slotPeak=slotHeight+2 springBaseThickness=1.4*springThickness stopperTop=top+top toothOuter=(1.0-toothPeakAlong)*smoothLength
+
+var centerStopperFront=149+halfInset centerRidgeBack=back-halfInset-1 centerRidgeFront=crossFront+halfInset+1 floor2=top-halfInset forkThickness=slotPeak+sideThickness holeRadiusPlus=holeRadiusGap+sideThickness rightHeight=crossHeight+sideThickness slotRight=crossHalfwidth-2*slotInset-filletRadius smoothInner=stemHalfwidth+filletRadius+1 springBetweenThickness=(springThickness+springBaseThickness)/2 toothHeight=toothPeakAlong*halfInset
+
+var centerRidgeBackBend=centerRidgeBack-2 centerRidgeFrontBend=centerRidgeFront+2*slotInset centerRidgeRight=slotRight-gap-slotInset forkToothThickness=forkThickness+gap rightHeightMinus=rightHeight-halfInset smoothSlotInner=smoothInner+2 toothBottom=toothOuter+sideThickness toothTop=rightHeight-toothOuter topRidgeFront=rightHeight-halfInset-1
+
+var centerRidgeLeft=centerRidgeRight-ridgeWidth forkTop=2*forkToothThickness+top rightStart=smoothSlotInner+gap smoothSlotOuter=smoothSlotInner+12
+
+var holeX=directorSpacing-rightStart holeY=forkTop/2+top/2+antennaHeight/2 slotLeft=centerRidgeLeft-gap-slotInset
+
+var antennaRightBack=holeY+holeRadiusPlus barRight=slotLeft-filletRadius-slotInset-rightStart smoothOuter=slotLeft-3 squareRight=crossHalfwidth+gap/4-rightStart squareTop=forkTop-forkThickness toothRight=smoothSlotOuter-gap-rightStart
+
+var antennaRightWidth=holeX+holeRadius+sideThickness barLeft=barRight-sideThickness riseBegin=slotRight+slotInset-rightStart riseEnd=squareRight+1
+
+var springBetweenX=0.75*barLeft
+
+window transform3D=basis(x y) id=topView transform=translate(border(),-border()-topByID()){
+
+sculpture alterations=bevel,view bevels=inset id=antennaCenter stratas=-1,1 {
+mirrorJoin alterations=fillet id=centerPolygon radius=filletRadius points=,back smoothInner, smoothOuter, crossHalfwidth, ,crossFront smoothOuter, smoothInner, stemHalfwidth, ,stopperBack ,0 -stemHalfwidth,
+layer heights=0,floor1 id=centerBase {
+copy work=centerPolygon
+}
+layer heights=floor2,top {
+copy work=centerPolygon
+mirrorJoin points=-clipHalfWidth-slotInset,clipFront-10 clipHalfWidth+slotInset, ,clipBack+slotInset+halfInset
+}
+layer heights=stopperTop-halfInset,stopperTop {
+mirrorJoin alterations=fillet radius=filletRadius points=-stemHalfwidth, ,stopperBack*0.7 stopperBackInset-stemHalfwidth,stopperBack stemHalfwidth-stopperBackInset,
+}
+}
+bevel bevels=halfInset stratas=top-1,top+1 work=antennaCenter {
+rectangle points=-crossHalfwidth-1,stopperBack+1 crossHalfwidth+2,back+2
+}
+bevel bevels=halfInset stratas=stopperTop-1,stopperTop+1 work=antennaCenter {
+rectangle points=-stemHalfwidth-1,-1 stemHalfwidth+1,stopperBack+1
+}
+
+pillar heights=0,slotHeight/2,slotHeight id=centerRidge {
+mirrorJoin points=centerRidgeLeft+quarterInset,centerRidgeFront centerRidgeLeft,centerRidgeFrontBend ,centerRidgeBackBend centerRidgeLeft+quarterInset,centerRidgeBack centerRidgeRight-quarterInset,
+}
+bend amplitudes=0,slotHeight stratas=slotHeight-1,slotHeight+1 work=centerRidge {
+rectangle points=slotLeft,centerRidgeFront-1 slotRight,centerRidgeFrontBend+1
+}
+bend amplitudes=0,-slotHeight stratas=slotHeight-1,slotHeight+1 work=centerRidge {
+rectangle points=slotLeft,centerRidgeBackBend-1 slotRight,centerRidgeBack+1
+}
+
+emboss tools=centerRidge work=antennaCenter {
+matrix2D planes=, -centerRidgeLeft-centerRidgeRight,
+}
+bend amplitudes=0,0,0,-halfInset stratas=-1,floor2-1 work=antennaCenter {
+rectangle id=stemRectangle points=stemHalfwidth-inset-1,-1 stemHalfwidth+1,crossFront+filletRadius
+}
+bend amplitudes=0,0,0,halfInset stratas=-1,floor2-1 work=antennaCenter {
+copy alterations=mirror direction=90 work=stemRectangle
+}
+
+mirrorJoin display=none id=centerSlotPolygon points=slotLeft,-1 ,slotHeight+quarterInset/2 slotLeft+quarterInset,slotPeak slotRight-quarterInset,
+
+polygon id=aroundCorner points=holeX-holeRadiusPlus,antennaRightBack antennaRightWidth, antennaRightWidth,holeY-holeRadiusPlus+2 slotRight+sideThickness-rightStart,0
+
+g transform=translate(rightStart,crossFront) {
+sculpture alterations=view id=antennaRight {
+layer heights=0,sideThickness {
+polygon alterations=fillet points=slotLeft-sideThickness-rightStart,0 barLeft,forkThickness-springBaseThickness springBetweenX,forkThickness-springBetweenThickness 0,forkThickness-springThickness ,forkThickness toothRight, toothRight+sideThickness, barLeft, ,forkTop-forkThickness mirrorJoin() pointsByID(aroundCorner) radius=filletRadius
+rectangle alterations=fillet clockwise=false points=barRight,forkThickness squareRight,forkTop-forkThickness radius=filletRadius
+}
+layer heights=rightHeight {
+polygon alterations=fillet points=slotLeft-sideThickness-rightStart, barLeft,forkThickness-springBaseThickness springBetweenX,forkThickness-springBetweenThickness 0,forkThickness-springThickness ,forkThickness toothRight, toothRight+sideThickness, squareRight, ,squareTop mirrorJoin() pointsByID(aroundCorner) radius=filletRadius
+}
+}
+
+}
+
+rectangle id=backSplitRectangle points=-1,forkTop/2 toothRight+sideThickness/2,forkTop-forkThickness+halfSpringThickness
+split splitHeights=toothBottom,smoothLength+sideThickness,rightHeight-smoothLength,toothTop work=antennaRight {
+copy work=backSplitRectangle
+}
+bend amplitudes=0,0 toothBottom,-gap-toothHeight smoothLength+sideThickness,-gap rightHeight-smoothLength,-gap toothTop,-gap-toothHeight rightHeight,0 splitIDs=backSplit stratas=toothBottom-gap,toothTop+gap vector=z work=antennaRight {
+copy work=backSplitRectangle
+}
+
+rectangle id=frontSplitRectangle points=-1,forkThickness-halfSpringThickness toothRight+sideThickness/2,forkTop/2
+split splitHeights=toothBottom,toothTop work=antennaRight {
+copy work=frontSplitRectangle
+}
+bend amplitudes=0,gap stratas=toothBottom-1,toothTop+1 vector=z work=antennaRight {
+copy work=frontSplitRectangle
+}
+
+difference id=rightSlot splitInsides=halfInset work=antennaRight {
+copy transform=translate(-rightStart,squareTop) work=centerSlotPolygon
+}
+bevel bevels=-1,0 splitIDs=rightSlot work=antennaRight
+
+pillar heights=-slotHeight,-slotHeight/2,0 id=rightRidge {
+mirrorJoin display=none points=centerRidgeLeft-rightStart+quarterInset,topRidgeFront centerRidgeLeft-rightStart,topRidgeFront-halfInset ,0 centerRidgeRight-rightStart,
+}
+bend amplitudes=0,-slotHeight stratas=-slotHeight-1,-slotHeight/2-1 work=rightRidge {
+rectangle points=slotLeft-rightStart,topRidgeFront-halfInset-1 slotRight-rightStart,topRidgeFront+1
+}
+
+bend amplitudes=0,0,-(stopperTop-halfInset-top)/2 stopperBack,0,0 stratas=stopperTop-halfInset-1,stopperTop+1 vector=y work=antennaCenter {
+rectangle points=-stemHalfwidth-1,-1 stemHalfwidth+1,stopperBack+1
+}
+
+}
+
+window transform3D=basis(x z) id=frontView transform=translate(border(),-border()-border()-topByID(topView)-topByID()) {
+
+emboss bottomTools=rightRidge stratas=-forkTop/2,0 work=antennaRight
+
+difference id=centerSlot splitInsides=inset+quarterInset work=antennaCenter {
+copy work=centerSlotPolygon
+matrix2D planes=, -slotLeft-slotRight,
+}
+
+bevel bevels=-1,0 splitIDs=centerSlot work=antennaCenter
+
+}
+
+window transform3D=basis(y z) id=rightView transform=translate(border()+border()+rightByID(topView),-border()-topByID(topView)) scale(1,-1) rotate(-90){
+
+difference work=antennaCenter {
+polygon points=crossFront-20,-2 crossFront-15,3 crossFront-8,3 crossFront-7,2 crossFront-5,-2
+}
+
+split splitHeights=-smoothSlotOuter,-smoothSlotInner,smoothSlotInner,smoothSlotOuter work=antennaCenter {
+rectangle points=crossFront-filletRadius,top-1 back+filletRadius,top+1
+}
+
+split id=closeToSlot splitHeights=riseEnd,riseBegin stratas=-1,toothRight work=antennaRight {
+rectangle display=none points=forkTop-forkThickness-1,rightHeight-1 forkTop-forkThickness,rightHeight+1
+}
+
+}
+
+window transform3D=basis(x y) id=topViewCopy transform=translate(border(),-border()-topByID(topView)) {
+
+bevel bevels=smoothLength-halfInset stratas=top-1,top+1 work=antennaCenter {
+rectangle id=smoothSlope points=smoothInner+1,crossFront-1 smoothSlotOuter+1,back+1
+copy alterations=mirror direction=90 work=smoothSlope
+}
+
+difference id=centerHole splitInsides=halfInset work=antennaCenter {
+regulon cx=0 cy=back-inset-wedgeHalfWidth+quarterInset-inset r=wedgeHalfWidth+slotInset
+polygon points=smoothOuter-1,back-halfInset-1-5 ,crossFront+halfInset+1+5 smoothOuter-9,(crossFront+back)/2
+}
+bevel bevels=-slotInset splitIDs=centerHole work=antennaCenter
+
+bend amplitudes=riseBegin,0,0 riseEnd,0,10 splitIDs=closeToSlot stratas=rightHeight-1,rightHeight+1 work=antennaRight {
+rectangle points=riseBegin,-1 antennaRightWidth+1,antennaRightBack+1
+}
+
+_difference id=hole splitInsides=halfInset work=antennaRight {
+polygon alterations=fillet points=riseEnd+sideThickness,forkTop-2 riseEnd+sideThickness,forkThickness holeX-holeRadiusPlus,holeY-holeRadiusGap-1.5 ,holeY+holeRadiusGap-1.5 radius=filletRadius
+regulon cx=holeX cy=holeY r=holeRadiusGap+slotInset
+}
+bevel bevels=-slotInset splitIDs=hole work=antennaRight
+
+move alterations=stl,polygonAnalysis,triangleAnalysis bedSize=250,210 rotation=90 id=antenna_center work=antennaCenter
+
+copy alterations=mirror,move,stl,view bedSize=180 direction=90 id=antenna_left output=antenna_left work=antennaRight
+
+move alterations=stl bedSize=180 id=antenna_right work=antennaRight
+
+}
+*/
