@@ -1,33 +1,78 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+function addConnectedSegmentsToPolygons(meetingMap, polygon, polygons, toolSegments, workSegments) {
+	var connectedSegmentArrays = getConnectedSegmentArrays(toolSegments, workSegments)
+	convertSegmentArraysToKeyArrays(connectedSegmentArrays)
+	for (var extantPolygon of connectedSegmentArrays) {
+		removeRepeats(extantPolygon)
+		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
+			var nodeStrings = extantPolygon[nodeStringIndex].split(' ')
+			var meetingKey = nodeStrings[1]
+			if (nodeStrings[0] == 'w') {
+				extantPolygon[nodeStringIndex] = polygon[parseInt(meetingKey)]
+			}
+			else {
+				extantPolygon[nodeStringIndex] = meetingMap.get(meetingKey).point
+			}
+		}
+		if (extantPolygon.length > 2) {
+			polygons.push(extantPolygon)
+		}
+	}
+}
+
 function addFilletedPoints(filletedPolygon, minimumAngle, numberOfSides, polygon, radius, vertexIndex) {
+	var beforePoint = polygon[(vertexIndex - 2 + polygon.length) % polygon.length]
 	var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
 	var centerPoint = polygon[vertexIndex]
 	var endPoint = polygon[(vertexIndex + 1) % polygon.length]
-	addFilletedPointsByTriple(beginPoint, centerPoint, endPoint, filletedPolygon, minimumAngle, numberOfSides, radius)
+	var afterPoint = polygon[(vertexIndex + 2) % polygon.length]
+	addFilletedPointsByQuintuple(
+	beforePoint, beginPoint, centerPoint, endPoint, afterPoint, filletedPolygon, minimumAngle, numberOfSides, radius)
 }
 
-function addFilletedPointsByTriple(beginPoint, centerPoint, endPoint, filletedPolygon, minimumAngle, numberOfSides, radius) {
+function addFilletedPointsByQuintuple
+(beforePoint, beginPoint, centerPoint, endPoint, afterPoint, filletedPolygon, minimumAngle, numberOfSides, radius) {
 	var centerBegin = getSubtraction2D(beginPoint, centerPoint)
 	var centerBeginLength = length2D(centerBegin)
 	var centerEnd = getSubtraction2D(endPoint, centerPoint)
 	var centerEndLength = length2D(centerEnd)
+	if (centerBeginLength == 0.0 || centerEndLength == 0.0) {
+		filletedPolygon.push(centerPoint)
+		return
+	}
 	divide2DScalar(centerBegin, centerBeginLength)
 	divide2DScalar(centerEnd, centerEndLength)
-	var absoluteCornerAngle = 2.0 * Math.asin(0.5 * distance2D(centerBegin, getMultiplication2DScalar(centerEnd, -1)))
-	var cornerOverMinimum = absoluteCornerAngle / minimumAngle
+	var twoOverAngle = 2.0 / minimumAngle
+	var absoluteHalfCornerAngle = Math.acos(0.5 * distance2D(centerBegin, centerEnd))
+	var cornerOverMinimum = twoOverAngle * absoluteHalfCornerAngle
 	var numberOfFilletSides = Math.ceil(cornerOverMinimum - gClose)
 	if (numberOfFilletSides < 2) {
 		filletedPolygon.push(centerPoint)
 		return
 	}
+	var numberOfSidesMinus = numberOfFilletSides - 1
+	var beforeBegin = getSubtraction2D(beginPoint, beforePoint)
+	var beforeBeginLength = length2D(beforeBegin)
+	if (beforeBeginLength != 0.0) {
+		divide2DScalar(beforeBegin, beforeBeginLength)
+		var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerBegin, beforeBegin)) - gClose)
+		centerBeginLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
+	}
+	var afterEnd = getSubtraction2D(endPoint, afterPoint)
+	var afterEndLength = length2D(afterEnd)
+	if (afterEndLength != 0.0) {
+		divide2DScalar(afterEnd, afterEndLength)
+		var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerEnd, afterEnd)) - gClose)
+		centerEndLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
+		centerBeginLength = Math.min(centerBeginLength, centerEndLength)
+	}
 	var centerVector = normalize2D(getAddition2D(centerBegin, centerEnd))
 	var dotProduct = dotProduct2D(centerVector, centerBegin)
-	var maximumLength = 0.5 * Math.min(centerBeginLength, centerEndLength)
 	var perpendicular = Math.sqrt(1.0 - dotProduct * dotProduct)
 	var distanceToTangent = radius * dotProduct / perpendicular
-	if (distanceToTangent > maximumLength) {
-		var lengthRatio = maximumLength / distanceToTangent
+	if (distanceToTangent > centerBeginLength) {
+		var lengthRatio = centerBeginLength / distanceToTangent
 		numberOfFilletSides = Math.ceil(Math.sqrt(lengthRatio) * cornerOverMinimum - gClose)
 		if (numberOfFilletSides < 2) {
 			filletedPolygon.push(centerPoint)
@@ -36,18 +81,18 @@ function addFilletedPointsByTriple(beginPoint, centerPoint, endPoint, filletedPo
 		radius *= lengthRatio
 		distanceToTangent *= lengthRatio
 	}
-	var halfSideLength = Math.tan(0.5 * absoluteCornerAngle / numberOfFilletSides) * radius
+	var halfSideLength = Math.tan(absoluteHalfCornerAngle / numberOfFilletSides) * radius
 	var beginTangent = getAddition2D(centerPoint, getMultiplication2DScalar(centerBegin, distanceToTangent - halfSideLength))
 	var filletCenter = getAddition2D(centerPoint, getMultiplication2DScalar(centerVector, radius / perpendicular))
-	var filletAngle = absoluteCornerAngle / numberOfFilletSides
+	var filletAngle = 2.0 * absoluteHalfCornerAngle / numberOfFilletSides
 	if (dotProduct2D([centerBegin[1], -centerBegin[0]], centerEnd) > 0.0) {
 		filletAngle = -filletAngle
 	}
 	filletedPolygon.push(beginTangent)
 	var beginTangentCenter = getSubtraction2D(beginTangent, filletCenter)
-	var filletRotation = getPolar(filletAngle)
+	var filletRotation = polar(filletAngle)
 	for (var filletIndex = 1; filletIndex < numberOfFilletSides; filletIndex++) {
-		beginTangentCenter = get2DRotation(beginTangentCenter, filletRotation)
+		beginTangentCenter = getRotation2DVector(beginTangentCenter, filletRotation)
 		filletedPolygon.push(getAddition2D(filletCenter, beginTangentCenter))
 	}
 }
@@ -75,174 +120,97 @@ function addRotationToCenterDirection(centerDirection) {
 	centerDirection.mirrorFromY = lineRotatedY + lineRotatedY
 }
 
-function addSplitPolygonByHeight(polygon, polygons, splitHeight) {
+function addSplitPolygonByHeight(polygon, splitHeight, splitPolygons) {
 	var alongIndexesMap = new Map()
-	var meetings = []
+	var isCounter = !getIsClockwise(polygon)
+	var meetingMap = new Map()
 	var toolAlongIndexes = []
+	var xMap = new Map()
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var endIndex = (vertexIndex + 1) % polygon.length
 		var beginPoint = polygon[vertexIndex]
 		var endPoint = polygon[endIndex]
-		var meeting = getMeetingByHeight(splitHeight, beginPoint, endPoint)
+		var meeting = null
+		var meetingKey = polygon[vertexIndex] + ';' + polygon[endIndex]
+		var workDirection = true
+		var reversedKey = polygon[endIndex] + ';' + polygon[vertexIndex]
+		if (meetingMap.has(reversedKey)) {
+			meetingKey = reversedKey
+			meeting = meetingMap.get(meetingKey)
+			workDirection = false
+		}
+		else {
+			var meeting = getMeetingByHeight(splitHeight, beginPoint[1], endPoint[1])
+		}
 		if (meeting != null) {
-			if (meeting.isWorkNode) {
-				if (meeting.workAlong < 0.5) {
-					meeting.key = beginPoint[0].toString() + ' ' + beginPoint[1].toString()
+			var workAlong = meeting.workAlong
+			if (workDirection) {
+				if (meeting.isWorkNode) {
+					if (meeting.workAlong < 0.5) {
+						meeting.point = beginPoint.slice(0)
+					}
+					else {
+						meeting.point = endPoint.slice(0)
+					}
 				}
 				else {
-					meeting.key = endPoint[0].toString() + ' ' + endPoint[1].toString()
+					meeting.point = [beginPoint[0] * (1.0 - meeting.workAlong) + endPoint[0] * meeting.workAlong, splitHeight]
+				}
+				if (xMap.has(meeting.point[0])) {
+					meetingKey = xMap.get(meeting.point[0])
+					meeting = meetingMap.get(meetingKey)
+				}
+				else {
+					meetingMap.set(meetingKey, meeting)
+					xMap.set(meeting.point[0], meetingKey)
 				}
 			}
 			else {
-				var x = beginPoint[0] * (1.0 - meeting.workAlong) + endPoint[0] * meeting.workAlong
-				meeting.key = x.toString() + ' ' + splitHeight.toString()
+				workAlong = 1.0 - workAlong
 			}
-			addMeetingToMap(meeting.workAlong, alongIndexesMap, meeting.isWorkNode, '', meetings.length, vertexIndex, polygon.length)
-			toolAlongIndexes.push([meeting.toolAlong, meetings.length])
-			meetings.push(meeting)
+			addMeetingToMap(workAlong, alongIndexesMap, meeting.isWorkNode, 'w ', meetingKey, vertexIndex, polygon.length)
+			var toolAlong = meeting.point[0]
+			if (isCounter) {
+				toolAlong = -toolAlong
+			}
+			toolAlongIndexes.push([toolAlong, meetingKey])
 		}
 	}
 	toolAlongIndexes.sort(compareFirstElementAscending)
-	for (var index = toolAlongIndexes.length - 1; index > 0; index--) {
-		if (meetings[toolAlongIndexes[index][1]].key == meetings[toolAlongIndexes[index - 1][1]].key) {
-			toolAlongIndexes.splice(index, 1)
-		}
-	}
-	addSplitPolygons(alongIndexesMap, meetings, polygon, polygons, toolAlongIndexes)
+	addSplitPolygons(alongIndexesMap, meetingMap, polygon, splitHeight, splitPolygons, toolAlongIndexes)
 }
 
-function addSplitPolygons(alongIndexesMap, meetings, polygon, polygons, toolAlongIndexes) {
-	if (meetings.length == 0) {
+function addSplitPolygons(alongIndexesMap, meetingMap, polygon, splitHeight, splitPolygons, toolSegments) {
+	if (meetingMap.size == 0) {
+		splitPolygons.push(polygon)
 		return
 	}
-	var arcMap = new Map()
-	var pointMap = new Map()
-	var toolBeginMap = new Map()
-	var toolEndMap = new Map()
-	var toolLineSet = new Set()
-	var toolIndexSet = new Set()
-	sortRemoveMeetings(alongIndexesMap, meetings)
-	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
-		var key = vertexIndex.toString()
-		if (alongIndexesMap.has(key)) {
-			var alongIndexes = alongIndexesMap.get(key)
-			for (var alongIndexIndex = alongIndexes.length - 1; alongIndexIndex > -1; alongIndexIndex--) {
-				var alongIndex = alongIndexes[alongIndexIndex]
-				if (alongIndex[0] != 0.0) {
-					var keyStrings = meetings[alongIndex[1]].key.split(' ')
-					polygon.splice(vertexIndex + 1, 0, [parseFloat(keyStrings[0]), parseFloat(keyStrings[1])])
-				}
-			}
-		}
+	sortAlongIndexesMap(alongIndexesMap)
+	var bottomSegments = getPolygonSegments(alongIndexesMap, meetingMap, polygon, 'w')
+	var topSegments = getTopSegments(1, bottomSegments, splitHeight)
+	for (var toolSegmentIndex = 0; toolSegmentIndex < toolSegments.length; toolSegmentIndex++) {
+		var meetingKey = toolSegments[toolSegmentIndex][1]
+		toolSegments[toolSegmentIndex] = [{nodeKey:'m ' + meetingKey, point:meetingMap.get(meetingKey).point}]
 	}
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var point = polygon[vertexIndex]
-		pointMap.set(point[0].toString() + ' ' + point[1].toString(), vertexIndex)
+	for (var toolSegmentIndex = 0; toolSegmentIndex < toolSegments.length - 1; toolSegmentIndex++) {
+		toolSegments[toolSegmentIndex].push(toolSegments[toolSegmentIndex + 1][0])
 	}
-	for (var meeting of meetings) {
-		meeting.pointIndex = pointMap.get(meeting.key)
-		meeting.point = polygon[meeting.pointIndex]
-	}
-	for (var toolAlongIndex of toolAlongIndexes) {
-		toolIndexSet.add(meetings[toolAlongIndex[1]].pointIndex)
-	}
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var endIndex = polygon[(vertexIndex + 1) % polygon.length]
-		if (toolIndexSet.has(vertexIndex) && toolIndexSet.has(endIndex)) {
-			toolLineSet.add(getEdgeKey(vertexIndex, endIndex))
-		}
-	}
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var beginIndex = (vertexIndex + 1) % polygon.length
-		var endIndex = (vertexIndex + 2) % polygon.length
-		var key = beginIndex + ' ' + endIndex
-		arcMap.set(key, [vertexIndex, (vertexIndex + 3) % polygon.length])
-		if (toolIndexSet.has(beginIndex)) {
-			toolBeginMap.set(beginIndex, key)
-		}
-		if (toolIndexSet.has(endIndex)) {
-			toolEndMap.set(endIndex, key)
-		}
-	}
-	for (var toolAlongIndexesIndex = 0; toolAlongIndexesIndex < toolAlongIndexes.length - 1; toolAlongIndexesIndex++) {
-		var beginMeeting = meetings[toolAlongIndexes[toolAlongIndexesIndex][1]]
-		var endMeeting = meetings[toolAlongIndexes[toolAlongIndexesIndex + 1][1]]
-		var beginKey = beginMeeting.pointIndex
-		var endKey = endMeeting.pointIndex
-		if (!toolLineSet.has(getEdgeKey(beginKey, endKey))) {
-			var midpoint = multiply2DScalar(getAddition2D(beginMeeting.point, endMeeting.point), 0.5)
-			if (getIsPointInsidePolygonOrClose(midpoint, polygon)) {
-				var beginEntryKey = toolEndMap.get(beginKey)
-				var beginExitKey = toolBeginMap.get(beginKey)
-				var endEntryKey = toolEndMap.get(endKey)
-				var endExitKey = toolBeginMap.get(endKey)
-				arcMap.set(beginKey + ' ' + endKey, [parseInt(beginEntryKey.split(' ')[0]), parseInt(endExitKey.split(' ')[1])])
-				arcMap.set(endKey + ' ' + beginKey, [parseInt(endEntryKey.split(' ')[0]), parseInt(beginExitKey.split(' ')[1])])
-				arcMap.get(beginEntryKey)[1] = endKey
-				arcMap.get(beginExitKey)[0] = endKey
-				arcMap.get(endEntryKey)[1] = beginKey
-				arcMap.get(endExitKey)[0] = beginKey
-				toolAlongIndexesIndex += 1
-			}
-		}
-	}
-	var joinedFacets = getJoinedFacetsByArcMap(arcMap)
-	var points = getArraysCopy(polygon)
-	overwriteArray(polygon, getPolygonByFacet(joinedFacets[0], points))
-	for (var joinedFacetIndex = 1; joinedFacetIndex < joinedFacets.length; joinedFacetIndex++) {
-		polygons.push(getPolygonByFacet(joinedFacets[joinedFacetIndex], points))
-	}
+	toolSegments.pop()
+	addConnectedSegmentsToPolygons(meetingMap, polygon, splitPolygons, toolSegments, bottomSegments)
+	toolSegments.reverse()
+	reverseArrays(toolSegments)
+	addConnectedSegmentsToPolygons(meetingMap, polygon, splitPolygons, toolSegments, topSegments)
 }
 
-function addSplitPolygonsByHeight(polygons, splitHeight) {
-	var polygonsLength = polygons.length
-	for (var polygonIndex = 0; polygonIndex < polygonsLength; polygonIndex++) {
-		var polygon = polygons[polygonIndex]
-		addSplitPolygonByHeight(polygon, polygons, splitHeight)
-	}
-}
-
-function addSplitPolygonsByHeights(polygons, splitHeights) {
-	for (var splitHeight of splitHeights) {
-		addSplitPolygonsByHeight(polygons, splitHeight)
-	}
-}
-
-function addTo3DPointIndexSet(equations, pointIndexSet, points, polygons, registry, statement, stratas) {
-	if (getIsEmpty(equations) && pointIndexSet.size == 0 && getIsEmpty(polygons)) {
-		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-			pointIndexSet.add(pointIndex)
-		}
-		return
-	}
-	if (equations != null) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var equation of equations) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				variableMap.set('point', points[pointIndex].toString())
-				if (getValueByEquation(registry, statement, equation)) {
-					pointIndexSet.add(pointIndex)
-				}
-			}
-		}
-	}
-	if (polygons == null) {
-		return
-	}
+function addSplitPolygonsByHeight(polygons, splitHeight, splitPolygons) {
 	for (var polygon of polygons) {
-		var boundingBox = getBoundingBox(polygon)
-		for (var strata of stratas) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (getIsInStrata(strata, point[2])) {
-					if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
-						if (getIsPointInsidePolygonOrClose(point, polygon)) {
-							pointIndexSet.add(pointIndex)
-						}
-					}
-				}
-			}
-		}
+		addSplitPolygonByHeight(polygon, splitHeight, splitPolygons)
+	}
+}
+
+function addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons) {
+	for (var splitHeight of splitHeights) {
+		addSplitPolygonsByHeight(polygons, splitHeight, splitPolygons)
 	}
 }
 
@@ -298,7 +266,12 @@ function bevelPoints(bevels, matrix3D, mesh, pointIndexSet, points, splits) {
 	}
 	var bevelMap = new Map()
 	for (var pointIndex of pointIndexSet) {
-		var interpolationAlong = getFlatInterpolationAlongBeginEnd(points[pointIndex][2], bevels)
+		var point = points[pointIndex]
+		if (point == undefined) {
+			noticeByList(['point is undefined in pointIndexSet in alteration.', points, pointIndex, pointIndexSet])
+			return
+		}
+		var interpolationAlong = getFlatInterpolationAlongBeginEnd(point[2], bevels)
 		var along = interpolationAlong[0]
 		var lower = interpolationAlong[1]
 		var upper = interpolationAlong[2]
@@ -316,23 +289,24 @@ function bevelPoints(bevels, matrix3D, mesh, pointIndexSet, points, splits) {
 		}
 		var horizontalVector = unitVectors[horizontalVectorIndex]
 		var highestCrossProductZ = -Number.MAX_VALUE
-		var otherVectorIndex = null
+		var highestCrossVector = horizontalVector
+		var maximumZ = smallestZ + 0.5
 		for (var unitVectorIndex = 0; unitVectorIndex < unitVectors.length; unitVectorIndex++) {
 			if (unitVectorIndex != horizontalVectorIndex) {
-				var crossProductZ = Math.abs(crossProduct2D(horizontalVector, unitVectors[unitVectorIndex]))
-				crossProductZ += gClose * Math.abs(dotProduct2D(horizontalVector, unitVectors[unitVectorIndex]))
-				if (crossProductZ > highestCrossProductZ) {
+				var otherVector = unitVectors[unitVectorIndex]
+				var crossProductZ = Math.abs(crossProduct2D(horizontalVector, otherVector))
+				crossProductZ += gClose * Math.abs(dotProduct2D(horizontalVector, otherVector))
+				if (crossProductZ > highestCrossProductZ && Math.abs(otherVector[2]) < maximumZ) {
 					highestCrossProductZ = crossProductZ
-					otherVectorIndex = unitVectorIndex
+					highestCrossVector = otherVector
 				}
 			}
 		}
-		var addition = getAddition2D(normalize2D(horizontalVector.slice(0)), normalize2D(unitVectors[otherVectorIndex].slice(0)))
-		var multiplication = getMultiplication2D(multiply2DScalar(addition, -2.0 / lengthSquared2D(addition)), inset)
-		bevelMap.set(pointIndex, add2D(points[pointIndex].slice(0), multiplication))
+		var addition = getAddition2D(normalize2D(horizontalVector.slice(0, 2)), normalize2D(highestCrossVector.slice(0, 2)))
+		bevelMap.set(pointIndex, getMultiplication2D(multiply2DScalar(addition, -2.0 / lengthSquared2D(addition)), inset))
 	}
 	for (var pointIndex of bevelMap.keys()) {
-		points[pointIndex] = bevelMap.get(pointIndex)
+		add2D(points[pointIndex], bevelMap.get(pointIndex))
 	}
 }
 
@@ -393,9 +367,6 @@ function getBoundedPoints2D(equations, points, polygons, registry, statement) {
 }
 
 function getBoundedPointsBySet(pointIndexSet, points) {
-	if (pointIndexSet.size == 0) {
-		return null
-	}
 	var boundedPoints = []
 	for (var pointIndex of pointIndexSet) {
 		boundedPoints.push(points[pointIndex])
@@ -428,7 +399,7 @@ function getCenterDirectionByCenterDirection(center, direction) {
 	}
 	direction[0] = getValueByDefault(0.0, direction[0])
 	if (direction.length == 1) {
-		return {center:center, direction:getPolar(direction[0] * gRadiansPerDegree)}
+		return {center:center, direction:polar(direction[0] * gRadiansPerDegree)}
 	}
 	direction[1] = getValueByDefault(0.0, direction[1])
 	var directionLength = length2D(direction)
@@ -535,7 +506,7 @@ function getOutsetPolygons(points, registry, statement) {
 	var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
 	var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, this.name)
 	var clockwise = getBooleanByStatement('clockwise', registry, statement)
-	if (clockwise == null) {
+	if (clockwise == undefined) {
 		clockwise = getIsClockwise(points)
 	}
 	var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
@@ -569,16 +540,50 @@ function getOutsets(registry, statement) {
 	return outsets
 }
 
-function getPointIndexSet(boundaryEquations, ids, points, polygons, mesh, registry, statement, stratas) {
+function getPointIndexSet(equations, ids, points, polygons, mesh, registry, statement, stratas) {
 	var pointIndexSet = new Set()
-	if (mesh.splitIndexesMap != undefined) {
+	if (getIsEmpty(equations) && getIsEmpty(ids) && getIsEmpty(polygons)) {
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			pointIndexSet.add(pointIndex)
+		}
+		return pointIndexSet
+	}
+	if (ids != null && mesh.splitIndexesMap != undefined) {
 		for (var id of ids) {
 			if (mesh.splitIndexesMap.has(id)) {
 				addElementsToSet(mesh.splitIndexesMap.get(id), pointIndexSet)
 			}
 		}
 	}
-	addTo3DPointIndexSet(boundaryEquations, pointIndexSet, points, polygons, registry, statement, stratas)
+	if (equations != null) {
+		var variableMap = getVariableMapByStatement(statement)
+		for (var equation of equations) {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				variableMap.set('point', points[pointIndex].toString())
+				if (getValueByEquation(registry, statement, equation)) {
+					pointIndexSet.add(pointIndex)
+				}
+			}
+		}
+	}
+	if (polygons == null) {
+		return pointIndexSet
+	}
+	for (var polygon of polygons) {
+		var boundingBox = getBoundingBox(polygon)
+		for (var strata of stratas) {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				var point = points[pointIndex]
+				if (getIsInStrata(strata, point[2])) {
+					if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
+						if (getIsPointInsidePolygonOrClose(point, polygon)) {
+							pointIndexSet.add(pointIndex)
+						}
+					}
+				}
+			}
+		}
+	}
 	return pointIndexSet
 }
 
@@ -594,10 +599,25 @@ function getPointsExcept(points, registry, statement) {
 	return points
 }
 
+function getTopSegments(parameterIndex, polygonSegments, splitHeight) {
+	var topSegments = new Array(polygonSegments.length).fill(null)
+	for (var vertexIndex = 0; vertexIndex < polygonSegments.length; vertexIndex++) {
+		var polygonSegment = polygonSegments[vertexIndex]
+		if (polygonSegment != null) {
+			var midpointZ = 0.5 * (polygonSegment[0].point[parameterIndex] + polygonSegment[1].point[parameterIndex])
+			if (midpointZ > splitHeight) {
+				topSegments[vertexIndex] = polygonSegments[vertexIndex]
+				polygonSegments[vertexIndex] = null
+			}
+		}
+	}
+	return topSegments
+}
+
 function mirrorByCenterDirectionRotation(centerDirection, point) {
-	rotate2D(point, centerDirection.reverseRotation)
+	rotate2DVector(point, centerDirection.reverseRotation)
 	point[1] = centerDirection.mirrorFromY - point[1]
-	return rotate2D(point, centerDirection.direction)
+	return rotate2DVector(point, centerDirection.direction)
 }
 
 function mirrorMesh(centerDirection, matrix3D, mesh) {
@@ -653,7 +673,7 @@ function splitMesh(equations, id, matrix3D, mesh, polygons, registry, splitHeigh
 					}
 				}
 			}
-			addSplitIndexesByFacetSet(facetIndexSet, id, false, splitHeight, mesh)
+			addSplitIndexesByFacetSet(facetIndexSet, id, splitHeight, mesh)
 		}
 	}
 	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
@@ -756,7 +776,7 @@ function transformPoints2DByEquation(amplitudes, center, points, registry, state
 	}
 	normalize2D(vector)
 	for (var point of points) {
-		addInterpolationArrayXPolylineLength(dotProduct2D(vector, getSubtraction2D(point, center)), amplitudes, 2, point)
+		add2D(point, additionInterpolation2D(dotProduct2D(vector, getSubtraction2D(point, center)), amplitudes))
 	}
 }
 
@@ -807,7 +827,7 @@ function transformPoints3DByEquation(amplitudes, center, points, registry, state
 	}
 	normalize3D(vector)
 	for (var point of points) {
-		addInterpolationArrayXPolylineLength(dotProduct3D(vector, getSubtraction3D(point, center)), amplitudes, 3, point)
+		add3D(point, additionInterpolation3D(dotProduct3D(vector, getSubtraction3D(point, center)), amplitudes))
 	}
 }
 
@@ -834,10 +854,7 @@ function wedgeMesh(inset, matrix3D, mesh) {
 var gBend = {
 	alterMesh: function(mesh, registry, statement) {
 		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var ids = []
-		if (statement.attributeMap.has('splitIDs')) {
-			ids = statement.attributeMap.get('splitIDs').split(' ').filter(lengthCheck)
-		}
+		var ids = getStrings('splitIDs', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
 		var polygons = getPolygonsHDRecursively(registry, statement)
@@ -910,10 +927,7 @@ var gBevel = {
 	alterMesh: function(mesh, registry, statement) {
 		var bevels = getPointsByKey('bevels', registry, statement)
 		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var ids = []
-		if (statement.attributeMap.has('splitIDs')) {
-			ids = statement.attributeMap.get('splitIDs').split(' ').filter(lengthCheck)
-		}
+		var ids = getStrings('splitIDs', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
 		var polygons = getPolygonsHDRecursively(registry, statement)
@@ -1128,13 +1142,13 @@ var gMove = {
 		var rotation = getFloatsByStatement('rotation', registry, statement)
 		if (!getIsEmpty(rotation)) {
 			if (rotation.length == 1) {
-				rotation = getPolar(rotation[0] * gRadiansPerDegree)
+				rotation = polar(rotation[0] * gRadiansPerDegree)
 			}
 			var rotationLength = length2D(rotation)
 			if (rotationLength != 0.0) {
 				divide2DScalar(rotation, rotationLength)
 				for (var point of mesh.points) {
-					rotate2D(point, rotation)
+					rotate2DVector(point, rotation)
 				}
 			}
 		}
@@ -1292,8 +1306,9 @@ var gSplit = {
 			return
 		}
 		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
-		addSplitPolygonsByHeights(polygons, splitHeights)
-		addPolygonsToGroup(polygons, registry, statement)
+		var splitPolygons = []
+		addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons)
+		addPolygonsToGroup(splitPolygons, registry, statement)
 	}
 }
 
