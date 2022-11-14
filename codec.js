@@ -43,6 +43,7 @@ var gProject = null
 var gRedoMap = null
 var gTitle = null
 var gUndoMap = null
+var gWordString = null
 //var gURLMaximumLength = 1900
 
 function browse(input) {
@@ -231,9 +232,12 @@ function update() {
 	updateWordArea(wordString)
 	if (gCurrentKey == null) {
 		var localWordString = localStorage.getItem(gTitle)
-		if (localWordString != null) {
-			localStorage.setItem('old_' + gTitle, localWordString)
+		if (localWordString != null) {		
+			if (localStorage.getItem('update_' + gTitle) == 'true') {		
+				localStorage.setItem('old_' + gTitle, localWordString)
+			}
 		}
+		localStorage.setItem('update_' + gTitle, 'false')
 	}
 	if (gRedoMap == null) {
 		gRedoMap = getMapByString(sessionStorage.getItem('redoMapKey@'))
@@ -301,6 +305,12 @@ function update() {
 	getWordStringUpdateStorage()
 	updateLink(wordString)
 	updateSelect(querySelect)
+	if (gWordString != null) {
+		if (gWordString != wordString && gTitle != null) {
+			localStorage.setItem('update_' + gTitle, 'true')
+		}
+	}
+	gWordString = wordString
 }
 
 function updateEdit() {
