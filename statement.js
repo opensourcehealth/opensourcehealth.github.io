@@ -204,6 +204,14 @@ function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchS
 	return replacedTokens.join('')
 }
 
+function getStrings(key, statement) {
+	var attributeMap = statement.attributeMap
+	if (!attributeMap.has(key)) {
+		return []
+	}
+	return attributeMap.get(key).replace(/,/g, ' ').split(' ').filter(lengthCheck)
+}
+
 function getIsIDUnique(id, registry, statement) {
 	if (registry.idMap.has(id)) {
 		return false
@@ -506,16 +514,8 @@ function getWorkStatement(registry, statement) {
 	return registry.idMap.get(workID)
 }
 
-function getWorkIDs(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('work')) {
-		return []
-	}
-	return attributeMap.get('work').replace(/,/g, ' ').split(' ').filter(lengthCheck)
-}
-
 function getWorkStatements(registry, statement) {
-	var workIDs = getWorkIDs(registry, statement)
+	var workIDs = getStrings('work', statement)
 	var workStatements = []
 	for (var workID of workIDs) {
 		workID = workID.trim()
