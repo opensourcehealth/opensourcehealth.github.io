@@ -1,5 +1,11 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+var gDifferenceExclusion = {toolExclusion:-1, workExclusion:1, workExclusionSet:new Set([1, 0])}
+var gIntersectionExclusion = {toolExclusion:-1, workExclusion:-1, workExclusionSet:new Set([-1])}
+var gUnionExclusion = {toolExclusion:1, workExclusion:1, workExclusionSet:new Set([1])}
+
+/*
+//deprecated
 function addExtantPolygons(extantPolygons, nodeMaps, originalNodeMapIndex, startException, turnRight) {
 	var defaultProximity = -9
 	if (turnRight) {
@@ -38,27 +44,27 @@ function addExtantPolygons(extantPolygons, nodeMaps, originalNodeMapIndex, start
 						if (alternateNode != null) {
 							var centerAlternate = getSubtraction2D(alternateNode.nextPoint, alternateNode.point)
 							var centerAlternateLength = length2D(centerAlternate)
-							if (centerAlternateLength != 0.0) {
-								divide2DScalar(centerAlternate, centerAlternateLength)
-								alternateProximity = getDirectionalProximity(centerBegin, centerAlternate)
-							}
-							else {
+							if (centerAlternateLength == 0.0) {
 								console.log(alternateNode)
 								console.log(extantPolygons)
 								console.log(nodeMaps)
+							}
+							else {
+								divide2DScalar(centerAlternate, centerAlternateLength)
+								alternateProximity = getDirectionalProximity(centerBegin, centerAlternate)
 							}
 						}
 						if (operatingNode != null) {
 							var centerOperating = getSubtraction2D(operatingNode.nextPoint, operatingNode.point)
 							var centerOperatingLength = length2D(centerOperating)
-							if (centerOperatingLength != 0.0) {
-								divide2DScalar(centerOperating, centerOperatingLength)
-								operatingProximity = getDirectionalProximity(centerBegin, centerOperating)
+							if (centerOperatingLength == 0.0) {
+//								console.log(operatingNode)
+//								console.log(extantPolygons)
+//								console.log(nodeMaps)
 							}
 							else {
-								console.log(operatingNode)
-								console.log(extantPolygons)
-								console.log(nodeMaps)
+								divide2DScalar(centerOperating, centerOperatingLength)
+								operatingProximity = getDirectionalProximity(centerBegin, centerOperating)
 							}
 						}
 					}
@@ -103,43 +109,8 @@ function addExtantPolygons(extantPolygons, nodeMaps, originalNodeMapIndex, start
 		}
 	}
 }
-
-/*deprecated23
-function addInsideConnectedFacets(endFacets, facets, points) {
-	var linkMap = new Map()
-	var xyPolygons = getPolygonsByFacets(endFacets, points)
-	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
-		var maximumXIntersections = []
-		var xyPolygon = xyPolygons[polygonIndex]
-		for (var otherIndex = 0; otherIndex < xyPolygons.length; otherIndex++) {
-			if (polygonIndex != otherIndex) {
-				var xyOtherPolygon = xyPolygons[otherIndex]
-				var maximumXIntersection = getMaximumXIntersectionByPolygon(xyPolygon[0], xyOtherPolygon)
-				if (maximumXIntersection != null) {
-					maximumXIntersections.push([maximumXIntersection, otherIndex])
-				}
-			}
-		}
-		var otherIndexSet = new Set()
-		for (var maximumXIntersection of maximumXIntersections) {
-			otherIndexSet.add(maximumXIntersection[1])
-		}
-		maximumXIntersections.sort(compareFirstElementDescending)
-		if (otherIndexSet.size % 2 == 1) {
-			addToLinkMap(polygonIndex, maximumXIntersections[0][1], linkMap)
-			console.log(polygonIndex)
-		}
-	}
-	var joinedMap = getJoinedMap(xyPolygons.length, linkMap)
-	for (var joined of joinedMap.values()) {
-		var joinedFacets = []
-		for (var joinedIndex of joined) {
-			joinedFacets.push(endFacets[joinedIndex])
-		}
-		facets.push(getConnectedFacet(joinedFacets, points))
-	}
-}
 */
+
 function addIntersectionsToSets(beginSet, endSet, intersections) {
 	for (intersectionIndex = 0; intersectionIndex < intersections.length; intersectionIndex += 2) {
 		endIntersectionIndex = intersectionIndex + 1
@@ -197,8 +168,10 @@ function addIntersectionsToTriple(xyBegin, xyEnd, tripleIntersection, y) {
 	}
 }
 
-function addMeetingsByPolygon(alongIndexesMap, meetings, toolPolygon, workPolygon) {
+function addMeetingsByPolygon(alongIndexesMap, meetingMap, toolPolygon, workPolygon) {
+	var xMap = new Map()
 	for (var toolBeginIndex = 0; toolBeginIndex < toolPolygon.length; toolBeginIndex++) {
+		var arrowMap = new Map()
 		var toolEndIndex = (toolBeginIndex + 1) % toolPolygon.length
 		var toolBegin = toolPolygon[toolBeginIndex]
 		var toolEnd = toolPolygon[toolEndIndex]
@@ -207,95 +180,104 @@ function addMeetingsByPolygon(alongIndexesMap, meetings, toolPolygon, workPolygo
 		if (deltaLength != 0.0) {
 			divide2DScalar(delta, deltaLength)
 			var reverseRotation = [delta[0], -delta[1]]
-			var toolBeginRotated = get2DRotation(toolBegin, reverseRotation)
-			var toolEndRotated = get2DRotation(toolEnd, reverseRotation)
+			var toolBeginRotated = getRotation2DVector(toolBegin, reverseRotation)
+			var toolEndRotated = getRotation2DVector(toolEnd, reverseRotation)
 			var y = toolBeginRotated[1]
 			var workPolygonRotated = get2DRotations(workPolygon, reverseRotation)
 			for (var workBeginIndex = 0; workBeginIndex < workPolygon.length; workBeginIndex++) {
 				var workEndIndex = (workBeginIndex + 1) % workPolygon.length
-				var workBeginRotated = workPolygonRotated[workBeginIndex]
-				var workEndRotated = workPolygonRotated[workEndIndex]
-				var meeting = getMeeting(toolBeginRotated[0], toolEndRotated[0], y, workBeginRotated, workEndRotated)
+				var meeting = null
+				var meetingKey = workPolygon[workBeginIndex] + ';' + workPolygon[workEndIndex] + ';' + toolBeginIndex
+				var workDirection = true
+				var reversedKey = workPolygon[workEndIndex] + ';' + workPolygon[workBeginIndex]
+				if (arrowMap.has(reversedKey)) {
+					meetingKey = reversedKey + ';' + toolBeginIndex
+					meeting = meetingMap.get(meetingKey)
+					workDirection = false
+				}
+				else {
+					var workBeginRotated = workPolygonRotated[workBeginIndex]
+					var workEndRotated = workPolygonRotated[workEndIndex]
+					meeting = getMeeting(toolBeginRotated[0], toolEndRotated[0], y, workBeginRotated, workEndRotated)
+				}
 				if (meeting != null) {
-					if (meeting.isWorkNode) {
-						if (meeting.workAlong < 0.5) {
-							meeting.point = workPolygon[workBeginIndex]
-						}
-						else {
-							meeting.point = workPolygon[workEndIndex]
-						}
-					}
-					else {
-						if (meeting.isToolNode) {
-							if (meeting.toolAlong < 0.5) {
-								meeting.point = toolBegin
+					var toolAlong = meeting.toolAlong
+					var workAlong = meeting.workAlong
+					if (workDirection) {
+						if (meeting.isWorkNode) {
+							if (meeting.workAlong < 0.5) {
+								meeting.point = workPolygon[workBeginIndex]
 							}
 							else {
-								meeting.point = toolEnd
+								meeting.point = workPolygon[workEndIndex]
 							}
 						}
 						else {
-							meeting.point = getMultiplicationArrayScalar(workPolygon[workBeginIndex], 1.0 - meeting.workAlong)
-							addArray(meeting.point, getMultiplicationArrayScalar(workPolygon[workEndIndex], meeting.workAlong))
+							if (meeting.isToolNode) {
+								if (meeting.toolAlong < 0.5) {
+									meeting.point = toolBegin
+								}
+								else {
+									meeting.point = toolEnd
+								}
+								var xKey = meeting.point
+								if (xMap.has(xKey)) {
+									meetingKey = xMap.get(xKey)
+									meeting = meetingMap.get(meetingKey)
+								}
+								else {
+									xMap.set(xKey, meetingKey)
+								}
+							}
+							else {
+								meeting.point = getMultiplicationArrayScalar(workPolygon[workBeginIndex], 1.0 - meeting.workAlong)
+								addArray(meeting.point, getMultiplicationArrayScalar(workPolygon[workEndIndex], meeting.workAlong))
+							}
 						}
+						arrowMap.set(workPolygon[workBeginIndex] + ';' + workPolygon[workEndIndex], meetingKey)
+						meetingMap.set(meetingKey, meeting)
+					}
+					else {
+						workAlong = 1.0 - workAlong
 					}
 					addMeetingToMap(
-						meeting.toolAlong,
+						toolAlong,
 						alongIndexesMap,
 						meeting.isToolNode,
 						't ',
-						meetings.length,
+						meetingKey,
 						toolBeginIndex,
 						toolPolygon.length)
 					addMeetingToMap(
-						meeting.workAlong,
+						workAlong,
 						alongIndexesMap,
 						meeting.isWorkNode,
 						'w ',
-						meetings.length,
+						meetingKey,
 						workBeginIndex,
 						workPolygon.length)
-					meetings.push(meeting)
 				}
 			}
 		}
 	}
 }
 
-function addMeetingToMap(along, alongIndexesMap, isNode, keyStart, meetingsLength, pointIndex, polygonLength) {
+function addMeetingToMap(along, alongIndexesMap, isNode, keyStart, meetingsLength, vertexIndex, polygonLength) {
 	if (isNode) {
 		if (along < 0.5) {
-			addElementToMapArray([0.0, meetingsLength], keyStart + pointIndex.toString(), alongIndexesMap)
+			addElementToMapArray([0.0, meetingsLength], keyStart + vertexIndex.toString(), alongIndexesMap)
 		}
 		else {
-			addElementToMapArray([0.0, meetingsLength], keyStart + ((pointIndex + 1) % polygonLength).toString(), alongIndexesMap)
+			addElementToMapArray([0.0, meetingsLength], keyStart + ((vertexIndex + 1) % polygonLength).toString(), alongIndexesMap)
 		}
 		return
 	}
-	addElementToMapArray([along, meetingsLength], keyStart + pointIndex.toString(), alongIndexesMap)
+	addElementToMapArray([along, meetingsLength], keyStart + vertexIndex.toString(), alongIndexesMap)
 }
 
 function addPointIndexToGridMapArray(gridMap, halfMinusOverRadius, point, pointIndex) {
 	var key = Math.round(point[0] * halfMinusOverRadius).toString() + ' ' + Math.round(point[1] * halfMinusOverRadius).toString()
 	addElementToMapArray(pointIndex, key, gridMap)
-}
-
-//deprecated
-function addPolygonToNodeStrings(alongIndexesMap, nodeStrings, polygon, prefix, prefixOther) {
-	for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
-		var endIndex = (pointIndex + 1) % polygon.length
-		var alongIndexKey = prefix + ' ' + pointIndex.toString()
-		nodeStrings.push(alongIndexKey)
-		if (alongIndexesMap.has(alongIndexKey)) {
-			var alongIndexes = alongIndexesMap.get(alongIndexKey)
-			for (var alongIndex of alongIndexes) {
-				var meetingIndexString = alongIndex[1].toString()
-				nodeStrings.push('m ' + meetingIndexString + ' ' + prefixOther)
-				nodeStrings.push('m ' + meetingIndexString + ' ' + prefix)
-			}
-		}
-		nodeStrings.push(prefix + ' ' + endIndex.toString())
-	}
 }
 
 function addToLinkMap(indexA, indexB, linkMap) {
@@ -331,6 +313,13 @@ function addXIntersectionsBySegment(begin, end, xIntersections, y) {
 	}
 }
 
+function convert2DPolygonsTo3D(xyPolygons, z) {
+	for (polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
+		xyPolygons[polygonIndex] = getPolygon3D(xyPolygons[polygonIndex], z)
+	}
+	return xyPolygons
+}
+
 function convertFacetsToPolygons(facets) {
 	for (var facet of facets) {
 		convertFacetsToPolygon(facet)
@@ -352,26 +341,12 @@ function convertPointStringsToPointLists(pointStrings) {
 	return pointStrings
 }
 
-function convert2DPolygonsTo3D(xyPolygons, z) {
-	for (polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
-		xyPolygons[polygonIndex] = getPolygon3D(xyPolygons[polygonIndex], z)
+function convertSegmentArraysToKeyArrays(segmentArrays) {
+	for (var segments of segmentArrays) {
+		for (var segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+			segments[segmentIndex] = segments[segmentIndex][0].nodeKey
+		}
 	}
-	return xyPolygons
-}
-
-function getPolygon3D(polygon, z) {
-	if (getIsEmpty(polygon)) {
-		return polygon
-	}
-	if (polygon[0].length > 2) {
-		return polygon
-	}
-	var polygon3D = new Array(polygon.length)
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var vertex = polygon[vertexIndex]
-		polygon3D[vertexIndex] = [vertex[0], vertex[1], z]
-	}
-	return polygon3D
 }
 
 function getBoundingBox(polygon) {
@@ -505,6 +480,83 @@ function getClosePointIndexOrNull(gridMap, point, points) {
 	return null
 }
 
+function getConnectedSegmentArrays(toolPolygonSegments, workPolygonSegments) {
+	if (workPolygonSegments.length < 3) {
+		return []
+	}
+	var startIndex = getStartIndex(workPolygonSegments)
+	if (startIndex == null) {
+		if (workPolygonSegments[0] == null) {
+			return []
+		}
+		return [workPolygonSegments]
+	}
+	var segmentArrays = getSegmentArrays(workPolygonSegments, startIndex)
+	var toolNodeMap = new Map()
+	for (var segmentIndex = 0; segmentIndex < toolPolygonSegments.length; segmentIndex++) {
+		var toolPolygonSegment = toolPolygonSegments[segmentIndex]
+		if (toolPolygonSegment != null) {
+			toolNodeMap.set(toolPolygonSegment[0].nodeKey, segmentIndex)
+		}
+	}
+	var endKeyMap = new Map()
+	for (var segmentIndex = 0; segmentIndex < segmentArrays.length; segmentIndex++) {
+		endKeyMap.set(segmentArrays[segmentIndex][0][0].nodeKey, segmentIndex)
+	}
+	var workSegmentArrays = []
+	for (var segmentIndex = 0; segmentIndex < segmentArrays.length; segmentIndex++) {
+		var segments = segmentArrays[segmentIndex]
+		var nodeBeginKey = segments[segments.length - 1][1].nodeKey
+		connectionSegments = getConnectionSegments(endKeyMap, nodeBeginKey, toolNodeMap, toolPolygonSegments)
+		if (connectionSegments != null) {
+			segmentArrays[segmentIndex] = null
+			var nodeEndKey = segments[0][0].nodeKey
+			pushArray(segments, connectionSegments.segments)
+			if (connectionSegments.nodeKey == segmentIndex) {
+				workSegmentArrays.push(segments)
+				if (segments.length < 3) {
+//					noticeByList(
+//					['segments is shorter than 3 in getConnectedSegmentArrays in polygon.', segments, segmentArrays, segmentIndex])
+				}
+				endKeyMap.delete(nodeEndKey)
+			}
+			else {
+				pushArray(segments, segmentArrays[connectionSegments.nodeKey])
+				segmentArrays[connectionSegments.nodeKey] = segments
+				endKeyMap.set(nodeEndKey, connectionSegments.nodeKey)
+			}
+		}
+	}
+	for (var segments of segmentArrays) {
+		if (segments != null) {
+			noticeByList(['segments are not null in getConnectedSegmentArrays in polygon.', segments, segmentArrays])
+			workSegmentArrays.push(segments)
+		}
+	}
+	return workSegmentArrays
+}
+
+function getConnectionSegments(endKeyMap, nodeBeginKey, toolNodeMap, toolPolygonSegments) {
+	if (!toolNodeMap.has(nodeBeginKey)) {
+		return null
+	}
+	var connectionSegments = []
+	var startIndex = toolNodeMap.get(nodeBeginKey)
+	for (var extraIndex = 0; extraIndex < toolPolygonSegments.length; extraIndex++) {
+		var segmentIndex = (startIndex + extraIndex) % toolPolygonSegments.length
+		var toolPolygonSegment = toolPolygonSegments[segmentIndex]
+		if (toolPolygonSegment == null) {
+			return null
+		}
+		connectionSegments.push(toolPolygonSegment)
+		var toolKey = toolPolygonSegment[1].nodeKey
+		if (endKeyMap.has(toolKey)) {
+			return {nodeKey:endKeyMap.get(toolKey), segments:connectionSegments}
+		}
+	}
+	return null
+}
+
 function getCrossProductByPolygon(polygon) {
 	removeIdentical3DPoints(polygon)
 	var product = [0.0, 0.0, 0.0]
@@ -520,6 +572,22 @@ function getCrossProductByPolygon(polygon) {
 		oldVector = vector
 	}
 	return product
+}
+
+function getDifferencePolygons(toolPolygon, workPolygon) {
+	var isWorkClockwise = getIsClockwise(workPolygon)
+	return getOperatedPolygonsByExclusion(gDifferenceExclusion, getDirectedPolygon(!isWorkClockwise, toolPolygon), workPolygon)
+}
+
+function getDifferencePolygonsByPolygons(toolPolygons, workPolygons) {
+	for (var toolPolygon of toolPolygons) {
+		var differencePolygons = []
+		for (var workPolygon of workPolygons) {
+			pushArray(differencePolygons, getDifferencePolygons(toolPolygon, workPolygon))
+		}
+		workPolygons = differencePolygons
+	}
+	return workPolygons
 }
 
 function getDirectedPolygon(clockwise, polygon) {
@@ -554,48 +622,104 @@ function getDoubleTriangleArea(a, b, c) {
 	return (b[0] - aX) * (aY - c[1]) + (b[1] - aY) * (c[0] - aX)
 }
 
-function getExtantNodeMap(alongIndexesMap, extantInsideness, meetings, otherPolygon, polygon, prefix, prefixOther) {
-	var nodes = []
-	var extantNodeMap = new Map()
-	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var nodeKey = prefix + ' ' + vertexIndex.toString()
-		var point = polygon[vertexIndex]
-		var extant = getPolygonInsideness(point, otherPolygon)
-		if (!extantInsideness) {
-			extant = -extant
+function getExtantPolygons(alongIndexesMap, exclusion, isVertical, meetingMap, toolPolygon, workPolygon) {
+	var toolPolygonSegments = getPolygonSegments(alongIndexesMap, meetingMap, toolPolygon, 't')
+	var workPolygonSegments = getPolygonSegments(alongIndexesMap, meetingMap, workPolygon, 'w')
+	for (var segmentIndex = toolPolygonSegments.length - 1; segmentIndex > -1; segmentIndex--) {
+		var toolPolygonSegment = toolPolygonSegments[segmentIndex]
+		if (toolPolygonSegment[0].nodeKey == toolPolygonSegment[1].nodeKey) {
+			toolPolygonSegments.splice(segmentIndex, 1)
 		}
-		nodes.push({extant:extant, nodeKey:nodeKey, point:point})
-		if (alongIndexesMap.has(nodeKey)) {
-			var alongIndexes = alongIndexesMap.get(nodeKey)
-			for (var alongIndex of alongIndexes) {
-				var meetingIndex = alongIndex[1]
-				var nodeKey = 'm ' + meetingIndex.toString()
-				if (alongIndex[0] == 0.0) {
-					nodes.pop()
+	}
+	if (isVertical) {
+		for (var segmentIndex = toolPolygonSegments.length - 1; segmentIndex > -1; segmentIndex--) {
+			var toolPolygonSegment = toolPolygonSegments[segmentIndex]
+			var nodeBegin = toolPolygonSegment[0]
+			var nodeEnd = toolPolygonSegment[1]
+			if (nodeBegin.nodeKey[0] == 'm' && nodeEnd.nodeKey[0] == 'm') {
+				if (nodeBegin.nodeKey != nodeEnd.nodeKey) {
+					if (nodeBegin.point[0] == nodeEnd.point[0] && nodeBegin.point[1] == nodeEnd.point[1]) {
+						var reversedSegment = [toolPolygonSegment[1], toolPolygonSegment[0]]
+						toolPolygonSegments.splice(segmentIndex + 1, 0, reversedSegment)
+					}
 				}
-				point = meetings[meetingIndex].point
-				var extant = getPolygonInsideness(point, otherPolygon)
-				if (!extantInsideness) {
-					extant = -extant
-				}
-				nodes.push({extant:extant, nodeKey:nodeKey, point:point})
 			}
 		}
 	}
-	for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) {
-		var beginNode = nodes[nodeIndex]
-		var centerNode = nodes[(nodeIndex + 1) % nodes.length]
-		if (beginNode.extant > -1 && centerNode.extant > -1) {
-			var extantNode = {
-				nextExtant:centerNode.extant,
-				nextKey:centerNode.nodeKey,
-				nextPoint:centerNode.point,
-				nodeKey:beginNode.nodeKey,
-				point:beginNode.point}
-			extantNodeMap.set(beginNode.nodeKey, extantNode)
+	nullifyExcludedPoints(exclusion.toolExclusion, workPolygon, toolPolygonSegments)
+	nullifyExcludedMidpoints(new Set([exclusion.toolExclusion]), workPolygon, toolPolygonSegments)
+	nullifyExcludedPoints(exclusion.workExclusion, toolPolygon, workPolygonSegments)
+	nullifyExcludedMidpoints(exclusion.workExclusionSet, toolPolygon, workPolygonSegments)
+	var connectedSegmentArrays = getConnectedSegmentArrays(toolPolygonSegments, workPolygonSegments)
+	convertSegmentArraysToKeyArrays(connectedSegmentArrays)
+	return connectedSegmentArrays
+}
+
+function getFacetsByArrowKeyMap(arrowKeyMap) {
+	var facets = []
+	for (var arrow of arrowKeyMap.values()) {
+		if (arrow != null) {
+			var arrowString = arrow.beginKey.toString() + ' ' + arrow.endKey.toString()
+			var facet = [arrow.beginKey]
+			arrowKeyMap.set(arrowString, null)
+			do {
+				if (arrowKeyMap.has(arrow.endKey)) {
+					var nextArrow = arrowKeyMap.get(arrow.endKey)
+					if (nextArrow == null) {
+//						warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was null in the arrowKeyMap:\n from the facet:\n'
+//						warning(warningString, [arrow, arrowKeyMap, facet])
+						break
+					}
+					else {
+						arrow = nextArrow
+						arrowKeyMap.set(arrow.beginKey, null)
+						facet.push(arrow.beginKey)
+					}
+				}
+				else {
+//					warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was not in the arrowKeyMap:\n from the facet:\n'
+//					warning(warningString, [arrow, arrowKeyMap, facet])
+					break
+				}
+				if (facet[0] == arrow.endKey) {
+					facets.push(facet)
+					break
+				}
+				if (facet.length > gLengthLimit) {
+//					warningString = 'In getFacetsByarrowKeyMap, polygon is too large or there is a mistake, length: \narrowKey: \nfacet: '
+//					warning(warningString, [facet.length, arrow, facet])
+					break
+				}
+			}
+			while (true)
 		}
 	}
-	return extantNodeMap
+	return facets
+}
+
+function getGridMultiplier(gridMap, points) {
+	if (getIsEmpty(points)) {
+		return null
+	}
+	var firstPoint = points[0]
+	var minimumX = firstPoint[0]
+	var maximumX = firstPoint[0]
+	var minimumY = firstPoint[1]
+	var maximumY = firstPoint[1]
+	for (var pointIndex = 1; pointIndex < points.length; pointIndex++) {
+		var point = points[pointIndex]
+		var minimumX = Math.min(minimumX, point[0])
+		var maximumX = Math.max(maximumX, point[0])
+		var minimumY = Math.min(minimumY, point[1])
+		var maximumY = Math.max(maximumY, point[1])
+	}
+	var maximumRange = Math.max(maximumX - minimumX, maximumY - minimumY)
+	var gridMultiplier = 2.0 * (Math.sqrt(points.length) + 1) / maximumRange
+	for (var point of points) {
+		var key = Math.round(point[0] * gridMultiplier).toString() + ' ' + Math.round(point[1] * gridMultiplier).toString()
+		addElementToMapArray(point, key, gridMap)
+	}
+	return gridMultiplier
 }
 
 function getHolePolygons(innerLeft, innerRight, outerBottom, outerTopRight, overhangAngle, thickness, width) {
@@ -697,249 +821,6 @@ function getHolePolygons(innerLeft, innerRight, outerBottom, outerTopRight, over
 		diamondTop += diamondHeight
 	}
 	return holePolygons
-}
-
-function getIsPolygonBent(polygon) {
-	removeIdentical3DPoints(polygon)
-	if (polygon.length < 3) {
-		return false
-	}
-	var center = polygon[0]
-	var oldProduct = null
-	var oldVector = getSubtraction3D(polygon[1], center)
-	for (var vertexIndex = 2; vertexIndex < polygon.length; vertexIndex++) {
-		vector = getSubtraction3D(polygon[vertexIndex], center)
-		var product = crossProduct(oldVector, vector)
-		var productLength = length3D(product)
-		if (productLength > 0.0) {
-			divide3DScalar(product, productLength)
-			if (oldProduct != null) {
-				if (Math.abs(dotProduct3D(product, oldProduct)) < gOneMinusClose) {
-					return true
-				}
-			}
-			oldProduct = product
-		}
-		oldVector = vector
-	}
-	return false
-}
-
-//deprecated
-function getPointByNode(node, meetings, polygon) {
-	var nodeStrings = node.split(' ')
-	if (nodeStrings[0] == 'm') {
-		return meetings[parseInt(nodeStrings[1])].point
-	}
-	return polygon[parseInt(nodeStrings[1])]
-}
-//deprecated
-function getMidpointByStrings(beginNode, endNode, meetings, polygon) {
-	var beginPoint = getPointByNode(beginNode, meetings, polygon)
-	var endPoint = getPointByNode(endNode, meetings, polygon)
-	return getMultiplication2DScalar(getAddition2D(beginPoint, endPoint), 0.5)
-}
-
-//deprecated
-function getExtantPolygonsOld(alongIndexesMap, extantInsideness, meetings, toolPolygon, workPolygon) {
-	var arrowMap = new Map()
-	var extantSet = new Set()
-	var toolStrings = []
-	var workStrings = []
-	addPolygonToNodeStrings(alongIndexesMap, toolStrings, toolPolygon, 't', 'w')
-	addPolygonToNodeStrings(alongIndexesMap, workStrings, workPolygon, 'w', 't')
-	for (var toolStringsIndex = 0; toolStringsIndex < toolStrings.length; toolStringsIndex += 2) {
-		var beginNode = toolStrings[toolStringsIndex]
-		var endNode = toolStrings[toolStringsIndex + 1]
-		var insideness = getPolygonInsideness(getMidpointByStrings(beginNode, endNode, meetings, toolPolygon), workPolygon)
-		if (insideness == 0) {
-			var endInsideness = getPolygonInsideness(getPointByNode(endNode, meetings, toolPolygon), workPolygon)
-			if (endInsideness == 0 || endInsideness == extantInsideness.tool) {
-				arrowMap.set(beginNode, endNode)
-			}
-		}
-		else {
-			if (insideness == extantInsideness.tool) {
-				arrowMap.set(beginNode, endNode)
-				extantSet.add(beginNode)
-			}
-		}
-	}
-	for (var workStringsIndex = 0; workStringsIndex < workStrings.length; workStringsIndex += 2) {
-		var beginNode = workStrings[workStringsIndex]
-		var endNode = workStrings[workStringsIndex + 1]
-		var insideness = getPolygonInsideness(getMidpointByStrings(beginNode, endNode, meetings, workPolygon), toolPolygon)
-		if (insideness == 0) {
-			var endInsideness = getPolygonInsideness(getPointByNode(endNode, meetings, workPolygon), toolPolygon)
-			if (endInsideness == 0 || endInsideness == extantInsideness.work) {
-				arrowMap.set(beginNode, endNode)
-			}
-		}
-		else {
-			if (insideness == extantInsideness.work) {
-				arrowMap.set(beginNode, endNode)
-				extantSet.add(beginNode)
-			}
-		}
-	}
-	var alternateKeyMap = new Map()
-	alternateKeyMap.set('t', 'w')
-	alternateKeyMap.set('w', 't')
-	var extantPolygons = []
-	for (var arrowKey of arrowMap.keys()) {
-		var arrowValue = arrowMap.get(arrowKey)
-		if (arrowValue != null && extantSet.has(arrowKey)) {
-			var extantPolygon = []
-			var firstKey = null
-			extantPolygons.push(extantPolygon)
-			for (var whileIndex = 0; whileIndex < 9876543; whileIndex++) {
-				if (extantPolygon.length == 0) {
-					firstKey = arrowKey
-					arrowMap.set(arrowKey, 's')
-				}
-				else {
-					if (arrowValue == 's' || arrowValue == null) {
-						arrowMap.set(firstKey, null)
-						break
-					}
-					else {
-						arrowMap.set(arrowKey, null)
-					}
-				}
-				extantPolygon.push(arrowKey)
-				arrowKey = arrowValue
-				if (arrowMap.has(arrowKey)) {
-					arrowValue = arrowMap.get(arrowKey)
-				}
-				else {
-					arrowValue = null
-				}
-				if (arrowValue == null) {
-					var keyStrings = arrowKey.split(' ')
-					var alternateKey = 'm ' + keyStrings[1] + ' ' + alternateKeyMap.get(keyStrings[2])
-					if (arrowMap.has(alternateKey)) {
-						arrowKey = alternateKey
-						arrowValue = arrowMap.get(arrowKey)
-					}
-				}
-			}
-		}
-	}
-	return extantPolygons
-}
-
-function getExtantPolygons(alongIndexesMap, isVertical, meetings, operator, toolPolygon, workPolygon) {
-	var toolExtantInsideness = true
-	var startException = 'm'
-	var workExtantInsideness = true
-	if (operator[0] == 'd') {
-		workExtantInsideness = false
-	}
-	else {
-		if (operator[0] == 'u') {
-			toolExtantInsideness = false
-			workExtantInsideness = false
-		}
-	}
-	if (operator[0] == 'i') {
-		startException = null
-	}
-	var toolNodeMap = getExtantNodeMap(alongIndexesMap, toolExtantInsideness, meetings, workPolygon, toolPolygon, 't', 'w')
-	var workNodeMap = getExtantNodeMap(alongIndexesMap, workExtantInsideness, meetings, toolPolygon, workPolygon, 'w', 't')
-	var extantPolygons = []
-	var nodeMaps = [toolNodeMap, workNodeMap]
-	if (isVertical) {
-		var normal = multiply3DScalar(getNormalByPolygon(workPolygon), gClose)
-		for (var nodeMap of nodeMaps) {
-			for (var node of nodeMap.values()) {
-				if (node.point.length == 3) {
-					node.point = getSubtraction2D(node.point, getMultiplication2DScalar(normal, node.point[2]))
-				}
-				if (node.nextPoint.length == 3) {
-					node.nextPoint = getSubtraction2D(node.nextPoint, getMultiplication2DScalar(normal, node.nextPoint[2]))
-				}
-			}
-		}
-		workPolygon = getArraysCopy(workPolygon)
-		for (var pointIndex = 0; pointIndex < workPolygon.length; pointIndex++) {
-			var point = workPolygon[pointIndex]
-			workPolygon[pointIndex] = getSubtraction2D(point, getMultiplication2DScalar(normal, point[2]))
-		}
-	}
-	var turnRight = getIsClockwise(workPolygon)
-	if (operator == 'u') {
-		turnRight = !turnRight
-	}
-	addExtantPolygons(extantPolygons, nodeMaps, 1, startException, turnRight)
-	addExtantPolygons(extantPolygons, nodeMaps, 0, startException, turnRight)
-	return extantPolygons
-}
-
-function getFacetsByArrowKeyMap(arrowKeyMap) {
-	var facets = []
-	for (var arrow of arrowKeyMap.values()) {
-		if (arrow != null) {
-			var arrowString = arrow.beginKey.toString() + ' ' + arrow.endKey.toString()
-			var facet = [arrow.beginKey]
-			arrowKeyMap.set(arrowString, null)
-			do {
-				if (arrowKeyMap.has(arrow.endKey)) {
-					var nextArrow = arrowKeyMap.get(arrow.endKey)
-					if (nextArrow == null) {
-//						warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was null in the arrowKeyMap:\n from the facet:\n'
-//						warning(warningString, [arrow, arrowKeyMap, facet])
-						break
-					}
-					else {
-						arrow = nextArrow
-						arrowKeyMap.set(arrow.beginKey, null)
-						facet.push(arrow.beginKey)
-					}
-				}
-				else {
-//					warningString = 'In getFacetsByarrowKeyMap, arrow.endKey:\n was not in the arrowKeyMap:\n from the facet:\n'
-//					warning(warningString, [arrow, arrowKeyMap, facet])
-					break
-				}
-				if (facet[0] == arrow.endKey) {
-					facets.push(facet)
-					break
-				}
-				if (facet.length > gLengthLimit) {
-//					warningString = 'In getFacetsByarrowKeyMap, polygon is too large or there is a mistake, length: \narrowKey: \nfacet: '
-//					warning(warningString, [facet.length, arrow, facet])
-					break
-				}
-			}
-			while (true)
-		}
-	}
-	return facets
-}
-
-function getGridMultiplier(gridMap, points) {
-	if (getIsEmpty(points)) {
-		return null
-	}
-	var firstPoint = points[0]
-	var minimumX = firstPoint[0]
-	var maximumX = firstPoint[0]
-	var minimumY = firstPoint[1]
-	var maximumY = firstPoint[1]
-	for (var pointIndex = 1; pointIndex < points.length; pointIndex++) {
-		var point = points[pointIndex]
-		var minimumX = Math.min(minimumX, point[0])
-		var maximumX = Math.max(maximumX, point[0])
-		var minimumY = Math.min(minimumY, point[1])
-		var maximumY = Math.max(maximumY, point[1])
-	}
-	var maximumRange = Math.max(maximumX - minimumX, maximumY - minimumY)
-	var gridMultiplier = 2.0 * (Math.sqrt(points.length) + 1) / maximumRange
-	for (var point of points) {
-		var key = Math.round(point[0] * gridMultiplier).toString() + ' ' + Math.round(point[1] * gridMultiplier).toString()
-		addElementToMapArray(point, key, gridMap)
-	}
-	return gridMultiplier
 }
 
 function getIndexRange(elements, index) {
@@ -1103,7 +984,12 @@ function getIntercircleLoopsByPolylines(polylines, radius) {
 	return getIntercircleLoops(points, radius)
 }
 
-function getIntersectedPolygons(polygons) {
+function getIntersectionPolygons(toolPolygon, workPolygon) {
+	var isWorkClockwise = getIsClockwise(workPolygon)
+	return getOperatedPolygonsByExclusion(gIntersectionExclusion, getDirectedPolygon(isWorkClockwise, toolPolygon), workPolygon)
+}
+
+function getIntersectionPolygonsByPolygons(polygons) {
 	if (polygons.length == 0) {
 		return []
 	}
@@ -1111,12 +997,12 @@ function getIntersectedPolygons(polygons) {
 	for (var polygonIndex = 1; polygonIndex < polygons.length; polygonIndex++) {
 		var operatedPolygons = []
 		for (var intersectedPolygon of intersectedPolygons) {
-			pushArray(operatedPolygons, getOperatedPolygons('i', polygons[polygonIndex], intersectedPolygon))
+			pushArray(operatedPolygons, getIntersectionPolygons(polygons[polygonIndex], intersectedPolygon))
 		}
 		intersectedPolygons = operatedPolygons
 	}
 	return intersectedPolygons
-}	
+}
 
 function getIntersectionPairsMap(xyPolygons) {
 	var intersectionPairsMap = new Map()
@@ -1251,6 +1137,32 @@ function getIsPointInsidePolygonOrClose(point, polygon) {
 	return getNumberOfIntersectionsToLeft(x, xIntersections) % 2 == 1
 }
 
+function getIsPolygonBent(polygon) {
+	removeIdentical3DPoints(polygon)
+	if (polygon.length < 3) {
+		return false
+	}
+	var center = polygon[0]
+	var oldProduct = null
+	var oldVector = getSubtraction3D(polygon[1], center)
+	for (var vertexIndex = 2; vertexIndex < polygon.length; vertexIndex++) {
+		vector = getSubtraction3D(polygon[vertexIndex], center)
+		var product = crossProduct(oldVector, vector)
+		var productLength = length3D(product)
+		if (productLength > 0.0) {
+			divide3DScalar(product, productLength)
+			if (oldProduct != null) {
+				if (Math.abs(dotProduct3D(product, oldProduct)) < gOneMinusClose) {
+					return true
+				}
+			}
+			oldProduct = product
+		}
+		oldVector = vector
+	}
+	return false
+}
+
 function getIsPolygonIntersecting(toolPolygon, workPolygon) {
 	var toolBox = getBoundingBox(toolPolygon)
 	var workBox = getBoundingBox(workPolygon)
@@ -1305,8 +1217,8 @@ function getIsPolygonMeeting(toolPolygon, workPolygon) {
 		if (deltaLength != 0.0) {
 			divide2DScalar(delta, deltaLength)
 			var reverseRotation = [delta[0], -delta[1]]
-			var toolBeginRotated = get2DRotation(toolBegin, reverseRotation)
-			var toolEndRotated = get2DRotation(toolEnd, reverseRotation)
+			var toolBeginRotated = getRotation2DVector(toolBegin, reverseRotation)
+			var toolEndRotated = getRotation2DVector(toolEnd, reverseRotation)
 			var y = toolBeginRotated[1]
 			var workPolygonRotated = get2DRotations(workPolygon, reverseRotation)
 			for (var workBeginIndex = 0; workBeginIndex < workPolygonRotated.length; workBeginIndex++) {
@@ -1344,9 +1256,9 @@ function getIsXYSegmentClose(begin, end, point) {
 	}
 	divide2DScalar(delta, deltaLength)
 	var reverseRotation = [delta[0], -delta[1]]
-	var beginRotated = get2DRotation(begin, reverseRotation)
-	var endRotated = get2DRotation(end, reverseRotation)
-	var pointRotated = get2DRotation(point, reverseRotation)
+	var beginRotated = getRotation2DVector(begin, reverseRotation)
+	var endRotated = getRotation2DVector(end, reverseRotation)
+	var pointRotated = getRotation2DVector(point, reverseRotation)
 	if (pointRotated[0] < beginRotated[0]) {
 		return distanceSquared2D(begin, point) < gQuarterCloseSquared
 	}
@@ -1362,11 +1274,11 @@ function getIsXYZCollinear(beginPoint, centerPoint, endPoint) {
 	var vectorALength = length3D(vectorA)
 	var vectorBLength = length3D(vectorB)
 	if (vectorALength == 0.0 && vectorBLength == 0.0) {
-		warningByList(['In getIsCollinear both vectors have zero length:', vectorA, vectorB])
+		warningByList(['In getIsCollinear both vectors have zero length:', vectorA, vectorB, beginPoint, centerPoint, endPoint])
 		return true
 	}
 	if (vectorALength == 0.0 || vectorBLength == 0.0) {
-		warningByList(['In getIsCollinear a vector has zero length:', vectorA, vectorB])
+		warningByList(['In getIsCollinear a vector has zero length:', vectorA, vectorB, beginPoint, centerPoint, endPoint])
 		return false
 	}
 	divide3DScalar(vectorA, vectorALength)
@@ -1382,9 +1294,9 @@ function getIsXYZSegmentClose(begin, end, point) {
 	}
 	divide3DScalar(delta, deltaLength)
 	var reverseRotation = [delta[0], -delta[1]]
-	var beginRotated = get2DRotation(begin, reverseRotation)
-	var endRotated = get2DRotation(end, reverseRotation)
-	var pointRotated = get2DRotation(point, reverseRotation)
+	var beginRotated = getRotation2DVector(begin, reverseRotation)
+	var endRotated = getRotation2DVector(end, reverseRotation)
+	var pointRotated = getRotation2DVector(point, reverseRotation)
 	if (pointRotated[0] < beginRotated[0]) {
 		return distanceSquared3D(begin, point) < gCloseSquared
 	}
@@ -1456,21 +1368,6 @@ function getJoinedMap(length, linkMap) {
 	}
 	return joinedMap
 }
-
-function getJoinedPolygons(polygons) {
-	if (polygons.length == 0) {
-		return []
-	}
-	var joinedPolygons = [polygons[0]]
-	for (var polygonIndex = 1; polygonIndex < polygons.length; polygonIndex++) {
-		var operatedPolygons = []
-		for (var joinedPolygon of joinedPolygons) {
-			pushArray(operatedPolygons, getOperatedPolygons('u', polygons[polygonIndex], joinedPolygon))
-		}
-		joinedPolygons = operatedPolygons
-	}
-	return joinedPolygons
-}	
 
 function getLinkTop(key, linkMap) {
 	var top = getLinkTopOnly(key, linkMap)
@@ -1544,6 +1441,26 @@ function getMeeting(toolBeginX, toolEndX, toolY, workBegin, workEnd) {
 	}
 	var deltaY = workEndY - workBeginY
 	if (Math.abs(deltaY) < gHalfClose) {
+/*
+		var deltaX = toolEndX - toolBeginX
+		var minimumX = Math.min(toolBeginX, toolEndX) - gClose
+		var maximumX = Math.max(toolBeginX, toolEndX) + gClose
+		if (workBeginX >= minimumX && workBeginX <= maximumX) {
+			return {isToolNode:false, isWorkNode:true, workAlong:0.0, toolAlong:(workBeginX - toolBeginX) / deltaX}
+		}
+		if (workEndX >= minimumX && workEndX <= maximumX) {
+			return {isToolNode:false, isWorkNode:true, workAlong:1.0, toolAlong:(workEndX - toolBeginX) / deltaX}
+		}
+		deltaX = workEndX - workBeginX
+		minimumX = Math.min(workBeginX, workEndX) - gClose
+		maximumX = Math.max(workBeginX, workEndX) + gClose
+		if (toolBeginX >= minimumX && toolBeginX <= maximumX) {
+			return {isToolNode:true, isWorkNode:false, workAlong:(toolBeginX - workBeginX) / deltaX, toolAlong:0.0}
+		}
+		if (toolEndX >= minimumX && toolEndX <= maximumX) {
+			return {isToolNode:true, isWorkNode:false, workAlong:(toolBeginX - workBeginX) / deltaX, toolAlong:1.0}
+		}
+*/
 		return null
 	}
 	var workAlong = (toolY - workBeginY) / deltaY
@@ -1563,22 +1480,19 @@ function getMeeting(toolBeginX, toolEndX, toolY, workBegin, workEnd) {
 	return {isToolNode:isToolNode, isWorkNode:isWorkNode, toolAlong:toolAlong, workAlong:workAlong}
 }
 
-function getMeetingByHeight(splitHeight, workBegin, workEnd) {
-	if (distanceSquared2D(workBegin, workEnd) == 0.0) {
-		return null
-	}
-	var workBeginY = workBegin[1]
-	var workEndY = workEnd[1]
-	if (getIsAwayFromHeight(splitHeight, workBeginY, workEndY)) {
+function getMeetingByHeight(splitHeight, workBeginY, workEndY) {
+	if (workBeginY > splitHeight == workEndY > splitHeight) {
 		return null
 	}
 	var deltaY = workEndY - workBeginY
 	if (Math.abs(deltaY) < gClose) {
-		return {isWorkNode:true, toolAlong:null, workAlong:0.0}
+		return {isWorkNode:true, workAlong:0.0}
 	}
 	var workAlong = (splitHeight - workBeginY) / deltaY
-	var toolAlong = (1.0 - workAlong) * workBegin[0] + workAlong * workEnd[0]
-	return {isWorkNode:workAlong < gClose || workAlong > gOneMinusClose, toolAlong:toolAlong, workAlong:workAlong}
+	if (workAlong < gClose || workAlong > gOneMinusClose) {
+		return {isWorkNode:true, workAlong:1.0 * (workAlong > 0.5)}
+	}
+	return {isWorkNode:false, workAlong:workAlong}
 }
 
 function getMinimumWidth(polygon) {
@@ -1649,46 +1563,27 @@ function getNumberOfShells(insideMap, polygonIndex) {
 	return 0
 }
 
-function getOperatedPolygons(operator, toolPolygon, workPolygon) {
+function getOperatedPolygonsByExclusion(exclusion, toolPolygon, workPolygon) {
 	var alongIndexesMap = new Map()
-	toolPolygon = getOperatorDirectedPolygon(getIsClockwise(workPolygon), operator, toolPolygon)
-	var meetings = []
-	addMeetingsByPolygon(alongIndexesMap, meetings, toolPolygon, workPolygon)
-	sortRemoveMeetings(alongIndexesMap, meetings)
-	var extantPolygons = getExtantPolygons(alongIndexesMap, false, meetings, operator, toolPolygon, workPolygon)
+	var meetingMap = new Map()
+	addMeetingsByPolygon(alongIndexesMap, meetingMap, toolPolygon, workPolygon)
+	sortAlongIndexesMap(alongIndexesMap, meetingMap)
+	var extantPolygons = getExtantPolygons(alongIndexesMap, exclusion, false, meetingMap, toolPolygon, workPolygon)
+	console.log(extantPolygons)
 	for (var extantPolygon of extantPolygons) {
 		removeRepeats(extantPolygon)
 		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
 			var nodeStrings = extantPolygon[nodeStringIndex].split(' ')
-			var nodeIndex = parseInt(nodeStrings[1])
+			var meetingKey = nodeStrings[1]
 			if (nodeStrings[0] == 't') {
-				extantPolygon[nodeStringIndex] = toolPolygon[nodeIndex]
+				extantPolygon[nodeStringIndex] = toolPolygon[parseInt(meetingKey)]
 			}
 			else {
 				if (nodeStrings[0] == 'w') {
-					extantPolygon[nodeStringIndex] = workPolygon[nodeIndex]
+					extantPolygon[nodeStringIndex] = workPolygon[parseInt(meetingKey)]
 				}
 				else {
-					extantPolygon[nodeStringIndex] = meetings[nodeIndex].point
-				}
-			}
-		}
-	}
-	var extantPolygons = getExtantPolygons(alongIndexesMap, false, meetings, operator, toolPolygon, workPolygon)
-	for (var extantPolygon of extantPolygons) {
-		removeRepeats(extantPolygon)
-		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
-			var nodeStrings = extantPolygon[nodeStringIndex].split(' ')
-			var nodeIndex = parseInt(nodeStrings[1])
-			if (nodeStrings[0] == 't') {
-				extantPolygon[nodeStringIndex] = toolPolygon[nodeIndex]
-			}
-			else {
-				if (nodeStrings[0] == 'w') {
-					extantPolygon[nodeStringIndex] = workPolygon[nodeIndex]
-				}
-				else {
-					extantPolygon[nodeStringIndex] = meetings[nodeIndex].point
+					extantPolygon[nodeStringIndex] = meetingMap.get(meetingKey).point
 				}
 			}
 		}
@@ -1793,7 +1688,7 @@ function getOutlinesQuickly(baseLocation, baseMarker, markerAbsolute, outsets, p
 }
 
 function getOutsetPolygon(outset, polygon) {
-	removeIdenticalXYPoints(polygon)
+	removeIdentical2DPoints(polygon)
 	var outsetPolygon = new Array(polygon.length)
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
@@ -1809,7 +1704,7 @@ function getOutsetPolygon(outset, polygon) {
 }
 
 function getOutsetPolygonByMarker(baseLocation, baseMarker, markerAbsolute, outsets, polygon, tipMarker) {
-	removeIdenticalXYPoints(polygon)
+	removeIdentical2DPoints(polygon)
 	var outset = outsets[0]
 	var outsetPolygon = []
 	var closestVertexIndex = null
@@ -1856,7 +1751,7 @@ function getOutsetPolygonByMarker(baseLocation, baseMarker, markerAbsolute, outs
 			if (dotProduct > 0.999 && marker != null) {
 				outsetPolygon.push(add2D(centerPoint.slice(0), getMultiplication2D(centerLeft, outset)))
 				for (var vertex of marker) {
-					var rotatedVertex = get2DRotation(vertex, centerRight)
+					var rotatedVertex = getRotation2DVector(vertex, centerRight)
 					if (!markerAbsolute) {
 						multiply2D(rotatedVertex, outset)
 					}
@@ -1943,7 +1838,7 @@ function getPointsByString(pointString) {
 	if (pointString == '') {
 		return []
 	}
-	var parameterStrings = pointString.split(' ')
+	var parameterStrings = pointString.split(' ').filter(lengthCheck)
 	for (parameterIndex = 0; parameterIndex < parameterStrings.length; parameterIndex++) {
 		parameterStrings[parameterIndex] = parameterStrings[parameterIndex].split(',').map(parseFloat)
 	}
@@ -1982,6 +1877,21 @@ function getPointInsidePolygon(polygon) {
 		return null
 	}
 	return [midX, midY]
+}
+
+function getPolygon3D(polygon, z) {
+	if (getIsEmpty(polygon)) {
+		return polygon
+	}
+	if (polygon[0].length > 2) {
+		return polygon
+	}
+	var polygon3D = new Array(polygon.length)
+	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
+		var vertex = polygon[vertexIndex]
+		polygon3D[vertexIndex] = [vertex[0], vertex[1], z]
+	}
+	return polygon3D
 }
 
 function getPolygonArea(polygon) {
@@ -2151,6 +2061,29 @@ function getPolygonsByLines(lines, pointMap) {
 	return getPolygonsByArrowMap(arrowMap, pointMap)
 }
 
+function getPolygonSegments(alongIndexesMap, meetingMap, polygon, prefix) {
+	var polygonSegments = []
+	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
+		var nodeKey = prefix + ' ' + vertexIndex.toString()
+		polygonSegments.push([{nodeKey:nodeKey, point:polygon[vertexIndex]}])
+		if (alongIndexesMap.has(nodeKey)) {
+			var alongIndexes = alongIndexesMap.get(nodeKey)
+			for (var alongIndex of alongIndexes) {
+				if (alongIndex[0] == 0.0) {
+					if (polygonSegments[polygonSegments.length - 1][0].nodeKey[0] != 'm') {
+						polygonSegments.pop()
+					}
+				}
+				polygonSegments.push([{nodeKey:'m ' + alongIndex[1], point:meetingMap.get(alongIndex[1]).point}])
+			}
+		}
+	}
+	for (var polygonSegmentIndex = 0; polygonSegmentIndex < polygonSegments.length; polygonSegmentIndex++) {
+		polygonSegments[polygonSegmentIndex].push(polygonSegments[(polygonSegmentIndex + 1) % polygonSegments.length][0])
+	}
+	return polygonSegments
+}
+
 function getPolygonSlice(polygon, beginIndex, endIndex) {
 	var polygonSlice = []
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
@@ -2162,6 +2095,28 @@ function getPolygonSlice(polygon, beginIndex, endIndex) {
 	}
 	noticeByList(['Could not find the endIndex for getPolygonSlice in polygon.', polygon, beginIndex, endIndex])
 	return polygon
+}
+
+function getSegmentArrays(polygonSegments, startIndex) {
+	var segmentArrays = []
+	var workSegments = null
+	for (var extraIndex = 0; extraIndex < polygonSegments.length; extraIndex++) {
+		var segmentIndex = (startIndex + extraIndex) % polygonSegments.length
+		var workPolygonSegment = polygonSegments[segmentIndex]
+		if (workPolygonSegment == null) {
+			if (workSegments != null) {
+				segmentArrays.push(workSegments)
+				workSegments = null
+			}
+		}
+		else {
+			if (workSegments == null) {
+				workSegments = []
+			}
+			workSegments.push(workPolygonSegment)
+		}
+	}
+	return segmentArrays
 }
 
 function getStringAlongMap(baseIndex, polygon) {
@@ -2243,17 +2198,6 @@ function getStringAlongMap(baseIndex, polygon) {
 	return stringAlongMap
 }
 
-function getSubtractedPolygons(toolPolygons, workPolygons) {
-	for (var toolPolygon of toolPolygons) {
-		var subtractedPolygons = []
-		for (var workPolygon of workPolygons) {
-			pushArray(subtractedPolygons, getOperatedPolygons('d', toolPolygon, workPolygon))
-		}
-		workPolygons = subtractedPolygons
-	}
-	return workPolygons
-}	
-
 function getSwapped2DPolygon(polygon) {
 	var swapped2DPolygon = new Array(polygon.length)
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
@@ -2274,8 +2218,7 @@ function getXYPolygonsByArrows(arrowsMap, points, z) {
 				if (arrowsMap.has(arrow.endKey)) {
 					var nextArrows = arrowsMap.get(arrow.endKey)
 					if (nextArrows == null) {
-						warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was null in the arrowsMap:\n from the keys:\n'
-						warning(warningString, [arrow, arrowsMap, keys])
+						noticeByList(['In getXYPolygonsByArrows in polygon, arrow.endKey was null.', arrow, arrowsMap, keys])
 						break
 					}
 					else {
@@ -2301,8 +2244,7 @@ function getXYPolygonsByArrows(arrowsMap, points, z) {
 					}
 				}
 				else {
-					warningString = 'In getXYPolygonsByArrows, arrow.endKey:\n was not in the arrowsMap:\n from the keys:\n'
-					warning(warningString, [arrow, arrowsMap, keys])
+					noticeByList(['In getXYPolygonsByArrows in polygon, arrow.endKey was null.', arrow, arrowsMap, keys])
 					break
 				}
 				if (keys[0] == arrow.endKey) {
@@ -2345,8 +2287,8 @@ function getZByPointPolygon(point, polygon) {
 	var bMinusALength = length2D(bMinusA)
 	var bMinusAMmirror = [bMinusA[0] / bMinusALength, -bMinusA[1] / bMinusALength]
 	var bMinusAX = bMinusA[0] * bMinusAMmirror[0] - bMinusA[1] * bMinusAMmirror[1]
-	var cMinusA = get2DRotation(getSubtraction2D(c, a), bMinusAMmirror)
-	var pointMinusA = get2DRotation(getSubtraction2D(point, a), bMinusAMmirror)
+	var cMinusA = getRotation2DVector(getSubtraction2D(c, a), bMinusAMmirror)
+	var pointMinusA = getRotation2DVector(getSubtraction2D(point, a), bMinusAMmirror)
 	var pointAlongC = pointMinusA[1] / cMinusA[1]
 	var pointAlongB = (pointMinusA[0] - cMinusA[0] * pointAlongC) / bMinusAX
 	var aMultiplied = getMultiplication3DScalar(a, 1 - pointAlongB - pointAlongC)
@@ -2405,6 +2347,31 @@ function isPointOutsideOrBorderingCircles(gridMap, halfMinusOver, linkSet, point
 	return true
 }
 
+function nullifyExcludedMidpoints(excludeInsidenessSet, otherPolygon, polygonSegments) {
+	for (var vertexIndex = 0; vertexIndex < polygonSegments.length; vertexIndex++) {
+		var polygonSegment = polygonSegments[vertexIndex]
+		if (polygonSegment != null) {
+			var midpoint = getMidpoint2D(polygonSegment[0].point, polygonSegment[1].point)
+			if (excludeInsidenessSet.has(getPolygonInsideness(midpoint, otherPolygon))) {
+				polygonSegments[vertexIndex] = null
+			}
+		}
+	}
+}
+
+function nullifyExcludedPoints(excludeInsideness, otherPolygon, polygonSegments) {
+	for (var vertexIndex = 0; vertexIndex < polygonSegments.length; vertexIndex++) {
+		var polygonSegment = polygonSegments[vertexIndex]
+		if (polygonSegment != null) {
+			var point = polygonSegment[1].point
+			if (excludeInsideness == getPolygonInsideness(point, otherPolygon)) {
+				polygonSegments[vertexIndex] = null
+				polygonSegments[(vertexIndex + 1) % polygonSegments.length] = null
+			}
+		}
+	}
+}
+
 function removeClose2DPoints(points) {
 	var gridSet = new Set()
 	var distantIndex = 0
@@ -2433,8 +2400,36 @@ function removeClose2DPoints(points) {
 	points.length = distantIndex
 }
 
+function removeCollinearPointsByFacets(collinearities, facets) {
+	for (var facet of facets) {
+		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			if (collinearities[facet[vertexIndex]]) {
+				facet[vertexIndex] = null
+			}
+		}
+		removeNulls(facet)
+	}
+}
+
+function removeCollinearPointsByMesh(mesh) {
+	var facets = mesh.facets
+	var points = mesh.points
+	var collinearities = new Array(points.length).fill(true)
+	for (var facet of facets) {
+		addFacetToCollinearities(collinearities, facet, points)
+	}
+	for (var facet of facets) {
+		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+			if (collinearities[facet[vertexIndex]]) {
+				facet[vertexIndex] = null
+			}
+		}
+		removeNulls(facet)
+	}
+}
+
 function removeCollinearXYPoints(polygon) {
-	removeIdenticalXYPoints(polygon)
+	removeIdentical2DPoints(polygon)
 	var nullIndexSet = new Set()
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
@@ -2449,6 +2444,17 @@ function removeCollinearXYPoints(polygon) {
 	removeNullsBySet(polygon, nullIndexSet)
 }
 
+function removeIdentical2DPoints(polygon) {
+	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
+		var point = polygon[vertexIndex]
+		var nextPoint = polygon[(vertexIndex + 1) % polygon.length]
+		if (point[0] == nextPoint[0] && point[1] == nextPoint[1]) {
+			polygon.splice(vertexIndex, 1)
+		}
+	}
+	return polygon
+}
+
 function removeIdentical3DPoints(polygon) {
 	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
 		var point = polygon[vertexIndex]
@@ -2459,15 +2465,6 @@ function removeIdentical3DPoints(polygon) {
 	}
 }
 
-function removeIdenticalXYPoints(polygon) {
-	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
-		var point = polygon[vertexIndex]
-		var nextPoint = polygon[(vertexIndex + 1) % polygon.length]
-		if (point[0] == nextPoint[0] && point[1] == nextPoint[1]) {
-			polygon.splice(vertexIndex, 1)
-		}
-	}
-}
 function rotateXYZParametersByPoints(rotation, pointList) {
 	for (var point of pointList) {
 		var original0 = point[0]
@@ -2527,23 +2524,9 @@ function setLinkTop(key, linkMap, top) {
 	warningByList(['In setLinkTop keyIndex = 9876543', key, linkMap, top])
 }
 
-function sortRemoveMeetings(alongIndexesMap, meetings) {
+function sortAlongIndexesMap(alongIndexesMap) {
 	for (var alongIndexes of alongIndexesMap.values()) {
 		alongIndexes.sort(compareFirstElementAscending)
-		for (var index = alongIndexes.length - 1; index > 0; index--) {
-			var meeting = meetings[alongIndexes[index][1]]
-			var lowerMeeting = meetings[alongIndexes[index - 1][1]]
-			if (meeting.pointIndex != undefined && lowerMeeting.pointIndex != undefined) {
-				if (meeting.pointIndex == lowerMeeting.pointIndex) {
-					alongIndexes.splice(index, 1)
-				}
-			}
-			else {
-				if (alongIndexes[index][0] == 0.0) {
-					alongIndexes.splice(index, 1)
-				}
-			}
-		}
 	}
 }
 
@@ -2563,6 +2546,26 @@ function swapXYPolygons(xyPolygons) {
 	for (var xyPolygon of xyPolygons) {
 		swapXYPolygon(xyPolygon)
 	}
+}
+
+function getUnionPolygons(toolPolygon, workPolygon) {
+	var isWorkClockwise = getIsClockwise(workPolygon)
+	return getOperatedPolygonsByExclusion(gUnionExclusion, getDirectedPolygon(isWorkClockwise, toolPolygon), workPolygon)
+}
+
+function getUnionPolygonsByPolygons(polygons) {
+	if (polygons.length == 0) {
+		return []
+	}
+	var joinedPolygons = [polygons[0]]
+	for (var polygonIndex = 1; polygonIndex < polygons.length; polygonIndex++) {
+		var operatedPolygons = []
+		for (var joinedPolygon of joinedPolygons) {
+			pushArray(operatedPolygons, getUnionPolygons(polygons[polygonIndex], joinedPolygon))
+		}
+		joinedPolygons = operatedPolygons
+	}
+	return joinedPolygons
 }
 
 function xyPointIsCloseToPoints(point, xyPoints) {
