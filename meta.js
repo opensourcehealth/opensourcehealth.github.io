@@ -125,14 +125,14 @@ function getDistanceSquaredToStatement(location, registry, statement) {
 	if (getIsEmpty(points)) {
 		return Number.MAX_VALUE
 	}
-	var closestDistance = Number.MAX_VALUE
+	var closestDistanceSquared = Number.MAX_VALUE
 	for (var point of points) {
-		var distance = getArrayDistanceSquared(location, point)
-		if (distance < closestDistance) {
-			closestDistance = distance
+		var distanceSquared = distanceSquaredArray(location, point, 3)
+		if (distanceSquared < closestDistanceSquared) {
+			closestDistanceSquared = distanceSquared
 		}
 	}
-	return closestDistance
+	return closestDistanceSquared
 }
 
 function getGroupBoundingBox(caller, registry, statement) {
@@ -591,8 +591,6 @@ var gGroup = {
 var gMatrix2D = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
-		//deprecated
-		gTagCenterMap.set('derive2D', this)
 	},
 	name: 'matrix2D',
 	processStatement: function(registry, statement) {
@@ -858,8 +856,11 @@ var gVar = {
 		addFunctionToVariableEntries(arcToRadius, gSetR)
 		addFunctionToVariableEntries(arcWaveXFromToHeight, null)
 		addFunctionToVariableEntries(arcYXFromToHeight, null)
+		addFunctionToVariableEntries(arrayAtIndex_Check, null)
 		addFunctionToVariableEntries(attributeByIDKey, gSetRS)
 		addFunctionToVariableEntries(border, gSetRS)
+		addFunctionToVariableEntries(bracket, null)
+		addFunctionsToVariableEntries([crossProduct_Check, crossProduct2D_Check], null)
 		addFunctionsToVariableEntries([distance2D_Check, distanceSquared2D_Check, distance3D_Check, distanceSquared3D_Check], null)
 		addFunctionsToVariableEntries([distanceArray_Check, distanceSquaredArray_Check], null)
 		addFunctionsToVariableEntries([divide2D_Check, divide2DScalar_Check, divide3D_Check, divide3DScalar_Check], null)
@@ -870,22 +871,31 @@ var gVar = {
 		addFunctionToVariableEntries(floatByIDKey, gSetRS)
 		addFunctionToVariableEntries(floatByKeyID, gSetRS)
 		addFunctionsToVariableEntries([getAddition2D_Check, getAddition3D_Check, getAdditionArray_Check], null)
-		addFunctionsToVariableEntries([getMultiplication2D_Check, getMultiplication2DScalar_Check, getMultiplication3D_Check], null)
-		addFunctionsToVariableEntries([getMultiplication3DScalar_Check, getMultiplicationArray_Check, getMultiplicationArray_Check], null)
+		addFunctionsToVariableEntries([getDivision2D_Check, getDivision2DScalar_Check], null)
+		addFunctionsToVariableEntries([getDivision3D_Check, getDivision3DScalar_Check], null)
+		addFunctionsToVariableEntries([getDivisionArray_Check, getDivisionArrayScalar_Check], null)
+		addFunctionsToVariableEntries([getMultiplication2D_Check, getMultiplication2DScalar_Check], null)
+		addFunctionsToVariableEntries([getMultiplication3D_Check, getMultiplication3DScalar_Check], null)
+		addFunctionsToVariableEntries([getMultiplicationArray_Check, getMultiplicationArrayScalar_Check], null)
 		addFunctionsToVariableEntries([getSubtraction2D_Check, getSubtraction3D_Check, getSubtractionArray_Check], null)
 		addFunctionToVariableEntries(insetsHeightAngle, null)
 		addFunctionToVariableEntries(intervalsFromQuantityIncrement, null)
 		addFunctionToVariableEntries(intervalsFromToAlong, null)
 		addFunctionToVariableEntries(intervalsFromToIncrement, null)
+		addFunctionToVariableEntries(joinPoints, gSetR)
+		addFunctionsToVariableEntries([length2D_Check, lengthSquared2D_Check, length3D_Check], null)
+		addFunctionsToVariableEntries([lengthSquared3D_Check, lengthArray_Check, lengthSquaredArray_Check], null)
 		addFunctionToVariableEntries(mirror, gSetR)
 		addFunctionToVariableEntries(mirrorJoin, gSetR)
 		addFunctionsToVariableEntries([multiply2D_Check, multiply2DScalar_Check, multiply3D_Check, multiply3DScalar_Check], null)
 		addFunctionsToVariableEntries([multiplyArray_Check, multiplyArrayScalar_Check], null)
 		addFunctionToVariableEntries(point, gSetRS)
 		addFunctionToVariableEntries(pointsByID, gSetRS)
-		addFunctionToVariableEntries(polar, null)
+		addFunctionToVariableEntries(polar_Check, null)
 		addFunctionToVariableEntries(rightByID, gSetRS)
+		addFunctionsToVariableEntries([rotate2DVector_Check, getRotation2DVector_Check], null)
 		addFunctionToVariableEntries(setAttributeByID, gSetRS)
+		addFunctionsToVariableEntries([sideHypoteneuse_Check, sideHypoteneuseSquared_Check], null)
 		addFunctionToVariableEntries(sineWaveXFromToCycles, null)
 		addFunctionToVariableEntries(sineYXFromToCycles, null)
 		addFunctionToVariableEntries(spiralBeforeFromTo, gSetR)
@@ -894,11 +904,13 @@ var gVar = {
 		addFunctionToVariableEntries(spiralFromToRadius, gSetR)
 		addFunctionToVariableEntries(spiralTo, gSetR)
 		addFunctionToVariableEntries(spiralToAngle, gSetR)
+		addFunctionToVariableEntries(spiralToRadius, gSetR)
 		addFunctionToVariableEntries(stepsFromQuantityIncrement, gSetR)
 		addFunctionToVariableEntries(stepsQuantityIncrement, gSetR)
 		addFunctionToVariableEntries(stepsFromToAlong, gSetR)
 		addFunctionToVariableEntries(stepsFromToQuantity, gSetR)
 		addFunctionToVariableEntries(stepsToAlong, gSetR)
+		addFunctionToVariableEntries(stepsToQuantity, gSetR)
 		addFunctionToVariableEntries(stringLength, gSetRS)
 		addFunctionsToVariableEntries([subtract2D_Check, subtract3D_Check, subtractArray_Check], null)
 		addFunctionToVariableEntries(topByID, gSetRS)
