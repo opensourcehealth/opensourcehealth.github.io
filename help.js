@@ -9,6 +9,7 @@ function noticeByList(notices) {
 	for (var notice of notices) {
 		console.log(notice)
 	}
+	console.log('caller: ' + noticeByList.caller.toString())
 }
 
 function warning(text, variables) {
