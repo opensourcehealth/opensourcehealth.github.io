@@ -30,20 +30,18 @@ function addFacetsByWorkMap(facets, workMap) {
 	}
 }
 
-function addFacetToLoneArrowSet(beginIndex, facet, loneArrowSet) {
-	if (facet == null) {
-		return
+function addIntersectionsToMesh(facets, id, originalLoneArrowSet, workMesh) {
+	var loneArrowSet = getLoneArrowSet(facets)
+	removeCollectionElementsByIterable(loneArrowSet, originalLoneArrowSet)
+	var pointSet = new Set()
+	for (var arrow of loneArrowSet) {
+		pointSet.add(arrow.split(' ')[0])
 	}
-	var endIndex = 1 - beginIndex
-	for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-		var consecutiveStrings = [facet[vertexIndex].toString(), facet[(vertexIndex + 1) % facet.length].toString()]
-		var reverseKey = consecutiveStrings[endIndex] + ' ' + consecutiveStrings[beginIndex]
-		if (loneArrowSet.has(reverseKey)) {
-			loneArrowSet.delete(reverseKey)
+	if (pointSet.size > 0) {
+		if (workMesh.intersectionIndexesMap == undefined) {
+			workMesh.intersectionIndexesMap = new Map()
 		}
-		else {
-			loneArrowSet.add(consecutiveStrings[beginIndex] + ' ' + consecutiveStrings[endIndex])
-		}
+		addElementsToMapArray(Array.from(pointSet), id, workMesh.intersectionIndexesMap)
 	}
 }
 
@@ -65,13 +63,11 @@ function addMeshesRecursively(depth, meshes, registry, statement) {
 }
 
 function addVerticalFacets(facetIntersections, isClockwiseTop, toolPolygon, workMesh) {
+	var facets = workMesh.facets
 	var workFacets = []
-	addFacetsByWorkMap(workFacets, getDifferenceWorkMap(workMesh.facets))
-	addVerticalFacetsByWork(workMesh.facets, getToolPairMap(facetIntersections, isClockwiseTop, workMesh.points, toolPolygon), workFacets)
-}
-
-function addVerticalFacetsByWork(facets, toolPairMap, workFacets) {
+	addFacetsByWorkMap(workFacets, getDifferenceWorkMap(facets))
 	var polylines = []
+	var toolPairMap = getToolPairMap(facetIntersections, isClockwiseTop, workMesh.points, toolPolygon)
 	for (var workFacet of workFacets) {
 		var startIndex = null
 		for (var vertexIndex = 0; vertexIndex < workFacet.length; vertexIndex++) {
@@ -179,42 +175,23 @@ function differenceByPolygon(id, splitHeights, splitInsides, strata, toolPolygon
 	var facets = workMesh.facets
 	addFacetsByWorkMap(facets, getDifferenceWorkMap(facets))
 	var toolDirected = getDirectedPolygon(false, toolPolygon)
-//	var facetIntersections = getFacetIntersections_Debug(strata, toolDirected, workMesh)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
 	directFacetIntersections(facetIntersections, true)
 	var meetingMap = getMeetingMap(facetIntersections, toolDirected, workMesh)
 	sortAlongIndexesMapByFacetIntersections(facetIntersections, meetingMap)
+	var originalLoneArrowSet = getLoneArrowSet(facets)
 	for (var facetIntersection of facetIntersections) {
-		var oldFacetsLength = facets.length
 		alterFacetsAddHorizontals(gDifferenceExclusion, facetIntersection, facetIntersections, meetingMap, strata, toolDirected, workMesh)
-		for (var facetIndex = oldFacetsLength; facetIndex < facets.length; facetIndex++) {
-			facetIntersection.extraFacetIndexes.push(facetIndex)
-		}
 	}
-	var toolMap = getToolMap(facetIntersections, workMesh.points, toolDirected)
-//	for (var facetIntersection of facetIntersections) {
-//		if (!facetIntersection.connected) {
-//			facets[facetIntersection.facetIndex] = facetIntersection.oldFacet
-//			for (var extraFacetIndex of facetIntersection.extraFacetIndexes) {
-//				facets[extraFacetIndex] = null
-//			}
-//		}
-//	}
-	removeShortArrays(workMesh.facets, 3)
-	var facetIndexStart = workMesh.facets.length
+	addIntersectionsToMesh(facets, id, originalLoneArrowSet, workMesh)
+	var facetIndexStart = facets.length
 	addVerticalFacets(facetIntersections, true, toolPolygon, workMesh)
 	if (!getIsEmpty(splitInsides)) {
 		var toolFacets = facets.slice(facetIndexStart, facets.length)
 		splitHeights = getSplitHeightsByInsides(toolFacets, splitHeights, splitInsides, workMesh)
 	}
-//	var workMap = getDifferenceWorkMap(facets)
-//	console.log('getDifferenceWorkMap(facets)')
-//	console.log(workMap)
-//	console.log(id)
 	addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh)
-//	var workMap = getDifferenceWorkMap(facets)
-//	console.log('getDifferenceWorkMap(facets) addSplitIndexesByIndexStart')
-//	console.log(workMap)
+	removeShortArrays(facets, 3)
 }
 
 function embossMesh(inversePoints, isTop, stratas, toolMesh, workMesh) {
@@ -313,10 +290,8 @@ insetToolDirected, inversePoints, isTop, strata, toolDirected, toolMeshFacets, t
 }
 
 function embossMeshByIntersections(closeFacetIntersections, facetIntersections,
-inversePoints, strata, toolDirected, toolMeshFacets, toolMeshPoints,
-xyFacet, xyFacetIndex, workMesh) {
+inversePoints, strata, toolDirected, toolMeshFacets, toolMeshPoints, xyFacet, xyFacetIndex, workMesh) {
 	addFacetsByWorkMap(workMesh.facets, getDifferenceWorkMap(workMesh.facets))
-	var originalFacetLength = workMesh.facets.length
 	allFacetIntersections = facetIntersections.concat(closeFacetIntersections)
 	var meetingMap = getMeetingMap(facetIntersections, toolDirected, workMesh)
 	sortAlongIndexesMapByFacetIntersections(facetIntersections, meetingMap)
@@ -402,7 +377,6 @@ xyFacet, xyFacetIndex, workMesh) {
 			toolFacet[pointIndexIndex] = pointToolIndexMap.get(pointIndex)
 		}
 	}
-	removeShortArrays(workMesh.facets, 3)
 	var workMap = getDifferenceWorkMap(workMesh.facets)
 	for (var toolFacetIndex = 0; toolFacetIndex < toolMeshFacets.length; toolFacetIndex++) {
 		var toolFacet = toolMeshFacets[toolFacetIndex]
@@ -410,6 +384,7 @@ xyFacet, xyFacetIndex, workMesh) {
 			workMesh.facets.push(getFacetByWorkMap(toolFacet, workMap))
 		}
 	}
+	removeShortArrays(workMesh.facets, 3)
 }
 function embossMeshesByTransform2Ds(matrix2Ds, matrix3D, isTop, stratas, toolMeshes, workMesh) {
 	if (getIsEmpty(toolMeshes)) {
@@ -437,12 +412,88 @@ function embossMeshesByTransform2Ds(matrix2Ds, matrix3D, isTop, stratas, toolMes
 	removeUnfacetedPoints(workMesh)
 }
 
-function getDifferenceWorkMap(facets) {
-	var loneArrowSet = new Set()
-	for (var facet of facets) {
-		addFacetToLoneArrowSet(0, facet, loneArrowSet)
+function getAssembledMesh(centerScale, meshes) {
+	if (meshes.length == 0) {
+		return {facets:[], points:[]}
 	}
-	return getWorkMapByArrowSet(loneArrowSet)
+	var assembledMesh = getMeshCopy(meshes[0])
+	if (!getIsEmpty(centerScale)) {
+		if (centerScale.length < 2) {
+			centerScale.push(centerScale[0])
+		}
+		if (centerScale.length < 3) {
+			centerScale.push(centerScale[1])
+		}
+	}
+	for (var meshIndex = 1; meshIndex < meshes.length; meshIndex++) {
+		var pointLength = assembledMesh.points.length
+		var meshCopy = getMeshCopy(meshes[meshIndex])
+		if (!getIsEmpty(centerScale)) {
+			var meshBoundingBox = getMeshBoundingBox(meshCopy)
+			var center = multiply3DScalar(getAddition3D(meshBoundingBox[0], meshBoundingBox[1]), 0.5)
+			add3Ds(meshCopy.points, getMultiplication3DScalar(center, -1.0))
+			multiply3Ds(meshCopy.points, centerScale)
+			add3Ds(meshCopy.points, center)
+		}
+		pushArray(assembledMesh.points, meshCopy.points)
+		for (var facet of meshCopy.facets) {
+			addArrayScalar(facet, pointLength)
+		}
+		pushArray(assembledMesh.facets, meshCopy.facets)
+
+		if (meshCopy.intersectionIndexesMap != undefined) {
+			for (var intersectionIndexes of meshCopy.intersectionIndexesMap.values()) {
+				addArrayScalar(intersectionIndexes, pointLength)
+			}
+			if (assembledMesh.intersectionIndexesMap == undefined) {
+				assembledMesh.intersectionIndexesMap = new Map(meshCopy.intersectionIndexesMap.entries())
+			}
+			else {
+				addMapToMapArray(meshCopy.intersectionIndexesMap, assembledMesh.intersectionIndexesMap)
+			}
+		}
+		if (meshCopy.splitIndexesMap != undefined) {
+			for (var splitIndexes of meshCopy.splitIndexesMap.values()) {
+				addArrayScalar(splitIndexes, pointLength)
+			}
+			if (assembledMesh.splitIndexesMap == undefined) {
+				assembledMesh.splitIndexesMap = new Map(meshCopy.splitIndexesMap.entries())
+			}
+			else {
+				addMapToMapArray(meshCopy.splitIndexesMap, assembledMesh.intersectionIndexesMap)
+			}
+		}
+	}
+	return assembledMesh
+}
+
+function getDifferenceWorkMap(facets) {
+	return getWorkMapByArrowSet(getLoneArrowSet(facets))
+}
+
+function getFacetIntersections(strata, toolPolygon, workMesh) {
+	var facetIntersections = []
+	for (var facetIndex = 0; facetIndex < workMesh.facets.length; facetIndex++) {
+		var facet = workMesh.facets[facetIndex]
+		if (getIsFacetInStrata(facet, workMesh.points, strata)) {
+			var workPolygon = getPolygonByFacet(facet, workMesh.points)
+			if (getIsPolygonIntersectingOrClose(toolPolygon, workPolygon)) {
+				var facetIntersection = {
+				facet:facet,
+				facetIndex:facetIndex,
+				isClockwise:true,
+				isVertical:Math.abs(getNormalByPolygon(workPolygon)[2]) < gClose,
+				isToolReversed:false,
+				toolMeshIndexMap:new Map(),
+				workPolygon:workPolygon}
+				if (!facetIntersection.isVertical) {
+					facetIntersection.isClockwise = getIsClockwise(workPolygon)
+				}
+				facetIntersections.push(facetIntersection)
+			}
+		}
+	}
+	return facetIntersections
 }
 
 function getMeshesByChildren(children, registry) {
@@ -466,15 +517,7 @@ function getMeshesByKey(key, registry, statement) {
 	}
 	return meshes
 }
-/*
-function getMissingArrowSet(facetIntersections) {
-	var missingArrowSet = new Set()
-	for (var facetIntersection of facetIntersections) {
-		addFacetToLoneArrowSet(1, facetIntersection.facet, missingArrowSet)
-	}
-	return missingArrowSet
-}
-*/
+
 function getOverlappedPolygons(outset, polygons) {
 	if (polygons.length < 2) {
 		return polygons
@@ -504,9 +547,17 @@ function getSplitHeightsByInsides(facets, splitHeights, splitInsides, workMesh) 
 			}
 		}
 	}
-	if (bottom != null) {
-		for (var splitInside of splitInsides) {
-			splitHeights = getPushArray(splitHeights, [bottom + splitInside, top - splitInside])
+	if (bottom == null) {
+		return splitHeights
+	}
+	for (var splitInside of splitInsides) {
+		var bottomPlus = bottom + splitInside
+		var topMinus = top - splitInside
+		if (Math.abs(bottomPlus - topMinus) < gClose) {
+			splitHeights = getPushArray(splitHeights, [bottomPlus])
+		}
+		else {
+			splitHeights = getPushArray(splitHeights, [bottomPlus, topMinus])
 		}
 	}
 	return splitHeights
@@ -593,7 +644,8 @@ function intersectionByPillar(id, matrix2Ds, matrix3D, splitHeights, splitInside
 		var transformedPolygons = getTransformed2DPointsByMatrix3Ds(toolPolygon, matrix2Ds)
 		for (var strata of toolPillar.stratas) {
 			for (var transformedPolygon of transformedPolygons) {
-				intersectionByPolygon(id, intersectionFacets, originalFacets, splitHeights, splitInsides, strata, transformedPolygon, workMesh)
+				intersectionByPolygon(
+				id, intersectionFacets, originalFacets, splitHeights, splitInsides, strata, transformedPolygon, workMesh)
 			}
 		}
 	}
@@ -611,12 +663,7 @@ function intersectionByPolygon(id, intersectionFacets, originalFacets, splitHeig
 	addFacetsByWorkMap(workMesh.facets, getDifferenceWorkMap(workMesh.facets))
 	var toolDirected = getDirectedPolygon(true, toolPolygon)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
-	var originalFacetIntersections = facetIntersections.slice(0)
-	var originalFacetLength = workMesh.facets.length
 	directFacetIntersections(facetIntersections, true)
-	for (var facetIntersectionIndex = facetIntersections.length - 1;  facetIntersectionIndex > -1; facetIntersectionIndex--) {
-		removeUnpairedFacet(true, facetIntersectionIndex, facetIntersections)
-	}
 	var meetingMap = getMeetingMap(facetIntersections, toolDirected, workMesh)
 	sortAlongIndexesMapByFacetIntersections(facetIntersections, meetingMap)
 	for (var facetIntersection of facetIntersections) {
@@ -628,10 +675,9 @@ function intersectionByPolygon(id, intersectionFacets, originalFacets, splitHeig
 	}
 	for (var facetIndex = 0; facetIndex < workMesh.facets.length; facetIndex++) {
 		if (!facetIndexSet.has(facetIndex)) {
-			workMesh.facets[facetIndex] = null
+			workMesh.facets[facetIndex] = []
 		}
 	}
-	removeShortArrays(workMesh.facets, 3)
 	var facetIndexStart = workMesh.facets.length
 	addVerticalFacets(facetIntersections, true, toolPolygon, workMesh)
 	if (!getIsEmpty(splitInsides)) {
@@ -644,6 +690,7 @@ function intersectionByPolygon(id, intersectionFacets, originalFacets, splitHeig
 			intersectionFacets.push(facet)
 		}
 	}
+	removeShortArrays(workMesh.facets, 3)
 }
 
 function unionByPillar(id, matrix2Ds, matrix3D, splitHeights, splitInsides, toolPillar, workMesh) {
@@ -670,27 +717,49 @@ function unionByPolygon(id, splitHeights, splitInsides, strata, toolPolygon, wor
 	if (toolPolygon.length < 3) {
 		return
 	}
-	addFacetsByWorkMap(workMesh.facets, getDifferenceWorkMap(workMesh.facets))
+	var facets = workMesh.facets
+	addFacetsByWorkMap(facets, getDifferenceWorkMap(facets))
 	var toolDirected = getDirectedPolygon(true, toolPolygon)
 	var facetIntersections = getFacetIntersections(strata, toolDirected, workMesh)
-	var originalFacetIntersections = facetIntersections.slice(0)
-	var originalFacetLength = workMesh.facets.length
 	directFacetIntersections(facetIntersections, false)
-	for (var facetIntersectionIndex = facetIntersections.length - 1;  facetIntersectionIndex > -1; facetIntersectionIndex--) {
-		removeUnpairedFacet(false, facetIntersectionIndex, facetIntersections)
-	}
 	var meetingMap = getMeetingMap(facetIntersections, toolDirected, workMesh)
 	sortAlongIndexesMapByFacetIntersections(facetIntersections, meetingMap)
+	var originalLoneArrowSet = getLoneArrowSet(facets)
 	for (var facetIntersection of facetIntersections) {
 		alterFacetsAddHorizontals(gUnionExclusion, facetIntersection, facetIntersections, meetingMap, strata, toolDirected, workMesh)
 	}
-	var facetIndexStart = workMesh.facets.length
+	addIntersectionsToMesh(facets, id, originalLoneArrowSet, workMesh)
+	var facetIndexStart = facets.length
 	addVerticalFacets(facetIntersections, false, toolPolygon, workMesh)
 	if (!getIsEmpty(splitInsides)) {
-		var toolFacets = workMesh.facets.slice(facetIndexStart, workMesh.facets.length)
+		var toolFacets = facets.slice(facetIndexStart, facets.length)
 		splitHeights = getSplitHeightsByInsides(toolFacets, splitHeights, splitInsides, workMesh)
 	}
 	addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh)
+	removeShortArrays(facets, 3)
+}
+
+var gAssembly = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'assembly',
+	processStatement:function(registry, statement) {
+		statement.tag = 'g'
+		var meshes = []
+		for (var child of statement.children) {
+			var mesh = getWorkMeshByID(child.attributeMap.get('id'), registry)
+			if (mesh != null) {
+				meshes.push(mesh)
+			}
+		}
+		if (getIsEmpty(meshes)) {
+			noticeByList(['No meshes could be found for assembly in construction.', statement])
+			return
+		}
+		var centerScale = getFloatsByStatement('centerScale', registry, statement)
+		analyzeOutputMesh(getAssembledMesh(centerScale, meshes), registry, statement)
+	}
 }
 
 var gDifference = {
@@ -890,4 +959,4 @@ var gUnion = {
 	}
 }
 
-var gConstructionProcessors = [gDifference, gEmboss, gIntersection, gJoin, gOverlap, gUnion]
+var gConstructionProcessors = [gAssembly, gDifference, gEmboss, gIntersection, gJoin, gOverlap, gUnion]
