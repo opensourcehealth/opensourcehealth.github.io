@@ -29,13 +29,9 @@
 
 var gLine = ''
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// save stls
-
-// add point joining after bend, ellipseSpiralFromTo
-// zoomInterpolation(x, amplitudes, vector, center)
-// svg font-family=DejaVu Serif, Garamond, Apple Garamond, Didot, Baskerville, serif
-// remove connected facets when not connected, remove removeUnpairedFacet from intersection and union, constructionIDs
-// rules for quantity
+// upload
+// test join because getWorkMeshes changed
+// upgrade join to handle multiple facets
 // outset point before fillet, outsetField
 //
 // split bent polygons
@@ -44,28 +40,26 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 //
 // test process join to handle matrix3Ds, omit origin
 // make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
+// ergonomic handle
 // bevelZ
 // make fastener
 // make slot for socket
 // row card pages
 // upload
-// maybe use empty facets instead of null facets and remove them afterwards
-// after version 3 is printed, remove wedge (top stopper) variables
+// after version 4 is printed, remove unused variables
+// remove connected facets when not connected or split and add horizontal tool facet
 //
 // low priority
-// test join because getWorkMeshes changed
-// upgrade join to handle multiple facets
+// test getEquation from fence and road
 // arrayFunctionX
 // polars
-// rx and ry for regulon
+// rx/ry and superEllipse for regularPolygon
 // arc ellipse from svg
-// bevel bug when beveling a retrace is probably fixed
-// id should be alphanumeric only without brackets, also get id from output if it exists
 // helix rotation
+// if identical declared id is found post notice
 // add notice if nothing is embossed, look beyond stratas
 // add noticeByList for tags outside of alteration, meta, generator2d
 // add notice for other missing and getStatementID whileIndex?
-// if identical id found, rename generated id if possible, if not post notice
 // bug when difference polygon point is on facet
 // change remaining XY to 2D
 // use warningByList instead of warning
@@ -79,17 +73,15 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // use getSwapped2DPolygon instead of swapPolygon in pixel and voxel if there is a possibility of a loop overlap
 // outset check for intersections
 // more matrix functions _Check..
-// make viewer bigger with outside rotation handles
 // delete getPolygonateMesh
 // analyze volume and surface area
 //
-// maybe add notice and viewer point output
-// viewer new/delete/move
+// maybe add notice
+// viewer new/delete/move for polygon poins
 // engrave: makes it possible to raise the edges
 // add skip3D option to copy
 // later when getting points, transform 2D if any then transform 3D if any
 // bug gridWidth=215.9 - 25.4 * (0.26 * 2) is different from 215.9 - 25.4 * 0.26 * 2
-// check why font has to be smaller to not wraparound
 // check expand when there are horizontal facets
 // delete a session
 // memories, add text change to line number to optionSelect key in codec > var key = query.slice(0, 10)
@@ -100,7 +92,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // mirror bend
 // lathe
 // spline?
-// make mesh grid
 // alphabetic encoding and compression
 // spring or staple or hook or fastener
 // parabola, parabolic interpolation
@@ -299,77 +290,12 @@ function getXYPointStringsByXYZ(points) {
 	return pointStrings
 }
 
-function zoomInterpolation(x, polyline, arrayLength) {
-	var interpolationAlong = getFlatInterpolationAlongBeginEnd(x, polyline)
-	var along = interpolationAlong[0]
-	var oneMinus = 1.0 - along
-	var lower = interpolationAlong[1]
-	var upper = interpolationAlong[2]
-	var minimumLength = Math.min(lower.length, upper.length)
-	var point = new Array(arrayLength).fill(1.0)
-	for (var dimensionIndex = 1; dimensionIndex < minimumLength; dimensionIndex++) {
-		point[dimensionIndex % arrayLength] = oneMinus * lower[dimensionIndex] + along * upper[dimensionIndex]
-	}
-	return point
-}
-
-function ellipseFromTo(registry, statement, from, to, radius, numberOfSides, includeFrom, includeTo) {
-	to = getValueByDefault(10.0, to)
-	to = getArrayByValue(to)
-	from = getArrayByValue(from)
-	from.length = Math.max(2, from.length, to.length)
-	to.length = from.length
-	setUndefinedElementsToValue(to, 0.0)
-	var center = getMidpoint2D(from, to)
-	var centerFrom = getSubtraction2D(from, center)
-	var centerFromLength = length2D(centerFrom)
-	var numberOfSides = getValueByDefault(24, numberOfSides)
-	var radius = getValueByDefault(1.0, radius)
-	includeFrom = getValueByDefault(true, includeFrom)
-	includeTo = getValueByDefault(true, includeTo)
-	var arc = []
-	if (includeFrom) {
-		arc.push(from)
-	}
-	if (centerFromLength == 0.0) {
-		return arc
-	}
-	var right = divide2DScalar([centerFrom[1], -centerFrom[0]], centerFromLength * Math.sqrt(centerFromLength))
-	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(Math.PI) / gDoublePi)
-	var zAddition = null
-	if (from.length > 2) {
-		zAddition = (to[2] - from[2]) / numberOfArcSides
-		center.push(0.0)
-		centerFrom.push(from[2])
-	}
-	var rotator = polar(Math.PI / numberOfArcSides)
-	numberOfArcSides -= 1
-	var arrayIndex = arc.length
-	arc.length = arc.length + numberOfArcSides
-	for (var vertexIndex = 0; vertexIndex < numberOfArcSides; vertexIndex++) {
-		rotate2DVector(centerFrom, rotator)
-		if (zAddition != null) {
-			centerFrom[2] += zAddition
-		}
-		var point = getAdditionArray(center, centerFrom, 3)
-		add2D(point, getMultiplication2DScalar(right, dotProduct2D(right, centerFrom) * (radius - centerFromLength)))
-		arc[arrayIndex++] = point
-	}
-	if (includeTo) {
-		arc.push(to)
-	}
-	return arc
-}
-
 function testBend() {
 	console.log('testBend')
-	console.log('ellipseFromTo')
-	var ellipse = ellipseFromTo(null, null, [0,0], [10,00], 2, 600, true, true)
-	console.log(ellipse)
-	drawXYPolygon(ellipse, getRGB())
-	var amplitudes = [[0,1], [2,3]]
+	var amplitudes = [[0,1,1], [2,3,3]]
 	console.log('additionInterpolation')
 	console.log(additionInterpolation(0.5, amplitudes, 2))
+	console.log(zoomInterpolation(0.5, amplitudes, [undefined, undefined, 5.0], undefined, 3))
 //	var pointString = '-2,-2 -2,9 12,-2 0,-1 0,7 10,-1 1,0 1,5 6,0 2,1 4,1 2,3 11,1 13,1 11,3'
 	var pointString = '-2,-2,0 -2,6,0 5,-2,0'
 //	var pointString = '-2,-2 -2,6 5,-2 4,-2 3,-2 2,-2 1.5,-2 1,-2 0,-2 -1,-2'
@@ -411,7 +337,7 @@ function testBevel() {
 	var polygons = [[[-1,1], [-1,-5], [9,-5], [9,1]]]
 	var splitBevels = [[2.5, 0.4]]
 	splitMeshByBevels(boundaryEquations, 'testBevel', null, mesh, polygons, null, splitBevels, null)
-	var pointIndexSet = getPointIndexSet(boundaryEquations, [], mesh.points, polygons, mesh, null, null, [[-1,1]])
+	var pointIndexSet = getPointIndexSet(boundaryEquations, [], mesh.points, polygons, mesh, null, [], null, [[-1,1]])
 	console.log(pointIndexSet)
 	console.log(mesh)
 	bevelPoints(bevels, null, mesh, pointIndexSet, mesh.points, splitBevels)
@@ -453,17 +379,18 @@ function testEquation() {
 //	var valueString = ' ( 3 % 2 ) * .3 * Math.min(8,11) + stringLength( testString ) '
 //	var valueString = ' 25 + 10 * 1.5 '
 //	var valueString = ' -Math.min(8,11) -Math.min(8,11) -Math.min(8,11) '
-//	var valueString = ' -Math.min(8,11) **Math.min(8,11) '
+//	var valueString = ' min(8,1.5*max(3,4)) '
+	var valueString = 'intervalsFromToIncrement(0,3.5,1)[0]'
 //	var valueString = ' -2+1 '
 //	var valueString = ' true && false '
 //	var valueString = ' 4, '
 //	var valueString = ' 1+2*3+4 '
 //	var valueString = ' stringLength( testString ) '
 //	var valueString = ' ( 5 % 3 ) + stringLength( testString ) '
-//	var valueString = ' intervals(0,3.5,1) '
+//	var valueString = ' intervalsFromToIncrement(0,3.5,1) '
 //	var valueString = ' testMap.value '
 //	var valueString = ' Math.sin(1) '
-	var valueString = ' testArray[0][0] '
+//	var valueString = ' testArray[0][0] '
 //	var valueString = ',2'
 //	var valueString = ' 1,2 '
 //	var valueString = ' [[3,5,7]] '
@@ -481,6 +408,9 @@ function testEquation() {
 	stringLength.optionSet = gSetS
 	zigzag.optionSet = null
 	var variableMap = new Map([
+		['intervalsFromToIncrement', intervalsFromToIncrement],
+		['max', Math.max],
+		['min', Math.min],
 		['stringLength', stringLength],
 		['Math', mathMap],
 		['test', '2'],
@@ -566,7 +496,7 @@ function testFace() {
 //	var pointMap = new Map()
 //	var tipMap = new Map()
 //	rotateXYZParametersByPoints(2, mesh.points)
-//	var xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
+//	var xyPolygonsMap = getSlicePolygonsMapByMesh(mesh)
 //	var voxelMap = getVoxelsByXYPolygonsMap(xyPolygonsMap)
 //	addVoxelLines(2, voxelMap, lines, pointMap, tipMap)
 //	var xyzPolygons = getPolygonsByLines(lines, pointMap)
@@ -826,7 +756,8 @@ function testOutline() {
 
 function testOutset() {
 	console.log('testOutset')
-	var pointString = '0,0 0,4 6,4 6,0'
+//	var pointString = '0,0 0,4 6,4 6,0'
+	var pointString = '0,0 0,4'
 //	var pointString = '0,0 0,2 6,4 6,0'
 //	var pointString = '6,0 6,4 0,2 0,0'
 //	var pointString = '8,-2 3,1 0,6 0,-2'
@@ -1109,8 +1040,8 @@ function testSubtraction() {
 //	polygons = ['8,-8 9,-8 9,-7', '7,-1 15,-8 11,-8 11,-7 12,-6 10,-6 11,-7 11,-8 7,-8']
 //	polygons = ['8,-5 9,-5 9,-3', '7,-1 15,-8 12,-8 12,-7 8,-4 8,-6 12,-7 12,-8 7,-8']
 //	var workPoints = '0,0 0,5 10,5 10,0'
-	var workPoints = '-2,4 2,4 2,0 -2,0'
-//	var workPoints = '0,-2 20,5 20,-2 14,-1 20,-2'
+//	var workPoints = '-2,4 2,4 2,0 -2,0'
+	var workPoints = '0,-2 20,5 20,-2 14,-1 20,-2'
 //	var workPoints = '0,-2 0,5 20,5 20,-2'
 //	var workPoints = '7,0 8,6 15,0'
 //	var workPoints = '7,0 8,7 15,0 7,0 9,3'
@@ -1120,8 +1051,8 @@ function testSubtraction() {
 //	var toolPoints = '12,-1 14,-1 12,0'
 //	var toolPoints = '9,2 8,2 8,-5'
 //	var toolPoints = '9,2 8,2 8,1'
-	var toolPoints = '2,0 2,2 -2,2 -2,0'
-//	var toolPoints = '15,-6 18,-6 18,1'
+//	var toolPoints = '2,0 2,2 -2,2 -2,0'
+	var toolPoints = '15,-6 18,-6 18,1'
 	var workPolygon = getPointsByString(workPoints)
 	var toolPolygon = getPointsByString(toolPoints)
 //	toolPolygon.reverse()
@@ -1354,7 +1285,7 @@ function createSVGTest() {
 	document.writeln('</defs>')
 	document.writeln('<g style="fill:none;stroke:rgb(0,0,0);stroke-width:0.01" transform="matrix(50,0,0,-50,300,300)">')
 	var before = new Date().getTime()
-	testBend()
+//	testBend()
 //	testBevel()
 //	testConnectedFacet()
 //	testDrillByMesh()
@@ -1387,7 +1318,7 @@ function createSVGTest() {
 //	testSculptureVertical()
 //	testSplitPoints()
 //	testSplitPolygon()
-//	testSubtraction()
+	testSubtraction()
 //	testTaper()
 //	testTransform()
 //	testTransforms()
