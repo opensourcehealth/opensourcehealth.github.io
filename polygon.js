@@ -349,6 +349,18 @@ function convertSegmentArraysToKeyArrays(segmentArrays) {
 	}
 }
 
+function directPolygonGroup(polygonGroup) {
+	if (polygonGroup.length < 2) {
+		return
+	}
+	var isClockwise = getIsClockwise(polygonGroup[0])
+	for (var polygonIndex = 1; polygonIndex < polygonGroup.length; polygonIndex++) {
+		if (getIsClockwise(polygonGroup[polygonIndex]) == isClockwise) {
+			polygonGroup[polygonIndex].reverse()
+		}
+	}
+}
+
 function getBoundingBox(polygon) {
 	if (getIsEmpty(polygon)) {
 		return null
@@ -1569,7 +1581,6 @@ function getOperatedPolygonsByExclusion(exclusion, toolPolygon, workPolygon) {
 	addMeetingsByPolygon(alongIndexesMap, meetingMap, toolPolygon, workPolygon)
 	sortAlongIndexesMap(alongIndexesMap, meetingMap)
 	var extantPolygons = getExtantPolygons(alongIndexesMap, exclusion, false, meetingMap, toolPolygon, workPolygon)
-	console.log(extantPolygons)
 	for (var extantPolygon of extantPolygons) {
 		removeRepeats(extantPolygon)
 		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
@@ -1887,6 +1898,7 @@ function getPolygon3D(polygon, z) {
 		return polygon
 	}
 	var polygon3D = new Array(polygon.length)
+	z = getValueByDefault(0.0, z)
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var vertex = polygon[vertexIndex]
 		polygon3D[vertexIndex] = [vertex[0], vertex[1], z]
@@ -2119,6 +2131,59 @@ function getSegmentArrays(polygonSegments, startIndex) {
 	return segmentArrays
 }
 
+function getSlicePolygonsByArrowsMap(arrowsMap, points, z) {
+	var xyPolygons = []
+	for (var arrowKey of arrowsMap.keys()) {
+		var arrows = arrowsMap.get(arrowKey)
+		if (arrows != null) {
+			var arrow = arrows[0]
+			var keys = [arrowKey]
+			arrowsMap.set(arrowKey, null)
+			do {
+				if (arrowsMap.has(arrow)) {
+					var nextArrows = arrowsMap.get(arrow)
+					if (nextArrows == null) {
+						xyPolygons.push(keys)
+						break
+					}
+					else {
+						var closePolygon = true
+						for (var nextArrow of nextArrows) {
+							if (arrowKey != nextArrow) {
+								arrowKey = arrow
+								arrowsMap.set(arrowKey, null)
+								arrow = nextArrow
+								keys.push(arrowKey)
+								closePolygon = false
+								break
+							}
+						}
+						if (closePolygon) {
+							arrowsMap.set(arrowKey, null)
+							arrow = arrowKey
+						}
+					}
+				}
+				else {
+					xyPolygons.push(keys)
+					break
+				}
+				if (keys[0] == arrow) {
+					xyPolygons.push(keys)
+					break
+				}
+			}
+			while (keys.length < points.length)
+		}
+	}
+	for (var xyPolygon of xyPolygons) {
+		for (var keyIndex = 0; keyIndex < xyPolygon.length; keyIndex++) {
+			xyPolygon[keyIndex] = getPointAlongEdge(xyPolygon[keyIndex], points, z)
+		}
+	}
+	return xyPolygons
+}
+
 function getStringAlongMap(baseIndex, polygon) {
 	var arrowSetMap = new Map()
 	var baseString = polygon[baseIndex][0].toString() + ' ' + polygon[baseIndex][1].toString()
@@ -2205,67 +2270,6 @@ function getSwapped2DPolygon(polygon) {
 		swapped2DPolygon[vertexIndex] = [point[1], point[0]]
 	}
 	return swapped2DPolygon
-}
-
-function getXYPolygonsByArrows(arrowsMap, points, z) {
-	var xyPolygons = []
-	for (var arrows of arrowsMap.values()) {
-		if (arrows != null) {
-			var arrow = arrows[0]
-			var keys = [arrow.beginKey]
-			removeArrowFromMap(arrows, arrowsMap, arrow.beginKey)
-			do {
-				if (arrowsMap.has(arrow.endKey)) {
-					var nextArrows = arrowsMap.get(arrow.endKey)
-					if (nextArrows == null) {
-						noticeByList(['In getXYPolygonsByArrows in polygon, arrow.endKey was null.', arrow, arrowsMap, keys])
-						break
-					}
-					else {
-						var nextArrow = null
-						for (var nextArrowIndex = nextArrows.length - 1; nextArrowIndex > -1; nextArrowIndex--) {
-							var nextArrow = nextArrows[nextArrowIndex]
-							if (arrow.beginKey == nextArrow.endKey && arrow.endKey == nextArrow.beginKey) {
-								nextArrows.splice(nextArrowIndex, 1)
-								break
-							}
-						}
-						if (nextArrows.length == 0) {
-							arrowsMap.set(arrow.endKey, null)
-//							warningString = 'In getXYPolygonsByArrows, from the arrow.endKey:\n nextArrows.length == 0 in the arrowsMap:\n from the keys:\n'
-//							warning(warningString, [arrow, arrowsMap, keys, xyPolygons])
-							break
-						}
-						else {
-							arrow = nextArrows[0]
-							removeArrowFromMap(nextArrows, arrowsMap, arrow.beginKey)
-							keys.push(arrow.beginKey)
-						}
-					}
-				}
-				else {
-					noticeByList(['In getXYPolygonsByArrows in polygon, arrow.endKey was null.', arrow, arrowsMap, keys])
-					break
-				}
-				if (keys[0] == arrow.endKey) {
-					xyPolygons.push(keys)
-					break
-				}
-				if (keys.length > gLengthLimit) {
-					warningString = 'In getXYPolygonsByArrows, polygon is too large or there is a mistake, length: \narrowKey: \nkeys: '
-					warning(warningString, [keys.length, arrow, keys])
-					break
-				}
-			}
-			while (true)
-		}
-	}
-	for (var xyPolygon of xyPolygons) {
-		for (var keyIndex = 0; keyIndex < xyPolygon.length; keyIndex++) {
-			xyPolygon[keyIndex] = getPointAlongEdge(xyPolygon[keyIndex], points, z)
-		}
-	}
-	return xyPolygons
 }
 
 function getZByPointPolygon(point, polygon) {
