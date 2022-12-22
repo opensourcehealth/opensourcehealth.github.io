@@ -204,7 +204,7 @@ function BooleanMonad() {
 
 function BracketCloseMonad() {
 	this.getNextMonad = function(character, registry, statement) {
-		return getNextMonadByMap(character, this, gOperatorMonadMap, registry, statement)
+		return getNextMonadByMap(character, this, gBracketCloseMonadMap, registry, statement)
 	}
 	this.getValue = function(registry, statement) {
 		return this.value
@@ -215,7 +215,8 @@ function BracketCloseMonad() {
 		if (this.value != null) {
 			return
 		}
-		if (this.previousMonad.precedenceLevel == 21) {
+		var previousName = this.previousMonad.constructor.name
+		if (previousName == 'BracketOpenMonad' || previousName == 'BracketOpenFunctionMonad') {
 			this.value = this.previousMonad.getResult(registry, statement, undefined)
 			this.previousMonad = this.previousMonad.previousMonad
 			return
@@ -542,7 +543,7 @@ function QuoteMonad() {
 
 function SquareCloseMonad() {
 	this.getNextMonad = function(character, registry, statement) {
-		return getNextMonadByMap(character, this, gOperatorSquareMonadMap, registry, statement)
+		return getNextMonadByMap(character, this, gBracketCloseMonadMap, registry, statement)
 	}
 	this.getValue = function(registry, statement) {
 		return this.value
@@ -734,6 +735,7 @@ gQuoteCharacters = ['"', "'"]
 gAlphabetBracketMonads = [['(', BracketOpenMonad], ['[', SquareOpenMonad]]
 addValueToArrayByKeys(gAlphabetBracketMonads, gAlphabetCharacters, VariableMonad)
 addValueToArrayByKeys(gAlphabetBracketMonads, gNotCharacters, NotMonad)
+gMemberSquareMonads = [['.', MemberMonad], ['[', SquareOpenArrayMonad]]
 gOperatorMonads = [[')', BracketCloseMonad], [',', CommaMonad], [']', SquareCloseMonad]]
 addValueToArrayByKeys(gOperatorMonads, gAdditionSubtractionCharacters, AdditionSubtractionMonad)
 addValueToArrayByKeys(gOperatorMonads, gBooleanCharacters, BooleanMonad)
@@ -743,17 +745,14 @@ addValueToArrayByKeys(gOperatorMonads, gGreaterLessCharacters, GreaterLessMonad)
 
 // monadMaps
 gBooleanMap = new Map([['??', 5], ['||', 6], ['&&', 7], ['|', 8], ['^', 9], ['&', 10]])
+gBracketCloseMonadMap = new Map(gOperatorMonads.concat(gMemberSquareMonads))
 gBracketCommaMonadMap = new Map([[')', BracketCloseMonad], [',', CommaMonad]])
 gDivisionMap = new Map([['*', 15], ['/', 15], ['%', 15], ['**', 16]])
 gGreaterLessMap = new Map([['>', 12], ['>:', 12], ['<', 12], ['<:', 12], ['<<', 13], ['>>', 13], ['>>>', 13]])
 gNegatedMap = new Map(gAlphabetBracketMonads)
 gOperatorMonadMap = new Map(gOperatorMonads)
-gOperatorBracketMonadMap = new Map(gOperatorMonads)
+gOperatorBracketMonadMap = new Map(gBracketCloseMonadMap)
 gOperatorBracketMonadMap.set('(', BracketOpenFunctionMonad)
-gOperatorBracketMonadMap.set('.', MemberMonad)
-gOperatorBracketMonadMap.set('[', SquareOpenArrayMonad)
-gOperatorSquareMonadMap = new Map(gOperatorMonads)
-gOperatorSquareMonadMap.set('[', SquareOpenArrayMonad)
 gStringMonadMap = new Map([[')', BracketCloseMonad], [',', CommaMonad]])
 addValueToMapByKeys(gQuoteCharacters, gStringMonadMap, QuoteMonad)
 addValueToMapByKeys(gAlphabetCharacters, gStringMonadMap, StringMonad)
@@ -767,6 +766,6 @@ gValueMonadMap.set('-', NegativeMonad)
 gValueMonadMap.set(']', SquareCloseMonad)
 gValueMonadMap.set(',', UndefinedCommaMonad)
 
-// others
+// sets
 gEquationSet = new Set(gGreaterLessCharacters.concat(gNotCharacters).concat(gQuoteCharacters).concat('()[]'.split('')))
 gFloatSet = new Set(gFloatCharacters)
