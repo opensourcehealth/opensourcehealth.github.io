@@ -31,12 +31,9 @@ function addArrowMapToHorizontalFacets(aboveIndex, arrowMaps, pointLayerMap, poi
 
 function addFacetsAlongLoneEdges(layers, mesh, pointLayerMap) {
 	var arrowMaps = [new Map(), new Map()]
-	var arrowSet = new Set()
 	var facets = mesh.facets
 	var points = mesh.points
-	for (var facet of facets) {
-		addFacetToLoneArrowSet(0, facet, arrowSet)
-	}
+	var arrowSet = getLoneArrowSet(facets)
 	for (var facet of facets) {
 		var lowIndex = Number.MAX_VALUE
 		var highIndex = -Number.MAX_VALUE
@@ -224,7 +221,7 @@ function addPolygonToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets,
 			}
 		}
 	}
-	var polygon3D = getPolygon3D(polygon, 0.0)
+	var polygon3D = getPolygon3D(polygon)
 	for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
 		var point = polygon3D[vertexIndex]
 		if (vertical) {
@@ -552,9 +549,9 @@ function getExtrusionMesh(isJoined, matrices, matrix, polygons) {
 	var polygonGroups = getPolygonGroups(polygons)
 	for (var polygonGroup of polygonGroups) {
 		var polygon3DGroup = new Array(polygonGroup.length)
-		polygon3DGroup[0] = getPolygon3D(getDirectedPolygon(true, polygonGroup[0]), 0.0)
+		polygon3DGroup[0] = getPolygon3D(getDirectedPolygon(true, polygonGroup[0]))
 		for (var polygonIndex = 1; polygonIndex < polygonGroup.length; polygonIndex++) {
-			polygon3DGroup[polygonIndex] = getPolygon3D(getDirectedPolygon(false, polygonGroup[polygonIndex]), 0.0)
+			polygon3DGroup[polygonIndex] = getPolygon3D(getDirectedPolygon(false, polygonGroup[polygonIndex]))
 		}
 		addToExtrusionMesh(isJoined, matrices, mesh, polygon3DGroup)
 	}
@@ -590,9 +587,9 @@ function getPillarMesh(heights, matrix, polygons) {
 	var polygonGroups = getPolygonGroups(polygons)
 	for (var polygonGroup of polygonGroups) {
 		var polygon3DGroup = new Array(polygonGroup.length)
-		polygon3DGroup[0] = getPolygon3D(getDirectedPolygon(true, polygonGroup[0]), 0.0)
+		polygon3DGroup[0] = getPolygon3D(getDirectedPolygon(true, polygonGroup[0]))
 		for (var polygonIndex = 1; polygonIndex < polygonGroup.length; polygonIndex++) {
-			polygon3DGroup[polygonIndex] = getPolygon3D(getDirectedPolygon(false, polygonGroup[polygonIndex]), 0.0)
+			polygon3DGroup[polygonIndex] = getPolygon3D(getDirectedPolygon(false, polygonGroup[polygonIndex]))
 		}
 		addToPillarMesh(heights, mesh, polygon3DGroup)
 	}
@@ -639,7 +636,7 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 		var polygon = removeIdentical2DPoints(sculpture.polygonMap.get(id))
 		layer.pointIndexes = []
 		var isClockwise = getIsClockwise(polygon)
-		var polygon3D = getPolygon3D(polygon, 0.0)
+		var polygon3D = getPolygon3D(polygon)
 		var topFacet = []
 		for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
 			var point = polygon3D[vertexIndex]
@@ -800,7 +797,7 @@ function triangulateBentFacets(mesh) {
 		var facet = facets[facetIndex]
 		if (facet.length > 3) {
 			if (getIsPolygonBent(getPolygonByFacet(facet, points))) {
-				var xyzTriangleFacets = get3DTriangleFacets(facet, points, xyPoints)
+				var xyzTriangleFacets = getTriangle3DFacets(facet, points, xyPoints)
 				if (xyzTriangleFacets.length == 0) {
 					facets.splice(facetIndex, 1)
 				}
