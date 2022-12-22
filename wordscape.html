@@ -146,7 +146,7 @@ function addOutputArea(text, title) {
 }
 
 function updateSVGArea(lines) {
-	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var registry = {generatedIDSet:new Set(), idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
 	meshViewer.setID('viewerCanvas', registry)
 	var svgStatement = getDocumentRoot(lines, 'svg')
 	if (svgStatement == null) {
