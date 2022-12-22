@@ -21,12 +21,16 @@ function addConnectedSegmentsToPolygons(meetingMap, polygon, polygons, toolSegme
 	}
 }
 
-function addFilletedPoints(filletedPolygon, minimumAngle, numberOfSides, polygon, radius, vertexIndex) {
-	var beforePoint = polygon[(vertexIndex - 2 + polygon.length) % polygon.length]
+function addFilletedPoints(checkLength, filletedPolygon, minimumAngle, numberOfSides, polygon, radius, vertexIndex) {
 	var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
 	var centerPoint = polygon[vertexIndex]
 	var endPoint = polygon[(vertexIndex + 1) % polygon.length]
-	var afterPoint = polygon[(vertexIndex + 2) % polygon.length]
+	var afterPoint = null
+	var beforePoint = null
+	if (checkLength) {
+		beforePoint = polygon[(vertexIndex - 2 + polygon.length) % polygon.length]
+		afterPoint = polygon[(vertexIndex + 2) % polygon.length]
+	}
 	addFilletedPointsByQuintuple(
 	beforePoint, beginPoint, centerPoint, endPoint, afterPoint, filletedPolygon, minimumAngle, numberOfSides, radius)
 }
@@ -52,26 +56,28 @@ function addFilletedPointsByQuintuple
 		return
 	}
 	var numberOfSidesMinus = numberOfFilletSides - 1
-	var beforeBegin = getSubtraction2D(beginPoint, beforePoint)
-	var beforeBeginLength = length2D(beforeBegin)
-	if (beforeBeginLength != 0.0) {
-		divide2DScalar(beforeBegin, beforeBeginLength)
-		var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerBegin, beforeBegin)) - gClose)
-		centerBeginLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
-	}
-	var afterEnd = getSubtraction2D(endPoint, afterPoint)
-	var afterEndLength = length2D(afterEnd)
-	if (afterEndLength != 0.0) {
-		divide2DScalar(afterEnd, afterEndLength)
-		var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerEnd, afterEnd)) - gClose)
-		centerEndLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
-		centerBeginLength = Math.min(centerBeginLength, centerEndLength)
+	if (beforePoint != null) {
+		var beforeBegin = getSubtraction2D(beginPoint, beforePoint)
+		var beforeBeginLength = length2D(beforeBegin)
+		if (beforeBeginLength != 0.0) {
+			divide2DScalar(beforeBegin, beforeBeginLength)
+			var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerBegin, beforeBegin)) - gClose)
+			centerBeginLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
+		}
+		var afterEnd = getSubtraction2D(endPoint, afterPoint)
+		var afterEndLength = length2D(afterEnd)
+		if (afterEndLength != 0.0) {
+			divide2DScalar(afterEnd, afterEndLength)
+			var numberOfSideSides = Math.ceil(twoOverAngle * Math.acos(0.5 * distance2D(centerEnd, afterEnd)) - gClose)
+			centerEndLength *= numberOfSidesMinus / (numberOfSidesMinus + Math.max(0, numberOfSideSides - 1))
+			centerBeginLength = Math.min(centerBeginLength, centerEndLength)
+		}
 	}
 	var centerVector = normalize2D(getAddition2D(centerBegin, centerEnd))
 	var dotProduct = dotProduct2D(centerVector, centerBegin)
 	var perpendicular = Math.sqrt(1.0 - dotProduct * dotProduct)
 	var distanceToTangent = radius * dotProduct / perpendicular
-	if (distanceToTangent > centerBeginLength) {
+	if (distanceToTangent > centerBeginLength && beforePoint != null) {
 		var lengthRatio = centerBeginLength / distanceToTangent
 		numberOfFilletSides = Math.ceil(Math.sqrt(lengthRatio) * cornerOverMinimum - gClose)
 		if (numberOfFilletSides < 2) {
@@ -85,12 +91,12 @@ function addFilletedPointsByQuintuple
 	var beginTangent = getAddition2D(centerPoint, getMultiplication2DScalar(centerBegin, distanceToTangent - halfSideLength))
 	var filletCenter = getAddition2D(centerPoint, getMultiplication2DScalar(centerVector, radius / perpendicular))
 	var filletAngle = 2.0 * absoluteHalfCornerAngle / numberOfFilletSides
-	if (dotProduct2D([centerBegin[1], -centerBegin[0]], centerEnd) > 0.0) {
+	if (dotProduct2D([centerBegin[1], -centerBegin[0]], centerEnd) < 0.0) {
 		filletAngle = -filletAngle
 	}
 	filletedPolygon.push(beginTangent)
 	var beginTangentCenter = getSubtraction2D(beginTangent, filletCenter)
-	var filletRotation = polar(filletAngle)
+	var filletRotation = polarCounterclockwise(filletAngle)
 	for (var filletIndex = 1; filletIndex < numberOfFilletSides; filletIndex++) {
 		beginTangentCenter = getRotation2DVector(beginTangentCenter, filletRotation)
 		filletedPolygon.push(getAddition2D(filletCenter, beginTangentCenter))
@@ -399,7 +405,7 @@ function getCenterDirectionByCenterDirection(center, direction) {
 	}
 	direction[0] = getValueByDefault(0.0, direction[0])
 	if (direction.length == 1) {
-		return {center:center, direction:polar(direction[0] * gRadiansPerDegree)}
+		return {center:center, direction:polarCounterclockwise(direction[0] * gRadiansPerDegree)}
 	}
 	direction[1] = getValueByDefault(0.0, direction[1])
 	var directionLength = length2D(direction)
@@ -453,11 +459,12 @@ function getDirectionMapZ(facets, points) {
 	return {deltaZ:maximumZ - minimumZ, horizontalDirectionMap:horizontalDirectionMap , minimumZ:minimumZ, maximumZ:maximumZ}
 }
 
-function getFilletedPolygon(numberOfSides, polygon, radius) {
+function getFilletedPolygon(numberOfSides, polygon, radius, checkLength) {
+	checkLength = getValueByDefault(true, checkLength)
 	var filletedPolygon = []
 	var minimumAngle = gDoublePi / numberOfSides
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		addFilletedPoints(filletedPolygon, minimumAngle, numberOfSides, polygon, radius, vertexIndex)
+		addFilletedPoints(checkLength, filletedPolygon, minimumAngle, numberOfSides, polygon, radius, vertexIndex)
 	}
 	return filletedPolygon
 }
@@ -540,16 +547,23 @@ function getOutsets(registry, statement) {
 	return outsets
 }
 
-function getPointIndexSet(equations, ids, points, polygons, mesh, registry, statement, stratas) {
+function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas) {
 	var pointIndexSet = new Set()
-	if (getIsEmpty(equations) && getIsEmpty(ids) && getIsEmpty(polygons)) {
+	if (getIsEmpty(equations) && getIsEmpty(intersectionIDs) && getIsEmpty(polygons) && getIsEmpty(splitIDs)) {
 		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			pointIndexSet.add(pointIndex)
 		}
 		return pointIndexSet
 	}
-	if (ids != null && mesh.splitIndexesMap != undefined) {
-		for (var id of ids) {
+	if (mesh.intersectionIndexesMap != undefined) {
+		for (var id of intersectionIDs) {
+			if (mesh.intersectionIndexesMap.has(id)) {
+				addElementsToSet(mesh.intersectionIndexesMap.get(id), pointIndexSet)
+			}
+		}
+	}
+	if (mesh.splitIndexesMap != undefined) {
+		for (var id of splitIDs) {
 			if (mesh.splitIndexesMap.has(id)) {
 				addElementsToSet(mesh.splitIndexesMap.get(id), pointIndexSet)
 			}
@@ -854,12 +868,14 @@ function wedgeMesh(inset, matrix3D, mesh) {
 var gBend = {
 	alterMesh: function(mesh, registry, statement) {
 		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var ids = getStrings('splitIDs', statement)
+		var intersectionIDs = getStrings('intersectionIDs', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
 		var polygons = getPolygonsHDRecursively(registry, statement)
+		var splitIDs = getStrings('splitIDs', statement)
 		var stratas = getStratas(registry, statement)
-		var pointIndexSet = getPointIndexSet(boundaryEquations, ids, points, polygons, mesh, registry, statement, stratas)
+		var pointIndexSet = getPointIndexSet(
+		boundaryEquations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas)
 		if (pointIndexSet.size == 0) {
 			return
 		}
@@ -867,16 +883,10 @@ var gBend = {
 		var amplitudes = getPointsByKey('amplitudes', registry, statement)
 		var center = getFloatsByStatement('center', registry, statement)
 		var translationEquations = getEquations('translations', statement)
-
-//deprecated23
-		deprecatedTranslationEquations = getEquations('translation', statement)
-		if (deprecatedTranslationEquations != null) {
-			translationEquations = getPushArray(translationEquations, deprecatedTranslationEquations)
-		}
-
 		var vector = get3DPointByStatement('vector', registry, statement)
 		transformPoints3DByEquation(amplitudes, center, boundedPoints, registry, statement, translationEquations, vector)
 		mesh.points = get3DsBy3DMatrix(matrix3D, points)
+		removeClosePoints(mesh)
 	},
 	getPoints: function(points, registry, statement) {
 		var boundaryEquations = getEquations('boundaryEquations', statement)
@@ -888,13 +898,6 @@ var gBend = {
 		var amplitudes = getPointsByKey('amplitudes', registry, statement)
 		var center = getFloatsByStatement('center', registry, statement)
 		var translationEquations = getEquations('translations', statement)
-
-//deprecated23
-		deprecatedTranslationEquations = getEquations('translation', statement)
-		if (deprecatedTranslationEquations != null) {
-			translationEquations = getPushArray(translationEquations, deprecatedTranslationEquations)
-		}
-
 		var vector = get3DPointByStatement('vector', registry, statement)
 		transformPoints2DByEquation(amplitudes, center, boundedPoints, registry, statement, translationEquations, vector)
 		return points
@@ -927,14 +930,16 @@ var gBevel = {
 	alterMesh: function(mesh, registry, statement) {
 		var bevels = getPointsByKey('bevels', registry, statement)
 		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var ids = getStrings('splitIDs', statement)
+		var intersectionIDs = getStrings('intersectionIDs', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
 		var polygons = getPolygonsHDRecursively(registry, statement)
 		var splitBevels = getPointsByKey('splitBevels', registry, statement)
+		var splitIDs = getStrings('splitIDs', statement)
 		var stratas = getStratas(registry, statement)
 		splitMeshByBevels(boundaryEquations, statement.attributeMap.get('id'), matrix3D, mesh, polygons, registry, splitBevels, stratas)
-		var pointIndexSet = getPointIndexSet(boundaryEquations, ids, points, polygons, mesh, registry, statement, stratas)
+		var pointIndexSet = getPointIndexSet(
+		boundaryEquations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas)
 		if (pointIndexSet.size == 0) {
 			return
 		}
@@ -988,9 +993,10 @@ var gExpand = {
 
 var gFillet = {
 	getPoints: function(points, registry, statement) {
-		var numberOfSides = getFloatByDefault(12, 'sides', registry, statement, this.name)
+		var checkLength = getBooleanByDefault(true, 'checkLength', registry, statement, this.name)
+		var numberOfSides = getFloatByDefault(this.sides, 'sides', registry, statement, this.name)
 		var radius = getFloatByDefault(1.0, 'radius', registry, statement, this.name)
-		return getFilletedPolygon(numberOfSides, points, radius)
+		return getFilletedPolygon(numberOfSides, points, radius, checkLength)
 	},
 	initialize: function() {
 		gGetPointsMap.set(this.name, this)
@@ -1006,7 +1012,8 @@ var gFillet = {
 		statement.tag = 'polygon'
 		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
-	}
+	},
+	sides: 12
 }
 
 var gMirror = {
@@ -1142,7 +1149,7 @@ var gMove = {
 		var rotation = getFloatsByStatement('rotation', registry, statement)
 		if (!getIsEmpty(rotation)) {
 			if (rotation.length == 1) {
-				rotation = polar(rotation[0] * gRadiansPerDegree)
+				rotation = polarCounterclockwise(rotation[0] * gRadiansPerDegree)
 			}
 			var rotationLength = length2D(rotation)
 			if (rotationLength != 0.0) {
