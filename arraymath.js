@@ -362,7 +362,7 @@ function getMultiplicationArrayScalar_Check(elements, multiplierScalar) {
 }
 
 function getRotation2DAngle(point, angle) {
-	return getRotation2DVector(point, polar(angle))
+	return getRotation2DVector(point, polarCounterclockwise(angle))
 }
 
 function getRotation2DAngle_Check(point, angle) {
@@ -521,20 +521,20 @@ function multiplyArrayScalar_Check(elements, multiplierScalar) {
 	return multiplyArrayScalar(getArrayByElements(elements), getValueByDefault(0.0, multiplierScalar))
 }
 
-function polar(angle) {
-	return [Math.cos(angle), -Math.sin(angle)]
-}
-
 function polar_Check(angle, radius) {
 	return polarRadius(getValueByDefault(0.0, angle) * gRadiansPerDegree, getValueByDefault(1.0, radius))
 }
 
+function polarCounterclockwise(angle) {
+	return [Math.cos(angle), Math.sin(angle)]
+}
+
 function polarRadius(angle, radius) {
-	return [radius * Math.cos(angle), radius * -Math.sin(angle)]
+	return [radius * Math.cos(angle), radius * Math.sin(angle)]
 }
 
 function rotate2DAngle(point, angle) {
-	return rotate2DVector(getArrayByElements(point, 2), polar(angle))
+	return rotate2DVector(getArrayByElements(point, 2), polarCounterclockwise(angle))
 }
 
 function rotate2DAngle_Check(point, angle) {
