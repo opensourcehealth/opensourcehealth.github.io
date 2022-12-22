@@ -1,6 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-const gDirections = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]];
+const gDirections = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]]
 const gXYPlanar = [1, 2, 0, 3]
 const gYZPlanar = [3, 4, 2, 5]
 const gZXPlanar = [5, 0, 4, 1]
@@ -544,7 +544,7 @@ function getXYZLatticeSubtraction(xyzLatticeA, xyzLatticeB) {
 }
 
 function getXYZLatticeByMesh(mesh) {
-	xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
+	xyPolygonsMap = getSlicePolygonsMapByMesh(mesh)
 	var xyzLattice = new Array(3)
 	xyzLattice[0] = new Map()
 	for (var entry of xyPolygonsMap) {
@@ -557,7 +557,7 @@ function getXYZLatticeByMesh(mesh) {
 		xyzLattice[1].set(entry[0], getIntersectionPairsMap(xyPolygons))
 	}
 	rotateXYZParametersByPoints(2, mesh.points)
-	var xyPolygonsMap = getXYPolygonsMapByMesh(mesh)
+	var xyPolygonsMap = getSlicePolygonsMapByMesh(mesh)
 	xyzLattice[2] = new Map()
 	for (var entry of xyPolygonsMap) {
 		xyzLattice[2].set(entry[0], getIntersectionPairsMap(entry[1]))
