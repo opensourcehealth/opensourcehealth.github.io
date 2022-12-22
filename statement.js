@@ -1,5 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+var gIDCountMap = new Map()
 const gIDJoinWord = '_'
 
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
@@ -9,7 +10,7 @@ function addPassthroughLines(depth, passthrough, passthroughNesting, statement) 
 		return
 	}
 	depth += 1
-	passthroughNesting.lines.push('  '.repeat(Math.max(0, passthroughNesting.nesting - 1)) + getLineByStatement(passthrough, statement))
+	passthroughNesting.lines.push('  '.repeat(Math.max(0, passthroughNesting.nesting - 1)) + getLineByStatement(statement))
 	if (statement.nestingIncrement == 1) {
 		passthroughNesting.nesting += 1
 	}
@@ -122,9 +123,14 @@ function deleteStatementsByTagDepth(depth, registry, statement, tag) {
 }
 
 function getConcatenatedUniqueID(id, registry, statement) {
-	for (var whileIndex = 1; whileIndex < gLengthLimit; whileIndex++) {
-		var check = id + gIDJoinWord + whileIndex.toString()
+	var whileCount = 2
+	if (gIDCountMap.has(id)) {
+		whileCount = gIDCountMap.get(id) + 1
+	}
+	for (; whileCount < gLengthLimit; whileCount++) {
+		var check = id + gIDJoinWord + whileCount.toString()
 		if (getIsIDUnique(check, registry, statement)) {
+			gIDCountMap.set(id, whileCount)
 			return check
 		}
 	}
@@ -218,17 +224,15 @@ function getIsIDUnique(id, registry, statement) {
 	}
 	statement.attributeMap.set('id', id)
 	registry.idMap.set(id, statement)
+	registry.generatedIDSet.add(id)
 	return true
 }
 
-function getLineByStatement(passthrough, statement) {
+function getLineByStatement(statement) {
 	var firstWord = statement.tag
 	if (firstWord == null) {
 		return ''
 	}
-//	if (firstWord != passthrough && statement.nestingIncrement == 1) {
-//		firstWord = 'g'
-//	}
 	var attributeWords = ['<' + firstWord]
 	for (var entry of statement.attributeMap) {
 		var value = entry[1]
@@ -386,11 +390,24 @@ function getStatementID(registry, statement) {
 	if (statement.attributeMap.has('id')) {
 		id = statement.attributeMap.get('id')
 		if (registry.idMap.has(id)) {
+			var previousStatement = registry.idMap.get(id)
+			if (registry.generatedIDSet.has(id)) {
+				previousStatement.attributeMap.delete('id')
+				getStatementID(registry, previousStatement)
+				registry.idMap.set(id, statement)
+				return
+			}
 			id = statement.tag + gIDJoinWord + id
 		}
 		else {
 			registry.idMap.set(id, statement)
 			return id
+		}
+	}
+	if (statement.attributeMap.has('output')) {
+		var output = statement.attributeMap.get('output')
+		if (getIsIDUnique(output, registry, statement)) {
+			return output
 		}
 	}
 	if (getIsIDUnique(id, registry, statement)) {
@@ -399,29 +416,20 @@ function getStatementID(registry, statement) {
 	if (statement.attributeMap.has('work')) {
 		id += gIDJoinWord + statement.attributeMap.get('work')
 	}
-	else {
-		var parentMap = statement.parent.attributeMap
-		if (parentMap.has('id')) {
-			id += gIDJoinWord + parentMap.get('id')
-		}
+	if (getIsIDUnique(id, registry, statement)) {
+		return id
+	}
+	var parentMap = statement.parent.attributeMap
+	if (parentMap.has('id')) {
+		id += gIDJoinWord + parentMap.get('id')
 	}
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
-	if (statement.attributeMap.has('points')) {
-		var pointStrings = statement.attributeMap.get('points').replace(/,/g, ' ').split(' ').filter(lengthCheck).slice(2, 4)
-		id += gIDJoinWord + pointStrings.join(gIDJoinWord)
+	for (var key of statement.attributeMap.keys(key)) {
+		id += gIDJoinWord + key
 		if (getIsIDUnique(id, registry, statement)) {
 			return id
-		}
-	}
-	var keys = 'cx cy x y r'.split(' ')
-	for (var key of keys) {
-		if (statement.attributeMap.has(key)) {
-			id += gIDJoinWord + key + statement.attributeMap.get(key)
-			if (getIsIDUnique(id, registry, statement)) {
-				return id
-			}
 		}
 	}
 	return getConcatenatedUniqueID(id, registry, statement)
@@ -445,13 +453,7 @@ function getUniqueID(id, registry, statement) {
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
-	for (var whileIndex = 1; whileIndex < gLengthLimit; whileIndex++) {
-		var check = id + gIDJoinWord + whileIndex.toString()
-		if (getIsIDUnique(check, registry, statement)) {
-			return check
-		}
-	}
-	return id
+	return getConcatenatedUniqueID(id, registry, statement)
 }
 
 function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
