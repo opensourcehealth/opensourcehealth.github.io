@@ -9,8 +9,8 @@ const gHashMultiplier = 1.0 / 65537
 const gHashRemainderMultiplier = (1.0 - (65536.0 * gHashMultiplier)) / 65536.0
 const gHalfClose = 0.5 * gClose
 const gHalfMinusOver = 0.499 / gClose
-const gLengthLimit = 9876543
-const gLengthLimitRoot = 3543
+const gLengthLimit = 7654321
+const gLengthLimitRoot = 4321
 const gOneOverClose = Math.round(1.0 / gClose)
 const gOneMinusClose = 1.0 - gClose
 const gQuarterCloseSquared = 0.25 * gCloseSquared
@@ -363,15 +363,16 @@ function getEquation(key, statement) {
 			return equationString
 		}
 	}
-	if (statement.variableMap.has(equationString)) {
-		return statement.variableMap.get(equationString)
+	var equationValue = getVariableValue(equationString, statement)
+	if (!getIsEmpty(equationValue)) {
+		return equationValue
 	}
 	return null
 }
 
 function getEquations(key, statement) {
 	if (!statement.attributeMap.has(key)) {
-		return null
+		return []
 	}
 	var equationString = statement.attributeMap.get(key)
 	for (var character of equationString) {
@@ -379,11 +380,12 @@ function getEquations(key, statement) {
 			return [equationString]
 		}
 	}
-	var equations = equationString.replace(/,/g, ' ').split(' ').filter(lengthCheck)
-	for (var equationIndex = 0; equationIndex < equations.length; equationIndex++) {
-		var equation = equations[equationIndex]
-		if (statement.variableMap.has(equation)) {
-			equations[equationIndex] = statement.variableMap.get(equation)
+	var equations = []
+	var equationStrings = equationString.replace(/,/g, ' ').split(' ').filter(lengthCheck)
+	for (var equationString of equationStrings) {
+		var equationValue = getVariableValue(equationString, statement)
+		if (!getIsEmpty(equationValue)) {
+			equations.push(equationValue)
 		}
 	}
 	return equations
