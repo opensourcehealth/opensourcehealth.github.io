@@ -1,8 +1,22 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function addElementListsToSet(elementLists, setToAddTo) {
+function addElementListsToSet(elementLists, setTo) {
 	for (var elements of elementLists) {
-		addElementsToSet(elements, setToAddTo)
+		addElementsToSet(elements, setTo)
+	}
+}
+
+function addElementsToMapArray(elements, key, mapTo) {
+	if (mapTo.has(key)) {
+		pushArray(mapTo.get(key), elements)
+		return
+	}
+	mapTo.set(key, elements)
+}
+
+function addElementsToSet(elements, setTo) {
+	for (var element of elements) {
+		setTo.add(element)
 	}
 }
 
@@ -15,17 +29,17 @@ function addElementToArrays(arrays, index, value) {
 	}
 }
 
-function addElementToMapArray(element, key, mapToAddTo) {
-	if (mapToAddTo.has(key)) {
-		mapToAddTo.get(key).push(element)
+function addElementToMapArray(element, key, mapTo) {
+	if (mapTo.has(key)) {
+		mapTo.get(key).push(element)
 		return
 	}
-	mapToAddTo.set(key, [element])
+	mapTo.set(key, [element])
 }
 
-function addElementsToSet(elements, setToAddTo) {
-	for (var element of elements) {
-		setToAddTo.add(element)
+function addMapToMapArray(mapFrom, mapTo) {
+	for (var entry of mapFrom.entries()) {
+		addElementsToMapArray(entry[1], entry[0], mapTo)
 	}
 }
 
@@ -363,6 +377,12 @@ function removeRepeats(elements) {
 		if (elements[elementIndex] == elements[(elementIndex + 1) % elements.length]) {
 			elements.splice(elementIndex, 1)
 		}
+	}
+}
+
+function removeCollectionElementsByIterable(collection, iterable) {
+	for (var element of iterable) {
+		collection.delete(element)
 	}
 }
 
