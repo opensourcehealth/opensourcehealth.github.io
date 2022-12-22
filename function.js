@@ -49,16 +49,17 @@ registry, statement, beforeX, beforeY, fromX, fromY, toX, toY, numberOfSides, in
 	registry, statement, [beforeX, beforeY], [fromX, fromY], [toX, toY], numberOfSides, includeBefore, includeFrom, includeTo)
 }
 
-function arcCenterRadius(centerX, centerY, radius, fromAngle, toAngle, numberOfSides) {
-	return spiralCenterRadius([centerX, centerY], radius, fromAngle, toAngle, numberOfSides)
+function arcCenterRadius(centerX, centerY, radius, fromAngle, toAngle, numberOfSides, includeFrom, includeTo) {
+	return spiralCenterRadius([centerX, centerY], radius, fromAngle, toAngle, undefined, numberOfSides, includeFrom, includeTo)
 }
 
 function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numberOfSides, includeFrom, includeTo) {
 	return spiralFromToAngle(registry, statement, [fromX, fromY], [toX, toY], angle, numberOfSides, includeFrom, includeTo)
 }
 
-function arcFromToRadius(registry, statement, fromX, fromY, toX, toY, radius, clockwise, numberOfSides, includeFrom, includeTo) {
-	return spiralFromToRadius(registry, statement, [fromX, fromY], [toX, toY], radius, clockwise, numberOfSides, includeFrom, includeTo)
+function arcFromToRadius(registry, statement, fromX, fromY, toX, toY, radius, counterclockwise, numberOfSides, includeFrom, includeTo) {
+	return spiralFromToRadius(
+	registry, statement, [fromX, fromY], [toX, toY], radius, counterclockwise, numberOfSides, includeFrom, includeTo)
 }
 
 function arcTo(registry, statement, toX, toY, numberOfSides, includeTo) {
@@ -70,9 +71,9 @@ function arcToAngle(registry, statement, toX, toY, angle, numberOfSides, include
 	return spiralFromToAngle(registry, statement, [undefined, undefined], [toX, toY], angle, numberOfSides, false, includeTo)
 }
 
-function arcToRadius(registry, statement, toX, toY, radius, clockwise, numberOfSides, includeTo) {
+function arcToRadius(registry, statement, toX, toY, radius, counterclockwise, numberOfSides, includeTo) {
 	return spiralFromToRadius(
-	registry, statement, [undefined, undefined], [toX, toY], radius, clockwise, numberOfSides, false, includeTo)
+	registry, statement, [undefined, undefined], [toX, toY], radius, counterclockwise, numberOfSides, false, includeTo)
 }
 
 function arcWaveXFromToHeight(xs, from, to, height, phase, along) {
@@ -128,12 +129,73 @@ function bracket(center, side) {
 	return [center - side, center + side]
 }
 
-function fillet(registry, statement, pointX, pointY, radius, numberOfSides) {
-	return filletPoint(registry, statement, [pointX, pointY], radius, numberOfSides)
+function ellipseFromToRadius(registry, statement, from, to, radius, numberOfSides, includeFrom, includeTo) {
+	to = getValueByDefault(10.0, to)
+	to = getArrayByValue(to)
+	from = getArrayByValue(from)
+	from.length = Math.max(2, from.length, to.length)
+	var variableMap = getVariableMapByStatement(statement.parent)
+	if (variableMap.has('_points')) {
+		var points = variableMap.get('_points')
+		if (points.length > 0) {
+			setUndefinedElementsToArray(from, points[points.length - 1])
+		}
+	}
+	setUndefinedElementsToValue(from, 0.0)
+	to.length = from.length
+	setUndefinedElementsToValue(to, 0.0)
+	var center = getMidpoint2D(from, to)
+	var centerFrom = getSubtraction2D(from, center)
+	var centerFromLength = length2D(centerFrom)
+	var numberOfSides = getValueByDefault(24, numberOfSides)
+	var radius = getValueByDefault(1.0, radius)
+	includeFrom = getValueByDefault(true, includeFrom)
+	includeTo = getValueByDefault(true, includeTo)
+	var arc = []
+	if (includeFrom) {
+		arc.push(from)
+	}
+	if (centerFromLength == 0.0) {
+		return arc
+	}
+	var right = divide2DScalar([centerFrom[1], -centerFrom[0]], centerFromLength * Math.sqrt(centerFromLength))
+	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(Math.PI) / gDoublePi)
+	var zAddition = null
+	if (from.length > 2) {
+		zAddition = (to[2] - from[2]) / numberOfArcSides
+		center.push(0.0)
+		centerFrom.push(from[2])
+	}
+	var rotator = polarCounterclockwise(Math.PI / numberOfArcSides)
+	numberOfArcSides -= 1
+	var arrayIndex = arc.length
+	arc.length = arc.length + numberOfArcSides
+	for (var vertexIndex = 0; vertexIndex < numberOfArcSides; vertexIndex++) {
+		rotate2DVector(centerFrom, rotator)
+		if (zAddition != null) {
+			centerFrom[2] += zAddition
+		}
+		var point = getAdditionArray(center, centerFrom, 3)
+		add2D(point, getMultiplication2DScalar(right, dotProduct2D(right, centerFrom) * (radius - centerFromLength)))
+		arc[arrayIndex++] = point
+	}
+	if (includeTo) {
+		arc.push(to)
+	}
+	return arc
 }
 
-function filletPoint(registry, statement, point, radius, numberOfSides) {
-	numberOfSides = getValueByDefault(24, numberOfSides)
+function ellipseToRadius(registry, statement, to, radius, numberOfSides, includeFrom, includeTo) {
+	return ellipseFromToRadius(registry, statement, [undefined, undefined], to, radius, numberOfSides, false, includeTo)
+}
+
+function fillet(registry, statement, pointX, pointY, radius, numberOfSides, checkLength) {
+	return filletPoint(registry, statement, [pointX, pointY], radius, numberOfSides, checkLength)
+}
+
+function filletPoint(registry, statement, point, radius, numberOfSides, checkLength) {
+	checkLength = getValueByDefault(true, checkLength)
+	numberOfSides = getValueByDefault(gFillet.sides, numberOfSides)
 	radius = getValueByDefault(1.0, radius)
 	var variableMap = getVariableMapByStatement(statement.parent)
 	if (variableMap.has('_points')) {
@@ -145,7 +207,7 @@ function filletPoint(registry, statement, point, radius, numberOfSides) {
 	setUndefinedElementsToValue(point, 0.0)
 	if (variableMap.has('_values')) {
 		var values = variableMap.get('_values')
-		values.push('filletTaggedPoints(' + point[0] + ',' + point[1] + ',' + radius + ',' + numberOfSides + ')')
+		values.push('filletTaggedPoints(' + point[0] + ',' + point[1] + ',' + radius + ',' + numberOfSides + ',' + checkLength + ')')
 	}
 	else {
 		noticeByList(['No values could be found for fillet in function.', statement])
@@ -153,7 +215,7 @@ function filletPoint(registry, statement, point, radius, numberOfSides) {
 	return [point]
 }
 
-function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberOfSides) {
+function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberOfSides, checkLength) {
 	var variableMap = getVariableMapByStatement(statement.parent)
 	if (!variableMap.has('_points')) {
 		noticeByList(['No points could be found for fillet in function.', statement])
@@ -164,11 +226,14 @@ function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberO
 		var point = points[pointIndex]
 		if (point.length > 1) {
 			if (point[0] - pointX == 0.0 && point[1] - pointY == 0.0) {
-				var beforePoint = points[(pointIndex - 2 + points.length) % points.length]
-				var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
+				var afterPoint = null
+				var beforePoint = null
+				if (checkLength) {
+					beforePoint = points[(pointIndex - 2 + points.length) % points.length]
+					afterPoint = points[(pointIndex + 2) % points.length]
+				}
 				var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
 				var endPoint = points[(pointIndex + 1) % points.length]
-				var afterPoint = points[(pointIndex + 2) % points.length]
 				var remainingPoints = points.slice(pointIndex + 1)
 				points.length = pointIndex
 				addFilletedPointsByQuintuple(
@@ -190,6 +255,23 @@ function floatByIDKey(registry, statement, id, key) {
 	return parseFloat(getStatementByID(registry, statement, id).attributeMap.get(key))
 }
 
+function getParabolicFrom(from, fromTo, levelStart, x, xMultiplier, zAddition) {
+	from = from.slice(0)
+	from[0] += x
+	if (levelStart) {
+		from[1] += x * x * xMultiplier
+	}
+	else {
+		x = fromTo[0] - x
+		x *= x * xMultiplier
+		from[1] += fromTo[1] - x
+	}
+	if (zAddition != null) {
+		from[2] += zAddition * x
+	}
+	return from
+}
+
 function insetsHeightAngle(height, overhangAngle, numberOfSegments) {
 	height = getValueByDefault(4.0, height)
 	numberOfSegments = Math.max(getValueByDefault(4, numberOfSegments), 1)
@@ -207,6 +289,10 @@ function insetsHeightAngle(height, overhangAngle, numberOfSegments) {
 		inset[0] *= xMultiplier
 	}
 	return insets
+}
+
+function intervalFromToBetween(from, to, along) {
+	return intervalsFromToBetween(from, to, along)[0]
 }
 
 function intervalsFromQuantityIncrement(from, quantity, increments, includeFrom) {
@@ -229,11 +315,12 @@ function intervalsFromQuantityIncrement(from, quantity, increments, includeFrom)
 		}
 		quantity = -quantity
 	}
-	var quantityFloor = Math.floor(quantity)
-	var properFraction = quantity - quantityFloor
+	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		return [from + (properFraction - 1.0) * increments[0]]
+		noticeByList(['quantityFloor is less than 1 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
+		return []
 	}
+	var properFraction = quantity - quantityFloor
 	var intervals = []
 	if (includeFrom) {
 		intervals.push(from)
@@ -242,11 +329,13 @@ function intervalsFromQuantityIncrement(from, quantity, increments, includeFrom)
 	if (properFraction > gClose) {
 		quantityFloor += 1
 	}
+	var arrayIndex = intervals.length
+	intervals.length = intervals.length + quantityFloor
 	var increment = 0
 	for (var count = 0; count < quantityFloor; count++) {
 		increment = increments[count % increments.length]
 		from += increment
-		intervals.push(from)
+		intervals[arrayIndex++] = from
 	}
 	if (properFraction > gClose) {
 		intervals[intervals.length - 1] = intervals[intervals.length - 2] + properFraction * increment
@@ -277,35 +366,34 @@ function intervalsFromToAlong(from, to, alongs, includeFrom, includeTo) {
 	return intervals
 }
 
-function intervalsFromToIncrement(from, to, minimumIncrements, includeFrom, includeTo) {
+function intervalsFromToBetween(from, to, alongs) {
+	return intervalsFromToAlong(from, to, alongs, false, false)
+}
+
+function intervalsFromToIncrement(from, to, increments, includeFrom, includeTo) {
 	from = getValueByDefault(0.0, from)
 	includeFrom = getValueByDefault(true, includeFrom)
 	includeTo = getValueByDefault(true, includeTo)
-	minimumIncrement = getValueByDefault(1.0, minimumIncrement)
+	increments = getValueByDefault(1.0, increments)
+	increments = getArrayByValue(increments)
 	var totalLength = 0.0
-	if (Array.isArray(minimumIncrements)) {
-		for (var minimumIncrement of minimumIncrements) {
-			totalLength += minimumIncrement
-		}
-	}
-	else {
-		totalLength = minimumIncrements
-		minimumIncrements = [minimumIncrements]
+	for (var increment of increments) {
+		totalLength += increment
 	}
 	to = getValueByDefault(10.0, to)
 	var difference = to - from
 	var numberUntilEnd = Math.floor((Math.abs(difference) + gClose) / Math.abs(totalLength))
 	if (numberUntilEnd == 0) {
-		noticeByList(['numberUntilEnd is 0 in intervalsFromToIncrement in function.', from, to, minimumIncrements])
+		noticeByList(['numberUntilEnd is 0 in intervalsFromToIncrement in function.', from, to, increments])
 		return [from]
 	}
 	if (totalLength == 0.0) {
-		noticeByList(['totalLength is 0 in intervalsFromToIncrement in function.', from, to, minimumIncrements])
+		noticeByList(['totalLength is 0 in intervalsFromToIncrement in function.', from, to, increments])
 		return [from]
 	}
 	var incrementMultiplier = difference / numberUntilEnd / totalLength
-	for (var incrementIndex = 0; incrementIndex < minimumIncrements.length; incrementIndex++) {
-		minimumIncrements[incrementIndex] *= incrementMultiplier
+	for (var incrementIndex = 0; incrementIndex < increments.length; incrementIndex++) {
+		increments[incrementIndex] *= incrementMultiplier
 	}
 	numberUntilEnd -= 1
 	var intervals = []
@@ -315,13 +403,56 @@ function intervalsFromToIncrement(from, to, minimumIncrements, includeFrom, incl
 	var arrayIndex = intervals.length
 	intervals.length = intervals.length + numberUntilEnd
 	for (var intervalIndex = 0; intervalIndex < numberUntilEnd; intervalIndex++) {
-		for (var minimumIncrement of minimumIncrements) {
-			from += minimumIncrement
+		for (var increment of increments) {
+			from += increment
 			intervals[arrayIndex++] = from
 		}
 	}
 	if (includeTo) {
 		intervals.push(to)
+	}
+	return intervals
+}
+
+function intervalsFromToQuantity(from, to, quantity, includeFrom, includeTo) {
+	from = getValueByDefault(0.0, from)
+	to = getValueByDefault(10.0, to)
+	includeFrom = getValueByDefault(true, includeFrom)
+	includeTo = getValueByDefault(true, includeTo)
+	quantity = getValueByDefault(11, quantity)
+	var one = 1.0
+	if (quantity < 0.0) {
+		one = -one
+		quantity = -quantity
+	}
+	var quantityFloor = Math.floor(quantity + gClose)
+	if (quantityFloor < 1) {
+		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', from, quantity, increments])
+		return []
+	}
+	var properFraction = quantity - quantityFloor
+	var intervals = []
+	if (includeFrom) {
+		intervals.push(from)
+		quantityFloor -= 1
+	}
+	quantity = quantityFloor
+	if (properFraction > gClose) {
+		quantityFloor++
+		quantity += properFraction
+	}
+	if (!includeTo) {
+		quantity += 1.0
+	}
+	var increment = (to - from) * one / quantity
+	var arrayIndex = intervals.length
+	intervals.length = intervals.length + quantityFloor
+	for (var count = 0; count < quantityFloor; count++) {
+		from += increment
+		intervals[arrayIndex++] = from
+	}
+	if (properFraction > gClose) {
+		intervals[intervals.length - 1] = intervals[intervals.length - 2] + properFraction * increment
 	}
 	return intervals
 }
@@ -430,6 +561,91 @@ function operation(registry, statement, symbol, elements, otherElements) {
 	return elements
 }
 
+function parabolaFromToQuantity(registry, statement, from, to, quantity, levelStart, horizontal, includeFrom, includeTo) {
+	to = getValueByDefault([10.0, 10.0], to)
+	to = getArrayByValue(to)
+	from = getArrayByValue(from)
+	from.length = Math.max(2, from.length, to.length)
+	var variableMap = getVariableMapByStatement(statement.parent)
+	if (variableMap.has('_points')) {
+		var points = variableMap.get('_points')
+		if (points.length > 0) {
+			setUndefinedElementsToArray(from, points[points.length - 1])
+		}
+	}
+	setUndefinedElementsToValue(from, 0.0)
+	to.length = from.length
+	setUndefinedElementsToValue(to, 0.0)
+	includeFrom = getValueByDefault(true, includeFrom)
+	includeTo = getValueByDefault(true, includeTo)
+	var levelStart = getValueByDefault(true, levelStart)
+	horizontal = getValueByDefault(true, horizontal)
+	from = from.slice(0)
+	if (!horizontal) {
+		swapXYPoint(from)
+		to = to.slice(0)
+		swapXYPoint(to)
+	}
+	var fromTo = getSubtractionArray(to, from, 3)
+	if (fromTo[0] == 0.0) {
+		noticeByList(['fromTo[0] is 0 in parabolaFromTo in function.', from, to, radius])
+		return arc
+	}
+	var quantity = getValueByDefault(11, quantity)
+	if (quantity < 0.0) {
+		fromTo[0] = -fromTo[0]
+		quantity = -quantity
+	}
+	var quantityFloor = Math.floor(quantity + gClose)
+	if (quantityFloor < 1) {
+		noticeByList(['quantityFloor is less than 1 in parabolaFromTo in function.', from, quantity, increments])
+		return []
+	}
+	var properFraction = quantity - quantityFloor
+	var parabola = []
+	if (includeFrom) {
+		parabola.push(from)
+		quantityFloor--
+	}
+	quantity = quantityFloor
+	if (properFraction > gClose) {
+		quantityFloor++
+		quantity += properFraction
+	}
+	if (!includeTo) {
+		quantity += 1.0
+	}
+	var arrayIndex = parabola.length
+	parabola.length = parabola.length + quantityFloor
+	var xMultiplier = fromTo[1] / fromTo[0] / fromTo[0]
+	var incrementX = fromTo[0] / quantity
+	var x = incrementX
+	var zAddition = null
+	if (from.length > 2) {
+		zAddition = fromTo[2] / fromTo[0]
+	}
+	for (var count = 0; count < quantityFloor; count++) {
+		parabola[arrayIndex++] = getParabolicFrom(from, fromTo, levelStart, x, xMultiplier, zAddition)
+		x += incrementX
+	}
+	if (properFraction > gClose) {
+		x = parabola[parabola.length - 2][0] + properFraction * incrementX
+		parabola[parabola.length - 1] = getParabolicFrom(from, fromTo, levelStart, x, xMultiplier, zAddition)
+	}
+	if (!horizontal) {
+		swapXYPolygon(parabola)
+	}
+	return parabola
+}
+
+function parabolaToQuantity(registry, statement, to, quantity, levelStart, horizontal, includeFrom, includeTo) {
+	var fromLength = 2
+	if (Array.isArray(to)) {
+		fromLength = to.length
+	}
+	return parabolaFromToQuantity(registry, statement, new Array(fromLength), to, quantity, levelStart, horizontal, false, includeTo)
+}
+
 function point(registry, statement, name, x, y, z) {
 	var pointArgumentsLength = arguments.length - 3
 	var point = new Array(pointArgumentsLength)
@@ -528,38 +744,38 @@ function spiralBeforeFromTo(registry, statement, before, from, to, numberOfSides
 	divide2DScalar(beforeFrom, beforeFromLength)
 	divide2DScalar(fromTo, fromToLength)
 	var angle = 4.0 * Math.asin(0.5 * distance2D(beforeFrom, fromTo)) * gDegreesPerRadian
-	if (crossProduct2D(beforeFrom, fromTo) > 0.0) {
+	if (crossProduct2D(beforeFrom, fromTo) < 0.0) {
 		angle = -angle
 	}
 	pushArray(arc, spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, includeFrom, includeTo))
 	return arc
 }
 
-function spiralCenterRadius(center, radius, fromAngle, toAngle, numberOfSides, toZ) {
+function spiralCenterRadius(center, radius, fromAngle, toAngle, toZ, numberOfSides, includeFrom, includeTo) {
 	center = getArrayByElements(center, 2)
 	radius = getValueByDefault(10.0, radius)
 	fromAngle = getValueByDefault(0.0, fromAngle) * gRadiansPerDegree
 	toAngle = getValueByDefault(360.0, toAngle) * gRadiansPerDegree
+	includeFrom = getValueByDefault(true, includeFrom)
+	includeTo = getValueByDefault(true, includeTo)
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var angleDifference = toAngle - fromAngle
-	var wasAngleDifferenceNegative = angleDifference < 0.0
-	angleDifference = Math.abs(angleDifference)
-	var numberOfRotations = Math.floor(angleDifference / gDoublePi - gClose)
-	angleDifference -= numberOfRotations * gDoublePi
-	var numberOfArcSides = Math.ceil(numberOfSides * angleDifference / gDoublePi)
-	if (wasAngleDifferenceNegative) {
-		angleDifference = -angleDifference
-	}
-	var rotator = polar(angleDifference / numberOfArcSides)
+	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(angleDifference) / gDoublePi)
+	var rotator = polarCounterclockwise(angleDifference / numberOfArcSides)
 	var centerFrom = polarRadius(fromAngle, radius)
 	var zAddition = null
 	if (center.length > 2) {
 		zAddition = (getValueByDefault(0.0, toZ) - center[2]) / numberOfArcSides
 		centerFrom.push(0.0)
 	}
-	if (Math.abs(angleDifference - gDoublePi) > gClose) {
-		numberOfArcSides += 1
+	if (!includeFrom) {
+		numberOfArcSides--
+		rotate2DVector(centerFrom, rotator)
+		if (zAddition != null) {
+			centerFrom[2] += zAddition
+		}
 	}
+	numberOfArcSides += 1 * includeTo
 	var arc = new Array(numberOfArcSides)
 	for (var pointIndex = 0; pointIndex < numberOfArcSides; pointIndex++) {
 		arc[pointIndex] = getAdditionArray(center, centerFrom)
@@ -613,7 +829,7 @@ function spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, 
 		if (angle < 0.0) {
 			perpendicularAngle = -perpendicularAngle
 		}
-		var right = [fromTo[1], -fromTo[0]]
+		var right = [-fromTo[1], fromTo[0]]
 		add2D(center, multiply2DScalar(right, 0.5 * Math.tan(perpendicularAngle)))
 		radius = Math.sqrt(halfFromToLength * halfFromToLength + lengthSquared2D(right))
 	}
@@ -626,7 +842,7 @@ function spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, 
 		zAddition = (to[2] - from[2]) / numberOfArcSides
 		centerFrom.push(0.0)
 	}
-	var rotator = polar(angle / numberOfArcSides)
+	var rotator = polarCounterclockwise(angle / numberOfArcSides)
 	numberOfArcSides -= 1
 	var arrayIndex = arc.length
 	arc.length = arc.length + numberOfArcSides
@@ -643,7 +859,7 @@ function spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, 
 	return arc
 }
 
-function spiralFromToRadius(registry, statement, from, to, radius, clockwise, numberOfSides, includeFrom, includeTo) {
+function spiralFromToRadius(registry, statement, from, to, radius, counterclockwise, numberOfSides, includeFrom, includeTo) {
 	to = getValueByDefault(10.0, to)
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
@@ -660,7 +876,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, clockwise, nu
 	setUndefinedElementsToValue(to, 0.0)
 	includeFrom = getValueByDefault(true, includeFrom)
 	includeTo = getValueByDefault(true, includeTo)
-	var clockwise = getValueByDefault(true, clockwise)
+	var counterclockwise = getValueByDefault(true, counterclockwise)
 	var fromTo = subtract2D(to.slice(0), from)
 	var fromToLength = length2D(fromTo)
 	var arc = []
@@ -668,7 +884,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, clockwise, nu
 		arc.push(from)
 	}
 	if (fromToLength == 0.0) {
-		noticeByList(['fromToLength is 0 in arcFromToRadius in function.', from, to, radius])
+		noticeByList(['fromToLength is 0 in spiralFromToRadius in function.', from, to, radius])
 		return arc
 	}
 	var center = multiply2DScalar(add2D(from.slice(0), to), 0.5)
@@ -679,7 +895,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, clockwise, nu
 		return arc
 	}
 	var right = [fromTo[1], -fromTo[0]]
-	if (clockwise != radius > 0.0) {
+	if (counterclockwise != radius > 0.0) {
 		fromToLength = -fromToLength
 	}
 	multiply2DScalar(right, Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength)
@@ -691,7 +907,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, clockwise, nu
 		angle = gDoublePi - angle
 	}
 	var numberOfArcSides = Math.ceil(numberOfSides * angle / gDoublePi)
-	if (!clockwise) {
+	if (counterclockwise) {
 		angle = -angle
 	}
 	var zAddition = null
@@ -699,7 +915,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, clockwise, nu
 		zAddition = (to[2] - from[2]) / numberOfArcSides
 		centerFrom.push(0.0)
 	}
-	var rotator = polar(angle / numberOfArcSides)
+	var rotator = polarCounterclockwise(angle / numberOfArcSides)
 	multiply2DScalar(centerFrom, Math.abs(radius))
 	numberOfArcSides -= 1
 	var arrayIndex = arc.length
@@ -734,12 +950,16 @@ function spiralToAngle(registry, statement, to, angle, numberOfSides, includeTo)
 	return spiralFromToAngle(registry, statement, new Array(fromLength), to, angle, numberOfSides, false, includeTo)
 }
 
-function spiralToRadius(registry, statement, to, radius, clockwise, numberOfSides, includeTo) {
+function spiralToRadius(registry, statement, to, radius, counterclockwise, numberOfSides, includeTo) {
 	var fromLength = 2
 	if (Array.isArray(to)) {
 		fromLength = to.length
 	}
-	return spiralFromToRadius(registry, statement, new Array(fromLength), to, radius, clockwise, numberOfSides, false, includeTo)
+	return spiralFromToRadius(registry, statement, new Array(fromLength), to, radius, counterclockwise, numberOfSides, false, includeTo)
+}
+
+function stepFromToBetween(registry, statement, from, to, along) {
+	return stepsFromToBetween(registry, statement, from, to, along)[0]
 }
 
 function stepsFromQuantityIncrement(registry, statement, from, quantity, increments, includeFrom) {
@@ -756,10 +976,6 @@ function stepsFromQuantityIncrement(registry, statement, from, quantity, increme
 	increments = getValueByDefault([1.0, 0.0], increments)
 	increments = getArrayByValue(increments)
 	quantity = getValueByDefault(11, quantity)
-	if (quantity == 0.0) {
-		noticeByList(['quantity is 0 in stepsFromQuantityIncrement in function.', from, quantity, increments])
-		return []
-	}
 	if (increments.length == 0) {
 		noticeByList(['increments.length is 0 in stepsFromQuantityIncrement in function.', from, quantity, increments])
 		return [from]
@@ -779,48 +995,33 @@ function stepsFromQuantityIncrement(registry, statement, from, quantity, increme
 		}
 		quantity = -quantity
 	}
-	var quantityFloor = Math.floor(quantity)
+	var quantityFloor = Math.floor(quantity + gClose)
+	if (quantityFloor < 1) {
+		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', from, quantity, increments])
+		return []
+	}
 	var properFraction = quantity - quantityFloor
 	from = from.slice(0)
-	if (quantityFloor < 1) {
-		return addArray(from, multiplyArrayScalar(increments[0], (properFraction - 1.0)))
-	}
 	var steps = []
 	if (includeFrom) {
 		steps.push(from.slice(0))
-		quantityFloor -= 1
+		quantityFloor--
 	}
 	if (properFraction > gClose) {
 		quantityFloor += 1
 	}
+	var arrayIndex = steps.length
+	steps.length = steps.length + quantityFloor
 	var increment = []
 	for (var count = 0; count < quantityFloor; count++) {
 		increment = increments[count % increments.length]
 		addArray(from, increment)
-		steps.push(from.slice(0))
+		steps[arrayIndex++] = from.slice(0)
 	}
 	if (properFraction > gClose) {
 		steps[steps.length - 1] = addArray(steps[steps.length - 2].slice(0), multiplyArrayScalar(increment, properFraction))
 	}
 	return steps
-}
-
-function stepsQuantityIncrement(registry, statement, quantity, increments) {
-	increments = getValueByDefault([1.0, 0.0], increments)
-	increments = getArrayByValue(increments)
-	if (increments.length == 0) {
-		noticeByList(['increments.length is 0 in stepsQuantityIncrement in function.', from, quantity, increments])
-		return []
-	}
-	if (getIsEmpty(increments[0])) {
-		noticeByList(['increments zero is empty in stepsQuantityIncrement in function.', from, quantity, increments])
-		return []
-	}
-	if (!Array.isArray(increments[0])) {
-		increments = [increments]
-	}
-	var from = new Array(increments[0].length)
-	return stepsFromQuantityIncrement(registry, statement, from, getValueByDefault(10, quantity), increments, false)
 }
 
 function stepsFromToAlong(registry, statement, from, to, alongs, includeFrom, includeTo) {
@@ -857,30 +1058,81 @@ function stepsFromToAlong(registry, statement, from, to, alongs, includeFrom, in
 	return steps
 }
 
+function stepsFromToBetween(registry, statement, from, to, alongs) {
+	return stepsFromToAlong(registry, statement, from, to, alongs, false, false)
+}
+
 function stepsFromToQuantity(registry, statement, from, to, quantity, includeFrom, includeTo) {
+	from = getArrayByValue(from)
+	var variableMap = getVariableMapByStatement(statement.parent)
+	if (variableMap.has('_points')) {
+		var points = variableMap.get('_points')
+		if (points.length > 0) {
+			setUndefinedElementsToArray(from, points[points.length - 1])
+		}
+	}
+	setUndefinedElementsToValue(from, 0.0)
+	to = getValueByDefault(10.0, to)
+	to = getArrayByValue(to)
+	to.length = from.length
+	setUndefinedElementsToValue(to, 0.0)
 	includeFrom = getValueByDefault(true, includeFrom)
 	includeTo = getValueByDefault(true, includeTo)
 	quantity = getValueByDefault(11, quantity)
-	var one = 1
+	var one = 1.0
 	if (quantity < 0.0) {
 		one = -one
 		quantity = -quantity
 	}
-	var quantityFloor = Math.floor(quantity)
-	quantityFloor += !includeFrom + !includeTo
-//	var properFraction = quantity - quantityFloor
-//	if (quantityFloor < 1) {
-//		return addArray(from, multiplyArrayScalar(increments[0], (properFraction - 1.0)))
-//	}
-	var increment = one / (quantityFloor - 1)
-	quantityFloor -= 2
-	var alongs = new Array(quantityFloor)
-	var total = 0.0
-	for (var incrementIndex = 0; incrementIndex < quantityFloor; incrementIndex++) {
-		total += increment
-		alongs[incrementIndex] = total
+	var quantityFloor = Math.floor(quantity + gClose)
+	if (quantityFloor < 1) {
+		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', from, quantity, increments])
+		return []
 	}
-	return stepsFromToAlong(registry, statement, from, to, alongs, includeFrom, includeTo)
+	var properFraction = quantity - quantityFloor
+	from = from.slice(0)
+	var steps = []
+	if (includeFrom) {
+		steps.push(from.slice(0))
+		quantityFloor--
+	}
+	quantity = quantityFloor
+	if (properFraction > gClose) {
+		quantityFloor++
+		quantity += properFraction
+	}
+	if (!includeTo) {
+		quantity += 1.0
+	}
+	var increment = multiplyArrayScalar(getSubtractionArray(to, from), one / quantity)
+	var arrayIndex = steps.length
+	steps.length = steps.length + quantityFloor
+	for (var count = 0; count < quantityFloor; count++) {
+		addArray(from, increment)
+		steps[arrayIndex++] = from.slice(0)
+	}
+	if (properFraction > gClose) {
+		steps[steps.length - 1] = addArray(steps[steps.length - 2].slice(0), multiplyArrayScalar(increment, properFraction))
+	}
+	return steps
+}
+
+function stepsQuantityIncrement(registry, statement, quantity, increments) {
+	increments = getValueByDefault([1.0, 0.0], increments)
+	increments = getArrayByValue(increments)
+	if (increments.length == 0) {
+		noticeByList(['increments.length is 0 in stepsQuantityIncrement in function.', from, quantity, increments])
+		return []
+	}
+	if (getIsEmpty(increments[0])) {
+		noticeByList(['increments zero is empty in stepsQuantityIncrement in function.', from, quantity, increments])
+		return []
+	}
+	if (!Array.isArray(increments[0])) {
+		increments = [increments]
+	}
+	var from = new Array(increments[0].length)
+	return stepsFromQuantityIncrement(registry, statement, from, getValueByDefault(10, quantity), increments, false)
 }
 
 function stepsToAlong(registry, statement, to, alongs, includeTo) {
@@ -891,12 +1143,24 @@ function stepsToAlong(registry, statement, to, alongs, includeTo) {
 	return stepsFromToAlong(registry, statement, new Array(fromLength), to, alongs, false, includeTo)
 }
 
+function stepsToBetween(registry, statement, to, alongs) {
+	var fromLength = 2
+	if (Array.isArray(to)) {
+		fromLength = to.length
+	}
+	return stepsFromToBetween(registry, statement, new Array(fromLength), to, alongs)
+}
+
 function stepsToQuantity(registry, statement, to, quantity, includeFrom, includeTo) {
 	var fromLength = 2
 	if (Array.isArray(to)) {
 		fromLength = to.length
 	}
 	return stepsFromToQuantity(registry, statement, new Array(fromLength), to, quantity, false, includeTo)
+}
+
+function stepToBetween(registry, statement, to, along) {
+	return stepsToBetween(registry, statement, to, along)[0]
 }
 
 function stringLength(word) {
@@ -993,4 +1257,31 @@ function zigzag(polyline, radiusMultiplier, numberOfSides) {
 	}
 	zigzagPolyline.push(polyline[polyline.length - 1])
 	return zigzagPolyline
+}
+
+function zoomInterpolation(x, polyline, point, center, arrayLength) {
+	center = getArrayByElements(center, arrayLength)
+	point = getArrayByElements(point, arrayLength)
+	var centerPoint = getSubtractionArray(point, center, arrayLength)
+	var interpolationAlong = getFlatInterpolationAlongBeginEnd(x, polyline)
+	var along = interpolationAlong[0]
+	var oneMinus = 1.0 - along
+	var lower = interpolationAlong[1]
+	var upper = interpolationAlong[2]
+	var minimumLength = Math.min(lower.length, upper.length)
+	var interpolation = new Array(arrayLength).fill(0.0)
+	for (var dimensionIndex = 1; dimensionIndex < minimumLength; dimensionIndex++) {
+		var dimensionModulo = dimensionIndex % arrayLength
+		var parameter = oneMinus * lower[dimensionIndex] + along * upper[dimensionIndex]
+		interpolation[dimensionModulo] = centerPoint[dimensionModulo] * (parameter - 1.0)
+	}
+	return interpolation
+}
+
+function zoomInterpolation2D(x, polyline, point, center) {
+	return zoomInterpolation(x, polyline, point, center, 2)
+}
+
+function zoomInterpolation3D(x, polyline, point, center) {
+	return zoomInterpolation(x, polyline, point, center, 3)
 }
