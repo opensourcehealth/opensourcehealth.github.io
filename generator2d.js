@@ -317,9 +317,8 @@ function getTextLength(text) {
 		}
 	}
 //	checkFlaw
-//	return textLength
-//	increased because of overlap in list description
-	return 1.1 * textLength
+//	decreased because it's too short in list description
+	return 0.85 * textLength
 }
 
 function lineIsTooLong(cellWidth, fontSize, line) {
@@ -460,61 +459,51 @@ var gList = {
 	name: 'list',
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
-		var variableMap = getVariableMapByStatement(statement.parent)
 		var children = []
-		if (variableMap.has('_listChildren')) {
-			children = variableMap.get('_listChildren').split(' ')
+		var variableValue = getVariableValue('listChildren', statement.parent)
+		if (variableValue != undefined) {
+			children = variableValue.split(' ')
 		}
 		var columns = 2
-		if (variableMap.has('_listColumns')) {
-			columns = parseInt(variableMap.get('_listColumns'))
+		var variableValue = getVariableValue('listColumns', statement.parent)
+		if (variableValue != undefined) {
+			columns = parseInt(variableValue)
 		}
 		var lineHeight = 5.0
-		if (variableMap.has('_listLineHeight')) {
-			lineHeight = parseFloat(variableMap.get('_listLineHeight'))
+		var variableValue = getVariableValue('listLineHeight', statement.parent)
+		if (variableValue != undefined) {
+			lineHeight = parseFloat(variableValue)
 		}
 		var margin = 2.0
-		if (variableMap.has('_listMargin')) {
-			margin = parseFloat(variableMap.get('_listMargin'))
+		var variableValue = getVariableValue('listMargin', statement.parent)
+		if (variableValue != undefined) {
+			margin = parseFloat(variableValue)
 		}
 		var transform = null
-		if (variableMap.has('_listTransform')) {
-			transform = variableMap.get('_listTransform')
+		var variableValue = getVariableValue('listTransform', statement.parent)
+		if (variableValue != undefined) {
+			transform = variableValue
 		}
-		var cellWidth = parseFloat(getValueByDefault('100.0', getAttributeValue('cellWidth', statement)))
-		var x = undefined
-		if (variableMap.has('_listX')) {
-			x = parseFloat(variableMap.get('_listX'))
-		}
-		var fontSize = parseFloat(getValueByDefault('3.5', getAttributeValue('font-size', statement)))
-		if (statement.attributeMap.has('children')) {
-			children = attributeMap.get('children').replace(/,/g, ' ').split(' ').filter(lengthCheck)
-		}
-		columns = getIntByDefault(columns, 'columns', registry, statement, this.name)
-		lineHeight = getFloatByDefault(lineHeight, 'lineHeight', registry, statement, this.name)
-		margin = getFloatByDefault(margin, 'margin', registry, statement, this.name)
 		if (statement.attributeMap.has('transform')) {
 			transform = attributeMap.get('transform')
 		}
-		x = getFloatByDefault(getValueByDefault(0.5 * cellWidth, x), 'x', registry, statement, this.name)
-		variableMap.set('_listChildren', children.join(' '))
-		variableMap.set('_listColumns', columns.toString())
-		variableMap.set('_listLineHeight', lineHeight.toString())
-		variableMap.set('_listMargin', margin.toString())
+		var cellWidth = parseFloat(getValueByDefault('100.0', getAttributeValue('cellWidth', statement)))
+		var x = 0.5 * cellWidth
+		var variableValue = getVariableValue('listX', statement.parent)
+		if (variableValue != undefined) {
+			x = parseFloat(variableValue)
+		}
+		var fontSize = parseFloat(getValueByDefault('3.5', getAttributeValue('font-size', statement)))
 		if (!getIsEmpty(transform)) {
 			attributeMap.set('transform', transform)
-			variableMap.set('_listTransform', transform)
 		}
-		variableMap.set('_listX', x.toString())
-		var yStart = getFloatByDefault(5.0, 'y', registry, statement, this.name)
+		var y = getFloatByDefault(5.0, 'y', registry, statement, this.name)
 		var formatFunctionMap = new Map([['fontSize', parseFloat], ['xOffset', parseFloat], ['y', parseFloat]])
-		var formats = null
-		if (variableMap.has('_listFormats')) {
-			formats = variableMap.get('_listFormats')
-		}	
-		if (attributeMap.has('formats')) {
-			formats = []
-			var formatWords = attributeMap.get('formats').split(' ').filter(lengthCheck)
+		var formats = []
+		var variableValue = getVariableValue('listFormats', statement.parent)
+
+		if (variableValue != undefined) {
+			var formatWords = variableValue.split(' ').filter(lengthCheck)
 			for (var formatWord of formatWords) {
 				if (formatWord.length > 0) {
 					var formatAttributes = formatWord.split(';')
@@ -529,15 +518,108 @@ var gList = {
 				}
 			}
 		}
-		if (formats == null) {
+		if (formats.length == 0) {
 			noticeByList(['No formats could be found for list in generator2d.', statement])
 			return
 		}
-		variableMap.set('_listFormats', formats)
 		var writableWidth = cellWidth - margin - margin
 		var xStart = x - 0.5 * writableWidth
 		var idStart = statement.attributeMap.get('id') + '_'
-		var y = yStart
+		for (var format of formats) {
+			if (format.y != undefined) {
+				y = format.y
+			}
+			y = getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y)
+		}
+		convertToGroup(statement)
+		var childCount = 0
+		for (var childID of children) {
+			childID = childID.trim()
+			if (registry.idMap.has(childID)) {
+				var childStatement = registry.idMap.get(childID)
+				var childCopy = getStatementByParentTag(new Map(), childStatement.nestingIncrement, statement, childStatement.tag)
+				getUniqueID(statement.attributeMap.get('id') + '_' + childCount, registry, childCopy)
+				copyStatementRecursively(registry, childCopy, childStatement)
+				statement.children.push(childCopy)
+				childCount++
+			}
+		}
+	}
+}
+
+var gListNew = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'listNew',
+	processStatement: function(registry, statement) {
+		var attributeMap = statement.attributeMap
+		var children = []
+		var variableValue = getVariableValue('listChildren', statement.parent)
+		if (variableValue != undefined) {
+			children = variableValue.split(' ')
+		}
+		var columns = 2
+		var variableValue = getVariableValue('listColumns', statement.parent)
+		if (variableValue != undefined) {
+			columns = parseInt(variableValue)
+		}
+		var lineHeight = 5.0
+		var variableValue = getVariableValue('listLineHeight', statement.parent)
+		if (variableValue != undefined) {
+			lineHeight = parseFloat(variableValue)
+		}
+		var margin = 2.0
+		var variableValue = getVariableValue('listMargin', statement.parent)
+		if (variableValue != undefined) {
+			margin = parseFloat(variableValue)
+		}
+		var transform = null
+		var variableValue = getVariableValue('listTransform', statement.parent)
+		if (variableValue != undefined) {
+			transform = variableValue
+		}
+		if (statement.attributeMap.has('transform')) {
+			transform = attributeMap.get('transform')
+		}
+		var cellWidth = parseFloat(getValueByDefault('100.0', getAttributeValue('cellWidth', statement)))
+		var x = 0.5 * cellWidth
+		var variableValue = getVariableValue('listX', statement.parent)
+		if (variableValue != undefined) {
+			x = parseFloat(variableValue)
+		}
+		var fontSize = parseFloat(getValueByDefault('3.5', getAttributeValue('font-size', statement)))
+		if (!getIsEmpty(transform)) {
+			attributeMap.set('transform', transform)
+		}
+		var y = getFloatByDefault(5.0, 'y', registry, statement, this.name)
+		var formatFunctionMap = new Map([['fontSize', parseFloat], ['xOffset', parseFloat], ['y', parseFloat]])
+		var formats = []
+		var variableValue = getVariableValue('listFormats', statement.parent)
+
+		if (variableValue != undefined) {
+			var formatWords = variableValue.split(' ').filter(lengthCheck)
+			for (var formatWord of formatWords) {
+				if (formatWord.length > 0) {
+					var formatAttributes = formatWord.split(';')
+					var format = {anchor:null, fontSize:fontSize, margin:margin, rightMargin:margin, xOffset:0.0}
+					formats.push(format)
+					for (var formatAttribute of formatAttributes) {
+						var formatEntry = formatAttribute.split(':')
+						if (formatEntry[1].length > 0) {
+							setObjectAttribute(formatEntry[0], formatFunctionMap, format, formatEntry[1])
+						}
+					}
+				}
+			}
+		}
+		if (formats.length == 0) {
+			noticeByList(['No formats could be found for list in generator2d.', statement])
+			return
+		}
+		var writableWidth = cellWidth - margin - margin
+		var xStart = x - 0.5 * writableWidth
+		var idStart = statement.attributeMap.get('id') + '_'
 		for (var format of formats) {
 			if (format.y != undefined) {
 				y = format.y
@@ -755,4 +837,4 @@ var gVerticalHole = {
 }
 
 var gGenerator2DProcessors = [
-gCircle, gGrid, gImage, gLettering, gList, gOutline, gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
+gCircle, gGrid, gImage, gLettering, gList, gListNew, gOutline, gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
