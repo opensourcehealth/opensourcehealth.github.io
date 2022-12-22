@@ -77,7 +77,7 @@ function updateSVGArea() {
 	var storageMap = new Map()
 	storageMap.set('selectedEntity', null)
 	storageMap.set('selectedRegion', null)
-	var registry = {idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
+	var registry = {generatedIDSet:new Set(), idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
 	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
 	var xmlStatement = getDocumentRoot(lines, 'xml')
 	console.log(xmlStatement)
