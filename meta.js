@@ -662,7 +662,7 @@ var gPolygonAnalysis = {
 		}
 		var normal = get3DPointByStatement('normal', registry, statement)
 		var analysisStatement = getStatementByParentTag(getMeshAnalysis(mesh, normal), 0, statement, 'polygonAnalysis')
-		analysisStatement.attributeMap.set('id', statement.attributeMap.get('id') + '_polygonAnalysis')
+		setIDMapSet(statement.attributeMap.get('id') + '_polygonAnalysis', registry, analysisStatement)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -675,7 +675,7 @@ var gPolygonAnalysis = {
 			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
 		}
 		else {
-			statement.attributeMap = getMeshAnalysis(workMesh, get3DPointByStatement('normal', registry, statement))
+			copyMissingKeys(getMeshAnalysis(workMesh, get3DPointByStatement('normal', registry, statement)), statement.attributeMap)
 		}
 	}
 }
@@ -812,7 +812,7 @@ var gTriangleAnalysis = {
 	alterMesh: function(mesh, registry, statement) {
 		var normal = get3DPointByStatement('normal', registry, statement)
 		var analysisStatement = getStatementByParentTag(getMeshAnalysis(getTriangleMesh(mesh), normal), 0, statement, 'triangleAnalysis')
-		analysisStatement.attributeMap.set('id', statement.attributeMap.get('id') + '_triangleAnalysis')
+		setIDMapSet(statement.attributeMap.get('id') + '_triangleAnalysis', registry, analysisStatement)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -825,7 +825,8 @@ var gTriangleAnalysis = {
 			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
 		}
 		else {
-			statement.attributeMap = getMeshAnalysis(getTriangleMesh(workMesh), get3DPointByStatement('normal', registry, statement))
+			workMesh = getTriangleMesh(workMesh)
+			copyMissingKeys(getMeshAnalysis(workMesh, get3DPointByStatement('normal', registry, statement)), statement.attributeMap)
 		}
 	}
 }
