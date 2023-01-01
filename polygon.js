@@ -511,15 +511,15 @@ function getConnectedSegmentArrays(toolPolygonSegments, workPolygonSegments) {
 			toolNodeMap.set(toolPolygonSegment[0].nodeKey, segmentIndex)
 		}
 	}
-	var endKeyMap = new Map()
+	var endMap = new Map()
 	for (var segmentIndex = 0; segmentIndex < segmentArrays.length; segmentIndex++) {
-		endKeyMap.set(segmentArrays[segmentIndex][0][0].nodeKey, segmentIndex)
+		endMap.set(segmentArrays[segmentIndex][0][0].nodeKey, segmentIndex)
 	}
 	var workSegmentArrays = []
 	for (var segmentIndex = 0; segmentIndex < segmentArrays.length; segmentIndex++) {
 		var segments = segmentArrays[segmentIndex]
 		var nodeBeginKey = segments[segments.length - 1][1].nodeKey
-		connectionSegments = getConnectionSegments(endKeyMap, nodeBeginKey, toolNodeMap, toolPolygonSegments)
+		connectionSegments = getConnectionSegments(endMap, nodeBeginKey, toolNodeMap, toolPolygonSegments)
 		if (connectionSegments != null) {
 			segmentArrays[segmentIndex] = null
 			var nodeEndKey = segments[0][0].nodeKey
@@ -530,12 +530,12 @@ function getConnectedSegmentArrays(toolPolygonSegments, workPolygonSegments) {
 //					noticeByList(
 //					['segments is shorter than 3 in getConnectedSegmentArrays in polygon.', segments, segmentArrays, segmentIndex])
 				}
-				endKeyMap.delete(nodeEndKey)
+				endMap.delete(nodeEndKey)
 			}
 			else {
 				pushArray(segments, segmentArrays[connectionSegments.nodeKey])
 				segmentArrays[connectionSegments.nodeKey] = segments
-				endKeyMap.set(nodeEndKey, connectionSegments.nodeKey)
+				endMap.set(nodeEndKey, connectionSegments.nodeKey)
 			}
 		}
 	}
@@ -548,7 +548,7 @@ function getConnectedSegmentArrays(toolPolygonSegments, workPolygonSegments) {
 	return workSegmentArrays
 }
 
-function getConnectionSegments(endKeyMap, nodeBeginKey, toolNodeMap, toolPolygonSegments) {
+function getConnectionSegments(endMap, nodeBeginKey, toolNodeMap, toolPolygonSegments) {
 	if (!toolNodeMap.has(nodeBeginKey)) {
 		return null
 	}
@@ -562,8 +562,8 @@ function getConnectionSegments(endKeyMap, nodeBeginKey, toolNodeMap, toolPolygon
 		}
 		connectionSegments.push(toolPolygonSegment)
 		var toolKey = toolPolygonSegment[1].nodeKey
-		if (endKeyMap.has(toolKey)) {
-			return {nodeKey:endKeyMap.get(toolKey), segments:connectionSegments}
+		if (endMap.has(toolKey)) {
+			return {nodeKey:endMap.get(toolKey), segments:connectionSegments}
 		}
 	}
 	return null
@@ -1104,6 +1104,17 @@ function getIsAwayFromHeight(splitHeight, workBeginY, workEndY) {
 	}
 	var splitHeightPlus = splitHeight + gClose
 	return workBeginY > splitHeightPlus && workEndY > splitHeightPlus
+}
+
+function getIsClear(side, sideOther, xIntersections) {
+	var minimumX = Math.min(side, sideOther) - gClose
+	var maximumX = Math.max(side, sideOther) + gClose
+	for (var xIntersection of xIntersections) {
+		if (xIntersection > minimumX && xIntersection < maximumX) {
+			return false
+		}
+	}
+	return true
 }
 
 function getIsClockwise(polygon) {
@@ -1933,6 +1944,22 @@ function getPolygonByFacet(facet, points) {
 	return polygon
 }
 
+function getPolygonByFacets(facets, points) {
+	var polygons = new Array(facets.length)
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		polygons[facetIndex] = getPolygonByFacet(facets[facetIndex], points)
+	}
+	return polygons
+}
+
+function getPolygonsByFacetIndexes(facetIndexes, facets, points) {
+	var polygons = new Array(facetIndexes.length)
+	for (var facetIndexIndex = 0; facetIndexIndex < facetIndexes.length; facetIndexIndex++) {
+		polygons[facetIndexIndex] = getPolygonByFacet(facets[facetIndexes[facetIndexIndex]], points)
+	}
+	return polygons
+}
+
 function getPolygonGroups(polygons) {
 	var polygonIndexGroups = getPolygonIndexGroups(polygons)
 	var polygonGroups = new Array(polygonIndexGroups.length)
@@ -2104,6 +2131,19 @@ function getPolygonSlice(polygon, beginIndex, endIndex) {
 			return polygonSlice
 		}
 		polygonSlice.push(polygon[sourceIndex])
+	}
+	noticeByList(['Could not find the endIndex for getPolygonSlice in polygon.', polygon, beginIndex, endIndex])
+	return polygon
+}
+
+function getRotatedSlice(polygon, beginIndex, endIndex, vector) {
+	var polygonSlice = []
+	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
+		var sourceIndex = (vertexIndex + beginIndex) % polygon.length
+		if (sourceIndex == endIndex) {
+			return polygonSlice
+		}
+		polygonSlice.push(getRotation2DVector(polygon[sourceIndex], vector))
 	}
 	noticeByList(['Could not find the endIndex for getPolygonSlice in polygon.', polygon, beginIndex, endIndex])
 	return polygon
