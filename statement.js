@@ -222,9 +222,7 @@ function getIsIDUnique(id, registry, statement) {
 	if (registry.idMap.has(id)) {
 		return false
 	}
-	statement.attributeMap.set('id', id)
-	registry.idMap.set(id, statement)
-	registry.generatedIDSet.add(id)
+	setIDMapSet(id, registry, statement)
 	return true
 }
 
@@ -555,6 +553,12 @@ function processStatementByTagMap(registry, statement, tagMap) {
 	if (tagMap.has(statement.tag)) {
 		tagMap.get(statement.tag).processStatement(registry, statement)
 	}
+}
+
+function setIDMapSet(id, registry, statement) {
+	statement.attributeMap.set('id', id)
+	registry.idMap.set(id, statement)
+	registry.generatedIDSet.add(id)
 }
 
 function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
