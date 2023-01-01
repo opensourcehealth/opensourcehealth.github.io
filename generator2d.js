@@ -5,13 +5,15 @@ var gIntegerSet = new Set('-0123456789'.split(''))
 var gLetteringMap = null
 var gLetteringSet = null
 
-function addPolygonsToGroup(polygons, registry, statement) {
+function addPolygonsToGroup(polygons, registry, statement, copyKeys = true) {
 	var exceptionSet = new Set(['checkIntersection', 'markerAbsolute', 'marker', 'outset'])
 	var idStart = statement.attributeMap.get('id') + '_polygon_'
 	for (var polygonIndex = 0; polygonIndex < polygons.length; polygonIndex++) {
 		var polygonStatement = getStatementByParentTag(new Map(), 0, statement, 'polygon')
 		getUniqueID(idStart + polygonIndex.toString(), registry, polygonStatement)
-		copyMissingKeysExcept(exceptionSet, statement.attributeMap, polygonStatement.attributeMap)
+		if (copyKeys) {
+			copyMissingKeysExcept(exceptionSet, statement.attributeMap, polygonStatement.attributeMap)
+		}
 		setPointsHD(polygons[polygonIndex], polygonStatement)
 		gPolygon.processStatement(registry, polygonStatement)
 	}
@@ -41,6 +43,10 @@ function addTextStatement(anchor, fontSize, format, idStart, registry, statement
 	getUniqueID(idStart + format.name, registry, textStatement)
 }
 
+function arcFromTo(fromX, fromY, toX, toY, radius, numberOfSides) {
+	return arcFromToRadius(null, {parent:{variableMap:null}}, fromX, fromY, toX, toY, radius, true, numberOfSides)
+}
+
 function cellX(registry, statement) {
 	var gridAttributeMap = statement.parent.attributeMap
 	var cellColumn = parseInt(gridAttributeMap.get('cellColumn'))
@@ -63,30 +69,30 @@ function createCharacterPolylineMap() {
 	gLetteringSet = new Set(['B', 'K', 'R', 'X'])
 	gLetteringMap = new Map()
 	var bottomDiagonal = [[0, 1], [1, 0]]
-	var bottomHorizontalSemicircle = arcFromToCenter(1, 0.5, 0, 0.5, 0.5)
-	var bottomLeftArc = arcFromToCenter(1.0, 0.03, 0.5, 0, 0.8)
+	var bottomHorizontalSemicircle = arcFromTo(1, 0.5, 0, 0.5, 0.5)
+	var bottomLeftArc = arcFromTo(1.0, 0.03, 0.5, 0, 0.8)
 	var bottomLine = [[0, 0], [1, 0]]
-	var bottomSemicircle = multiplyArraysByIndex(arcFromToCenter(0, 1, 0, 0, 0.5), 2.0, 0)
+	var bottomSemicircle = multiplyArraysByIndex(arcFromTo(0, 1, 0, 0, 0.5), 2.0, 0)
 	var diagonalDown = [[0, 2], [1, 0]]
 	var diagonalUp = [[0, 0], [1, 2]]
 	var leftBisectedPolyline = [[0, 0], [0, 1], [0, 2]]
 	var leftLine = [[0, 0], [0, 2]]
-	var leftTallSemicircle = multiplyArraysByIndex(arcFromToCenter(1.0, 0, 1.0, 2, 1.0), 0.5, 0)
+	var leftTallSemicircle = multiplyArraysByIndex(arcFromTo(1.0, 0, 1.0, 2, 1.0), 0.5, 0)
 	var lowLeftLine = [[0, 0.5], [0, 2]]
 	var lowRightLine = [[1, 0.5], [1, 2]]
 	var middleLine = [[0, 1], [1, 1]]
 	var middleVerticalLine = [[0.5, 0], [0.5, 2]]
 	var rightBisectedPolyline = [[1, 0], [1, 1], [1, 2]]
 	var rightLine = [[1, 0], [1, 2]]
-	var rightTallSemicircle = multiplyArraysByIndex(arcFromToCenter(1.0, 2, 1.0, 0, 1.0), 0.5, 0)
+	var rightTallSemicircle = multiplyArraysByIndex(arcFromTo(1.0, 2, 1.0, 0, 1.0), 0.5, 0)
 	var topDiagonal = [[0, 1], [1, 2]]
 	var topLine = [[0, 2], [1, 2]]
-	var topRightArc = arcFromToCenter(0.5, 2, 1.0, 1.97, 0.8)
-	var topSemicircle = multiplyArraysByIndex(arcFromToCenter(0, 2, 0, 1, 0.5), 2.0, 0)
+	var topRightArc = arcFromTo(0.5, 2, 1.0, 1.97, 0.8)
+	var topSemicircle = multiplyArraysByIndex(arcFromTo(0, 2, 0, 1, 0.5), 2.0, 0)
 	gLetteringMap.set('A', [[[0, 0], [0.2, 0.8], [0.5, 2], [0.8, 0.8], [1, 0]], [[0.2,0.8], [0.8,0.8]]])
 	gLetteringMap.set('B', [bottomSemicircle, leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('C', [bottomLeftArc, leftTallSemicircle, topRightArc])
-	gLetteringMap.set('D', [arcFromToCenter(0, 2, 0, 0, 1), leftLine])
+	gLetteringMap.set('D', [arcFromTo(0, 2, 0, 0, 1), leftLine])
 	gLetteringMap.set('E', [bottomLine, leftBisectedPolyline, middleLine, topLine])
 	gLetteringMap.set('F', [leftBisectedPolyline, middleLine, topLine])
 	gLetteringMap.set('G', [[[0.7, 0.9], [1.0, 0.9], [1.0, 0.03]], bottomLeftArc, leftTallSemicircle, topRightArc])
@@ -101,8 +107,8 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('P', [leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5, 0], [0.9, -0.15]]])
 	gLetteringMap.set('R', [leftBisectedPolyline, topSemicircle, bottomDiagonal])
-	var s = [arcFromToCenter(0.5, 0, 0.1, 0.03, 0.8), arcFromToCenter(0.853, 0.853, 0.5, 0, 0.5)]
-	pushArray(s, [[[0.853, 0.853], [0.147, 1.147]], arcFromToCenter(0.147, 1.147, 0.5, 2, 0.5), arcFromToCenter(0.5, 2, 0.9, 1.97, 0.8)])
+	var s = [arcFromTo(0.5, 0, 0.1, 0.03, 0.8), arcFromTo(0.853, 0.853, 0.5, 0, 0.5), [[0.853, 0.853], [0.147, 1.147]]]
+	pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
 	gLetteringMap.set('S', s)
 	gLetteringMap.set('T', [middleVerticalLine, [[0, 2], [0.5, 2], [1, 2]]])
 	gLetteringMap.set('U', [lowRightLine, bottomHorizontalSemicircle, lowLeftLine])
@@ -250,10 +256,8 @@ function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
 	var betweenCharacter = 0.1 * fontHeight + strokeWidth
 	var halfHeight = fontHeight * 0.5
 	var averageAdvance = halfHeight + betweenCharacter
-	var fontMultiplier = [halfHeight, halfHeight]
 	var letteringOutlines = []
 	var maximumX = 0
-	var minimumX = null
 	var radius = strokeWidth / fontHeight
 	var outsets = [[radius, radius]]
 	var x = 0
@@ -262,28 +266,24 @@ function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
 	}
 	for (var character of text) {
 		var polylines = gLetteringMap.get(character)
-		if (polylines != null) {
+		if (polylines == null) {
+			x += averageAdvance
+		}
+		else {
 			var outlines = getOutlines(null, null, gLetteringSet.has(character), true, outsets, polylines, null)
-			multiply2DArrays(outlines, fontMultiplier)
-			var boundingX = getBoundingXByPolygons(outlines)
+			var polygon = getConnectedPolygon(outlines)
+			polygon = getArraysCopy(polygon)
+			multiply2DsByScalar(polygon, halfHeight)
+			var boundingX = getBoundingXByPolygons([polygon])
 			x -= boundingX[0]
-			if (minimumX == null) {
-				minimumX = x
-			}
-			addArrayArraysByIndex(outlines, x, 0)
-			pushArray(letteringOutlines, outlines)
+			addArraysByIndex(polygon, x, 0)
+			letteringOutlines.push(polygon)
 			x += boundingX[1]
 			maximumX = x
 			x += betweenCharacter
 		}
-		else {
-			x += averageAdvance
-		}
 	}
-	if (minimumX == null) {
-		return letteringOutlines
-	}
-	addArrayArraysByIndex(letteringOutlines, textAlign * (minimumX - maximumX) - minimumX, 0)
+	addArrayArraysByIndex(letteringOutlines, -textAlign * maximumX, 0)
 	return letteringOutlines
 }
 
@@ -448,7 +448,7 @@ var gLettering = {
 			return
 		}
 		convertToGroup(statement)
-		addPolygonsToGroup(outlines, registry, statement)
+		addPolygonsToGroup(outlines, registry, statement, false)
 	}
 }
 
@@ -837,4 +837,5 @@ var gVerticalHole = {
 }
 
 var gGenerator2DProcessors = [
-gCircle, gGrid, gImage, gLettering, gList, gListNew, gOutline, gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
+gCircle, gGrid, gImage, gLettering, gList, gListNew, gOutline,
+gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
