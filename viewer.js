@@ -218,6 +218,21 @@ function drawMesh(control, viewer) {
 	for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
 		context.beginPath()
 		var facet = zPolygons[zPolygonIndex][1]
+		if (viewer.colorControl.selectedState) {
+			var normal = getNormalByFacet(facet, mesh.points)
+			if (normal != null) {
+				var red = 128 + 87 * Math.abs(normal[0]) + 40 * (normal[0] < -gClose)
+				var green = 128 + 87 * Math.abs(normal[1]) + 40 * (normal[1] > gClose)
+				var blue = 128 + 87 * Math.abs(normal[2]) + 40 * (normal[2] > gClose)
+				var colorString = 'rgb(' + red + ', ' + green + ', ' + blue + ')'
+				if (viewer.type[0] == 'S') {
+					context.fillStyle = colorString
+				}
+				else {
+					context.strokeStyle = colorString
+				}
+			}
+		}
 		moveToPoint(context, canvasPoints[facet[0]])
 		for (var vertexIndex = 1; vertexIndex < facet.length; vertexIndex++) {
 			lineToPoint(context, canvasPoints[facet[vertexIndex]])
@@ -225,13 +240,6 @@ function drawMesh(control, viewer) {
 		context.closePath()
 		context.stroke()
 		if (viewer.type[0] == 'S') {
-			if (viewer.colorControl.selectedState) {
-				var normal = getNormalByFacet(facet, mesh.points)
-				var red = 128 + 87 * Math.abs(normal[0]) + 40 * (normal[0] < -gClose)
-				var green = 128 + 87 * Math.abs(normal[1]) + 40 * (normal[1] > gClose)
-				var blue = 128 + 87 * Math.abs(normal[2]) + 40 * (normal[2] > gClose)
-				context.fillStyle = 'rgb(' + red + ', ' + green + ', ' + blue + ')'
-			}
 			context.fill()
 		}
 	}
@@ -287,7 +295,13 @@ function drawSlice(canvasPoints, control, mesh, viewer) {
 	var view = viewer.view
 	if (viewer.colorControl.selectedState) {
 		var directionIndex = getMatrixDirectionIndex(view.rotationMatrix)
-		context.fillStyle = ['#d78080', '#ff8080', '#80d780', '#80ff80', '#8080d7', '#8080ff'][directionIndex]
+		var colorString = ['#d78080', '#ff8080', '#80d780', '#80ff80', '#8080d7', '#8080ff'][directionIndex]
+		if (viewer.type[0] == 'S') {
+			context.fillStyle = colorString
+		}
+		else {
+			context.strokeStyle = colorString
+		}
 	}
 	sliceControl = viewer.sliceControl
 	var rangeZ = getRangeZ(canvasPoints)
