@@ -110,12 +110,30 @@ function addMirrorPoints(centerDirection, mirrorStart, points) {
 	if (distanceSquared2D(pointStart, mirrorByCenterDirectionRotation(centerDirection, pointStart.slice(0))) < gCloseSquared) {
 		mirrorStart -= 1
 	}
+	if (points.length > 1) {
+		var beginPoint = points[points.length - 2]
+		var centerPoint = points[points.length - 1]
+		var endPoint = mirrorByCenterDirectionRotation(centerDirection, points[mirrorStart].slice(0))
+		var midpoint = getMidpointArray(beginPoint, endPoint)
+		if (distanceSquaredArray(centerPoint, midpoint) < gCloseSquared) {
+			points.pop()
+		}
+	}
 	for (var pointIndex = mirrorStart; pointIndex > -1; pointIndex--) {
 		var mirrorPoint = mirrorByCenterDirectionRotation(centerDirection, points[pointIndex].slice(0))
 		if (distanceSquared2D(pointZero, mirrorPoint) < gCloseSquared) {
 			break
 		}
 		points.push(mirrorPoint)
+	}
+	if (points.length > 2) {
+		var beginPoint = points[points.length - 1]
+		var centerPoint = points[0]
+		var endPoint = points[1]
+		var midpoint = getMidpointArray(beginPoint, endPoint)
+		if (distanceSquaredArray(centerPoint, midpoint) < gCloseSquared) {
+			points.splice(0, 1)
+		}
 	}
 }
 
@@ -1018,14 +1036,14 @@ var gFillet = {
 
 var gMirror = {
 	alterMesh: function(mesh, registry, statement) {
-		var centerDirection = getCenterDirection(registry, statement, 'mirror')
+		var centerDirection = getCenterDirection(registry, statement, this.name)
 		if (centerDirection == null) {
 			return
 		}
 		mirrorMesh(centerDirection, getChainMatrix3D(registry, statement), mesh)
 	},
 	getPoints: function(points, registry, statement) {
-		var centerDirection = getCenterDirection(registry, statement, 'mirror')
+		var centerDirection = getCenterDirection(registry, statement, this.name)
 		if (centerDirection != null) {
 			addRotationToCenterDirection(centerDirection)
 			for (var point of points) {
@@ -1054,32 +1072,14 @@ var gMirror = {
 			return
 		}
 		statement.tag = getValueByKeyDefault('polygon', 'tag', registry, statement, this.name)
-		var centerDirection = getCenterDirection(registry, statement, this.name)
-		var mirrorStart = points.length - 1
-		if (centerDirection == null) {
-			centerDirection = getCenterDirectionMirrorStart(mirrorStart, points)
-			mirrorStart = centerDirection.mirrorStart
-		}
-		addRotationToCenterDirection(centerDirection)
-		var pointZero = points[0]
-		var pointStart = points[mirrorStart]
-		if (distanceSquared2D(pointStart, mirrorByCenterDirectionRotation(centerDirection, pointStart.slice(0))) < gCloseSquared) {
-			mirrorStart -= 1
-		}
-		for (var pointIndex = mirrorStart; pointIndex > -1; pointIndex--) {
-			var mirrorPoint = mirrorByCenterDirectionRotation(centerDirection, points[pointIndex].slice(0))
-			if (distanceSquared2D(pointZero, mirrorPoint) < gCloseSquared) {
-				break
-			}
-			points.push(mirrorPoint)
-		}
+		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
 	}
 }
 
 var gMirrorJoin = {
 	alterMesh: function(mesh, registry, statement) {
-		var centerDirection = getCenterDirection(registry, statement, 'mirrorJoin')
+		var centerDirection = getCenterDirection(registry, statement, this.name)
 		if (centerDirection == null) {
 			return
 		}
@@ -1090,14 +1090,13 @@ var gMirrorJoin = {
 		joinMeshes(null, null, [mesh, mirroredMesh])
 	},
 	getPoints: function(points, registry, statement) {
-		var centerDirection = getCenterDirection(registry, statement, 'mirrorJoin')
-		if (centerDirection != null) {
-			addRotationToCenterDirection(centerDirection)
-			for (var point of points) {
-				mirrorByCenterDirectionRotation(centerDirection, point)
-			}
-			points.reverse()
+		var centerDirection = getCenterDirection(registry, statement, this.name)
+		var mirrorStart = points.length - 1
+		if (centerDirection == null) {
+			centerDirection = getCenterDirectionMirrorStart(mirrorStart, points)
+			mirrorStart = centerDirection.mirrorStart
 		}
+		addMirrorPoints(centerDirection, mirrorStart, points)
 		return points
 	},
 	initialize: function() {
@@ -1119,25 +1118,7 @@ var gMirrorJoin = {
 			return
 		}
 		statement.tag = getValueByKeyDefault('polygon', 'tag', registry, statement, this.name)
-		var centerDirection = getCenterDirection(registry, statement, this.name)
-		var mirrorStart = points.length - 1
-		if (centerDirection == null) {
-			centerDirection = getCenterDirectionMirrorStart(mirrorStart, points)
-			mirrorStart = centerDirection.mirrorStart
-		}
-		addRotationToCenterDirection(centerDirection)
-		var pointZero = points[0]
-		var pointStart = points[mirrorStart]
-		if (distanceSquared2D(pointStart, mirrorByCenterDirectionRotation(centerDirection, pointStart.slice(0))) < gCloseSquared) {
-			mirrorStart -= 1
-		}
-		for (var pointIndex = mirrorStart; pointIndex > -1; pointIndex--) {
-			var mirrorPoint = mirrorByCenterDirectionRotation(centerDirection, points[pointIndex].slice(0))
-			if (distanceSquared2D(pointZero, mirrorPoint) < gCloseSquared) {
-				break
-			}
-			points.push(mirrorPoint)
-		}
+		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
 	}
 }
