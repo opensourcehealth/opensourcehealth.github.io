@@ -248,7 +248,7 @@ function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberO
 
 //deprecated23
 function floatByKeyID(registry, statement, key, id) {
-	return parseFloat(getStatementByID(registry, statement, id).attributeMap.get(key))
+	return floatByIDKey(registry, statement, id, key)
 }
 
 function floatByIDKey(registry, statement, id, key) {
@@ -488,28 +488,7 @@ function joinPoints(registry, statement, sourcePoints, numberOfJoins, from, unti
 
 //deprecated23
 function mirror(registry, statement, center, direction) {
-	var variableMap = getVariableMapByStatement(statement.parent)
-	if (!variableMap.has('_points')) {
-		noticeByList(['In mirror in function the variableMap does not have _points:', statement])
-		return [[]]
-	}
-	var points = variableMap.get('_points')
-	if (points.length < 2) {
-		noticeByList(['In mirror in function _points is shorter than 2:', points, toX, toY, statement])
-		return [[]]
-	}
-	if (direction != undefined) {
-		direction = getArrayByValue(direction)
-	}
-	var centerDirection = getCenterDirectionByCenterDirection(center, direction)
-	var mirrorStart = points.length - 1
-	if (centerDirection == null) {
-		var centerDirection = getCenterDirectionMirrorStart(mirrorStart, points)
-		mirrorStart = centerDirection.mirrorStart
-	}
-	addMirrorPoints(centerDirection, mirrorStart, points)
-	// must return something, which will be added to the points, so the last point is popped
-	return [points.pop()]
+	return mirrorJoin(registry, statement, center, direction)
 }
 
 function mirrorJoin(registry, statement, center, direction) {
