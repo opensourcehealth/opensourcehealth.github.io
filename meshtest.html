@@ -22,25 +22,29 @@
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
 <script src="statement.js"></script>
-<script src="viewer.js"></script>
+<script src="viewbroker.js"></script>
+<script src="viewfractal2d.js"></script>
+<script src="viewmesh.js"></script>
 <script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gLine = ''
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// upload
-// test join because getWorkMeshes changed
-// upgrade join to handle multiple facets
+// getUniqueIDByMonad, platonic, svg
+// astronomy: gravity, temperature, day
+// cell outline
+// polygonJoin, brickwork
 // outset point before fillet, outsetField
-// fillet should use previous point and use in antenna
+// fillet mesh
+// view split, polygon, fractal
+// make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
+// upload
 //
 // split bent polygons
 // maybe triangulateBentFacets vertically if possible
 // check for unplanar polygons and triangulate
 //
 // test process join to handle matrix3Ds, omit origin
-// make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
 // ergonomic handle
 // bevelZ
 // make fastener
@@ -48,7 +52,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // row card pages
 // upload
 // after version 4 is printed, remove unused variables
-// remove connected facets when not connected or split and add horizontal tool facet
 //
 // low priority
 // test getEquation from fence and road
@@ -198,6 +201,17 @@ function drawVoxelMap(voxelMap) {
 	}
 }
 
+function drawXYInsetPolygon(xyPolygon, inset) {
+	inset = getValueByDefault(0.2, inset)
+	drawXYPolygon(getOutsetPolygon([inset, inset], getArraysCopy(xyPolygon)), getRGB())
+}
+
+function drawXYInsetPolygons(xyPolygons, inset) {
+	for (var xyPolygon of xyPolygons) {
+		drawXYInsetPolygon(xyPolygon, inset)
+	}
+}
+
 function drawXYLines(lines, pointMap) {
 	for (var line of lines) {
 		var pointStrings = [pointMap.get(line.beginKey).join(','), pointMap.get(line.endKey).join(',')]
@@ -273,6 +287,11 @@ function drawXYZPolyline(points, rgb) {
 	document.writeln('<polyline  points="' + getXYPointStringsByXYZ(points).join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')" />')
 }
 
+function getSVGTextLength(character) {
+	document.writeln('<text x=20 y="5" fill="blue" id="' + character + '">' + character + '</text>')
+	return document.getElementById(character).getComputedTextLength()
+}
+
 function getXYPointStringByXYZ(point) {
 //	return [point[0], point[1] + point[2] * 0.3].join(',')
 	var point2D = [point[0] + point[2] * 0.3, point[1] + point[2] * 0.2]
@@ -309,7 +328,7 @@ function testBend() {
 	var boundaryPolygons = [[[-3,-3], [-3,2], [8,-3]]]
 	var translationEquation = '3.0'
 	var variableMap = new Map()
-	var parent = {parent:null, variableMap:variableMap}
+	var parent = {parent:undefined, variableMap:variableMap}
 	var statement = {parent:parent}
 	drawXYPolygons(boundaryPolygons)
 	var stratas = [[-5,-3]]
@@ -420,7 +439,7 @@ function testEquation() {
 		['testArray', '[[3,4],[5,6]]'],
 		['testMap', testMap],
 		['zigzag', zigzag]])
-	var parent = {parent:null, variableMap:variableMap}
+	var parent = {parent:undefined, variableMap:variableMap}
 	var statement = {parent:parent}
 	var value = getValueByEquation(null, statement, valueString)
 	console.log('value')
@@ -455,8 +474,8 @@ function testExtrusion() {
 //	var value = 'g transforms=path(0,-1,3 2,-3,4)'
 	var value = 'rotateZ(30) translate(1,2,3) path(0,0,0 0,-.5,3 0,0,6)'
 //	var value = 'g transforms=path(0,0,0 0,-.5,3 0,0,6)'
-	var parent = getStatementByParentTag(new Map(), 1, null, 'g')
-	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var parent = getStatementByParentTag(new Map(), 1, undefined, 'g')
+	var registry = {dataMap:new Map(), idMap:new Map(), meshMap:new Map()}
 	var statement = getStatementByParentTag(new Map([['transforms', value]]), 1, parent, 'g')
 	console.log(statement)
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transforms')))
@@ -536,7 +555,7 @@ function testFence() {
 	var curve = '(z - 0.5) * (z - 0.5)'
 	var heights = [0, .1, .2]
 	var overhangAngle = 45 * gRadiansPerDegree
-	var statement = {parent:{parent:null, variableMap:new Map()}}
+	var statement = {parent:{parent:undefined, variableMap:new Map()}}
 	var thickness = 0.06
 	var tops = [[0, 0, 1], [3, 1, 2], [6, 4, 5]]
 	var width = 0.48
@@ -560,6 +579,23 @@ function testFillet() {
 	console.log('filletedPolygon')
 	console.log(filletedPolygon)
 	drawXYPolygon(filletedPolygon, getRGB())
+}
+
+function testFormattedText() {
+	console.log('testFormattedText')
+	var attributeMap = new Map()
+	var format = {fontSize:12, name:'yo', xOffset:0}
+	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idMap:new Map(), meshMap:new Map(), views:[]}
+	var text = 'hello dave #p wide light bigbigbigword what is a matter with the clothes I am wearing can #/'
+	var parent = getStatementByParentTag(new Map(), 1, undefined, 'g')
+	var statement = getStatementByParentTag(attributeMap, 1, parent, 'formattedText')
+	var attributeMap = new Map([['font-size', '3'], ['left', '5'], ['right', '20'], ['text-anchor', 'start'], ['x', '0'], ['y', '10']])
+	var root = {attributeMap:attributeMap}
+	var format = {attributeMap:new Map([['name', 'DaveTest']]), parent:root}
+	addTextStatements(format, registry, statement, text)
+	console.log('root')
+	console.log(root)
+	console.log(statement)
 }
 
 function testIntercircle() {
@@ -607,23 +643,23 @@ function testJoin() {
 
 function testLength() {
 	console.log('testLength')
-	document.writeln('<g font-size="10" id="group" style="fill:black;stroke:black;stroke-width:0.0">')
-//	font-size=10 because at 1 there are many overly rounded lengths, like 0.xx00
-	var characters = 'abcdefghi'.split('')
-//	var characters = 'jklmnopqr'.split('')
-//	var characters = 'stuvwxyz'.split('')
-//	var characters = 'ABCDEFGHI'.split('')
-//	var characters = 'JKLMNOPQR'.split('')
-//	var characters = 'STUVWXYZ'.split('')
-//	var characters = '0123456789'.split('')
-//	var characters = ')!@#$%^&*('.split('')
-//	var characters = ',<.>/?;:[{]}\|-_=+`~'.split('')
-	for (var character of characters) {
-		writeLength(character)
-	}
-	document.writeln('</g>')
-	console.log(gLine)
-	console.log(getTextLength('abc '))
+	var numberLength = {numberOfCharacters:0, totalGroupLength:0.0, totalLength:0.0}
+
+//	font-size=1000 to get integers
+	writeLengths('abcdefghi'.split(''), numberLength)
+	writeLengths('jklmnopqr'.split(''), numberLength)
+	writeLengths('stuvwxyz'.split(''), numberLength)
+	writeLengths('ABCDEFGHI'.split(''), numberLength)
+	writeLengths('JKLMNOPQR'.split(''), numberLength)
+	writeLengths('STUVWXYZ'.split(''), numberLength)
+	writeLengths('0123456789'.split(''), numberLength)
+	writeLengths(')!@#$%^&*('.split(''), numberLength)
+	writeLengths(',<.>/?;:['.split(''), numberLength)
+	writeLengths('{]}\|-_=+`~'.split(''), numberLength)
+
+	console.log(numberLength)
+	console.log(numberLength.totalLength / numberLength.numberOfCharacters)
+	console.log(numberLength.totalLength / numberLength.totalGroupLength)
 }
 
 function testLettering() {
@@ -923,7 +959,7 @@ function testRoad() {
 	var heights = [0, 1]
 //	var heights = [0, 1, 2]
 	var numberOfIntervals = 4
-	var statement = {parent:{parent:null, variableMap:new Map()}}
+	var statement = {parent:{parent:undefined, variableMap:new Map()}}
 	var mesh = getPlankMesh(heights, centers.length - 1)
 	convertPlankToRoad(betweens, centers, curve, null, mesh, null, statement)
 	console.log('mesh points')
@@ -1094,9 +1130,9 @@ function testTaper() {
 
 function testTransform() {
 	console.log('testTransform')
-	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, null, 'g')
+	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, undefined, 'g')
 	var value = 'translate(2,(3))scale(1,2)'
-	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var registry = {dataMap:new Map(), idMap:new Map(), meshMap:new Map()}
 	var statement = getStatementByParentTag(new Map([['transform', value]]), 1, parent, 'g')
 	console.log(statement.attributeMap)
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transform')))
@@ -1108,14 +1144,14 @@ function testTransform() {
 
 function testTransforms() {
 	console.log('testTransforms')
-	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, null, 'g')
+	var parent = getStatementByParentTag(new Map([['comment', 'true']]), 1, undefined, 'g')
 //	var value = 'rotate3D(0,0,1,index*5) heights=0,1,2'
 //	var value = 'rotate(index*9) heights=0,1,2'
 //	var value = 'stair(0,-1,(2+1) 2,-3,4 4,-5,6)'
 //	var value = 'path(0,-1,3 2,-3,4 4,-5,6)'
 //	var value = 'path(0,-1,3 2,-3,4)'
 	var value = 'path(0,0,0 0,-.5,3 0,0,6)'
-	var registry = {idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
+	var registry = {dataMap:new Map(), idMap:new Map(), meshMap:new Map()}
 	var statement = getStatementByParentTag(new Map([['transforms', value]]), 1, parent, 'g')
 	console.log(getBracketSeparatedWords(statement.attributeMap.get('transforms')))
 	var matrices = getMatrices3DAndZeroHeight(registry, statement, null)
@@ -1155,8 +1191,10 @@ function testTriangulate() {
 //	var pointString = '24,0 30,0 30,50 24,50 24,40 -24,40 -24,50 -30,50 -30,0 -24,0 -24,10 24,10 24,0 24,30 24,20 -24,20 -24,30 24,30'
 //	var pointString = '-24.400000000000006,-224 -96.93096831535877,-215 -97.20591390266026,-217.08841907552085 -98.01201357715915,-219.03451584232062 -99.29433297818109,-220.7056670218189 -100.96548415767938,-221.98798642284083 -102.91158092447918,-222.79408609733974 -105,-223.06903168464123 -107.08841907552082,-222.79408609733974 -109.0345158423206,-221.98798642284083 -110.70566702181891,-220.7056670218189 -111.98798642284085,-219.03451584232062 -112.79408609733974,-217.0884190755208 -113.06903168464122,-215 -112.79408609733974,-212.91158092447915 -111.98798642284085,-210.96548415767938 -110.70566702181893,-209.29433297818105 -109.0345158423206,-208.01201357715917 -107.08841907552082,-207.20591390266026 -105,-206.93096831535877 -102.91158092447917,-207.20591390266026 -100.96548415767938,-208.01201357715917 -99.29433297818107,-209.29433297818105 -98.01201357715915,-210.96548415767938 -97.20591390266026,-212.91158092447915 -96.93096831535877,-215 -24.400000000000006,-224 -24.400000000000006,-183.99999999999994 -185.60000000000002,-184 -185.60000000000002,-224 -24.400000000000006,-224 -29.400000000000006,-221 -37.400000000000006,-204 -29.400000000000006,-187 -29.400000000000006,-221'
 //	var pointString = '-37.898102010146246,-221.82508898043224 -96.93096831535877,-214.5 -97.20591390266026,-216.58841907552085 -98.01201357715915,-218.53451584232062 -99.29433297818109,-220.20566702181893 -100.96548415767938,-221.48798642284086 -102.91158092447918,-222.29408609733974 -105,-222.56903168464123 -107.08841907552082,-222.29408609733974 -109.0345158423206,-221.48798642284083 -110.70566702181891,-220.20566702181893 -111.98798642284085,-218.53451584232062 -112.79408609733974,-216.58841907552082 -113.06903168464122,-214.5 -112.79408609733974,-212.41158092447918 -111.98798642284085,-210.46548415767938 -110.70566702181893,-208.79433297818107 -109.0345158423206,-207.51201357715917 -107.08841907552082,-206.70591390266026 -105,-206.43096831535877 -102.91158092447917,-206.70591390266026 -100.96548415767938,-207.51201357715917 -99.29433297818107,-208.79433297818107 -98.01201357715915,-210.46548415767938 -97.20591390266026,-212.41158092447918 -96.93096831535877,-214.5 -37.898102010146246,-221.82508898043224 -47.400000000000006,-203.5 -33.400000000000006,-185.5 -33.400000000000006,-222.38323564566494 -24.400000000000006,-223.50000000000003 -24.400000000000006,-183.49999999999997 -185.60000000000002,-183.5 -185.60000000000002,-223.50000000000003 -37.029629629629625,-223.50000000000003 -37.898102010146246,-221.82508898043224 -47.400000000000006,-203.5 -33.400000000000006,-185.5 -33.400000000000006,-222.38323564566494 -33.400000000000006,-223.50000000000003 -24.400000000000006,-223.50000000000003'
-	var pointString = '-72.69416058394161,-97.75 -69.3,-91.75 -69.3,-79.5496577882578 -69.68161199515768,-78.48744000586944 -75.55892007564165,-71.36343021134343 -75.9349419813431,-70.41517375495249 -76.5125,-61.57499999999999 -76.95,-52.19999999999999 -77.21249999999999,-42.82499999999999 -77.29454342062846,-34.03463350409387 -77.88465896757641,-33.449999999999996 -78.71421356237309,-33.449999999999996 -79.3,-34.0357864376269 -79.3,-44.05 -79.3,-48.05 -79.3,-68.57815538347683 -80.16815538347683,-70.08184461652314 -81.67184461652316,-70.94999999999999 -81.67184461652316,-74.94999999999999 -80.16815538347683,-75.81815538347682 -79.3,-77.32184461652315 -79.3,-83.35 -79.3,-87.35 -79.3,-94.37815538347684 -80.16815538347683,-95.88184461652315 -81.67184461652316,-96.75 -93.32815538347683,-96.75 -94.83184461652316,-95.88184461652315 -95.7,-94.37815538347684 -95.7,-88.75 -100.19999999999999,-88.75 -101.69999999999999,-87.28518375848799 -101.69999999999999,-83.41481624151199 -100.19999999999999,-81.94999999999999 -95.69999999999999,-81.94999999999999 -95.69999999999999,-77.32184461652315 -94.83184461652316,-75.81815538347682 -93.32815538347683,-74.94999999999999 -81.67184461652316,-74.94999999999999 -81.67184461652316,-70.94999999999999 -93.32815538347683,-70.94999999999999 -94.83184461652316,-70.08184461652314 -95.7,-68.57815538347683 -95.69999999999999,-48.05 -95.69999999999999,-44.05 -95.69999999999999,-34.0357864376269 -96.2857864376269,-33.449999999999996 -97.11534103242359,-33.449999999999996 -97.70545657937154,-34.03463350409387 -97.7875,-42.82499999999999 -98.05,-52.19999999999999 -98.4875,-61.57499999999999 -99.06505801865688,-70.41517375495249 -99.44107992435833,-71.36343021134343 -105.37647847436608,-78.5578526962013 -105.74783741165703,-79.45611981533133 -107.47693761814745,-97.75'
+//	var pointString = '-72.69416058394161,-97.75 -69.3,-91.75 -69.3,-79.5496577882578 -69.68161199515768,-78.48744000586944 -75.55892007564165,-71.36343021134343 -75.9349419813431,-70.41517375495249 -76.5125,-61.57499999999999 -76.95,-52.19999999999999 -77.21249999999999,-42.82499999999999 -77.29454342062846,-34.03463350409387 -77.88465896757641,-33.449999999999996 -78.71421356237309,-33.449999999999996 -79.3,-34.0357864376269 -79.3,-44.05 -79.3,-48.05 -79.3,-68.57815538347683 -80.16815538347683,-70.08184461652314 -81.67184461652316,-70.94999999999999 -81.67184461652316,-74.94999999999999 -80.16815538347683,-75.81815538347682 -79.3,-77.32184461652315 -79.3,-83.35 -79.3,-87.35 -79.3,-94.37815538347684 -80.16815538347683,-95.88184461652315 -81.67184461652316,-96.75 -93.32815538347683,-96.75 -94.83184461652316,-95.88184461652315 -95.7,-94.37815538347684 -95.7,-88.75 -100.19999999999999,-88.75 -101.69999999999999,-87.28518375848799 -101.69999999999999,-83.41481624151199 -100.19999999999999,-81.94999999999999 -95.69999999999999,-81.94999999999999 -95.69999999999999,-77.32184461652315 -94.83184461652316,-75.81815538347682 -93.32815538347683,-74.94999999999999 -81.67184461652316,-74.94999999999999 -81.67184461652316,-70.94999999999999 -93.32815538347683,-70.94999999999999 -94.83184461652316,-70.08184461652314 -95.7,-68.57815538347683 -95.69999999999999,-48.05 -95.69999999999999,-44.05 -95.69999999999999,-34.0357864376269 -96.2857864376269,-33.449999999999996 -97.11534103242359,-33.449999999999996 -97.70545657937154,-34.03463350409387 -97.7875,-42.82499999999999 -98.05,-52.19999999999999 -98.4875,-61.57499999999999 -99.06505801865688,-70.41517375495249 -99.44107992435833,-71.36343021134343 -105.37647847436608,-78.5578526962013 -105.74783741165703,-79.45611981533133 -107.47693761814745,-97.75'
 //	var pointString = '-69.68161199515768,-78.48744000586944 -75.55892007564165,-71.36343021134343 -75.9349419813431,-70.41517375495249 -76.5125,-61.57499999999999 -76.95,-52.19999999999999 -77.21249999999999,-42.82499999999999 -77.29454342062846,-34.03463350409387 -77.88465896757641,-33.449999999999996 -78.71421356237309,-33.449999999999996 -79.3,-34.0357864376269 -79.3,-44.05 -79.3,-48.05 -79.3,-68.57815538347683 -80.16815538347683,-70.08184461652314 -81.67184461652316,-70.94999999999999 -81.67184461652316,-74.94999999999999 -80.16815538347683,-75.81815538347682 -79.3,-77.32184461652315 -79.3,-83.35 -79.3,-87.35 -79.3,-94.37815538347684 -80.16815538347683,-95.88184461652315 -81.67184461652316,-96.75 -93.32815538347683,-96.75 -94.83184461652316,-95.88184461652315 -95.7,-94.37815538347684 -95.7,-88.75 -100.19999999999999,-88.75 -101.69999999999999,-87.28518375848799 -101.69999999999999,-83.41481624151199 -100.19999999999999,-81.94999999999999 -95.69999999999999,-81.94999999999999 -95.69999999999999,-77.32184461652315 -94.83184461652316,-75.81815538347682 -93.32815538347683,-74.94999999999999 -81.67184461652316,-74.94999999999999 -81.67184461652316,-70.94999999999999 -93.32815538347683,-70.94999999999999 -94.83184461652316,-70.08184461652314 -95.7,-68.57815538347683 -95.69999999999999,-48.05 -95.69999999999999,-44.05 -95.69999999999999,-34.0357864376269 -96.2857864376269,-33.449999999999996 -97.11534103242359,-33.449999999999996 -97.70545657937154,-34.03463350409387 -97.7875,-42.82499999999999 -98.05,-52.19999999999999 -98.4875,-61.57499999999999 -99.06505801865688,-70.41517375495249 -99.44107992435833,-71.36343021134343 -105.37647847436608,-78.5578526962013'
+	var pointString = '76,-70 76,-72 74,-72 74,-86 104,-86 104,-26 74,-26 74,-40 76,-40 83,-35 86.5,-35 86.5,-34 86.5,-31 91.5,-31 91.5,-34 91.5,-35 95,-35 95,-47 91.5,-47 91.5,-48 91.5,-51 86.5,-51 86.5,-48 86.5,-47 83,-47 83,-35 76,-40 76,-42 76,-70 83,-65 86.5,-65 86.5,-64 86.5,-61 91.5,-61 91.5,-64 91.5,-65 95,-65 95,-77 91.5,-77 91.5,-78 91.5,-81 86.5,-81 86.5,-78 86.5,-77 83,-77 83,-65'
+//	var pointString = '136,-35 134,-23 76,-23 73.99999999999996,-35 74.00000000000003,-56.99999999999997 76,-69 79.14359353944897,-69 82.85640646055101,-71.14359353944897 85,-74.85640646055103 82.99999999999999,-217 82.99999999999999,-223.57439780373045 83.98697564639414,-221.2936725606235 85.79857345141995,-219.59251355748881 92.99999999999999,-217 87.39999999999999,-207.6315789473684 90.40000000000002,-27 119.6,-27 122.6,-207.6315789473684 87.39999999999999,-207.6315789473684 92.99999999999999,-217 116.99999999999999,-217 124.20142654858002,-219.59251355748881 126.01302435360583,-221.2936725606235 126.99999999999999,-223.57439780373045 126.99999999999999,-217 125,-74.85640646055103 127.14359353944897,-71.14359353944897 130.856406460551,-69 134,-69 136,-57'
 	var points = getPointsByString(pointString)
 //	var facet = [4, 3, 2, 1, 0]
 //	var facet = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -1186,7 +1224,7 @@ function testTriangulate() {
 	var concaveFacets = getConcaveFacets(facet.slice(0), points)
 	var xyTriangleFacets = getXYTriangleFacets(facet, points)
 	var triangles = getPolygonsByFacets(xyTriangleFacets, points)
-	add2Ds(points, [150,20])
+	add2Ds(points, [0,60])
 	multiply3DsByScalar(points, 0.2)
 //	drawXYPolygon(getPolygonByFacet(facet, points), getRGB())
 	var concavePolygons = getPolygonsByFacets(concaveFacets, points)
@@ -1204,9 +1242,10 @@ function testTriangulate() {
 		}
 	}
 	console.log(xyTriangleFacets)
+	console.log(concavePolygons)
 	console.log(multiples)
-	drawXYPolygons(concavePolygons, [[0.1, 0.0], [0.1, 0.1], [0.0, 0.1], [-0.1, 0.1], [-0.1, -0.0], [-0.1, -0.1], [0.0, -0.1], [0.1, -0.1]])
-//	drawXYPolygons(triangles, [[0.0, 0.0], [0.1, 0.0], [0.1, 0.1], [0.0, 0.1], [-0.1, 0.1], [-0.1, -0.0], [-0.1, -0.1], [0.0, -0.1], [0.1, -0.1]])
+	drawXYInsetPolygons(concavePolygons, 0.05)
+//	drawXYInsetPolygons(triangles, 0.05)
 	return
 	console.log(triangleFacets)
 //	rotateXYZParametersByPoints(1, points)
@@ -1296,10 +1335,19 @@ function testVoxelBoolean() {
 //	console.log(getMeshAnalysis(meshC))
 }
 
-function writeLength(character) {
-	document.writeln('<text x=20 y="5" fill="blue" id="' + character + '">' + character + '</text>')
-	gLine += character + ' ' + document.getElementById(character).getComputedTextLength().toFixed(3) + ' '
-//	gLine += character + ' ' + document.getElementById(character).getComputedTextLength().toString() + ' '
+function writeLengths(characters, numberLength) {
+	var line = ''
+	document.writeln('<g font-family=freeserif,Palatino font-size="1000" font-weight="normal" id="group" style="fill:black;stroke:black;stroke-width:0.0">')
+	for (var character of characters) {
+		var textLength = getSVGTextLength(character)
+		line += character + ' ' + textLength + ' '
+		numberLength.totalLength += textLength
+	}
+	numberLength.totalGroupLength += getSVGTextLength(characters.join(''))
+	console.log(line)
+	console.log(numberLength.totalLength / numberLength.totalGroupLength)
+	numberLength.numberOfCharacters += characters.length
+	document.writeln('</g>')
 }
 
 function createSVGTest() {
@@ -1323,9 +1371,10 @@ function createSVGTest() {
 //	testFacetSubtraction()
 //	testFence()
 //	testFillet()
+//	testFormattedText()
 //	testIntercircle()
 //	testJoin()
-//	testLength()
+	testLength()
 //	testLettering()
 //	testLinkMap()
 //	testLoop()
@@ -1348,7 +1397,7 @@ function createSVGTest() {
 //	testTaper()
 //	testTransform()
 //	testTransforms()
-	testTriangulate()
+//	testTriangulate()
 //	testVoxel()
 //	testVoxelBoolean()
 //	testWedge()
