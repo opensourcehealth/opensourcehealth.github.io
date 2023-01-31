@@ -187,15 +187,19 @@ function get3DPoints(registry, statement, value) {
 	return getPointsByValue(registry, statement, characters.join(''))
 }
 
+function getAttributeFloat(key, statement) {
+	return parseFloat(getAttributeValue(key, statement))
+}
+
 function getAttributeValue(key, statement) {
 	for (var parentLevel = 0; parentLevel < gLengthLimit; parentLevel++) {
-		if (statement.attributeMap != null) {
+		if (statement.attributeMap != undefined) {
 			if (statement.attributeMap.has(key)) {
 				return statement.attributeMap.get(key)
 			}
 		}
 		statement = statement.parent
-		if (statement == null) {
+		if (statement == undefined) {
 			return undefined
 		}
 	}
@@ -216,7 +220,7 @@ function getBooleanByStatement(key, registry, statement) {
 function getBooleanByStatementValue(key, registry, statement, value) {
 	value = value.trim()
 	if (value.length == 0) {
-		return null
+		return undefined
 	}
 	if (value == 'false' || value == '0') {
 		return false
@@ -229,11 +233,25 @@ function getBooleanByStatementValue(key, registry, statement, value) {
 	return boolean
 }
 
+function getBooleanByString(text) {
+	text = text.trim()
+	if (text.length == 0) {
+		return undefined
+	}
+	if (text == 'false' || text == '0') {
+		return false
+	}
+	if (text == 'true' || text == '1') {
+		return true
+	}
+	return undefined
+}
+
 function getChainMatrix3D(registry, statement) {
 	var transformedMatrix = get3DMatrix(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		var statement = statement.parent
-		if (statement == null) {
+		if (statement == undefined) {
 			if (transformedMatrix == null) {
 				return getUnitMatrix3D()
 			}
@@ -270,14 +288,14 @@ function getChainSkipMatrix2D(registry, statement) {
 	var transformedMatrix = getMatrix2D(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		statement = statement.parent
-		if (statement == null) {
+		if (statement == undefined) {
 			return transformedMatrix
 		}
 		var skip2D = statement.tag == 'abstract' || statement.tag == 'window'
 		if (statement.attributeMap.has('skip2D')) {
 			skip2D = getBooleanByStatementValue('skip2D', registry, statement, statement.attributeMap.get('skip2D'))
 		}
-		if (!skip2D) {
+		if (skip2D != true) {
 			statementMatrix = getMatrix2D(registry, statement)
 			if (statementMatrix != null) {
 				if (transformedMatrix == null) {
@@ -296,14 +314,14 @@ function getChainSkipMatrix2DUntil(caller, registry, statement) {
 	var matrix2DUntil = getMatrix2D(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		statement = statement.parent
-		if (statement == null || statement == caller) {
+		if (statement == undefined || statement == caller) {
 			return matrix2DUntil
 		}
 		var skip2D = statement.tag == 'abstract' || statement.tag == 'window'
 		if (statement.attributeMap.has('skip2D')) {
 			skip2D = getBooleanByStatementValue('skip2D', registry, statement, statement.attributeMap.get('skip2D'))
 		}
-		if (!skip2D) {
+		if (skip2D != true) {
 			statementMatrix = getMatrix2D(registry, statement)
 			if (statementMatrix != null) {
 				if (matrix2DUntil == null) {
@@ -322,7 +340,7 @@ function getChainSkipMatrix3D(registry, statement) {
 	var transformedMatrix = get3DMatrix(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		var statement = statement.parent
-		if (statement == null) {
+		if (statement == undefined) {
 			if (transformedMatrix == null) {
 				return getUnitMatrix3D()
 			}
@@ -334,7 +352,7 @@ function getChainSkipMatrix3D(registry, statement) {
 		if (statement.attributeMap.has('skip3D')) {
 			skip3D = getBooleanByStatementValue('skip3D', registry, statement, statement.attributeMap.get('skip3D'))
 		}
-		if (!skip3D) {
+		if (skip3D != true) {
 			var statementMatrix = get3DMatrix(registry, statement)
 			if (statementMatrix != null) {
 				if (transformedMatrix == null) {
@@ -739,11 +757,6 @@ function getMatrix2D(registry, statement) {
 function getMatrix2DsByChildren(children, registry) {
 	var matrix2DsByChildren = []
 	for (var child of children) {
-
-		// deprecated
-		var matrix2Ds = getPointsByTag('transform2Ds', registry, child, 'derive2D')
-		matrix2DsByChildren = getPushArray(matrix2DsByChildren, matrix2Ds)
-
 		matrix2Ds = getPointsByTag('matrix2Ds', registry, child, 'matrix2D')
 		matrix2DsByChildren = getPushArray(matrix2DsByChildren, matrix2Ds)
 	}
@@ -754,7 +767,7 @@ function getMatrix2DUntil(caller, registry, statement) {
 	var matrix2DUntil = getMatrix2D(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		statement = statement.parent
-		if (statement == null || statement == caller) {
+		if (statement == undefined || statement == caller) {
 			return matrix2DUntil
 		}
 		statementMatrix = getMatrix2D(registry, statement)
@@ -768,6 +781,17 @@ function getMatrix2DUntil(caller, registry, statement) {
 		}
 	}
 	return matrix2DUntil
+}
+
+function getPath2DByStatement(registry, statement) {
+	if (statement.attributeMap.has('path')) {
+		return removeIdentical2DPoints(getPointsByValue(registry, statement, statement.attributeMap.get('path')))
+	}
+	var workStatement = getWorkStatementByKey('pathID', registry, statement)
+	if (workStatement == undefined) {
+		return []
+	}
+	return removeIdentical2DPoints(getPointsHDByStatementOnly(registry, workStatement))
 }
 
 function getPointByDefault(defaultValue, key, registry, statement, tag) {
@@ -807,6 +831,18 @@ function getPointsByValue(registry, statement, value) {
 }
 
 function getPointsHD(registry, statement) {
+	var points = getPointsHDByStatementOnly(registry, statement)
+	if (points != null) {
+		return points
+	}
+	var workStatement = getWorkStatement(registry, statement)
+	if (workStatement == undefined) {
+		return null
+	}
+	return getPointsHDByStatementOnly(registry, workStatement)
+}
+
+function getPointsHDByStatementOnly(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (attributeMap.has('pointsHD')) {
 		var points = getPointsByValue(registry, statement, attributeMap.get('pointsHD'))
@@ -865,6 +901,30 @@ function getStringByArray(depth, elements) {
 	return '[' + betweens.join(',') + ']'
 }
 
+function getVariableFloat(key, statement) {
+	return parseFloat(getVariableValue(key, statement))
+}
+
+function getVariableFloatByDefault(defaultValue, key, statement) {
+	var variableValue = getVariableValue(key, statement)
+	if (variableValue == undefined) {
+		return defaultValue
+	}
+	return parseFloat(variableValue)
+}
+
+function getVariableInt(key, statement) {
+	return parseInt(getVariableValue(key, statement))
+}
+
+function getVariableIntByDefault(defaultValue, key, statement) {
+	var variableValue = getVariableValue(key, statement)
+	if (variableValue == undefined) {
+		return defaultValue
+	}
+	return parseInt(variableValue)
+}
+
 function getVariableMapByStatement(statement) {
 	if (statement.variableMap == null) {
 		statement.variableMap = new Map()
@@ -880,11 +940,46 @@ function getVariableValue(key, statement) {
 			}
 		}
 		statement = statement.parent
-		if (statement == null) {
+		if (statement == undefined) {
 			return undefined
 		}
 	}
 	return undefined
+}
+
+function getVector2DByStatement(registry, statement) {
+	var vector = get3DPointByStatement('vector', registry, statement)
+	if (getIsEmpty(vector)) {
+		return [1.0, 0.0]
+	}
+	if (vector.length == 1) {
+		vector.push(0.0)
+	}
+	var vectorLength = length2D(vector)
+	if (vectorLength == 0.0) {
+		noticeByList(['Zero length vector in getVector2DByStatement in parsenumber.', statement])
+		return [1.0, 0.0]
+	}
+	return divide3DScalar(vector, vectorLength)
+}
+
+function getVector3DByStatement(registry, statement) {
+	var vector = get3DPointByStatement('vector', registry, statement)
+	if (getIsEmpty(vector)) {
+		return [1.0, 0.0, 0.0]
+	}
+	if (vector.length == 1) {
+		vector.push(0.0)
+	}
+	if (vector.length == 2) {
+		vector.push(0.0)
+	}
+	var vectorLength = length3D(vector)
+	if (vectorLength == 0.0) {
+		noticeByList(['Zero length vector in getVector3DByStatement in parsenumber.', statement])
+		return [1.0, 0.0, 0.0]
+	}
+	return divide3DScalar(vector, vectorLength)
 }
 
 function roundFloats(floats, places) {
@@ -892,6 +987,21 @@ function roundFloats(floats, places) {
 		floats[floatIndex] = parseFloat(parameter.toFixed(places))
 	}
 	return floats
+}
+
+function setAttributeValue(key, monad, value) {
+	for (var parentLevel = 0; parentLevel < gLengthLimit; parentLevel++) {
+		if (monad.attributeMap != undefined) {
+			if (monad.attributeMap.has(key)) {
+				monad.attributeMap.set(key, value)
+				return
+			}
+		}
+		monad = monad.parent
+		if (monad == undefined) {
+			return
+		}
+	}
 }
 
 function setPointsHD(points, statement) {
