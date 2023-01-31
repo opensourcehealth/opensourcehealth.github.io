@@ -39,7 +39,7 @@
 </table>
 <table>
 <tr>
-<th><p id="paragraphText"></p></th><th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
+<th><canvas id="viewerCanvas" width="0" height="0" style="border:1px solid black"></canvas></th><th id="paragraphText"></th>
 </tr>
 </table>
 <table>
@@ -77,7 +77,9 @@
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
 <script src="statement.js"></script>
-<script src="viewer.js"></script>
+<script src="viewbroker.js"></script>
+<script src="viewfractal2d.js"></script>
+<script src="viewmesh.js"></script>
 <script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
@@ -146,10 +148,17 @@ function addOutputArea(text, title) {
 }
 
 function updateSVGArea(lines) {
-	var registry = {generatedIDSet:new Set(), idMap:new Map(), meshMap:new Map(), storageMap:new Map()}
-	meshViewer.setID('viewerCanvas', registry)
+}
+
+function updateWordArea(wordString) {
+	var lines = getBracketReplacedLinesByText(wordString)
+	var paragraphTextElement = document.getElementById('paragraphText')
+
+	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idMap:new Map(), meshMap:new Map(), views:[]}
 	var svgStatement = getDocumentRoot(lines, 'svg')
-	if (svgStatement == null) {
+	if (svgStatement == undefined) {
+		paragraphTextElement.innerHTML = ''
+		paragraphTextElement.hidden = true
 		return ''
 	}
 	var descendants = [svgStatement]
@@ -162,27 +171,46 @@ function updateSVGArea(lines) {
 	createDefault(registry, svgStatement)
 	descendants = [svgStatement]
 	addToDescendantsInsideFirst(descendants, svgStatement)
-	processDescendantsByTagMap(registry, svgStatement, gTagBeginMap)
+//	var before = new Date().getTime()
 	processDescendantsByTagMap(registry, svgStatement, gTagCenterMap)
-	var lineThickness = 10
+//	console.log('Execution time')
+//	console.log(new Date().getTime() - before)
+//	var lineThickness = 10
 	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
-	var height = lineThickness
-	var padding = 5
-	var width = lineThickness
-	if (boundingBox != null) {
-		height += boundingBox[1][1]
-		width += boundingBox[1][0] + lineThickness
-		height = Math.max(height, 300)
-		width = Math.max(width, 300)
+	var height = null
+	var width = null
+	var heightSuffix = ''
+	var widthSuffix = ''
+	if (svgStatement.attributeMap.has('height')) {
+		var heightString = svgStatement.attributeMap.get('height')
+		heightSuffix = getAlphabeticSuffix(heightString)
+		height = parseFloat(heightString)
 	}
-	if (!svgStatement.attributeMap.has('height')) {
-		svgStatement.attributeMap.set('height', height.toFixed())
+	if (svgStatement.attributeMap.has('width')) {
+		var widthString = svgStatement.attributeMap.get('width')
+		widthSuffix = getAlphabeticSuffix(widthString)
+		width = parseFloat(widthString)
+	}
+	var padding = 5
+	var doublePadding = 2 * padding
+	if (height == null) {
+		if (boundingBox != null) {
+			height = boundingBox[1][1] + doublePadding
+		}
+	}
+	if (width == null) {
+		if (boundingBox != null) {
+			width = boundingBox[1][0] + doublePadding
+		}
+	}
+	if (height != null) {
+		svgStatement.attributeMap.set('height', height.toFixed() + heightSuffix)
+	}
+	if (width != null) {
+		svgStatement.attributeMap.set('width', width.toFixed() + widthSuffix)
 	}
 	if (!svgStatement.attributeMap.has('style')) {
 		svgStatement.attributeMap.set('style', 'border:1px solid black;padding:' + padding.toString() + 'px')
-	}
-	if (!svgStatement.attributeMap.has('width')) {
-		svgStatement.attributeMap.set('width', width.toFixed())
 	}
 	if (!svgStatement.attributeMap.has('xmlns')) {
 		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
@@ -193,15 +221,26 @@ function updateSVGArea(lines) {
 	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('svgArea', svgLines)
 	document.getElementById('svgArea').value = svgString
-	meshViewer.start(height + padding + padding)
-	return svgString
+	if (height == null || width == null) {
+		paragraphTextElement.hidden = true
+	}
+	else {
+		paragraphTextElement.hidden = false
+		paragraphTextElement.innerHTML = svgString
+	}
+	if (height == null) {
+		height = 0
+	}
+	else {
+		height += doublePadding
+	}
+	document.getElementById('viewerCanvas').hidden = registry.views.length == 0
+	if (registry.views.length > 0) {
+		viewBroker.start(Math.max(height, viewBroker.minimumHeight), 'viewerCanvas', registry)
+	}
 }
 
-function updateWordArea(wordString) {
-	document.getElementById('paragraphText').innerHTML = updateSVGArea(getBracketReplacedLinesByText(wordString))
-}
-
-var gTagBeginMap = new Map()
+var gParentFirstSet = new Set()
 var gTagCenterMap = new Map()
 gProcessors = gAlterationProcessors.concat(gConstructionProcessors).concat(gGenerator2DProcessors)
 gProcessors = gProcessors.concat(gGenerator3DProcessors).concat(gMetaProcessors)
