@@ -27,42 +27,106 @@ function addPolylinesToGroup(polylines, registry, statement) {
 	}
 }
 
-function addTextStatement(anchor, fontSize, format, idStart, registry, statement, text, writableWidth, x, y) {
-	var textAttributeMap = new Map([['innerHTML', text], ['x', (x + format.xOffset).toString()], ['y', y.toString()]])
-	var localFontSize = format.fontSize
-	if (lineIsTooLong(writableWidth, localFontSize, text)) {
-		localFontSize = writableWidth / getTextLength(text)
+function addTextStatement(monad, registry, statement, wordLengths) {
+	if (wordLengths.length == 0) {
+		return
+	}
+	var root = monad
+	for (var count = 0; count < gLengthLimit; count++) {
+		if (root.parent == undefined) {
+			break
+		}
+		root = root.parent
+	}
+	var yString = getAttributeValue('y', monad)
+	var text = getJoinedWordByWordLengths(wordLengths)
+	var textLength = 0
+	for (var wordLength of wordLengths) {
+		textLength += wordLength.length
+	}
+	var x = getAttributeFloat('x', monad) + parseFloat(getValueByDefault('0.0', getAttributeValue('dx', monad)))
+	var textAttributeMap = new Map([['innerHTML', text], ['x', x.toString()], ['y', yString]])
+	var fontSize = getAttributeFloat('font-size', root)
+	var localFontSize = getAttributeFloat('font-size', monad)
+	yString = getNextYString(localFontSize, monad, yString)
+	var writableWidth = getAttributeFloat('right', monad) - getAttributeFloat('left', monad)
+	if (textLength > writableWidth) {
+		localFontSize *= writableWidth / textLength
 	}
 	if (localFontSize != fontSize) {
 		textAttributeMap.set('font-size', localFontSize.toString())
 	}
-	if (anchor != null) {
-		textAttributeMap.set('text-anchor', anchor)
+	var localTextAnchor = getAttributeValue('text-anchor', monad)
+	if (localTextAnchor != getAttributeValue('text-anchor', root)) {
+		textAttributeMap.set('text-anchor', localTextAnchor)
 	}
 	var textStatement = getStatementByParentTag(textAttributeMap, 0, statement, 'text')
-	getUniqueID(idStart + format.name, registry, textStatement)
+	var idStart = getAttributeValue('id', monad)
+	var name = getAttributeValue('name', monad)
+	if (name != undefined) {
+		idStart += '_' + name
+	}
+	getUniqueID(idStart, registry, textStatement)
+	wordLengths.length = 0
+	setAttributeValue('y', monad, yString)
+}
+
+function addTextStatements(format, registry, statement, text) {
+	var textMonadMap = new Map([['b', BoldMonad], ['i', ItalicMonad], ['p', ParagraphMonad], ['sub', SubscriptMonad]])
+	textMonadMap.set('sup', SuperscriptMonad)
+	var monad = new PlainMonad()
+	monad.parent = format
+	var words = text.split(' ').filter(lengthCheck)
+	for (var word of words) {
+		monad = getNextMonad(monad, textMonadMap, registry, statement, word)
+	}
+	monad.close(registry, statement)
 }
 
 function arcFromTo(fromX, fromY, toX, toY, radius, numberOfSides) {
 	return arcFromToRadius(null, {parent:{variableMap:null}}, fromX, fromY, toX, toY, radius, true, numberOfSides)
 }
 
-function cellX(registry, statement) {
-	var gridAttributeMap = statement.parent.attributeMap
-	var cellColumn = parseInt(gridAttributeMap.get('cellColumn'))
-	if (cellColumn >= parseFloat(gridAttributeMap.get('columns'))) {
-		cellColumn = 0
-		gridAttributeMap.set('cellColumn', '0')
-		gridAttributeMap.set('cellRow', (parseInt(gridAttributeMap.get('cellRow')) + 1).toString())
+function BoldMonad() {
+	this.close = function(registry, statement) {
+		var fontSize = getAttributeFloat('font-size', this)
+		var joinedWord = getJoinedWordByWordLengths(this.wordLengths)
+		var joinedLength = getTextLength(joinedWord) * fontSize
+		var word = '<tspan font-weight = "bold" >' + joinedWord + '</tspan>'
+		this.parent.wordLengths.push({word:word, length:joinedLength})
+		this.wordLengths.length = 0
 	}
-	var x = cellColumn * parseFloat(gridAttributeMap.get('cellWidth'))
-	gridAttributeMap.set('cellColumn', (parseInt(gridAttributeMap.get('cellColumn')) + 1).toString())
+	this.initialize = function(registry, statement) {
+	}
+}
+
+function cellX(registry, statement) {
+	var parent = statement.parent
+	var variableMap = getVariableMapByStatement(parent)
+	var cellColumn = getVariableInt('grid_cellColumn', parent)
+	if (cellColumn >= getVariableFloat('grid_columns', parent)) {
+		cellColumn = 0
+		variableMap.set('grid_cellColumn', '0')
+		variableMap.set('grid_cellRow', (getVariableInt('grid_cellRow', parent) + 1).toString())
+	}
+	var x = cellColumn * getVariableFloat('grid_cellWidth', parent)
+	variableMap.set('grid_cellColumn', (getVariableInt('grid_cellColumn', parent) + 1).toString())
 	return x
 }
 
 function cellY(registry, statement) {
-	var gridAttributeMap = statement.parent.attributeMap
-	return parseInt(gridAttributeMap.get('cellRow')) * parseFloat(gridAttributeMap.get('cellHeight'))
+	return getVariableInt('grid_cellRow', statement.parent) * getVariableFloat('grid_cellHeight', statement.parent)
+}
+
+function closeByDYMultiplier(dyMultiplier, monad, registry, statement) {
+	var fontSize = getAttributeFloat('font-size', monad)
+	var dy = dyMultiplier * fontSize
+	var joinedWord = getJoinedWordByWordLengths(monad.wordLengths)
+	var joinedLength = getTextLength(joinedWord) * fontSize
+	var word = '<tspan dx = "-' + (0.2 * fontSize).toString() + '"  dy = "' + dy.toString() + '" font-size = "'
+	word += (0.6 * fontSize).toString() + '">' + joinedWord + '</tspan><tspan display="none" dy = "' + (-dy).toString() + '">.</tspan>'
+	monad.parent.wordLengths.push({word:word, length:joinedLength})
+	monad.wordLengths.length = 0
 }
 
 function createCharacterPolylineMap() {
@@ -119,107 +183,22 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('Z', [bottomLine, diagonalUp, topLine])
 }
 
-function getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y) {
-	var name = format.name
-	if (!attributeMap.has(name)) {
-		return y
+function getAnchorFontParent(registry, statement) {
+	var attributeMap = new Map()
+	var fontSize = getAttributeValue('font-size', statement)
+	if (fontSize == undefined) {
+		fontSize = '12'
+		statement.attributeMap.set('font-size', fontSize)
 	}
-	var localLineHeight = lineHeight
-	if (format.fontSize != fontSize) {
-		localLineHeight += format.fontSize - fontSize
+	attributeMap.set('font-size', fontSize)
+	attributeMap.set('id', statement.attributeMap.get('id'))
+	var textAnchor = getAttributeValue('text-anchor', statement)
+	if (textAnchor == undefined) {
+		textAnchor = 'middle'
+		statement.attributeMap.set('text-anchor', textAnchor)
 	}
-	var value = attributeMap.get(name)
-	value = getValueByDefault(value, getVariableValue(value, statement))
-	var anchor = 'start'
-	if (format.anchor != null) {
-		anchor = format.anchor
-	}
-	if (value[0] == '#') {
-		var line = ''
-		var lines = []
-		var valueWords = value.slice(1).split(' ').filter(lengthCheck)
-		writableWidth += format.margin - format.rightMargin
-		for (var valueWord of valueWords) {
-			if (valueWord[0] == '#') {
-				lines.push(line)
-				line = ''
-				for (var charactersRemoved = 0; charactersRemoved < 987; charactersRemoved++) {
-					valueWord = valueWord.slice(1).trim()
-					if (valueWord.length == 0) {
-						break
-					}
-					if (valueWord[0] == '#') {
-						lines.push('')
-					}
-					else {
-						if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
-							lines.push(valueWord)
-						}
-						else {
-							line = valueWord
-						}
-						break
-					}
-				}
-			}
-			else {
-				if (line.length > 0) {
-					var checkLine = line + ' ' + valueWord
-					if (lineIsTooLong(writableWidth, format.fontSize, checkLine)) {
-						lines.push(line)
-						if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
-							lines.push(valueWord)
-						}
-						else {
-							line = valueWord
-						}
-					}
-					else {
-						line = checkLine
-					}
-				}
-				else {
-					if (lineIsTooLong(writableWidth, format.fontSize, valueWord)) {
-						lines.push(valueWord)
-					}
-					else {
-						line = valueWord
-					}
-				}
-			}
-		}
-		if (line.length > 0) {
-			lines.push(line)
-		}
-		for (var line of lines) {
-			addTextStatement(anchor, fontSize, format, idStart, registry, statement, line, writableWidth, xStart, y)
-			y += localLineHeight
-		}
-		return y
-	}
-	if (value[0] == '^') {
-		var columnWords = value.slice(1).split('^').filter(lengthCheck)
-		var rowEndRoundedUp = Math.ceil(columnWords.length / columns)
-		var originalY = y
-		var totalRowIndex = 0
-		var columnOffset = writableWidth / columns
-		var columnX = xStart
-		for (var columnIndex = 0; columnIndex < columns; columnIndex++) {
-			y = originalY
-			for (var rowIndex = 0; rowIndex < rowEndRoundedUp; rowIndex++) {
-				if (totalRowIndex < columnWords.length) {
-					var word = columnWords[totalRowIndex]
-					addTextStatement(anchor, fontSize, format, idStart, registry, statement, word, writableWidth, columnX, y)
-					y += localLineHeight
-					totalRowIndex += 1
-				}
-			}
-			columnX += columnOffset
-		}
-		return y
-	}
-	addTextStatement(format.anchor, fontSize, format, idStart, registry, statement, value, writableWidth, x, y)
-	return y + localLineHeight
+	attributeMap.set('text-anchor', textAnchor)
+	return {attributeMap:attributeMap}
 }
 
 function getBox(registry, statement) {
@@ -250,6 +229,17 @@ function getBox(registry, statement) {
 		}
 	}
 	return points
+}
+
+function getJoinedWordByWordLengths(wordLengths) {
+	if (wordLengths.length == 0) {
+		return ''
+	}
+	var joinedWords = new Array(wordLengths.length)
+	for (var wordLengthIndex = 0; wordLengthIndex < wordLengths.length; wordLengthIndex++) {
+		joinedWords[wordLengthIndex] = wordLengths[wordLengthIndex].word
+	}
+	return joinedWords.join(' ')
 }
 
 function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
@@ -287,42 +277,208 @@ function getLetteringOutlines(fontHeight, strokeWidth, text, textAlign) {
 	return letteringOutlines
 }
 
+function getNextMonad(monad, monadMap, registry, statement, word) {
+	if (word == '>') {
+		if (monad.shouldAddAttributes) {
+			monad.attributeMap = new Map(getAttributes(getQuoteSeparatedSnippets(getJoinedWordByWordLengths(monad.wordLengths))))
+			monad.wordLengths.length = 0
+			monad.shouldAddAttributes = undefined
+			return monad
+		}
+	}
+	if (word.startsWith('<')) {
+		var tag = word.slice(1)
+		if (tag.startsWith('/')) {
+			monad.close(registry, statement)
+			return monad.parent
+		}
+		if (tag.endsWith('>')) {
+			tag = tag.slice(0, -1)
+		}
+		var nextMonadConstructor = TSpanMonad
+		if (monadMap.has(tag)) {
+			nextMonadConstructor = monadMap.get(tag)
+		}
+		var nextMonad = new nextMonadConstructor()
+		nextMonad.attributeMap = new Map()
+		nextMonad.parent = monad
+		if (!word.endsWith('>')) {
+			nextMonad.shouldAddAttributes = true
+		}
+		nextMonad.wordLengths = []
+		nextMonad.initialize(registry, statement)
+		return nextMonad
+	}
+	var fontSize = getAttributeFloat('font-size', monad)
+	monad.wordLengths.push({word:word, length:getTextLength(word) * fontSize})
+	return monad
+}
+
+function getNextYString(fontSize, monad, yString) {
+	var lineHeightString = getAttributeValue('lineHeight', monad)
+	if (lineHeightString != undefined) {
+		fontSize = parseFloat(lineHeightString)
+	}
+	return (parseFloat(yString) + fontSize).toString()
+}
+
+function getTextFormatMonad(registry, statement) {
+	var monad = getAnchorFontParent(registry, statement)
+	var attributeMap = monad.attributeMap
+	setFloatByKeyStatement(attributeMap, 0.0, 'dx', registry, statement)
+	setFloatByKeyStatement(attributeMap, 0.0, 'left', registry, statement)
+	var lineHeight = getFloatByStatement('lineHeight', registry, statement)
+	if (!getIsEmpty(lineHeight)) {
+		attributeMap.set('lineHeight', lineHeight.toString())
+	}
+	setFloatByKeyStatement(attributeMap, 0.0, 'right', registry, statement)
+	setFloatByKeyStatement(attributeMap, 0.0, 'x', registry, statement)
+	setFloatByKeyStatement(attributeMap, 0.0, 'y', registry, statement)
+	return monad
+}
+
 function getTextLength(text) {
 	if (gCharacterLengthMap == null) {
 		gCharacterLengthMap = new Map()
-		var characterLengths = 'a 5.962 b 6.402 c 5.601 d 6.402 e 5.918 f 3.701 g 6.402 h 6.441 i 3.198'.split(' ')
-		pushArray(characterLengths, 'j 3.101 k 6.059 l 3.198 m 9.483 n 6.441 o 6.021 p 6.402 q 6.402 r 4.780'.split(' '))
-		pushArray(characterLengths, 's 5.132 t 4.018 u 6.441 v 5.649 w 8.559 x 5.640 y 5.649 z 5.268'.split(' '))
-		pushArray(characterLengths, 'A 7.222 B 7.348 C 7.652 D 8.017 E 7.300 F 6.938 G 7.988 H 8.721 I 3.950'.split(' '))
-		pushArray(characterLengths, 'J 4.009 K 7.471 L 6.641 M 10.239 N 8.750 O 8.198 P 6.728 Q 8.198 R 7.529'.split(' '))
-		pushArray(characterLengths, 'S 6.851 T 6.670 U 8.427 V 7.222 W 10.278 X 7.119 Y 6.602 Z 6.948'.split(' '))
-		pushArray(characterLengths, '0 6.363 1 6.363 2 6.363 3 6.363 4 6.363 5 6.363 6 6.363 7 6.363 8 6.363 9 6.363'.split(' '))
-		pushArray(characterLengths, ') 3.902 ! 4.018 @ 10.000 # 8.379 $ 6.363 % 9.502 ^ 8.379 & 8.902 * 5.000 ( 3.902'.split(' '))
-		pushArray(characterLengths, ', 3.178 < 8.379 . 3.178 > 8.379 / 3.369 ? 5.362 ; 3.369 : 3.369 [ 3.902'.split(' '))
-		pushArray(characterLengths, '{ 6.363 ] 3.902 } 6.363 | 3.369 - 3.379 _ 5.000 = 8.379 + 8.379 ` 5.000 ~ 8.379'.split(' '))
+		var characterLengths = 'a 435 b 500 c 444 d 499 e 444 f 373 g 467 h 498 i 278'.split(' ')
+		pushArray(characterLengths, 'j 348 k 513 l 258 m 779 n 489 o 491 p 500 q 499 r 345'.split(' '))
+		pushArray(characterLengths, 's 367 t 283 u 490 v 468 w 683 x 482 y 471 z 417'.split(' '))
+		pushArray(characterLengths, 'A 721 B 631 C 670 D 719 E 610 F 564 G 722 H 714 I 327'.split(' '))
+		pushArray(characterLengths, 'J 385 K 709 L 611 M 881 N 725 O 724 P 576 Q 723 R 667'.split(' '))
+		pushArray(characterLengths, 'S 529 T 606 U 721 V 701 W 947 X 714 Y 701 Z 613'.split(' '))
+		pushArray(characterLengths, '0 500 1 500 2 500 3 500 4 500 5 500 6 500 7 500 8 500 9 500'.split(' '))
+		pushArray(characterLengths, ') 333 ! 333 @ 865 # 500 $ 500 % 833 ^ 469 & 778 * 500 ( 333'.split(' '))
+		pushArray(characterLengths, ', 250 < 564 . 250 > 564 / 296 ? 444 ; 250 : 250 [ 333'.split(' '))
+		pushArray(characterLengths, '{ 480 ] 333 } 480 | 200 - 333 _ 500 = 564 + 564 ` 250 ~ 500'.split(' '))
 		for (var characterIndex = 0; characterIndex < characterLengths.length; characterIndex += 2) {
-			gCharacterLengthMap.set(characterLengths[characterIndex], 0.1 * parseFloat(characterLengths[characterIndex + 1]))
+			gCharacterLengthMap.set(characterLengths[characterIndex], 0.001 * parseFloat(characterLengths[characterIndex + 1]))
 		}
 	}
-	gCharacterLengthMap.set(' ', 0.3)
-	gCharacterLengthMap.set("'", 0.32)
-	gCharacterLengthMap.set('"', 0.4)
+	gCharacterLengthMap.set(' ', 0.249)
+	gCharacterLengthMap.set("'", 0.266)
+	gCharacterLengthMap.set('"', 0.332)
 	var textLength = 0.0
 	for (var character of text) {
 		if (gCharacterLengthMap.has(character)) {
 			textLength += gCharacterLengthMap.get(character)
 		}
 		else {
-			textLength += 0.62
+			textLength += 0.515
 		}
 	}
-//	checkFlaw
-//	decreased because it's too short in list description
-	return 0.85 * textLength
+	return textLength
+}
+
+function ItalicMonad() {
+	this.close = function(registry, statement) {
+		var fontSize = getAttributeFloat('font-size', this)
+		var joinedWord = getJoinedWordByWordLengths(this.wordLengths)
+		var joinedLength = getTextLength(joinedWord) * fontSize
+		var word = '<tspan font-style = "italic" >' + joinedWord + '</tspan>'
+		this.parent.wordLengths.push({word:word, length:joinedLength})
+		this.wordLengths.length = 0
+	}
+	this.initialize = function(registry, statement) {
+	}
 }
 
 function lineIsTooLong(cellWidth, fontSize, line) {
 	return getTextLength(line) * fontSize > cellWidth
+}
+
+function ParagraphMonad() {
+	this.close = function(registry, statement) {
+		var textAnchor = getAttributeValue('text-anchor', this)
+		var fontSize = getAttributeFloat('font-size', this)
+		var left = getAttributeFloat('left', this)
+		var right = getAttributeFloat('right', this)
+		var writableWidth = right - left
+		var x = left
+		if (textAnchor == 'end' ) {
+			x = right
+		}
+		else {
+			if (textAnchor == 'middle' ) {
+				x = 0.5 * (left + right)
+			}
+		}
+		this.attributeMap.set('x', x.toString())
+		var oldLength = 0.0
+		var oldWordLengths = []
+		for (var wordLength of this.wordLengths) {
+			if (wordLength.length > writableWidth) {
+				if (oldWordLengths.length > 0) {
+					addTextStatement(this, registry, statement, oldWordLengths)
+					oldLength = 0
+				}
+				addTextStatement(this, registry, statement, [wordLength])
+			}
+			else {
+				oldLength += wordLength.length
+				if (oldWordLengths.length > 0) {
+					oldLength += getTextLength(' ') * fontSize
+				}
+				oldWordLengths.push(wordLength)
+				if (oldLength > writableWidth) {
+					oldWordLengths.pop()
+					addTextStatement(this, registry, statement, oldWordLengths)
+					oldLength = wordLength.length
+					oldWordLengths = [wordLength]
+				}
+			}
+		}
+		addTextStatement(this, registry, statement, oldWordLengths)
+		var yString = getAttributeValue('y', this)
+		setAttributeValue('y', this, getNextYString(getAttributeFloat('font-size', this), this, yString))
+	}
+	this.initialize = function(registry, statement) {
+		this.parent.close(registry, statement)
+	}
+}
+
+
+function PlainMonad() {
+	this.close = function(registry, statement) {
+		addTextStatement(this, registry, statement, this.wordLengths)
+	}
+	this.wordLengths = []
+}
+
+function setFloatByKeyStatement(attributeMap, defaultValue, key, registry, statement) {
+	attributeMap.set(key, getFloatByDefault(defaultValue, key, registry, statement, statement.tag).toString())
+}
+
+function SuperscriptMonad() {
+	this.close = function(registry, statement) {
+		closeByDYMultiplier(-0.4, this, registry, statement)
+	}
+	this.initialize = function(registry, statement) {
+	}
+}
+
+function SubscriptMonad() {
+	this.close = function(registry, statement) {
+		closeByDYMultiplier(0.15, this, registry, statement)
+	}
+	this.initialize = function(registry, statement) {
+	}
+}
+
+function TSpanMonad() {
+	this.close = function(registry, statement) {
+		var fontSize = getAttributeFloat('font-size', this)
+		var joinedWord = getJoinedWordByWordLengths(this.wordLengths)
+		var joinedLength = getTextLength(joinedWord) * fontSize
+		var word = '<tspan'
+		for (var entry of this.attributeMap.entries()) {
+			word += ' ' + entry[0] + '="' + entry[1] + '"'
+		}
+		word += ' >' + joinedWord + '</tspan>'
+		this.parent.wordLengths.push({word:word, length:joinedLength})
+		this.wordLengths.length = 0
+	}
+	this.initialize = function(registry, statement) {
+	}
 }
 
 var gCircle = {
@@ -337,44 +493,82 @@ var gCircle = {
 	}
 }
 
+var gFormattedText = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'formattedText',
+	processStatement: function(registry, statement) {
+		if (statement.attributeMap.has('text')) {
+			addTextStatements(getTextFormatMonad(registry, statement), registry, statement, statement.attributeMap.get('text'))
+			convertToGroup(statement)
+			return
+		}
+		noticeByList(['No text could be found for formattedText in generator2d.', statement])
+	}
+}
+
+var gFractal2D = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'fractal2D',
+	processStatement: function(registry, statement) {
+		var view = new ViewFractal2D()
+		view.blueFrequency = getFloatByDefault(0.89, 'blueFrequency', registry, statement, this.name)
+		view.escapeRadius = getFloatByDefault(2.0, 'escapeRadius', registry, statement, this.name)
+		view.changePixels = getIntByDefault(10000, 'changePixels', registry, statement, this.name)
+		view.greenFrequency = getFloatByDefault(0.11, 'greenFrequency', registry, statement, this.name)
+		view.id = statement.attributeMap.get('id')
+		view.iterations = getIntByDefault(200, 'iterations', registry, statement, this.name)
+		view.pixelSize = getIntByDefault(1, 'pixelSize', registry, statement, this.name)
+		view.redFrequency = getFloatByDefault(0.03, 'redFrequency', registry, statement, this.name)
+		view.type = statement.attributeMap.get('type')
+		view.x = getFloatByDefault(0.0, 'x', registry, statement, this.name)
+		view.y = getFloatByDefault(0.0, 'y', registry, statement, this.name)
+		view.zoom = getFloatByDefault(1.0, 'zoom', registry, statement, this.name)
+		var controlBoxHeight = 2 * viewBroker.controlWidth + 6 * viewBroker.wideHeight + 3.5 * viewBroker.textSpace
+		viewBroker.minimumHeight = Math.max(viewBroker.minimumHeight, controlBoxHeight)
+		registry.views.push(view)
+	}
+}
+
 var gGrid = {
 	initialize: function() {
-		gTagBeginMap.set(this.name, this)
+		gParentFirstSet.add(this.name)
+		gTagCenterMap.set(this.name, this)
 		addFunctionToVariableEntries(cellX, gSetR)
 		addFunctionToVariableEntries(cellY, gSetR)
 	},
 	name: 'grid',
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
-		var attributeMap = statement.attributeMap
-		var columns = getIntByDefault(1, 'columns', registry, statement, this.name)
+		var parent = statement.parent
+
+		var cellHeight = getVariableFloatByDefault(100.0, 'grid_cellHeight', parent)
+		var cellWidth = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
+		var columns = getVariableIntByDefault(1, 'grid_columns', parent)
 		var cornerMultiplier = getFloatByDefault(1.0, 'corner', registry, statement, this.name)
-		var rows = getIntByDefault(1, 'rows', registry, statement, this.name)
-		var gridHeight = getFloatByDefault(100.0, 'gridHeight', registry, statement, this.name)
-		var gridWidth = getFloatByDefault(100.0, 'gridWidth', registry, statement, this.name)
+		var rows = getVariableIntByDefault(1, 'grid_rows', parent)
 		var lineLength = getFloatByDefault(2.0, 'lineLength', registry, statement, this.name)
 		var cornerLength = getFloatByDefault(lineLength, 'cornerLength', registry, statement, this.name)
 		var edgeLength = getFloatByDefault(lineLength, 'edgeLength', registry, statement, this.name)
 		var insideLength = getFloatByDefault(lineLength, 'insideLength', registry, statement, this.name)
 		var outsideLength = getFloatByDefault(0.0, 'outsideLength', registry, statement, this.name)
-		var cellHeight = gridHeight / rows
-		var cellWidth = gridWidth / columns
-		attributeMap.set('cellColumn', '0')
-		attributeMap.set('cellHeight', cellHeight.toString())
-		attributeMap.set('cellRow', '0')
-		attributeMap.set('cellWidth', cellWidth.toString())
-		attributeMap.set('columns', columns.toString())
-		attributeMap.set('gridHeight', gridHeight.toString())
-		attributeMap.set('gridWidth', gridWidth.toString())
-		attributeMap.set('rows', rows.toString())
-		var groupMap = new Map(attributeMap)
-		attributeMap.delete('style')
+		var gridHeight = cellHeight * rows
+		var gridWidth = cellWidth * columns
+
+		var variableMap = getVariableMapByStatement(parent)
+		variableMap.set('grid_cellColumn', '0')
+		variableMap.set('grid_cellRow', '0')
+		var groupMap = new Map(statement.attributeMap)
+		statement.attributeMap.delete('style')
 		if (cornerLength * edgeLength * insideLength == 0.0) {
 			return
 		}
 		var gridHeightPlus = gridHeight + outsideLength
 		var gridWidthPlus = gridWidth + outsideLength
-		var groupStatement = getStatementByParentTag(groupMap, 1, statement, 'group')
+		var groupStatement = getStatementByParentTag(groupMap, 1, statement, 'g')
 		groupStatement.attributeMap.delete('transform')
 		getUniqueID('gridGroup', registry, groupStatement)
 		var polylines = []
@@ -460,77 +654,127 @@ var gList = {
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		var children = []
-		var variableValue = getVariableValue('listChildren', statement.parent)
+		var parent = statement.parent
+		var variableValue = getVariableValue('list_children', parent)
 		if (variableValue != undefined) {
 			children = variableValue.split(' ')
 		}
-		var columns = 2
-		var variableValue = getVariableValue('listColumns', statement.parent)
-		if (variableValue != undefined) {
-			columns = parseInt(variableValue)
-		}
-		var lineHeight = 5.0
-		var variableValue = getVariableValue('listLineHeight', statement.parent)
-		if (variableValue != undefined) {
-			lineHeight = parseFloat(variableValue)
-		}
-		var margin = 2.0
-		var variableValue = getVariableValue('listMargin', statement.parent)
-		if (variableValue != undefined) {
-			margin = parseFloat(variableValue)
-		}
-		var transform = null
-		var variableValue = getVariableValue('listTransform', statement.parent)
-		if (variableValue != undefined) {
-			transform = variableValue
-		}
-		if (statement.attributeMap.has('transform')) {
+		var margin = getVariableFloatByDefault(2.0, 'list_margin', parent)
+		var transform = getVariableValue('list_transform', parent)
+		if (attributeMap.has('transform')) {
 			transform = attributeMap.get('transform')
 		}
-		var cellWidth = parseFloat(getValueByDefault('100.0', getAttributeValue('cellWidth', statement)))
+		var cellWidth = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
 		var x = 0.5 * cellWidth
-		var variableValue = getVariableValue('listX', statement.parent)
-		if (variableValue != undefined) {
-			x = parseFloat(variableValue)
-		}
-		var fontSize = parseFloat(getValueByDefault('3.5', getAttributeValue('font-size', statement)))
 		if (!getIsEmpty(transform)) {
 			attributeMap.set('transform', transform)
 		}
-		var y = getFloatByDefault(5.0, 'y', registry, statement, this.name)
-		var formatFunctionMap = new Map([['fontSize', parseFloat], ['xOffset', parseFloat], ['y', parseFloat]])
-		var formats = []
-		var variableValue = getVariableValue('listFormats', statement.parent)
+		if (attributeMap.has('function')) {
+			functionString = attributeMap.get('function') + '('
+			if (attributeMap.has('arguments')) {
+				functionString += attributeMap.get('arguments')
+			}
+			functionString += ')'
+			getValueByEquation(registry, statement, functionString)
+		}
 
+		var anchorFontParent = getAnchorFontParent(registry, statement)
+		var parentAttributeMap = anchorFontParent.attributeMap
+		setFloatByKeyStatement(parentAttributeMap, 0.0, 'dy', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, margin, 'left', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, cellWidth - margin, 'right', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, 0.5 * cellWidth, 'x', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, 0.0, 'y', registry, statement)
+
+		var formatMonads = []
+		var variableValue = getVariableValue('list_formats', parent)
 		if (variableValue != undefined) {
 			var formatWords = variableValue.split(' ').filter(lengthCheck)
 			for (var formatWord of formatWords) {
 				if (formatWord.length > 0) {
 					var formatAttributes = formatWord.split(';')
-					var format = {anchor:null, fontSize:fontSize, margin:margin, rightMargin:margin, xOffset:0.0}
-					formats.push(format)
+					var formatAttributeMap = new Map()
+					var formatMonad = {attributeMap:formatAttributeMap, parent:anchorFontParent}
 					for (var formatAttribute of formatAttributes) {
 						var formatEntry = formatAttribute.split(':')
-						if (formatEntry[1].length > 0) {
-							setObjectAttribute(formatEntry[0], formatFunctionMap, format, formatEntry[1])
+						var key = formatEntry[0]
+						if (key.length > 0) {
+							formatAttributeMap.set(key, formatEntry[1])
+							if (key.startsWith('image')) {
+								formatMonad.isImage = true
+							}
 						}
+					}
+					if (formatAttributeMap.has('name')) {
+						formatMonads.push(formatMonad)
 					}
 				}
 			}
 		}
-		if (formats.length == 0) {
+		if (formatMonads.length == 0) {
 			noticeByList(['No formats could be found for list in generator2d.', statement])
 			return
 		}
-		var writableWidth = cellWidth - margin - margin
-		var xStart = x - 0.5 * writableWidth
-		var idStart = statement.attributeMap.get('id') + '_'
-		for (var format of formats) {
-			if (format.y != undefined) {
-				y = format.y
+
+		for (var formatMonad of formatMonads) {
+			var name = formatMonad.attributeMap.get('name')
+			if (attributeMap.has(name)) {
+				var value = attributeMap.get(name)
+				value = getValueByDefault(value, getVariableValue(value, statement))
+				var keyValue = getAttributeValue('key', formatMonad)
+				if (keyValue != undefined) {
+					value = value.trim()
+					if (value.length == 0) {
+						if (attributeMap.has(keyValue)) {
+							value = attributeMap.get(keyValue)
+						}
+					}
+				}
+				var lowerValue = getAttributeValue('lower', formatMonad)
+				if (lowerValue != undefined) {
+					if (getBooleanByString(lowerValue)) {
+						value = value.toLowerCase()
+					}
+				}
+				var compressedValue = getAttributeValue('compressed', formatMonad)
+				if (compressedValue != undefined) {
+					if (getBooleanByString(compressedValue)) {
+						value = value.trim().replace(/ /g, '')
+					}
+				}
+				if (formatMonad.isImage) {
+					var x = getAttributeFloat('x', formatMonad) + parseFloat(getValueByDefault('0.0', getAttributeValue('dx', formatMonad)))
+					var yString = getAttributeValue('y', formatMonad)
+					var imagePrefix = getAttributeValue('imagePrefix', formatMonad)
+					if (imagePrefix != undefined) {
+						value = imagePrefix + value
+					}
+					var imageSuffix = getAttributeValue('imageSuffix', formatMonad)
+					if (imageSuffix != undefined) {
+						value += imageSuffix
+					}
+					var imageMap = new Map([['href', value], ['x', x.toString()], ['y', yString]])
+					var imageStatement = getStatementByParentTag(imageMap, 0, statement, 'image')
+					var idStart = getAttributeValue('id', formatMonad)
+					if (value != undefined) {
+						idStart += '_' + value
+					}
+					getUniqueID(idStart, registry, imageStatement)
+				}
+				else {
+					addTextStatements(formatMonad, registry, statement, value)
+					var words = value.split(' ')
+					for (var wordIndex = words.length - 1; wordIndex > -1; wordIndex--) {
+						var word = words[wordIndex]
+						if (word.startsWith('<') || word.endsWith('>')) {
+							words.splice(wordIndex, 1)
+						}
+					}
+					attributeMap.set(name, words.join(' '))
+				}
 			}
-			y = getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y)
 		}
+
 		convertToGroup(statement)
 		var childCount = 0
 		for (var childID of children) {
@@ -538,102 +782,7 @@ var gList = {
 			if (registry.idMap.has(childID)) {
 				var childStatement = registry.idMap.get(childID)
 				var childCopy = getStatementByParentTag(new Map(), childStatement.nestingIncrement, statement, childStatement.tag)
-				getUniqueID(statement.attributeMap.get('id') + '_' + childCount, registry, childCopy)
-				copyStatementRecursively(registry, childCopy, childStatement)
-				statement.children.push(childCopy)
-				childCount++
-			}
-		}
-	}
-}
-
-var gListNew = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'listNew',
-	processStatement: function(registry, statement) {
-		var attributeMap = statement.attributeMap
-		var children = []
-		var variableValue = getVariableValue('listChildren', statement.parent)
-		if (variableValue != undefined) {
-			children = variableValue.split(' ')
-		}
-		var columns = 2
-		var variableValue = getVariableValue('listColumns', statement.parent)
-		if (variableValue != undefined) {
-			columns = parseInt(variableValue)
-		}
-		var lineHeight = 5.0
-		var variableValue = getVariableValue('listLineHeight', statement.parent)
-		if (variableValue != undefined) {
-			lineHeight = parseFloat(variableValue)
-		}
-		var margin = 2.0
-		var variableValue = getVariableValue('listMargin', statement.parent)
-		if (variableValue != undefined) {
-			margin = parseFloat(variableValue)
-		}
-		var transform = null
-		var variableValue = getVariableValue('listTransform', statement.parent)
-		if (variableValue != undefined) {
-			transform = variableValue
-		}
-		if (statement.attributeMap.has('transform')) {
-			transform = attributeMap.get('transform')
-		}
-		var cellWidth = parseFloat(getValueByDefault('100.0', getAttributeValue('cellWidth', statement)))
-		var x = 0.5 * cellWidth
-		var variableValue = getVariableValue('listX', statement.parent)
-		if (variableValue != undefined) {
-			x = parseFloat(variableValue)
-		}
-		var fontSize = parseFloat(getValueByDefault('3.5', getAttributeValue('font-size', statement)))
-		if (!getIsEmpty(transform)) {
-			attributeMap.set('transform', transform)
-		}
-		var y = getFloatByDefault(5.0, 'y', registry, statement, this.name)
-		var formatFunctionMap = new Map([['fontSize', parseFloat], ['xOffset', parseFloat], ['y', parseFloat]])
-		var formats = []
-		var variableValue = getVariableValue('listFormats', statement.parent)
-
-		if (variableValue != undefined) {
-			var formatWords = variableValue.split(' ').filter(lengthCheck)
-			for (var formatWord of formatWords) {
-				if (formatWord.length > 0) {
-					var formatAttributes = formatWord.split(';')
-					var format = {anchor:null, fontSize:fontSize, margin:margin, rightMargin:margin, xOffset:0.0}
-					formats.push(format)
-					for (var formatAttribute of formatAttributes) {
-						var formatEntry = formatAttribute.split(':')
-						if (formatEntry[1].length > 0) {
-							setObjectAttribute(formatEntry[0], formatFunctionMap, format, formatEntry[1])
-						}
-					}
-				}
-			}
-		}
-		if (formats.length == 0) {
-			noticeByList(['No formats could be found for list in generator2d.', statement])
-			return
-		}
-		var writableWidth = cellWidth - margin - margin
-		var xStart = x - 0.5 * writableWidth
-		var idStart = statement.attributeMap.get('id') + '_'
-		for (var format of formats) {
-			if (format.y != undefined) {
-				y = format.y
-			}
-			y = getYAddFormatWord(attributeMap, fontSize, format, idStart, registry, lineHeight, statement, writableWidth, x, xStart, y)
-		}
-		convertToGroup(statement)
-		var childCount = 0
-		for (var childID of children) {
-			childID = childID.trim()
-			if (registry.idMap.has(childID)) {
-				var childStatement = registry.idMap.get(childID)
-				var childCopy = getStatementByParentTag(new Map(), childStatement.nestingIncrement, statement, childStatement.tag)
-				getUniqueID(statement.attributeMap.get('id') + '_' + childCount, registry, childCopy)
+				getUniqueID(attributeMap.get('id') + '_' + childCount, registry, childCopy)
 				copyStatementRecursively(registry, childCopy, childStatement)
 				statement.children.push(childCopy)
 				childCount++
@@ -736,14 +885,20 @@ var gRegularPolygon = {
 		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
 		var outsideness = getFloatByDefault(1.0, 'outsideness', registry, statement, this.name)
 		var radius = getFloatByDefault(1.0, 'r', registry, statement, this.name)
+		var sideOffset = getFloatByDefault(0.0, 'sideOffset', registry, statement, this.name)
 		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
-		var angle = 0.0
+		var startAngle = getFloatByDefault(0.0, 'startAngle', registry, statement, this.name)
+		startAngle *= gRadiansPerDegree
 		var angleIncrement = gDoublePi / sides
+		startAngle += sideOffset * angleIncrement
+		var center = [cx, cy]
 		radius *= outsideness / Math.cos(0.5 * angleIncrement) + 1.0 - outsideness
 		var points = new Array(sides)
+		var point = polarRadius(startAngle, radius)
+		var rotation = polarCounterclockwise(angleIncrement)
 		for (var vertexIndex = 0; vertexIndex < sides; vertexIndex++) {
-			points[vertexIndex] = [cx + Math.cos(angle) * radius, cy - Math.sin(angle) * radius]
-			angle += angleIncrement
+			points[vertexIndex] = getAddition2D(point, center)
+			rotate2DVector(point, rotation)
 		}
 		statement.tag = 'polygon'
 		setPointsExcept(points, registry, statement)
@@ -837,5 +992,5 @@ var gVerticalHole = {
 }
 
 var gGenerator2DProcessors = [
-gCircle, gGrid, gImage, gLettering, gList, gListNew, gOutline,
+gCircle, gFormattedText, gFractal2D, gGrid, gImage, gLettering, gList, gOutline,
 gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
