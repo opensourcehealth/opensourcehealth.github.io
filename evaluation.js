@@ -27,6 +27,16 @@ function createCommaReturnUndefined(monad) {
 	return undefined
 }
 
+function getAlphabeticSuffix(text) {
+	var alphabetSet = new Set(gAlphabetCharacters)
+	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
+		if (alphabetSet.has(text[characterIndex])) {
+			return text.slice(characterIndex)
+		}
+	}
+	return ''
+}
+
 function getArrayByMonad(monad, registry, statement) {
 	var elements = [monad.getValue(registry, statement)]
 	for (var whileIndex = 0; whileIndex < gLengthLimit; whileIndex++) {
