@@ -107,14 +107,6 @@ function get2DByPortion(portionA, a2D, b2D) {
 	return [portionA * a2D[0] + portionB * b2D[0], portionA * a2D[1] + portionB * b2D[1]]
 }
 
-function get2DRotations(xys, xyRotator) {
-	var xyRotations = new Array(xys.length)
-	for (var xyIndex = 0; xyIndex < xys.length; xyIndex++) {
-		xyRotations[xyIndex] = getRotation2DVector(xys[xyIndex], xyRotator)
-	}
-	return xyRotations
-}
-
 function get3DBy3DMatrix(matrix, point) {
 //	0 4 8  12
 //	1 5 9  13
@@ -380,6 +372,16 @@ function getMatrix2DByRotate(floats) {
 	}
 	latestMatrix = getMultiplied2DMatrix(latestMatrix, [1.0, 0.0, 0.0, 1.0, -x, -y])
 	return getMultiplied2DMatrix([1.0, 0.0, 0.0, 1.0, x, y], latestMatrix)
+}
+
+function getMatrix2DByRotationVectorTranslation(rotationVector, translation) {
+//	a c e		0 2 4
+//	b d f		1 3 5
+//	0 0 1		    +
+//
+//	cos -sin
+//	sin cos
+	return [rotationVector[0], rotationVector[1], -rotationVector[1], rotationVector[0], translation[0], translation[1]]
 }
 
 function getMatrix2DByScale(floats) {
@@ -1025,6 +1027,14 @@ function getRGBByIndex(rgbIndex) {
 	return [getBrightness256(rgbIndex * 0.617), getBrightness256(rgbIndex * 0.733), getBrightness256(rgbIndex * 0.317)]
 }
 
+function getRotations2DVector(points, vector) {
+	var rotations2D = new Array(points.length)
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		rotations2D[pointIndex] = getRotation2DVector(points[pointIndex], vector)
+	}
+	return rotations2D
+}
+
 function getTransformed2DPointsByMatrix3Ds(polygon, matrix2Ds) {
 	if (getIsEmpty(matrix2Ds)) {
 		return [polygon]
@@ -1170,6 +1180,13 @@ function normalize3D(xyz) {
 	return xyz
 }
 
+function rotate2DsVector(points, vector) {
+	for (var point of points) {
+		rotate2DVector(point, vector)
+	}
+	return points
+}
+
 function rotate3DByBasis(rotationBasis, xyz, xyRotator) {
 	var basis0 = rotationBasis[0]
 	var basis1 = rotationBasis[1]
@@ -1181,6 +1198,16 @@ function rotate3DByBasis(rotationBasis, xyz, xyRotator) {
 function rotate3DsByBasis(rotationBasis, xyzs, xyRotator) {
 	for (var xyz of xyzs) {
 		rotate3DByBasis(rotationBasis, xyz, xyRotator)
+	}
+}
+
+function transform2DOr3DPoints(matrix, points) {
+	if (matrix.length == 6) {
+		transform2DPoints(matrix, points)
+		return
+	}
+	if (matrix.length == 16) {
+		transform3DPoints(matrix, points)
 	}
 }
 
@@ -1199,14 +1226,11 @@ function transform2DPoints(matrix2D, points) {
 	return points
 }
 
-function transform2DOr3DPoints(matrix, points) {
-	if (matrix.length == 6) {
-		transform2DPoints(matrix, points)
-		return
+function transform2DPointsByFacet(facet, matrix2D, points) {
+	for (var pointIndex of facet) {
+		transform2DPoint(matrix2D, points[pointIndex])
 	}
-	if (matrix.length == 16) {
-		transform3DPoints(matrix, points)
-	}
+	return points
 }
 
 function transform3DPoints(matrix3D, points) {
