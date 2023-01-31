@@ -183,7 +183,7 @@ function addMeetingsByPolygon(alongIndexesMap, meetingMap, toolPolygon, workPoly
 			var toolBeginRotated = getRotation2DVector(toolBegin, reverseRotation)
 			var toolEndRotated = getRotation2DVector(toolEnd, reverseRotation)
 			var y = toolBeginRotated[1]
-			var workPolygonRotated = get2DRotations(workPolygon, reverseRotation)
+			var workPolygonRotated = getRotations2DVector(workPolygon, reverseRotation)
 			for (var workBeginIndex = 0; workBeginIndex < workPolygon.length; workBeginIndex++) {
 				var workEndIndex = (workBeginIndex + 1) % workPolygon.length
 				var meeting = null
@@ -298,19 +298,22 @@ function addXIntersectionsByPolyline(xIntersections, xyPolyline, y) {
 	}
 }
 
+function addXIntersectionsByPolylineClose(xIntersections, xyPolyline, y) {
+	addXIntersectionsByPolyline(xIntersections, xyPolyline, y - gClose)
+	addXIntersectionsByPolyline(xIntersections, xyPolyline, y + gClose)
+}
+
 function addXIntersectionsBySegment(begin, end, xIntersections, y) {
-	if ((begin[1] == y) && (end[1] == y)) {
-		xIntersections.push(begin[0])
-		xIntersections.push(end[0])
+//	if ((begin[1] == y) && (end[1] == y)) {
+//		xIntersections.push(begin[0])
+//		xIntersections.push(end[0])
+//	}
+//	else {
+	if ((begin[1] < y) != (end[1] < y)) {
+		var beginPortion = (end[1] - y) / (end[1] - begin[1])
+		xIntersections.push(beginPortion * begin[0] + (1.0 - beginPortion) * end[0])
 	}
-	else {
-		if ((begin[1] < y) != (end[1] < y)) {
-			deltaY = end[1] - begin[1]
-			beginPortion = (end[1] - y) / deltaY
-			endPortion = 1.0 - beginPortion
-			xIntersections.push(beginPortion * begin[0] + endPortion * end[0])
-		}
-	}
+//	}
 }
 
 function convert2DPolygonsTo3D(xyPolygons, z) {
@@ -1106,6 +1109,7 @@ function getIsAwayFromHeight(splitHeight, workBeginY, workEndY) {
 	return workBeginY > splitHeightPlus && workEndY > splitHeightPlus
 }
 
+//deprecated23, to be replaced with area check
 function getIsClear(side, sideOther, xIntersections) {
 	var minimumX = Math.min(side, sideOther) - gClose
 	var maximumX = Math.max(side, sideOther) + gClose
@@ -1243,7 +1247,7 @@ function getIsPolygonMeeting(toolPolygon, workPolygon) {
 			var toolBeginRotated = getRotation2DVector(toolBegin, reverseRotation)
 			var toolEndRotated = getRotation2DVector(toolEnd, reverseRotation)
 			var y = toolBeginRotated[1]
-			var workPolygonRotated = get2DRotations(workPolygon, reverseRotation)
+			var workPolygonRotated = getRotations2DVector(workPolygon, reverseRotation)
 			for (var workBeginIndex = 0; workBeginIndex < workPolygonRotated.length; workBeginIndex++) {
 				var workEndIndex = (workBeginIndex + 1) % workPolygonRotated.length
 				var workBeginRotated = workPolygonRotated[workBeginIndex]
@@ -1280,15 +1284,15 @@ function getIsXYSegmentClose(begin, end, point) {
 	divide2DScalar(delta, deltaLength)
 	var reverseRotation = [delta[0], -delta[1]]
 	var beginRotated = getRotation2DVector(begin, reverseRotation)
-	var endRotated = getRotation2DVector(end, reverseRotation)
+	var endRotatedX = end[0] * reverseRotation[0] - end[1] * reverseRotation[1]
 	var pointRotated = getRotation2DVector(point, reverseRotation)
 	if (pointRotated[0] < beginRotated[0]) {
 		return distanceSquared2D(begin, point) < gQuarterCloseSquared
 	}
-	if (pointRotated[0] > endRotated[0]) {
+	if (pointRotated[0] > endRotatedX) {
 		return distanceSquared2D(end, point) < gQuarterCloseSquared
 	}
-	return Math.abs(pointRotated[1] - endRotated[1]) < gHalfClose
+	return Math.abs(pointRotated[1] - beginRotated[1]) < gHalfClose
 }
 
 function getIsXYZCollinear(beginPoint, centerPoint, endPoint) {
@@ -1535,12 +1539,12 @@ function getMinimumWidth(polygon) {
 		if (insetDeltaLength != 0.0) {
 			divide2DScalar(insetDelta, insetDeltaLength)
 			var xyRotator = [insetDelta[0], -insetDelta[1]]
-			var polygonRotated = get2DRotations(polygon, xyRotator)
+			var polygonRotated = getRotations2DVector(polygon, xyRotator)
 			var polylineRotated = polygonRotated.slice(vertexIndex + 1)
 			pushArray(polylineRotated, polygonRotated.slice(0, vertexIndex))
 			var centerRotated = polygonRotated[vertexIndex]
 			var xIntersections = []
-			addXIntersectionsByPolyline(xIntersections, polylineRotated, centerRotated[1])
+			addXIntersectionsByPolylineClose(xIntersections, polylineRotated, centerRotated[1])
 			for (var xIntersection of xIntersections) {
 				if (xIntersection > centerRotated[0]) {
 					var width = xIntersection - centerRotated[0]
@@ -1719,7 +1723,11 @@ function getOutsetPolygon(outset, polygon) {
 		var endPoint = polygon[(vertexIndex + 1) % polygon.length]
 		var centerEnd = normalize2D(getSubtraction2D(endPoint, centerPoint))
 		var outsetDelta = getAddition2D(centerBegin, centerEnd)
-		divide2DScalar(outsetDelta, dotProduct2D([-centerEnd[1], centerEnd[0]], outsetDelta))
+		var divisor = dotProduct2D([-centerEnd[1], centerEnd[0]], outsetDelta)
+		if (divisor == 0.0) {
+			divisor = 1.0
+		}
+		divide2DScalar(outsetDelta, divisor)
 		outsetPolygon[vertexIndex] = add2D(centerPoint.slice(0), getMultiplication2D(outsetDelta, outset))
 	}
 	return outsetPolygon
@@ -1988,16 +1996,13 @@ function getPolygonIndexGroups(polygons) {
 		var polygon = polygons[polygonIndex]
 		var point = polygon[0]
 		for (var outsideIndex = 0; outsideIndex < polygonIndex; outsideIndex++) {
-
 			if (getPolygonInsideness(point, polygons[outsideIndex]) == 1) {
-//			if (getIsPointInsidePolygonOrClose(point, polygons[outsideIndex])) {
 				outsides.push(outsideIndex)
 				addElementToMapArray(outsideIndex, polygonIndex, insideMap)
 			}
 		}
 		for (var outsideIndex = polygonIndex + 1; outsideIndex < polygons.length; outsideIndex++) {
 			if (getPolygonInsideness(point, polygons[outsideIndex]) == 1) {
-//			if (getIsPointInsidePolygonOrClose(point, polygons[outsideIndex])) {
 				outsides.push(outsideIndex)
 				addElementToMapArray(outsideIndex, polygonIndex, insideMap)
 			}
@@ -2124,6 +2129,9 @@ function getPolygonSegments(alongIndexesMap, meetingMap, polygon, prefix) {
 }
 
 function getPolygonSlice(polygon, beginIndex, endIndex) {
+	if (polygon.length == 0) {
+		return []
+	}
 	var polygonSlice = []
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var sourceIndex = (vertexIndex + beginIndex) % polygon.length
@@ -2462,14 +2470,7 @@ function removeCollinearPointsByMesh(mesh) {
 	for (var facet of facets) {
 		addFacetToCollinearities(collinearities, facet, points)
 	}
-	for (var facet of facets) {
-		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-			if (collinearities[facet[vertexIndex]]) {
-				facet[vertexIndex] = null
-			}
-		}
-		removeNulls(facet)
-	}
+	removeCollinearPointsByFacets(collinearities, facets)
 }
 
 function removeCollinearXYPoints(polygon) {
@@ -2489,6 +2490,9 @@ function removeCollinearXYPoints(polygon) {
 }
 
 function removeIdentical2DPoints(polygon) {
+	if (polygon.length < 2) {
+		return polygon
+	}
 	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
 		var point = polygon[vertexIndex]
 		var nextPoint = polygon[(vertexIndex + 1) % polygon.length]
