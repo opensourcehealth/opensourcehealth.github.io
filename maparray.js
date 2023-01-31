@@ -151,6 +151,12 @@ function copyMissingKeysExcept(exceptionSet, mapFrom, mapTo) {
 	}
 }
 
+function deleteElementsFromSet(elements, setFrom) {
+	for (var element of elements) {
+		setFrom.delete(element)
+	}
+}
+
 function getArrayArraysCopy(arrayArrays) {
 	var arrayArraysCopy = new Array(arrayArrays.length)
 	for (var arraysIndex = 0; arraysIndex < arrayArrays.length; arraysIndex++) {
@@ -417,6 +423,7 @@ function setMapIfMissing(key, map, value) {
 	}
 }
 
+//deprecated24
 function setObjectAttribute(key, map, object, value) {
 	if (map.has(key)) {
 		value = map.get(key)(value)
