@@ -351,7 +351,7 @@ function getStatementByID(registry, statement, id) {
 	}
 	if (id[0] == ('/')) {
 		for (var depth = 0; depth < gRecursionLimit; depth++) {
-			if (statement.parent == null) {
+			if (statement.parent == undefined) {
 				return statement
 			}
 			statement = statement.parent
@@ -365,7 +365,7 @@ function getStatementByID(registry, statement, id) {
 		return statement
 	}
 	for (var character of id) {
-		if (statement.parent == null) {
+		if (statement.parent == undefined) {
 			return statement
 		}
 		statement = statement.parent
@@ -399,6 +399,66 @@ function setClosestStatementRecursively(closestDistanceStatement, depth, locatio
 	}
 }
 
+function ViewImage() {
+	this.draw = function() {
+		if (this.image == null) {
+			this.image = new Image()
+			this.image.src = this.filename
+		}
+		var viewImage = viewBroker.viewImage
+		clearBoundingBox(viewImage.boundingBox, viewBroker.context)
+		if (this.image.complete) {
+			if (this.height == null) {
+				var greatestDimension = Math.max(this.image.naturalHeight, this.image.naturalWidth)
+				var zoomRatio = 1.0 * viewBroker.canvas.height / greatestDimension
+				this.height = zoomRatio * this.image.naturalHeight
+				this.width = zoomRatio * this.image.naturalWidth
+				this.halfCanvasMinus = viewBroker.halfWidth - this.width / 2
+				this.canvasHeightMinus = viewBroker.canvas.height - this.height
+			}
+			viewBroker.context.drawImage(this.image, this.halfCanvasMinus, this.canvasHeightMinus, this.width, this.height)
+		}
+		else {
+			this.image.onload = wordscapeViewerDraw
+		}
+	}
+	this.height = null
+	this.image = null
+	this.mouseDown = function(event) {
+		this.polyline.push(viewBroker.mouseDown2D)
+		var boundingBox = getBoundingBox(this.polyline)
+		var minimumPoint = boundingBox[0]
+		var size = getSubtraction2D(boundingBox[1], minimumPoint)
+		var maximumDimension = Math.max(Math.max(size[0], size[1]), 1.0)
+		var fittedString = ''
+		var multiplier = 100.0 / maximumDimension
+		for (var fittedIndex = 0; fittedIndex < this.polyline.length; fittedIndex++) {
+			var point = this.polyline[fittedIndex]
+			var x = multiplier * (point[0] - minimumPoint[0])
+			var y = multiplier * (boundingBox[1][1] - point[1])
+			fittedString += x.toFixed(1) + ',' + y.toFixed(1) + ' '
+		}
+		console.log(fittedString)
+	}
+	this.mouseMove = function(event) {
+		var characterBegin = viewBroker.analysisCharacterStart
+		var context = viewBroker.context
+		context.clearRect(characterBegin, 0, viewBroker.canvas.width, viewBroker.doubleTextSpace + 1)
+		setTextContext(context)
+		context.textAlign = 'left'
+		context.fillText('x :  ' + event.offsetX, characterBegin, viewBroker.textSpace)
+		context.fillText('y :  ' + event.offsetY, characterBegin, viewBroker.doubleTextSpace)
+	}
+	this.mouseOut = function(event) {
+	}
+	this.mouseUp = function(event) {
+	}
+	this.polyline = []
+	this.start = function() {
+		viewBroker.viewImage = {boundingBox:[[0, 0], [viewBroker.canvas.height, viewBroker.canvas.height]]}
+	}
+}
+
 function workMesh(registry, statement, propertyName) {
 	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('work')) {
@@ -423,42 +483,29 @@ function workMesh(registry, statement, propertyName) {
 
 var gAbstract = {
 	initialize: function() {
-		gTagBeginMap.set(this.name, this)
+		gParentFirstSet.add(this.name)
+		gTagCenterMap.set(this.name, this)
 	},
 	name: 'abstract',
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
 		var attributeMap = statement.attributeMap
+		setMapIfMissing('font-weight', attributeMap, 'normal')
 		setMapIfMissing('skip2D', attributeMap, 'true')
 		setMapIfMissing('skip3D', attributeMap, 'true')
+		setMapIfMissing('style', attributeMap, 'fill:none;stroke:black;stroke-width:1')
 		var flipY = getFloatByStatement('flipY', registry, statement)
 		if (flipY != null) {
 			scaleString = 'scale(' + flipY + ',' + (-flipY) + ')'
 			attributeMap.set('transform', scaleString)
 		}
-		var styleMap = new Map([
-			['fill', 'none'],
-			['stroke', 'rgb(0,0,0)'],
-			['stroke-width', '1']])
-		if (attributeMap.has('style')) {
-			styles = attributeMap.get('style').replace(/ /g, '').split(';')
-			for (var style of styles) {
-				var entry = style.split(':')
-				styleMap.set(entry[0], entry[1])
-			}
-		}
-		styles = []
-		for (var entry of styleMap) {
-			styles.push(entry[0] + ':' + entry[1])
-		}
-		attributeMap.set('style', styles.join(';'))
 		titleStrings = []
 		gProject = null
 		if (attributeMap.has('project')) {
 			gProject = attributeMap.get('project')
 			if (gProject != 'untitled') {
 				titleStrings.push(gProject)
-				registry.storageMap.set('project', gProject)
+				registry.dataMap.set('project', gProject)
 			}
 		}
 		gAbstractID = null
@@ -466,14 +513,14 @@ var gAbstract = {
 			gAbstractID = attributeMap.get('id')
 			if (gAbstractID != 'untitled' && gAbstractID != 'abstract' && gAbstractID != gProject) {
 				titleStrings.push(gAbstractID)
-				registry.storageMap.set('abstractID', gAbstractID)
+				registry.dataMap.set('abstractID', gAbstractID)
 			}
 		}
 		gDate = null
 		if (attributeMap.has('date')) {
 			gDate = attributeMap.get('date')
 			titleStrings.push(gDate)
-			registry.storageMap.set('date', gDate)
+			registry.dataMap.set('date', gDate)
 		}
 		gTitle = titleStrings.join('_')
 		titleStrings.push('Wordscape')
@@ -542,8 +589,8 @@ var gCopy = {
 var gCSV = {
 	alterMesh: function(mesh, registry, statement) {
 		var id = getOutputOrWorkOrID(statement.attributeMap)
-		var date = getNullOrValue('date', registry.storageMap)
-		addOutputArea(getCSVMeshString(date, id, mesh, getNullOrValue('project', registry.storageMap)), 'CSV - ' + id)
+		var date = getNullOrValue('date', registry.dataMap)
+		addOutputArea(getCSVMeshString(date, id, mesh, getNullOrValue('project', registry.dataMap)), 'CSV - ' + id)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -686,10 +733,10 @@ var gRow = {
 	},
 	name: 'row',
 	processStatement: function(registry, statement) {
-		convertToGroup(statement)
 		if (!statement.attributeMap.has('cells')) {
 			return
 		}
+		convertToGroup(statement)
 		var cellStrings = statement.attributeMap.get('cells').split(' ').filter(lengthCheck)
 		for (var cellString of cellStrings) {
 			var cells = cellString.split(',').filter(lengthCheck)
@@ -711,6 +758,32 @@ var gRow = {
 				}
 			}
 		}
+	}
+}
+
+var gSpreadsheet = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'spreadsheet',
+	processStatement: function(registry, statement) {
+		var delimiter = ';'
+		if (statement.attributeMap.has('delimiter')) {
+			delimiter = statement.attributeMap.get('delimiter')
+		}
+		var rows = []
+		statement.tag = 'g'
+		for (var child of statement.children) {
+			if (child.tag == 'row') {
+				if (child.attributeMap.has('line')) {
+					rows.push(child.attributeMap.get('line').split(delimiter))
+				}
+			}
+		}
+		if (registry.spreadsheetMap == undefined) {
+			registry.spreadsheetMap = new Map()
+		}
+		registry.spreadsheetMap.set(statement.attributeMap.get('id'), rows)
 	}
 }
 
@@ -897,8 +970,8 @@ var gVar = {
 		addFunctionToVariableEntries(pointsByID, gSetRS)
 		addFunctionToVariableEntries(polar_Check, null)
 		addFunctionToVariableEntries(rightByID, gSetRS)
-		addFunctionsToVariableEntries([rotate2DVector_Check, getRotation2DVector_Check], null)
-		addFunctionToVariableEntries(setAttributeByID, gSetRS)
+		addFunctionsToVariableEntries([reverseSigns_Check, rotate2DAngle_Check, rotate2DVector_Check, getRotation2DVector_Check], null)
+		addFunctionsToVariableEntries([setAttributeByID, setAttributesRowTable, setAttributesTable], gSetRS)
 		addFunctionsToVariableEntries([sideHypoteneuse_Check, sideHypoteneuseSquared_Check], null)
 		addFunctionToVariableEntries(sineWaveXFromToCycles, null)
 		addFunctionToVariableEntries(sineYXFromToCycles, null)
@@ -949,14 +1022,24 @@ var gVar = {
 
 var gView = {
 	alterMesh: function(mesh, registry, statement) {
-		meshViewer.addMesh(statement.attributeMap.get('id'), null)
+		if (mesh == null) {
+			return
+		}
+		var view = new ViewMesh()
+		view.id = statement.attributeMap.get('id')
+		viewBroker.minimumHeight = Math.max(viewBroker.minimumHeight, 96)
+		registry.views.push(view)
 	},
 	getPoints: function(points, registry, statement) {
 		if (statement.tag != 'image') {
 			return points
 		}
 		if (statement.attributeMap.has('href')) {
-			meshViewer.addImage(statement.attributeMap.get('href'), statement.attributeMap.get('id'))
+			var view = new ViewImage()
+			view.filename = statement.attributeMap.get('href')
+			view.id = statement.attributeMap.get('id')
+			viewBroker.minimumHeight = Math.max(viewBroker.minimumHeight, 256)
+			registry.views.push(view)
 		}
 		else {
 			noticeByList(['No href for image in meta.', statement])
@@ -999,6 +1082,7 @@ var gMetaProcessors = [
 	gMatrix3D,
 	gPolygonAnalysis,
 	gRow,
+	gSpreadsheet,
 	gSTLInput,
 	gSTL,
 	gString,
