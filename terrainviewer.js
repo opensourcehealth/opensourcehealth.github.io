@@ -249,7 +249,6 @@ var terrainViewer = {
 		this.region = null
 		this.scaleSelectID = scaleSelectID
 		this.view = null
-		this.views = []
 	},
 	setPixel: function(pixelSelectedIndex) {
 		var pixelMultiplierString = this.pixelMultiplierStrings[pixelSelectedIndex]
@@ -298,7 +297,7 @@ var terrainViewer = {
 		this.sideArrows = new Array(4)
 		for (var polygonIndex = 0; polygonIndex < 4; polygonIndex++) {
 			var rotation = gRotations[polygonIndex]
-			this.sideArrows[polygonIndex] = add2Ds(get2DRotations(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
+			this.sideArrows[polygonIndex] = add2Ds(getRotations2DVector(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
 		}
 		setPixelSelect(this.pixelMultiplierStrings, this.pixelSelectedIndex, this.pixelSelectID)
 		setScaleSelect(this.scaleStrings, this.scaleSelectedIndex, this.scaleSelectID)
