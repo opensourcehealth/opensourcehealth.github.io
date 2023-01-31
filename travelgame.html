@@ -51,6 +51,7 @@
 <br>
 <br>
 <script src="maparray.js"></script>
+<script src="arraymath.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
 <script src="help.js"></script>
@@ -74,10 +75,10 @@
 
 function updateSVGArea() {
 	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
-	var storageMap = new Map()
-	storageMap.set('selectedEntity', null)
-	storageMap.set('selectedRegion', null)
-	var registry = {generatedIDSet:new Set(), idMap:new Map(), objectMap:new Map(), storageMap:storageMap}
+	var dataMap = new Map()
+	dataMap.set('selectedEntity', null)
+	dataMap.set('selectedRegion', null)
+	var registry = {dataMap:dataMap, generatedIDSet:new Set(), idMap:new Map(), objectMap:new Map()}
 	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
 	var xmlStatement = getDocumentRoot(lines, 'xml')
 	console.log(xmlStatement)
@@ -113,7 +114,7 @@ function updateSVGArea() {
 	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('xmlArea', xmlLines)
 	document.getElementById('xmlArea').value = xmlString
-	terrainViewer.start(registry.storageMap.get('terrainViewer.maximumHeight'))
+	terrainViewer.start(registry.dataMap.get('terrainViewer.maximumHeight'))
 	return xmlString
 }
 
@@ -121,7 +122,7 @@ function updateWordArea(wordString) {
 	updateSVGArea()
 }
 
-var gTagBeginMap = new Map()
+var gParentFirstSet = new Set()
 var gTagCenterMap = new Map()
 gProcessors = gTerrainProcessors
 initializeProcessors(gProcessors)
