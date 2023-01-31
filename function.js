@@ -310,9 +310,7 @@ function intervalsFromQuantityIncrement(from, quantity, increments, includeFrom)
 		return [from]
 	}
 	if (quantity < 0.0) {
-		for (var incrementIndex = 0; incrementIndex < increments.length; incrementIndex++) {
-			increments[incrementIndex] = -increments[incrementIndex]
-		}
+		reverseSigns(increments)
 		quantity = -quantity
 	}
 	var quantityFloor = Math.floor(quantity + gClose)
@@ -659,6 +657,102 @@ function setAttributeByID(registry, statement, key, id, value) {
 	return getStatementByID(registry, statement, id).attributeMap.set(key, value)
 }
 
+function setAttributesRowTable(registry, statement, rowIndex) {
+	if (registry.spreadsheetMap == undefined) {
+		return
+	}
+	if (registry.spreadsheetMap.size == 0) {
+		return
+	}
+	var id = getVariableValue('spreadsheet_id', statement.parent)
+	if (id == undefined) {
+		for (id of registry.spreadsheetMap.keys()) {
+			break
+		}
+	}
+	setAttributesTable(registry, statement, id, rowIndex, getVariableValue('table_id', statement.parent))
+}
+
+function setAttributesTable(registry, statement, id, rowIndex, tableID) {
+	if (registry.spreadsheetMap == undefined) {
+		return
+	}
+	if (!registry.spreadsheetMap.has(id)) {
+		return
+	}
+	if (registry.spreadsheetTableMapMap == undefined) {
+		registry.spreadsheetTableMapMap = new Map()
+	}
+	var spreadsheetTableMap = undefined
+	if (registry.spreadsheetTableMapMap.has(id)) {
+		spreadsheetTableMap = registry.spreadsheetTableMapMap.get(id)
+	}
+	else {
+		var spreadsheetStatement = registry.spreadsheetMap.get(id)
+		spreadsheetTableMap = new Map()
+		var titleIndex = null
+		var rows = registry.spreadsheetMap.get(id)
+		var table = undefined
+		var tableNumber = 0
+		for (var spreadsheetRowIndex = 0; spreadsheetRowIndex < rows.length; spreadsheetRowIndex++) {
+			var row = rows[spreadsheetRowIndex]
+			if (table == undefined) {
+				if (row.length > 0) {
+					if (row[0] == '_table') {
+						table = {rows:[], titles:[]}
+						if (row.length > 1) {
+							spreadsheetTableMap.set(row[1], table)
+						}
+						else {
+							spreadsheetTableMap.set(tableNumber.toString(), table)
+							tableNumber++
+						}
+						titleIndex = spreadsheetRowIndex + 1
+					}
+				}
+			}
+			else {
+				if (row.length > 0) {
+					if (row[0].startsWith('_end')) {
+						table = undefined
+					}
+					else {
+						if (spreadsheetRowIndex == titleIndex) {
+							table.titles = row
+						}
+						else {
+							table.rows.push(row)
+						}
+					}
+				}
+			}
+		}
+		registry.spreadsheetTableMapMap.set(id, spreadsheetTableMap)
+	}
+	if (spreadsheetTableMap.size == 0) {
+		return
+	}
+	var table = undefined
+	if (tableID == undefined) {
+		for (table of spreadsheetTableMap.values()) {
+			break
+		}
+	}
+	else {
+		if (!spreadsheetTableMap.has(tableID)) {
+			return
+		}
+		table = spreadsheetTableMap.get(tableID)
+	}
+	if (rowIndex >= table.rows.length) {
+		return
+	}
+	var row = table.rows[rowIndex]
+	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
+		statement.attributeMap.set(table.titles[columnIndex], row[columnIndex])
+	}
+}
+
 function sineWaveXFromToCycles(xs, from, to, numberOfCycles, phase, numberOfSegments) {
 	var from = getValueByDefault(0.0, from)
 	var to = getValueByDefault(4.0, to)
@@ -968,9 +1062,7 @@ function stepsFromQuantityIncrement(registry, statement, from, quantity, increme
 	}
 	if (quantity < 0.0) {
 		for (var parameters of increments) {
-			for (var parameterIndex = 0; parameterIndex < parameters.length; parameterIndex++) {
-				parameters[parameterIndex] = -parameters[parameterIndex]
-			}
+			reverseSigns(parameters)
 		}
 		quantity = -quantity
 	}
