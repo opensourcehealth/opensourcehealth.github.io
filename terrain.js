@@ -1,606 +1,217 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gIDCountMap = new Map()
-const gIDJoinWord = '_'
+const gCreatureVariableSet = new Set(['color', 'filename', 'location', 'scaleIndex'])
+const gRegionVariableSet = new Set(['entry', 'terrain'])
 
-function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
-	if (depth > gRecursionLimit) {
-		var warningText = 'Recursion limit of 1,000 in addPassthroughLines reached, no further statements will be added.'
-		warningByList([warningText, statement, gRecursionLimit])
-		return
+function getEntryLocation(childrenMaps, entryCenter, terrain) {
+	var childrenMap = childrenMaps[0]
+	if (!childrenMap.has(entryCenter[0].toString() + ',' + entryCenter[1].toString())) {
+		return entryCenter
 	}
-	depth += 1
-	passthroughNesting.lines.push('  '.repeat(Math.max(0, passthroughNesting.nesting - 1)) + getLineByStatement(statement))
-	if (statement.nestingIncrement == 1) {
-		passthroughNesting.nesting += 1
-	}
-	for (var child of statement.children) {
-		addPassthroughLines(depth, passthrough, passthroughNesting, child)
-	}
-	if (statement.nestingIncrement == 1) {
-		passthroughNesting.nesting -= 1
-		var passthroughLine = '  '.repeat(Math.max(0, passthroughNesting.nesting - 1))
-		if (statement.tag == passthrough) {
-			passthroughLine += '</' + passthrough + '>'
-		}
-		else {
-			passthroughLine += '</' + statement.tag + '>'
-		}
-		passthroughNesting.lines.push(passthroughLine)
-	}
-}
-
-function addToDescendantsInsideFirst(descendants, statement) {
-	if (descendants.length >= gLengthLimit) {
-		var warningText = 'Recursion limit of 9876543 of\naddToDescendantsInsideFirst reached, no further descendants will be added.'
-		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
-		return
-	}
-	if (statement.children != null) {
-		for (var child of statement.children) {
-			if (gParentFirstSet.has(child.tag)) {
-				descendants.push(child)
-				addToDescendantsInsideFirst(descendants, child)
-			}
-			else {
-				addToDescendantsInsideFirst(descendants, child)
-				descendants.push(child)
-			}
-		}
-	}
-}
-
-function addToDescendantsOutsideFirst(descendants, statement) {
-	if (descendants.length >= gLengthLimit) {
-		var warningText = 'Recursion limit of 9876543 of\naddToDescendants reached, no further descendants will be added.'
-		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
-		return
-	}
-	if (statement.children != null) {
-		for (var child of statement.children) {
-			descendants.push(child)
-			addToDescendantsOutsideFirst(descendants, child)
-		}
-	}
-}
-
-function convertToGroup(statement) {
-	statement.tag = 'g'
-	statement.nestingIncrement = 1
-}
-
-function convertToGroupIfParent(statement) {
-	if (statement.nestingIncrement == 1) {
-		statement.tag = 'g'
-	}
-}
-
-function createDefault(registry, rootStatement) {
-	rootStatement.variableMap = new Map(gVariableMapEntries)
-	if (registry.idMap.has('_default')) {
-		return
-	}
-	var defaultStatement = getStatementByParentTag(new Map([['id', '_default']]), 0, undefined, 'default')
-	defaultStatement.parent = rootStatement
-	rootStatement.children.splice(0, 0, defaultStatement)
-	registry.idMap.set('_default', defaultStatement)
-}
-
-function deleteStatement(statement) {
-	var id = statement.attributeMap.get('id')
-	var siblings = statement.parent.children
-	for (var siblingIndex = 0; siblingIndex < siblings.length; siblingIndex++) {
-		var attributeMap = siblings[siblingIndex].attributeMap
-		if (attributeMap.has('id')) {
-			if (attributeMap.get('id') == id) {
-				siblings.splice(siblingIndex, 1)
-				return
-			}
-		}
-	}
-}
-
-function deleteStatementsByTagDepth(depth, registry, statement, tag) {
-	var children = statement.children
-	if (children == null) {
-		return
-	}
-	if (depth > gRecursionLimit) {
-		var warningText = 'Recursion limit of 100 in deleteStatementsByTagDepth reached, no further statements will be deleted.'
-		var warningVariables = [gRecursionLimit, statement]
-		warning(warningText, warningVariables)
-		return
-	}
-	depth += 1
-	for (var childIndex = children.length - 1; childIndex > -1; childIndex--) {
-		var child = children[childIndex]
-		deleteStatementsByTagDepth(depth, registry, child, tag)
-		if (child.tag == tag) {
-			children.splice(childIndex, 1)
-		}
-	}
-	if (children.length == 1 && depth > 1) {
-		if (children[0].nestingIncrement == -1) {
-			deleteStatement(statement)
-		}
-	}
-}
-
-function getConcatenatedUniqueID(id, registry, statement) {
-	var whileCount = 2
-	if (gIDCountMap.has(id)) {
-		whileCount = gIDCountMap.get(id) + 1
-	}
-	for (; whileCount < gLengthLimit; whileCount++) {
-		var check = id + gIDJoinWord + whileCount.toString()
-		if (getIsIDUnique(check, registry, statement)) {
-			gIDCountMap.set(id, whileCount)
-			return check
-		}
-	}
-	return id
-}
-
-function getDocumentRoot(lines, tag) {
-	var lastParent = undefined
-	for (var line of lines) {
-		var statement = getStatement(line)
-		if (lastParent == undefined) {
-			if (statement.tag != null) {
-				if (statement.tag == tag) {
-					statement.nestingIncrement = 1
+	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
+		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
+			for (var x = 1 - shellIndex; x < shellIndex; x++) {
+				var entryLocation = getAddition2D(entryCenter, [x, signedShellIndex])
+				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
+					return entryLocation
 				}
-				else {
-					statement.parent = getStatementByParentTag(new Map(), 1, undefined, tag)
-					statement.parent.children.push(statement)
-				}
-				if (statement.nestingIncrement == 1) {
-					lastParent = statement
-				}
-				else {
-					lastParent = statement.parent
+			}
+			for (var y = - shellIndex; y <= shellIndex; y++) {
+				var entryLocation = getAddition2D(entryCenter, [signedShellIndex, y])
+				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
+					return entryLocation
 				}
 			}
 		}
-		else {
-			statement.parent = lastParent
-			if (statement.nestingIncrement == 1) {
-				lastParent = statement
-			}
-			else {
-				if (statement.nestingIncrement == -1) {
-					if (lastParent.parent != undefined) {
-						lastParent = lastParent.parent
-					}
-				}
-			}
-			if (statement.tag != null) {
-				statement.parent.children.push(statement)
-			}
-		}
 	}
-	if (lastParent == null) {
-		return undefined
-	}
-	for (var remainingIndex = 0; remainingIndex < gLengthLimit; remainingIndex++) {
-		if (lastParent.parent == undefined) {
-			return lastParent
-		}
-		lastParent = lastParent.parent
-	}
-	return undefined
+	return entryCenter
 }
 
-function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix) {
-	searchSuffix = '.' + searchSuffix
-	var replacedTokens = []
-	var tokens = getTokens('-', [bracketString])
-	tokens = getTokens('+', tokens)
-	for (var token of tokens) {
-		indexOfSearchSuffix = token.indexOf(searchSuffix)
-		if (indexOfSearchSuffix != -1) {
-			beforeSuffix = token.slice(0, indexOfSearchSuffix).trim()
-			if (replacementMap.has(beforeSuffix)) {
-				value = parseFloat(replacementMap.get(beforeSuffix)) + increment
-				replacedTokens.push(value)
-			}
-			else {
-				warningText = 'Error in getIDReplacedBySuffix, could not find id:\nin search string:'
-				warningVariables = [beforeSuffix, bracketString]
-				warning(warningText, warningVariables)
-			}
-		}
-		else {
-			replacedTokens.push(token)
-		}
+function getIsOccupied(childrenMaps, location, terrain) {
+	if (terrain.getTerrainParameters(location, 0).length > 3) {
+		return true
 	}
-	return replacedTokens.join('')
-}
-
-function getStrings(key, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has(key)) {
-		return []
-	}
-	return attributeMap.get(key).replace(/,/g, ' ').split(' ').filter(lengthCheck)
-}
-
-function getIsIDUnique(id, registry, statement) {
-	if (registry.idMap.has(id)) {
-		return false
-	}
-	setIDMapSet(id, registry, statement)
-	return true
-}
-
-function getLineByStatement(statement) {
-	var firstWord = statement.tag
-	if (firstWord == null) {
-		return ''
-	}
-	var attributeWords = ['<' + firstWord]
-	for (var entry of statement.attributeMap) {
-		var value = entry[1]
-		var quoteString = '"'
-		if (value.indexOf('"') != -1) {
-			quoteString = '\''
-		}
-		var attributeLine = entry[0] + '=' + quoteString + value + quoteString
-		if (firstWord == 'text') {
-			if (entry[0] != 'innerHTML') {
-				attributeWords.push(attributeLine)
-			}
-		}
-		else {
-			attributeWords.push(attributeLine)
-		}
-	}
-	var attributeLine = attributeWords.join(' ')
-	var lineClosing = '>'
-	if (statement.nestingIncrement == 0) {
-		lineClosing = '/>'
-	}
-	if (firstWord == 'text' && statement.attributeMap.has('innerHTML')) {
-		return attributeLine +  '>' + statement.attributeMap.get('innerHTML') + '</text>'
-	}
-	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
-		return attributeLine + lineClosing
-	}
-	return attributeLine + ' ' + lineClosing
-}
-
-function getPassthroughLinesByStatement(passthrough, statement) {
-	var passthroughNesting = {lines:[], nesting:0}
-	addPassthroughLines(0, passthrough, passthroughNesting, statement)
-	return passthroughNesting.lines
-}
-
-function getQuoteSeparatedSnippets(line) {
-	var quoteCharacter = null
-	var quoteSeparatedSnippets = []
-	var start = 0
-	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
-		var character = line[characterIndex]
-		if (quoteCharacter == null) {
-			if (gSpaceEqualSet.has(character)) {
-				var quoteSeparatedWord = line.slice(start, characterIndex)
-				if (quoteSeparatedWord.length > 0) {
-					quoteSeparatedSnippets.push(getUnquotedText(quoteSeparatedWord))
-				}
-				if (character == '=') {
-					quoteSeparatedSnippets.push(character)
-				}
-				start = characterIndex + 1
-			}
-			else {
-				if (gQuoteSet.has(character)) {
-					quoteCharacter = character
+	for (var scaleIndex = 0; scaleIndex < childrenMaps.length; scaleIndex++) {
+		var childrenMap = childrenMaps[scaleIndex]
+		var locationAtScale = terrain.getLocationAtScale(location, scaleIndex)
+		var xyKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
+		if (childrenMap.has(xyKey)) {
+			var children = childrenMap.get(xyKey)
+			for (var child of children) {
+				if (child.location[0] == location[0] && child.location[1] == location[1]) {
+					return true
 				}
 			}
 		}
-		else {
-			if (character == quoteCharacter) {
-				quoteCharacter = null
-			}
-		}
 	}
-	quoteSeparatedSnippets.push(getUnquotedText(line.slice(start)))
-	return quoteSeparatedSnippets
+	return false
 }
 
-function getStatement(line) {
-	line = line.trim()
-	if (line.startsWith('</') || line.startsWith('}')) {
-		return getStatementByParentTag(undefined, -1, undefined, null)
-	}
-	if (line.length < 2) {
-		return getStatementByParentTag(undefined, 0, undefined, null)
-	}
-	var lastCharacter = line[line.length - 1]
-	var nestingIncrement = 0
-	var sliceBegin = line[0] == '<'
-	var sliceEnd = line.length
-	if (lastCharacter == '>' || lastCharacter == '{') {
-		if (line[line.length - 2] == '/') {
-			sliceEnd -= 2
-		}
-		else {
-			sliceEnd -= 1
-			nestingIncrement = 1
+function setAttributeMap(exceptSet, fromMap, toMap) {
+	for (var key of fromMap) {
+		if (!exceptSet.has(key)) {
+			toMap.set(key, fromMap.get(key))
 		}
 	}
-	line = line.slice(sliceBegin, sliceEnd).trim()
-	var tag = line
-	var indexOfSpace = line.indexOf(' ')
-	if (indexOfSpace != -1) {
-		tag = tag.slice(0, indexOfSpace)
+}
+
+function Creature() {
+	this.archetype = null
+	this.attributeMap = new Map()
+	this.children = []
+	this.color = '#696006'
+	this.filename = 'delfador.png'
+	this.location = [0.0, 0.0]
+	this.parent = null
+	this.scaleIndex = 0
+	this.add = function(child) {
+		this.children.push(child)
+		child.location = null
+		child.parent = this
+		return true
 	}
-	if (tag.length == 0) {
-		return getStatementByParentTag(undefined, 0, undefined, null)
+	this.getChildren = function() {
+		return this.children
 	}
-	line = line.slice(indexOfSpace + 1).trim()
-	var innerHTML = null
-	if (tag == 'text') {
-		var lastIndexOfGreaterThan = line.lastIndexOf('>')
-		if (lastIndexOfGreaterThan != -1) {
-			if (line.endsWith('<')) {
-				innerHTML = line.slice(lastIndexOfGreaterThan + 1, -1)
-			}
-			else {
-				innerHTML = line.slice(lastIndexOfGreaterThan + 1)
-			}
-			line = line.slice(0, lastIndexOfGreaterThan).trim()
+}
+
+function Region(terrain) {
+	this.attributeMap = new Map()
+	this.childrenMaps = []
+	this.entry = [0, 0]
+	this.location = [0, 0]
+	this.parent = null
+	this.scaleIndex = 0
+	this.terrainMap = new Map()
+	this.terrain = terrain
+	this.add = function(child) {
+		for (var mapIndex = this.childrenMaps.length; mapIndex < child.scaleIndex + 1; mapIndex++) {
+			this.childrenMaps.push(new Map())
 		}
-	}
-	var quoteSeparatedSnippets = getQuoteSeparatedSnippets(line)
-	var tag = getCapitalizedKey(tag)
-	if (quoteSeparatedSnippets.length == 0) {
-		return getStatementByParentTag(new Map(), nestingIncrement, undefined, tag)
-	}
-	var attributes = getAttributes(quoteSeparatedSnippets)
-	if (innerHTML != null) {
-		attributes.push(['innerHTML', innerHTML])
-	}
-	for (var attribute of attributes) {
-		keyStrings = attribute[0].split('.')
-		if (keyStrings.length == 1) {
-			attribute[0] = getCapitalizedKey(attribute[0])
+		add2D(child.location, this.entry)
+		child.location = getEntryLocation(this.childrenMaps, child.location, this.terrain)
+		var childrenMap = this.childrenMaps[child.scaleIndex]
+		var locationAtScale = this.terrain.getLocationAtScale(child.location, child.scaleIndex)
+		var addKey = locationAtScale[0].toString() + ',' + locationAtScale[1].toString()
+		var children = null
+		if (childrenMap.has(addKey)) {
+			children = childrenMap.get(addKey)
 		}
 		else {
-			if (keyStrings.length == 2) {
-				keyStrings[0] = getCapitalizedKey(keyStrings[0])
-				keyStrings[1] = getCapitalizedKey(keyStrings[1])
-				attribute[0] = keyStrings.join('.')
+			children = []
+			childrenMap.set(addKey, children)
+		}
+		children.push(child)
+		child.parent = this
+		return true
+	}
+	this.getChildren = function() {
+		var allChildren = []
+		for (var childrenMap of this.childrenMaps) {
+			for (var children of this.childrenMap.values()) {
+				pushArray(allChildren, children)
 			}
 		}
+		return allChildren
 	}
-	return getStatementByParentTag(new Map(attributes), nestingIncrement, undefined, tag)
 }
 
-function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
-	var children = null
-	if (tag != null) {
-		children = []
-	}
-	var statement =
-	{attributeMap:attributeMap, children:children, nestingIncrement:nestingIncrement, parent:parent, tag:tag, variableMap:null}
-	if (parent != null) {
-		parent.children.push(statement)
-	}
-	return statement
-}
-
-function getStatementID(registry, statement) {
-	var id = statement.tag
-	if (statement.attributeMap.has('id')) {
-		id = statement.attributeMap.get('id')
-		if (registry.idMap.has(id)) {
-			var previousStatement = registry.idMap.get(id)
-			if (registry.generatedIDSet.has(id)) {
-				previousStatement.attributeMap.delete('id')
-				getStatementID(registry, previousStatement)
-				registry.idMap.set(id, statement)
-				return
-			}
-			id = statement.tag + gIDJoinWord + id
-		}
-		else {
-			registry.idMap.set(id, statement)
-			return id
-		}
-	}
-	if (statement.attributeMap.has('output')) {
-		var output = statement.attributeMap.get('output')
-		if (getIsIDUnique(output, registry, statement)) {
-			return output
-		}
-	}
-	if (getIsIDUnique(id, registry, statement)) {
-		return id
-	}
-	if (statement.attributeMap.has('work')) {
-		id += gIDJoinWord + statement.attributeMap.get('work')
-	}
-	if (getIsIDUnique(id, registry, statement)) {
-		return id
-	}
-	var parentMap = statement.parent.attributeMap
-	if (parentMap.has('id')) {
-		id += gIDJoinWord + parentMap.get('id')
-	}
-	if (getIsIDUnique(id, registry, statement)) {
-		return id
-	}
-	for (var key of statement.attributeMap.keys(key)) {
-		id += gIDJoinWord + key
-		if (getIsIDUnique(id, registry, statement)) {
-			return id
-		}
-	}
-	return getConcatenatedUniqueID(id, registry, statement)
-}
-
-function getTokens(delimeter, searchStrings) {
-	tokens = []
-	for (var searchString of searchStrings) {
-		subTokens = searchString.split(delimeter)
-		for (subTokenIndex = 0; subTokenIndex < subTokens.length; subTokenIndex++) {
-			tokens.push(subTokens[subTokenIndex])
-			if (subTokenIndex < subTokens.length - 1) {
-				tokens.push(delimeter)
+var gCreature = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'creature',
+	processStatement:function(registry, statement) {
+		var attributeMap = statement.attributeMap
+		var creature = new Creature()
+		if (attributeMap.has('race')) {
+			if (attributeMap.get('race') == 'red dragon') {
+				creature.color = '#ffa500'
+				creature.filename = 'red_dragon_welsh.png'
 			}
 		}
-	}
-	return tokens
-}
-
-function getUniqueID(id, registry, statement) {
-	if (getIsIDUnique(id, registry, statement)) {
-		return id
-	}
-	return getConcatenatedUniqueID(id, registry, statement)
-}
-
-function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
-	var attributeMap = statement.attributeMap
-	var value = getValueByKeyTag(attributeMap, key, tag)
-	if (value != null) {
-		return value
-	}
-	if (attributeMap.has(key)) {
-		value = attributeMap.get(key)
-		if (value.length > 0) {
-			return value
+	//	if (!attributeMap.has('archetype')) {
+	//		attributeMap.set('archetype', 'sage')
+	//	}
+		var dataMap = registry.dataMap
+		var selectedRegion = dataMap.get('selectedRegion')
+	//	var archetype = attributeMap.get('archetype')
+		creature.color = getValueByKeyDefault(creature.color, 'color', registry, statement, this.name)
+		creature.filename = getValueByKeyDefault(creature.filename, 'filename', registry, statement, this.name)
+		creature.location = getFloatsByDefault(creature.location, 'location', registry, statement, this.name)
+		creature.scaleIndex = getIntByDefault(creature.scaleIndex, 'scaleIndex', registry, statement, this.name)
+		setAttributeMap(gCreatureVariableSet, attributeMap, creature.attributeMap)
+		if (selectedRegion != null) {
+			selectedRegion.add(creature)
 		}
 	}
-	var defaultMap = registry.idMap.get('_default').attributeMap
-	var value = getValueByKeyTag(defaultMap, key, tag)
-	if (value != null) {
-		return value
-	}
-	if (defaultValue == null || defaultValue == undefined) {
-		return undefined
-	}
-	var defaultString = defaultValue.toString()
-	var keyValueString = key + ':' + defaultString
-	if (defaultMap.has(tag)) {
-		defaultMap.set(tag, defaultMap.get(tag) + ';' + keyValueString)
-	}
-	else {
-		defaultMap.set(tag, keyValueString)
-	}
-	return defaultString
 }
 
-function getValueByKeyTag(attributeMap, key, tag) {
-	if (attributeMap.has(tag)) {
-		var keyValueStrings = attributeMap.get(tag).split(';')
-		for (var keyValueString of keyValueStrings) {
-			var keyValue = keyValueString.split(':')
-			if (keyValue[0].trim() == key) {
-				var value = keyValue[1].trim()
-				if (value.length > 0) {
-					return value
-				}
-				return null
-			}
+var gLaunch = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'launch',
+	processStatement:function(registry, statement) {
+		var workStatement = getWorkStatement(registry, statement)
+		if (workStatement == undefined) {
+			return
 		}
+		var workAttributeMap = workStatement.attributeMap
+		var exhaustVelocity = getFloatByDefault(1000.0, 'exhaustVelocity', registry, workStatement, this.name)
+		var numberOfStages = getIntByDefault(1, 'stages', registry, workStatement, this.name)
+		var payloadRatio = getFloatByDefault(1.0, 'payloadRatio', registry, workStatement, this.name)
+		var propellantRatio = getFloatByDefault(10.0, 'propellantRatio', registry, workStatement, this.name)
+		var dryMass = 1.0 + payloadRatio
+		var wetMass = dryMass + propellantRatio
+		var massRatio = wetMass / dryMass
+		var wetPayloadRatio = wetMass / payloadRatio
+		var stageSpeed = exhaustVelocity * Math.log(massRatio)
+		var finalSpeed = numberOfStages * stageSpeed
+		var finalWetPayloadRatio = Math.pow(wetPayloadRatio, numberOfStages)
+		console.log(finalSpeed)
+		console.log(finalWetPayloadRatio)
+		console.log(massRatio)
+		console.log(stageSpeed)
+		console.log(wetMass)
 	}
-	return null
 }
 
-function getWorkStatement(registry, statement) {
-	return getWorkStatementByKey('work', registry, statement)
-}
-
-function getWorkStatementByKey(key, registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has(key)) {
-		return undefined
-	}
-	return registry.idMap.get(attributeMap.get(key))
-}
-
-function getWorkStatements(registry, statement) {
-	var workIDs = getStrings('work', statement)
-	var workStatements = []
-	for (var workID of workIDs) {
-		workID = workID.trim()
-		if (registry.idMap.has(workID)) {
-			workStatements.push(registry.idMap.get(workID))
+var gRegion = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'region',
+	processStatement:function(registry, statement) {
+		var attributeMap = statement.attributeMap
+		if (!attributeMap.has('terrain')) {
+			attributeMap.set('terrain', 'oceanfront')
 		}
-	}
-	return workStatements
-}
-
-function initializeProcessors(processors) {
-	for (var processor of processors) {
-		processor.initialize()
-		addToCapitalizationMap(processor.name)
-	}
-}
-
-function processDescendants(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendantsInsideFirst(descendants, rootStatement)
-	for (var statement of descendants) {
-		processStatementByTagMap(registry, statement, tagMap)
-	}
-}
-
-function processDescendantsByTagMap(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendantsInsideFirst(descendants, rootStatement)
-	for (var statement of descendants) {
-		processStatementByTagMap(registry, statement, tagMap)
-	}
-}
-
-function processStatementByTagMap(registry, statement, tagMap) {
-	if (tagMap.has(statement.tag)) {
-		tagMap.get(statement.tag).processStatement(registry, statement)
-	}
-}
-
-function setIDMapSet(id, registry, statement) {
-	statement.attributeMap.set('id', id)
-	registry.idMap.set(id, statement)
-	registry.generatedIDSet.add(id)
-}
-
-function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
-	var points = getPointsHD(registry, statement)
-	if (points == null) {
-		return boundingBox
-	}
-	var matrix2DUntil = getMatrix2DUntil(caller, registry, statement)
-	if (matrix2DUntil != null) {
-		transform2DPoints(matrix2DUntil, points)
-	}
-	for (var point of points) {
-		if (boundingBox == null) {
-			boundingBox = [point.slice(0, 2), point.slice(0, 2)]
+		var dataMap = registry.dataMap
+		var selectedRegion = dataMap.get('selectedRegion')
+		var terrainString = attributeMap.get('terrain')
+		var terrain = new Terrain(terrainString)
+		var region = new Region(terrain)
+		region.entry = getFloatsByDefault([6204,0], 'entry', registry, statement, this.name)
+		if (selectedRegion != null) {
+			selectedRegion.add(region)
 		}
-		else {
-			widenBoundingBox(boundingBox, point)
-		}
+		dataMap.set('selectedRegion', region)
+		terrainViewer.region = region
 	}
-	return boundingBox
 }
 
-function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
-	if (statement.tag == 'group' || statement.tag == 'g') {
-		getMatrix2D(registry, statement)
+var gTerrainViewer = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'terrainViewer',
+	processStatement:function(registry, statement) {
+	//	var maximumWidth = getFloatByDefault(740.0, 'maximumWidth', registry, statement, this.name)
+		var maximumWidth = getFloatByDefault(390.0, 'maximumWidth', registry, statement, this.name)
+		registry.dataMap.set('terrainViewer.maximumHeight', maximumWidth)
+		registry.dataMap.set('terrainViewer.maximumWidth', maximumWidth)
 	}
-	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
-		if (statement.attributeMap.has('display')) {
-			if (statement.attributeMap.get('display') == 'none') {
-				return boundingBox
-			}
-		}
-		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
-	}
-	return boundingBox
 }
+
+var gTerrainProcessors = [gCreature, gLaunch, gRegion, gTerrainViewer]
