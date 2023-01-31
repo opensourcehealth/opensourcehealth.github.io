@@ -1,14 +1,15 @@
-<svg font-family="freeserif,Palatino" id="svg" style="padding:0mm" viewBox="0 0 215.9 838.2" width="215.9mm" height="838.2mm" xmlns="http://www.w3.org/2000/svg">
-<default id="_default" grid="corner:1;cornerLength:1.5;edgeLength:1.5" list="y:5"/>
-<g date="22.02.08" font-size="3.5" id="Wizard Color" project="Deck" style="fill:black;stroke:black;stroke-width:0.05" text-anchor="middle" skip2D="true" skip3D="true">
-  <comment ANSI_A="215.9, 279.4" oldMarginWidth="0.26 * 2" marginWidth="0.77 * 2" oldMarginHeight="0.19 + 0.15" marginHeight="0.19 + 0.18" id="comment"/>
-  <var translateX="19.450000000000003" translateY="4.699999999999989" id="var"/>
+<svg font-family="freeserif,Palatino" font-size="4" id="svg" style="padding:0mm" viewBox="0 0 215.9 838.2" width="216mm" height="838mm" xmlns="http://www.w3.org/2000/svg">
+<default id="_default" grid="corner:1;cornerLength:1.5;edgeLength:1.5" list="dy:0;left:4;right:55;x:29.5;y:0"/>
+<g date="22.02.08" id="Wizard Color" project="Deck" style="fill:black;stroke:black;stroke-width:0.05" text-anchor="middle" font-weight="normal" skip2D="true" skip3D="true">
+  <var ANSI_A_Width="215.9" ANSI_A_Height="279.4" id="var"/>
+  <var grid_cellWidth="59" grid_cellHeight="90" grid_columns="3" grid_rows="3" id="var_Wizard Color"/>
+  <var translateX="19.450000000000003" translateY="4.699999999999989" id="var_Wizard Color_translateX"/>
   <license type="ShareAlike 1.0 Generic (CC SA 1.0)" href="https://creativecommons.org/licenses/sa/1.0/" id="license"/>
-  <string listFormats="y:12;name:smallTitle;fontSize:10;xOffset:-1 y:16;name:title;fontSize:15;anchor:end;xOffset:-2 y:19;name:article y:28;name:subtitle;fontSize:6 y:70;name:description" listTransform="translate(cellX(),cellY())" id="string"/>
-  <var listColumns="3" listLineHeight="4" listMargin="4" id="var_Wizard Color"/>
+  <string list_formats="name:smallTitle;dx:-1;font-size:10;y:12 name:title;dx:-2;font-size:15;text-anchor:end;y:16 name:article;lineHeight:3.5;text-anchor:start;y:19 name:subtitle;font-size:6;y:28 name:description;text-anchor:start;y:70" list_transform="translate(cellX(),cellY())" id="string"/>
+  <var list_margin="4" id="var_Wizard Color_list_margin"/>
   <var scale="0.22" id="var_Wizard Color_scale"/>
-  <var halfCellWidth="29.5" id="var_Wizard Color_halfCellWidth"/>
-  <g id="grid" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" cellColumn="3" cellHeight="90" cellRow="2" cellWidth="59">
+  <g id="grid" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
+    <var halfCellWidth="29.5" id="var_grid"/>
     <defs id="defs">
       <radialGradient id="sphereGradient" cx="50%" cy="50%" r="100%" fr="20%" fx="50%" fy="50%">
         <stop offset="0%" style="stop-color:white;stop-opacity:1" id="stop"/>
@@ -41,8 +42,8 @@
     <g title="A" id="list" transform="translate(0,0)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_title">A</text>
     </g>
-    <string listChildren="heart staffBottom" id="string_grid"/>
-    <g title="4" subtitle="Enlarge" description="#Doubles combat attack" id="list_grid" transform="translate(59,0)">
+    <string list_children="heart staffBottom" id="string_grid"/>
+    <g title="4" subtitle="Enlarge" description="Doubles combat attack" id="list_grid" transform="translate(59,0)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_3">4</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_subtitle">Enlarge</text>
       <text x="4" y="70" text-anchor="start" id="list_grid_description">Doubles combat attack</text>
@@ -106,11 +107,11 @@
         </g>
       </g>
     </g>
-    <g title="10" subtitle="Wizard Omnispell" description="#Any heart wizardry up to 9 or any wizardry up to 7" id="list_grid_title_subtitle" transform="translate(0,90)">
+    <g title="10" subtitle="Wizard Omnispell" description="Any heart wizardry up to 9 or any wizardry up to 7" id="list_grid_title_subtitle" transform="translate(0,90)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_subtitle_title">10</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_title_subtitle_subtitle">Wizard Omnispell</text>
-      <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_5">Any heart wizardry up to 9 or any</text>
-      <text x="4" y="74" text-anchor="start" id="list_grid_title_subtitle_description_6">wizardry up to 7</text>
+      <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_5">Any heart wizardry up to 9 or</text>
+      <text x="4" y="74" text-anchor="start" id="list_grid_title_subtitle_description_6">any wizardry up to 7</text>
       <g id="list_grid_title_subtitle_0">
         <polygon id="list_grid_title_subtitle_0_copy_heartBase" points="50,78 51.4587638720519,83.93839199000477 54.310823269785516,89.3474814376989 58.38674148714606,93.90592219597855 63.44437414332327,97.34290392076653 69.18325462868806,99.45424052018782 75.26244438962719,100.11450055369701 81.32078759278247,99.28445893176534 86.99836686851293,97.01342722147315 91.95788547902652,93.43632411793727 95.90470562763127,88.76566012061053 98.60435246226005,83.27891259319182 99.89644388584496,77.302041236499 99.70421862374077,71.19012329611681 98.03909649955192,65.30625893900476 95,60 64,25 55.65498349215633,13.253209244392458 50,0 44.34501650784367,13.253209244392458 36,25 5.0000000000000036,60.00000000000001 1.960903500448087,65.30625893900476 0.29578137625923245,71.19012329611681 0.10355611415504502,77.302041236499 1.3956475377399522,83.27891259319182 4.095294372368732,88.76566012061053 8.04211452097349,93.43632411793727 13.001633131487074,97.01342722147315 18.67921240721754,99.28445893176534 24.737555610372816,100.11450055369701 30.816745371311946,99.45424052018782 36.55562585667674,97.34290392076653 41.61325851285395,93.90592219597855 45.6891767302145,89.3474814376989 48.54123612794812,83.93839199000477" center="50" direction="90" style="fill:red;stroke:red" tag="polygon" transform="matrix(0.112,0,0,-0.112,29.5,16.2)"/>
       </g>
@@ -140,7 +141,7 @@
         </g>
       </g>
     </g>
-    <g title="K" subtitle="Phase" description="#Steal: Caster picks three cards and steals one" id="list_grid_title_subtitle_description" transform="translate(59,90)">
+    <g title="K" subtitle="Phase" description="Steal: Caster picks three cards and steals one" id="list_grid_title_subtitle_description" transform="translate(59,90)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_subtitle_description_title">K</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_title_subtitle_description_subtitle">Phase</text>
       <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_description">Steal: Caster picks three cards</text>
@@ -174,7 +175,7 @@
         </g>
       </g>
     </g>
-    <string listChildren="diamond staffBottom" id="string_grid_listChildren"/>
+    <string list_children="diamond staffBottom" id="string_grid_list_children"/>
     <g title="3" id="list_grid_title_2" transform="translate(118,90)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_2_title">3</text>
       <g id="list_grid_title_2_0">
@@ -206,7 +207,7 @@
         </g>
       </g>
     </g>
-    <g title="6" subtitle="Fly" description="#Escape combat attack unless caster uses fly" id="list_grid_title_subtitle_description_2" transform="translate(0,180)">
+    <g title="6" subtitle="Fly" description="Escape combat attack unless caster uses fly" id="list_grid_title_subtitle_description_2" transform="translate(0,180)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_subtitle_description_2_title">6</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_title_subtitle_description_2_subtitle">Fly</text>
       <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_2_description">Escape combat attack unless</text>
@@ -240,7 +241,7 @@
         </g>
       </g>
     </g>
-    <g title="9" subtitle="Portal" description="#Escape combat attack" id="list_grid_title_subtitle_description_3" transform="translate(59,180)">
+    <g title="9" subtitle="Portal" description="Escape combat attack" id="list_grid_title_subtitle_description_3" transform="translate(59,180)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_subtitle_description_3_title">9</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_title_subtitle_description_3_subtitle">Portal</text>
       <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_3_description">Escape combat attack</text>
@@ -273,7 +274,7 @@
         </g>
       </g>
     </g>
-    <g title="Q" subtitle="Sanctuary" description="#Escape combat attack" id="list_grid_title_subtitle_description_4" transform="translate(118,180)">
+    <g title="Q" subtitle="Sanctuary" description="Escape combat attack" id="list_grid_title_subtitle_description_4" transform="translate(118,180)">
       <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_title_subtitle_description_4_title">Q</text>
       <text x="29.5" y="28" font-size="6" id="list_grid_title_subtitle_description_4_subtitle">Sanctuary</text>
       <text x="4" y="70" text-anchor="start" id="list_grid_title_subtitle_description_4_description">Escape combat attack</text>
@@ -306,7 +307,7 @@
         </g>
       </g>
     </g>
-    <g id="gridGroup" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" style="stroke-width:1" cellColumn="0" cellHeight="90" cellRow="0" cellWidth="59">
+    <g id="gridGroup" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
       <polyline points="-3,0 1.5,0" id="gridGroup_polyline_0"/>
       <polyline points="175.5,0 180,0" id="gridGroup_polyline_1"/>
       <polyline points="-3,270 1.5,270" id="gridGroup_polyline_2"/>
@@ -342,9 +343,9 @@
     </g>
   </g>
   <g transform="translate(0,279.4)" id="g">
-    <g id="grid_grid" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" cellColumn="3" cellHeight="90" cellRow="2" cellWidth="59">
-      <string listChildren="heart staffBottom" id="string_grid_grid"/>
-      <g title="2" subtitle="Oakfist" description="#Combat: Attacker discards one target card" id="list_grid_grid" transform="translate(0,0)">
+    <g id="grid_grid" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
+      <string list_children="heart staffBottom" id="string_grid_grid"/>
+      <g title="2" subtitle="Oakfist" description="Combat: Attacker discards one target card" id="list_grid_grid" transform="translate(0,0)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_5">2</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_subtitle">Oakfist</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_description">Combat: Attacker discards one</text>
@@ -378,7 +379,7 @@
           </g>
         </g>
       </g>
-      <g title="5" subtitle="Charm" description="#Reverse steal" id="list_grid_grid_title" transform="translate(59,0)">
+      <g title="5" subtitle="Charm" description="Reverse steal" id="list_grid_grid_title" transform="translate(59,0)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_title">5</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_title_subtitle_2">Charm</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_description">Reverse steal</text>
@@ -411,11 +412,11 @@
           </g>
         </g>
       </g>
-      <g title="8" subtitle="Gaseous" description="#Steal: Caster picks two cards and steals one" id="list_grid_grid_title_subtitle" transform="translate(118,0)">
+      <g title="8" subtitle="Gaseous" description="Steal: Caster picks two cards and steals one" id="list_grid_grid_title_subtitle" transform="translate(118,0)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_subtitle_title">8</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_title_subtitle_subtitle">Gaseous</text>
-        <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_subtitle_description_4">Steal: Caster picks two cards and</text>
-        <text x="4" y="74" text-anchor="start" id="list_grid_grid_title_subtitle_description_5">steals one</text>
+        <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_subtitle_description_4">Steal: Caster picks two cards</text>
+        <text x="4" y="74" text-anchor="start" id="list_grid_grid_title_subtitle_description_5">and steals one</text>
         <g id="list_grid_grid_title_subtitle_0">
           <polygon id="list_grid_grid_title_subtitle_0_copy_heartBase" points="50,78 51.4587638720519,83.93839199000477 54.310823269785516,89.3474814376989 58.38674148714606,93.90592219597855 63.44437414332327,97.34290392076653 69.18325462868806,99.45424052018782 75.26244438962719,100.11450055369701 81.32078759278247,99.28445893176534 86.99836686851293,97.01342722147315 91.95788547902652,93.43632411793727 95.90470562763127,88.76566012061053 98.60435246226005,83.27891259319182 99.89644388584496,77.302041236499 99.70421862374077,71.19012329611681 98.03909649955192,65.30625893900476 95,60 64,25 55.65498349215633,13.253209244392458 50,0 44.34501650784367,13.253209244392458 36,25 5.0000000000000036,60.00000000000001 1.960903500448087,65.30625893900476 0.29578137625923245,71.19012329611681 0.10355611415504502,77.302041236499 1.3956475377399522,83.27891259319182 4.095294372368732,88.76566012061053 8.04211452097349,93.43632411793727 13.001633131487074,97.01342722147315 18.67921240721754,99.28445893176534 24.737555610372816,100.11450055369701 30.816745371311946,99.45424052018782 36.55562585667674,97.34290392076653 41.61325851285395,93.90592219597855 45.6891767302145,89.3474814376989 48.54123612794812,83.93839199000477" center="50" direction="90" style="fill:red;stroke:red" tag="polygon" transform="matrix(0.112,0,0,-0.112,29.5,16.2)"/>
         </g>
@@ -476,7 +477,7 @@
           </g>
         </g>
       </g>
-      <string listChildren="diamond staffBottom" id="string_grid_grid_listChildren"/>
+      <string list_children="diamond staffBottom" id="string_grid_grid_list_children"/>
       <g title="A" id="list_grid_grid_title_3" transform="translate(59,90)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_3_title">A</text>
         <g id="list_grid_grid_title_3_0">
@@ -539,7 +540,7 @@
           </g>
         </g>
       </g>
-      <g title="7" subtitle="Underwater" description="#Pick a card from top of deck" id="list_grid_grid_title_subtitle_description" transform="translate(0,180)">
+      <g title="7" subtitle="Underwater" description="Pick a card from top of deck" id="list_grid_grid_title_subtitle_description" transform="translate(0,180)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_subtitle_description_title">7</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_title_subtitle_description_subtitle">Underwater</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_subtitle_description_description">Pick a card from top of deck</text>
@@ -572,7 +573,7 @@
           </g>
         </g>
       </g>
-      <g title="10" subtitle="Sight" description="#Stop steal" id="list_grid_grid_title_subtitle_description_2" transform="translate(59,180)">
+      <g title="10" subtitle="Sight" description="Stop steal" id="list_grid_grid_title_subtitle_description_2" transform="translate(59,180)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_subtitle_description_2_title">10</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_title_subtitle_description_2_subtitle">Sight</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_subtitle_description_2_description">Stop steal</text>
@@ -605,7 +606,7 @@
           </g>
         </g>
       </g>
-      <g title="K" subtitle="Astral Portage" description="#Escape combat attack" id="list_grid_grid_title_subtitle_description_3" transform="translate(118,180)">
+      <g title="K" subtitle="Astral Portage" description="Escape combat attack" id="list_grid_grid_title_subtitle_description_3" transform="translate(118,180)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_title_subtitle_description_3_title">K</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_title_subtitle_description_3_subtitle">Astral Portage</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_title_subtitle_description_3_description">Escape combat attack</text>
@@ -638,46 +639,46 @@
           </g>
         </g>
       </g>
-      <g id="gridGroup_4" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" style="stroke-width:1" cellColumn="0" cellHeight="90" cellRow="0" cellWidth="59">
-        <polyline points="-3,0 1.5,0" id="gridGroup_4_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_4_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_4_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_4_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_4_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_4_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_4_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_4_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_4_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_4_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_4_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_4_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_4_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_4_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_4_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_4_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_4_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_4_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_4_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_4_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_4_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_4_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_4_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_4_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_4_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_4_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_4_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_4_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_4_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_4_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_4_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_4_polyline_31"/>
+      <g id="gridGroup_2" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
+        <polyline points="-3,0 1.5,0" id="gridGroup_2_polyline_0"/>
+        <polyline points="175.5,0 180,0" id="gridGroup_2_polyline_1"/>
+        <polyline points="-3,270 1.5,270" id="gridGroup_2_polyline_2"/>
+        <polyline points="175.5,270 180,270" id="gridGroup_2_polyline_3"/>
+        <polyline points="0,-3 0,1.5" id="gridGroup_2_polyline_4"/>
+        <polyline points="177,-3 177,1.5" id="gridGroup_2_polyline_5"/>
+        <polyline points="0,268.5 0,273" id="gridGroup_2_polyline_6"/>
+        <polyline points="177,268.5 177,273" id="gridGroup_2_polyline_7"/>
+        <polyline points="59,-3 59,1.5" id="gridGroup_2_polyline_8"/>
+        <polyline points="59,268.5 59,273" id="gridGroup_2_polyline_9"/>
+        <polyline points="57.5,0 60.5,0" id="gridGroup_2_polyline_10"/>
+        <polyline points="57.5,270 60.5,270" id="gridGroup_2_polyline_11"/>
+        <polyline points="118,-3 118,1.5" id="gridGroup_2_polyline_12"/>
+        <polyline points="118,268.5 118,273" id="gridGroup_2_polyline_13"/>
+        <polyline points="116.5,0 119.5,0" id="gridGroup_2_polyline_14"/>
+        <polyline points="116.5,270 119.5,270" id="gridGroup_2_polyline_15"/>
+        <polyline points="-3,90 1.5,90" id="gridGroup_2_polyline_16"/>
+        <polyline points="175.5,90 180,90" id="gridGroup_2_polyline_17"/>
+        <polyline points="0,88.5 0,91.5" id="gridGroup_2_polyline_18"/>
+        <polyline points="177,88.5 177,91.5" id="gridGroup_2_polyline_19"/>
+        <polyline points="-3,180 1.5,180" id="gridGroup_2_polyline_20"/>
+        <polyline points="175.5,180 180,180" id="gridGroup_2_polyline_21"/>
+        <polyline points="0,178.5 0,181.5" id="gridGroup_2_polyline_22"/>
+        <polyline points="177,178.5 177,181.5" id="gridGroup_2_polyline_23"/>
+        <polyline points="57.8,90 60.2,90" id="gridGroup_2_polyline_24"/>
+        <polyline points="59,88.8 59,91.2" id="gridGroup_2_polyline_25"/>
+        <polyline points="116.8,90 119.2,90" id="gridGroup_2_polyline_26"/>
+        <polyline points="118,88.8 118,91.2" id="gridGroup_2_polyline_27"/>
+        <polyline points="57.8,180 60.2,180" id="gridGroup_2_polyline_28"/>
+        <polyline points="59,178.8 59,181.2" id="gridGroup_2_polyline_29"/>
+        <polyline points="116.8,180 119.2,180" id="gridGroup_2_polyline_30"/>
+        <polyline points="118,178.8 118,181.2" id="gridGroup_2_polyline_31"/>
       </g>
     </g>
   </g>
   <g transform="translate(0,558.8)" id="g_Wizard Color">
-    <g id="grid_grid_g_Wizard Color" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" cellColumn="3" cellHeight="90" cellRow="2" cellWidth="59">
-      <string listChildren="heart staffBottom" id="string_grid_grid_g_Wizard Color"/>
-      <g title="3" subtitle="Polymorph" description="#Steal: Caster steals a card" id="list_grid_grid_g_Wizard Color" transform="translate(0,0)">
+    <g id="grid_grid_g_Wizard Color" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
+      <string list_children="heart staffBottom" id="string_grid_grid_g_Wizard Color"/>
+      <g title="3" subtitle="Polymorph" description="Steal: Caster steals a card" id="list_grid_grid_g_Wizard Color" transform="translate(0,0)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_g_Wizard Color_title_6">3</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_g_Wizard Color_subtitle">Polymorph</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_g_Wizard Color_description">Steal: Caster steals a card</text>
@@ -710,7 +711,7 @@
           </g>
         </g>
       </g>
-      <g title="6" subtitle="Oakskin" description="#Stops combat attack" id="list_grid_grid_g_Wizard Color_title" transform="translate(59,0)">
+      <g title="6" subtitle="Oakskin" description="Stops combat attack" id="list_grid_grid_g_Wizard Color_title" transform="translate(59,0)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_g_Wizard Color_title_title">6</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_g_Wizard Color_title_subtitle_2">Oakskin</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_g_Wizard Color_title_description">Stops combat attack</text>
@@ -805,7 +806,7 @@
           </g>
         </g>
       </g>
-      <string listChildren="diamond staffBottom" id="string_grid_grid_g_Wizard Color_listChildren"/>
+      <string list_children="diamond staffBottom" id="string_grid_grid_g_Wizard Color_list_children"/>
       <g title="2" id="list_grid_grid_g_Wizard Color_title_4" transform="translate(59,90)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_g_Wizard Color_title_4_title">2</text>
         <g id="list_grid_grid_g_Wizard Color_title_4_0">
@@ -837,7 +838,7 @@
           </g>
         </g>
       </g>
-      <g title="5" subtitle="Invisibility" description="#Steal: Caster steals a card" id="list_grid_grid_g_Wizard Color_title_subtitle" transform="translate(118,90)">
+      <g title="5" subtitle="Invisibility" description="Steal: Caster steals a card" id="list_grid_grid_g_Wizard Color_title_subtitle" transform="translate(118,90)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_g_Wizard Color_title_subtitle_title">5</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_g_Wizard Color_title_subtitle_subtitle">Invisibility</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_g_Wizard Color_title_subtitle_description_2">Steal: Caster steals a card</text>
@@ -901,7 +902,7 @@
           </g>
         </g>
       </g>
-      <g title="J" subtitle="Scry" description="#See all cards" id="list_grid_grid_g_Wizard Color_title_subtitle_description" transform="translate(59,180)">
+      <g title="J" subtitle="Scry" description="See all cards" id="list_grid_grid_g_Wizard Color_title_subtitle_description" transform="translate(59,180)">
         <text x="27.5" y="16" font-size="15" text-anchor="end" id="list_grid_grid_g_Wizard Color_title_subtitle_description_title">J</text>
         <text x="29.5" y="28" font-size="6" id="list_grid_grid_g_Wizard Color_title_subtitle_description_subtitle">Scry</text>
         <text x="4" y="70" text-anchor="start" id="list_grid_grid_g_Wizard Color_title_subtitle_description_description">See all cards</text>
@@ -934,26 +935,22 @@
           </g>
         </g>
       </g>
-      <string listChildren="staffBottom" listLineHeight="3" id="string_grid_grid_g_Wizard Color_listChildren_listLineHeight"/>
-      <g smallTitle="Joker" article="#If the actor picks an unused card, she picks randomly from the target's cards ##Only one doubling card can be used for each action ##If a joker is used, it can still be any card of its suits and class at the end ##At the end, the players make poker hands with up to 5 cards ##License: ShareAlike" id="list_grid_grid_g_Wizard Color_smallTitle" transform="translate(118,180)">
+      <string list_children="staffBottom" id="string_grid_grid_g_Wizard Color_list_children_2"/>
+      <g smallTitle="Joker" article="If the actor picks an unused card, she picks randomly from the target's cards Only one doubling card can be used for each action If a joker is used, it can still be any card of its suits and class at the end At the end, the players make poker hands with up to 5 cards License: ShareAlike" id="list_grid_grid_g_Wizard Color_smallTitle" transform="translate(118,180)">
         <polygon transform="translate(-25.5) translate(29.5,12) scale(0.07,-0.07)" work="heartBase" id="copy_heartBase_list_grid_grid_g_Wizard Color_smallTitle" points="50,78 51.4587638720519,83.93839199000477 54.310823269785516,89.3474814376989 58.38674148714606,93.90592219597855 63.44437414332327,97.34290392076653 69.18325462868806,99.45424052018782 75.26244438962719,100.11450055369701 81.32078759278247,99.28445893176534 86.99836686851293,97.01342722147315 91.95788547902652,93.43632411793727 95.90470562763127,88.76566012061053 98.60435246226005,83.27891259319182 99.89644388584496,77.302041236499 99.70421862374077,71.19012329611681 98.03909649955192,65.30625893900476 95,60 64,25 55.65498349215633,13.253209244392458 50,0 44.34501650784367,13.253209244392458 36,25 5.0000000000000036,60.00000000000001 1.960903500448087,65.30625893900476 0.29578137625923245,71.19012329611681 0.10355611415504502,77.302041236499 1.3956475377399522,83.27891259319182 4.095294372368732,88.76566012061053 8.04211452097349,93.43632411793727 13.001633131487074,97.01342722147315 18.67921240721754,99.28445893176534 24.737555610372816,100.11450055369701 30.816745371311946,99.45424052018782 36.55562585667674,97.34290392076653 41.61325851285395,93.90592219597855 45.6891767302145,89.3474814376989 48.54123612794812,83.93839199000477" center="50" direction="90" style="fill:red;stroke:red" tag="polygon"/>
         <polygon transform="translate(17.5) translate(29.5,12) scale(0.07,-0.07)" work="diamondBase" id="copy_diamondBase_list_grid_grid_g_Wizard Color_smallTitle" points="50,0 41.557919673956214,16.045755441222177 30.08630748559247,30.086307485592485 16.045755441222163,41.557919673956214 0,50 0,50 16.045755441222177,58.44208032604378 30.086307485592485,69.91369251440753 41.557919673956214,83.95424455877783 50,100 58.4420803260438,83.95424455877783 69.91369251440751,69.91369251440753 83.95424455877783,58.44208032604377 100,49.99999999999999 100,49.99999999999999 83.95424455877784,41.55791967395621 69.91369251440753,30.086307485592485 58.442080326043786,16.045755441222177" center="50" direction="90" style="fill:red;stroke:red" tag="polygon"/>
         <text x="28.5" y="12" font-size="10" id="list_grid_grid_g_Wizard Color_smallTitle_smallTitle">Joker</text>
-        <text x="4" y="19" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article">If the actor picks an unused card,</text>
-        <text x="4" y="22" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_2">she picks randomly from the</text>
-        <text x="4" y="25" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_3">target's cards</text>
-        <text x="4" y="28" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_4"></text>
-        <text x="4" y="31" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_5">Only one doubling card can be</text>
-        <text x="4" y="34" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_6">used for each action</text>
-        <text x="4" y="37" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_7"></text>
-        <text x="4" y="40" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_8">If a joker is used, it can still be</text>
-        <text x="4" y="43" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_9">any card of its suits and class at</text>
-        <text x="4" y="46" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_10">the end</text>
-        <text x="4" y="49" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_11"></text>
-        <text x="4" y="52" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_12">At the end, the players make</text>
-        <text x="4" y="55" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_13">poker hands with up to 5 cards</text>
-        <text x="4" y="58" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_14"></text>
-        <text x="4" y="61" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_15">License: ShareAlike</text>
+        <text x="4" y="19" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article">If the actor picks an unused</text>
+        <text x="4" y="22.5" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_2">card, she picks randomly from</text>
+        <text x="4" y="26" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_3">the target's cards</text>
+        <text x="4" y="33" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_4">Only one doubling card can be</text>
+        <text x="4" y="36.5" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_5">used for each action</text>
+        <text x="4" y="43.5" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_6">If a joker is used, it can still be</text>
+        <text x="4" y="47" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_7">any card of its suits and class at</text>
+        <text x="4" y="50.5" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_8">the end</text>
+        <text x="4" y="57.5" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_9">At the end, the players make</text>
+        <text x="4" y="61" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_10">poker hands with up to 5 cards</text>
+        <text x="4" y="68" text-anchor="start" id="list_grid_grid_g_Wizard Color_smallTitle_article_11">License: ShareAlike</text>
         <g id="list_grid_grid_g_Wizard Color_smallTitle_0">
           <var id="list_grid_grid_g_Wizard Color_smallTitle_0_var_staffBottom" offset="3.5" y="86"/>
           <g id="list_grid_grid_g_Wizard Color_smallTitle_0_copy" transform="matrix(-0.22,2.694222958124177e-17,2.694222958124177e-17,0.22,26,82.48)">
@@ -977,39 +974,39 @@
           </g>
         </g>
       </g>
-      <g id="gridGroup_5" columns="3" oldGridWidth="215.9 - 25.4 * (0.26 * 2)" gridWidth="177" oldGridHeight="279.4 - 25.4 * (0.19 + 0.15)" gridHeight="270" insideLength="1.2" lineLength="1.5" outsideLength="3" rows="3" skip2D="true" style="stroke-width:1" cellColumn="0" cellHeight="90" cellRow="0" cellWidth="59">
-        <polyline points="-3,0 1.5,0" id="gridGroup_5_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_5_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_5_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_5_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_5_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_5_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_5_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_5_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_5_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_5_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_5_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_5_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_5_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_5_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_5_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_5_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_5_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_5_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_5_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_5_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_5_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_5_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_5_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_5_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_5_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_5_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_5_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_5_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_5_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_5_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_5_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_5_polyline_31"/>
+      <g id="gridGroup_3" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
+        <polyline points="-3,0 1.5,0" id="gridGroup_3_polyline_0"/>
+        <polyline points="175.5,0 180,0" id="gridGroup_3_polyline_1"/>
+        <polyline points="-3,270 1.5,270" id="gridGroup_3_polyline_2"/>
+        <polyline points="175.5,270 180,270" id="gridGroup_3_polyline_3"/>
+        <polyline points="0,-3 0,1.5" id="gridGroup_3_polyline_4"/>
+        <polyline points="177,-3 177,1.5" id="gridGroup_3_polyline_5"/>
+        <polyline points="0,268.5 0,273" id="gridGroup_3_polyline_6"/>
+        <polyline points="177,268.5 177,273" id="gridGroup_3_polyline_7"/>
+        <polyline points="59,-3 59,1.5" id="gridGroup_3_polyline_8"/>
+        <polyline points="59,268.5 59,273" id="gridGroup_3_polyline_9"/>
+        <polyline points="57.5,0 60.5,0" id="gridGroup_3_polyline_10"/>
+        <polyline points="57.5,270 60.5,270" id="gridGroup_3_polyline_11"/>
+        <polyline points="118,-3 118,1.5" id="gridGroup_3_polyline_12"/>
+        <polyline points="118,268.5 118,273" id="gridGroup_3_polyline_13"/>
+        <polyline points="116.5,0 119.5,0" id="gridGroup_3_polyline_14"/>
+        <polyline points="116.5,270 119.5,270" id="gridGroup_3_polyline_15"/>
+        <polyline points="-3,90 1.5,90" id="gridGroup_3_polyline_16"/>
+        <polyline points="175.5,90 180,90" id="gridGroup_3_polyline_17"/>
+        <polyline points="0,88.5 0,91.5" id="gridGroup_3_polyline_18"/>
+        <polyline points="177,88.5 177,91.5" id="gridGroup_3_polyline_19"/>
+        <polyline points="-3,180 1.5,180" id="gridGroup_3_polyline_20"/>
+        <polyline points="175.5,180 180,180" id="gridGroup_3_polyline_21"/>
+        <polyline points="0,178.5 0,181.5" id="gridGroup_3_polyline_22"/>
+        <polyline points="177,178.5 177,181.5" id="gridGroup_3_polyline_23"/>
+        <polyline points="57.8,90 60.2,90" id="gridGroup_3_polyline_24"/>
+        <polyline points="59,88.8 59,91.2" id="gridGroup_3_polyline_25"/>
+        <polyline points="116.8,90 119.2,90" id="gridGroup_3_polyline_26"/>
+        <polyline points="118,88.8 118,91.2" id="gridGroup_3_polyline_27"/>
+        <polyline points="57.8,180 60.2,180" id="gridGroup_3_polyline_28"/>
+        <polyline points="59,178.8 59,181.2" id="gridGroup_3_polyline_29"/>
+        <polyline points="116.8,180 119.2,180" id="gridGroup_3_polyline_30"/>
+        <polyline points="118,178.8 118,181.2" id="gridGroup_3_polyline_31"/>
       </g>
     </g>
   </g>
