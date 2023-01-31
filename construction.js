@@ -528,7 +528,6 @@ function getAssembledMesh(centerScale, meshes) {
 		}
 	}
 	for (var meshIndex = 1; meshIndex < meshes.length; meshIndex++) {
-		var pointLength = assembledMesh.points.length
 		var meshCopy = getMeshCopy(meshes[meshIndex])
 		if (!getIsEmpty(centerScale)) {
 			var meshBoundingBox = getMeshBoundingBox(meshCopy)
@@ -537,34 +536,7 @@ function getAssembledMesh(centerScale, meshes) {
 			multiply3Ds(meshCopy.points, centerScale)
 			add3Ds(meshCopy.points, center)
 		}
-		pushArray(assembledMesh.points, meshCopy.points)
-		for (var facet of meshCopy.facets) {
-			addArrayScalar(facet, pointLength)
-		}
-		pushArray(assembledMesh.facets, meshCopy.facets)
-
-		if (meshCopy.intersectionIndexesMap != undefined) {
-			for (var intersectionIndexes of meshCopy.intersectionIndexesMap.values()) {
-				addArrayScalar(intersectionIndexes, pointLength)
-			}
-			if (assembledMesh.intersectionIndexesMap == undefined) {
-				assembledMesh.intersectionIndexesMap = new Map(meshCopy.intersectionIndexesMap.entries())
-			}
-			else {
-				addMapToMapArray(meshCopy.intersectionIndexesMap, assembledMesh.intersectionIndexesMap)
-			}
-		}
-		if (meshCopy.splitIndexesMap != undefined) {
-			for (var splitIndexes of meshCopy.splitIndexesMap.values()) {
-				addArrayScalar(splitIndexes, pointLength)
-			}
-			if (assembledMesh.splitIndexesMap == undefined) {
-				assembledMesh.splitIndexesMap = new Map(meshCopy.splitIndexesMap.entries())
-			}
-			else {
-				addMapToMapArray(meshCopy.splitIndexesMap, assembledMesh.intersectionIndexesMap)
-			}
-		}
+		addMeshToAssembledMesh(assembledMesh, meshCopy)
 	}
 	return assembledMesh
 }
