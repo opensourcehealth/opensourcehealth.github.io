@@ -533,6 +533,17 @@ function polarRadius(angle, radius) {
 	return [radius * Math.cos(angle), radius * Math.sin(angle)]
 }
 
+function reverseSigns(elements) {
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		elements[elementIndex] = -elements[elementIndex]
+	}
+	return elements
+}
+
+function reverseSigns_Check(elements) {
+	return reverseSigns(getArrayByElements(elements))
+}
+
 function rotate2DAngle(point, angle) {
 	return rotate2DVector(getArrayByElements(point, 2), polarCounterclockwise(angle))
 }
