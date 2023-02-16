@@ -1,5 +1,15 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+function addArraysToSpreadsheetStrings(arrays, name, strings) {
+	strings.push('_arrays\t' + name)
+	var arraysCopy = new Array(arrays.length)
+	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+		arraysCopy[arrayIndex] = arrays[arrayIndex].join('\t')
+	}
+	pushArray(strings, arraysCopy)
+	strings.push('_end')
+}
+
 function addConnectedSegmentsToFacets(meetingMap, facet, facets, toolSegments, workSegments) {
 	var connectedSegmentArrays = getConnectedSegmentArrays(toolSegments, workSegments)
 	convertSegmentArraysToKeyArrays(connectedSegmentArrays)
@@ -583,37 +593,83 @@ function getClosedFacet(beginIndex, facet) {
 
 function getClosestConnectionByFacets(facets, points) {
 	var closestDistanceSquared = Number.MAX_VALUE
-	var connection = {firstVertexIndex:null, otherVertexIndex:null, otherFacetIndex:null}
-	var polygons = getPolygonByFacets(facets, points)
+	var connection = {}
+	var distanceConnections = []
+	var polygons = getPolygonsByFacets(facets, points)
 	var firstFacet = facets[0]
 	var firstPolygon = polygons[0]
+	var firstCenter = [0.0, 0.0]
+	for (var point of firstPolygon) {
+		add2D(firstCenter, point)
+	}
+	divide2DScalar(firstCenter, firstPolygon.length)
+	for (var otherFacetIndex = 1; otherFacetIndex < facets.length; otherFacetIndex++) {
+		var otherPolygon = polygons[otherFacetIndex]
+		for (var otherVertexIndex = 0; otherVertexIndex < otherPolygon.length; otherVertexIndex++) {
+			distanceConnections.push([distanceSquared2D(firstCenter, otherPolygon[otherVertexIndex]), otherFacetIndex, otherVertexIndex])
+		}
+	}
+	distanceConnections.sort(compareFirstElementAscending)
+	for (var distanceConnection of distanceConnections) {
+		var otherFacetIndex = distanceConnection[1]
+		var otherVertexIndex = distanceConnection[2]
+		var otherPolygon = polygons[otherFacetIndex]
+		var otherPoint = otherPolygon[otherVertexIndex]
+		for (var firstVertexIndex = 0; firstVertexIndex < firstPolygon.length; firstVertexIndex++) {
+			var firstPoint = firstPolygon[firstVertexIndex]
+			var firstCheck = getSubtraction2D(firstPoint, otherPoint)
+			var distanceSquared = lengthSquared2D(firstCheck)
+			if (distanceSquared < closestDistanceSquared && distanceSquared > 0.0) {
+				divide2DScalar(firstCheck, Math.sqrt(distanceSquared))
+				var reverseRotation = [firstCheck[0], -firstCheck[1]]
+				var firstIndexPlus = (firstVertexIndex + 1) % firstPolygon.length
+				var firstSliceRotated = getRotatedSlice(firstPolygon, firstIndexPlus, firstVertexIndex, reverseRotation)
+				var otherIndexPlus = (otherVertexIndex + 1) % otherPolygon.length
+				var otherSliceRotated = getRotatedSlice(otherPolygon, otherIndexPlus, otherVertexIndex, reverseRotation)
+				var xIntersections = []
+				var firstRotated = getRotation2DVector(firstPoint, reverseRotation)
+				var otherRotated = getRotation2DVector(otherPoint, reverseRotation)
+				var y = firstRotated[1]
+				addXIntersectionsByPolylineClose(xIntersections, firstSliceRotated, y)
+				addXIntersectionsByPolylineClose(xIntersections, otherSliceRotated, y)
+				if (getIsClear(firstRotated[0], otherRotated[0], xIntersections)) {
+					closestDistanceSquared = distanceSquared
+					connection.firstVertexIndex = firstVertexIndex
+					connection.otherVertexIndex = otherVertexIndex
+					connection.otherFacetIndex = otherFacetIndex
+				}
+			}
+		}
+		if (connection.firstVertexIndex != undefined) {
+			break
+		}
+	}
+	var otherFacetIndex = connection.otherFacetIndex
+	var otherPolygon = polygons[otherFacetIndex]
 	for (var firstVertexIndex = 0; firstVertexIndex < firstPolygon.length; firstVertexIndex++) {
 		var firstPoint = firstPolygon[firstVertexIndex]
-		for (var otherFacetIndex = 1; otherFacetIndex < facets.length; otherFacetIndex++) {
-			var otherPolygon = polygons[otherFacetIndex]
-			for (var otherVertexIndex = 0; otherVertexIndex < otherPolygon.length; otherVertexIndex++) {
-				var otherPoint = otherPolygon[otherVertexIndex]
-				var firstCheck = getSubtraction2D(firstPoint, otherPoint)
-				var distanceSquared = lengthSquared2D(firstCheck)
-				if (distanceSquared < closestDistanceSquared && distanceSquared > 0.0) {
-					divide2DScalar(firstCheck, Math.sqrt(distanceSquared))
-					var reverseRotation = [firstCheck[0], -firstCheck[1]]
-					var firstIndexPlus = (firstVertexIndex + 1) % firstPolygon.length
-					var firstSliceRotated = getRotatedSlice(firstPolygon, firstIndexPlus, firstVertexIndex, reverseRotation)
-					var otherIndexPlus = (otherVertexIndex + 1) % otherPolygon.length
-					var otherSliceRotated = getRotatedSlice(otherPolygon, otherIndexPlus, otherVertexIndex, reverseRotation)
-					var xIntersections = []
-					var firstRotated = getRotation2DVector(firstPoint, reverseRotation)
-					var otherRotated = getRotation2DVector(otherPoint, reverseRotation)
-					var y = firstRotated[1]
-					addXIntersectionsByPolylineClose(xIntersections, firstSliceRotated, y)
-					addXIntersectionsByPolylineClose(xIntersections, otherSliceRotated, y)
-					if (getIsClear(firstRotated[0], otherRotated[0], xIntersections)) {
-						closestDistanceSquared = distanceSquared
-						connection.firstVertexIndex = firstVertexIndex
-						connection.otherVertexIndex = otherVertexIndex
-						connection.otherFacetIndex = otherFacetIndex
-					}
+		for (var otherVertexIndex = 0; otherVertexIndex < otherPolygon.length; otherVertexIndex++) {
+			var otherPoint = otherPolygon[otherVertexIndex]
+			var firstCheck = getSubtraction2D(firstPoint, otherPoint)
+			var distanceSquared = lengthSquared2D(firstCheck)
+			if (distanceSquared < closestDistanceSquared && distanceSquared > 0.0) {
+				divide2DScalar(firstCheck, Math.sqrt(distanceSquared))
+				var reverseRotation = [firstCheck[0], -firstCheck[1]]
+				var firstIndexPlus = (firstVertexIndex + 1) % firstPolygon.length
+				var firstSliceRotated = getRotatedSlice(firstPolygon, firstIndexPlus, firstVertexIndex, reverseRotation)
+				var otherIndexPlus = (otherVertexIndex + 1) % otherPolygon.length
+				var otherSliceRotated = getRotatedSlice(otherPolygon, otherIndexPlus, otherVertexIndex, reverseRotation)
+				var xIntersections = []
+				var firstRotated = getRotation2DVector(firstPoint, reverseRotation)
+				var otherRotated = getRotation2DVector(otherPoint, reverseRotation)
+				var y = firstRotated[1]
+				addXIntersectionsByPolylineClose(xIntersections, firstSliceRotated, y)
+				addXIntersectionsByPolylineClose(xIntersections, otherSliceRotated, y)
+				if (getIsClear(firstRotated[0], otherRotated[0], xIntersections)) {
+					closestDistanceSquared = distanceSquared
+					connection.firstVertexIndex = firstVertexIndex
+					connection.otherVertexIndex = otherVertexIndex
+					connection.otherFacetIndex = otherFacetIndex
 				}
 			}
 		}
@@ -724,31 +780,6 @@ function getConnectedPolygon(polygons) {
 	}
 	var mesh = getMeshByPolygons(polygons)
 	return getPolygonByFacet(getConnectedFacet(mesh.facets, mesh.points), mesh.points)
-}
-
-function getCSVMeshString(date, id, mesh, project) {
-	var meshStrings = ['solid']
-	if (!getIsEmpty(date)) {
-		meshStrings.push('date,' + date)
-	}
-	meshStrings.push('format,csv')
-	meshStrings.push('name,' + id)
-	if (!getIsEmpty(project)) {
-		meshStrings.push('project,' + project)
-	}
-	meshStrings.push('points')
-	var points = mesh.points
-	for (var point of points) {
-		meshStrings.push(point.toString())
-	}
-	meshStrings.push('endpoints')
-	meshStrings.push('facets')
-	for (var facet of mesh.facets) {
-		meshStrings.push(facet.toString())
-	}
-	meshStrings.push('endfacets')
-	meshStrings.push('endsolid')
-	return meshStrings.join('\n')
 }
 
 function getEdgeKey(aString, bString) {
@@ -1449,46 +1480,12 @@ function getMeshByLattice(lattice) {
 	return getPolygonateMesh(getMeshByTipMap(pointMap, tipMap))
 }
 
-function getMeshByPolygons(polygons) {
-	var facets = new Array(polygons.length)
-	var pointMap = new Map()
-	var points = []
-	for (var polygonIndex = 0; polygonIndex < polygons.length; polygonIndex++) {
-		var polygon = polygons[polygonIndex]
-		var facet = new Array(polygon.length)
-		for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
-			var point = polygon[pointIndex]
-			var pointString = point.join(',')
-			if (pointMap.has(pointString)) {
-				facet[pointIndex] = pointMap.get(pointString)
-			}
-			else {
-				facet[pointIndex] = points.length
-				pointMap.set(pointString, points.length)
-				points.push(point)
-			}
-		}
-		facets[polygonIndex] = facet
-	}
-	return {facets:facets, points:points}
-}
-
-function getMeshBySTL(id, stlInputString) {
-//solid your_name 
-//facet normal
-//  outer loop
-//    vertex
-//    vertex
-//    vertex
-//  endloop
-//endfacet
-//endsolid
+function getMeshByLines(id, lines) {
 	var facet = []
 	var facets = []
 	var isSolid = false
 	var pointMap = new Map()
 	var points = []
-	var lines = stlInputString.split(getEndOfLine(stlInputString))
 	for (var line of lines) {
 		var words = line.split(' ').filter(lengthCheck)
 		if (words.length > 0) {
@@ -1524,13 +1521,67 @@ function getMeshBySTL(id, stlInputString) {
 			else {
 				if (words.length > 1) {
 					if (firstWord == 'solid') {
-						if (words[1] == id) {
+						if (words[1] == id || id == undefined) {
 							isSolid = true
 						}
 					}
 				}
 			}
 		}
+	}
+	return null
+}
+
+function getMeshByPolygons(polygons) {
+	var facets = new Array(polygons.length)
+	var pointMap = new Map()
+	var points = []
+	for (var polygonIndex = 0; polygonIndex < polygons.length; polygonIndex++) {
+		var polygon = polygons[polygonIndex]
+		var facet = new Array(polygon.length)
+		for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
+			var point = polygon[pointIndex]
+			var pointString = point.join(',')
+			if (pointMap.has(pointString)) {
+				facet[pointIndex] = pointMap.get(pointString)
+			}
+			else {
+				facet[pointIndex] = points.length
+				pointMap.set(pointString, points.length)
+				points.push(point)
+			}
+		}
+		facets[polygonIndex] = facet
+	}
+	return {facets:facets, points:points}
+}
+
+function getMeshBySTL(id, stlInputString) {
+//solid your_name 
+//facet normal
+//  outer loop
+//    vertex
+//    vertex
+//    vertex
+//  endloop
+//endfacet
+//endsolid
+	var lines = stlInputString.split(getEndOfLine(stlInputString))
+	var mesh = getMeshByLines(id, lines)
+	if (mesh == null) {
+		return getMeshByLines(undefined, lines)
+	}
+	return mesh
+}
+
+function getMeshByTSV(tsvInputString) {
+	var rows = getBracketReplacedLinesByText(tsvInputString)
+	for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+		rows[rowIndex] = rows[rowIndex].split('\t')
+	}
+	var spreadsheetArraysMap = getSpreadsheetArraysMap(rows)
+	if (spreadsheetArraysMap.has('facets') && spreadsheetArraysMap.has('points')) {
+		return {facets:spreadsheetArraysMap.get('facets'), points:spreadsheetArraysMap.get('points')}
 	}
 	return null
 }
@@ -1550,8 +1601,8 @@ function getMeshString(date, filetype, id, mesh, project) {
 	if (filetype.toLowerCase() == 'stl') {
 		return getSTLMeshString(id, mesh)
 	}
-	if (filetype.toLowerCase() == 'csv') {
-		return getCSVMeshString(date, id, mesh, project)
+	if (filetype.toLowerCase() == 'tsv') {
+		return getTSVMeshString(date, id, mesh, project)
 	}
 	return null
 }
@@ -1766,6 +1817,38 @@ function getSplitFacet(bisector, facet, vertexIndex, xyPoints) {
 	return null
 }
 
+function getSpreadsheetArraysMap(rows) {
+	var spreadsheetArraysMap = new Map()
+	var arrays = undefined
+	var arraysNumber = 0
+	for (var spreadsheetRowIndex = 0; spreadsheetRowIndex < rows.length; spreadsheetRowIndex++) {
+		var row = rows[spreadsheetRowIndex]
+		if (row.length > 0) {
+			if (arrays == undefined) {
+				if (row[0] == '_arrays') {
+					arrays = []
+					if (row.length > 1) {
+						spreadsheetArraysMap.set(row[1], arrays)
+					}
+					else {
+						spreadsheetArraysMap.set(arraysNumber.toString(), arrays)
+						arraysNumber++
+					}
+				}
+			}
+			else {
+				if (row[0].startsWith('_end')) {
+					arrays = undefined
+				}
+				else {
+					arrays.push(row)
+				}
+			}
+		}
+	}
+	return spreadsheetArraysMap
+}
+
 function getSTLMeshString(id, mesh) {
 //solid your_name 
 //facet normal
@@ -1856,6 +1939,20 @@ function getTriangulated3DPolygons(polygons) {
 
 function getTriangleMesh(mesh) {
 	return {facets:getAllTriangleFacets(mesh), points:mesh.points}
+}
+
+function getTSVMeshString(date, id, mesh, project) {
+	var meshStrings = ['_format\tsolid']
+	if (!getIsEmpty(date)) {
+		meshStrings.push('date\t' + date)
+	}
+	meshStrings.push('name\t' + id)
+	if (!getIsEmpty(project)) {
+		meshStrings.push('project\t' + project)
+	}
+	addArraysToSpreadsheetStrings(mesh.points, 'points', meshStrings)
+	addArraysToSpreadsheetStrings(mesh.facets, 'facets', meshStrings)
+	return meshStrings.join('\n')
 }
 
 function getVertexIndex(facet, pointIndex) {
