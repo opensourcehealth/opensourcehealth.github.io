@@ -653,6 +653,33 @@ function rightByID(registry, statement, id) {
 	return boundingBox[1][0]
 }
 
+function setAttributesArrays(registry, statement, id) {
+	if (registry.spreadsheetMap == undefined) {
+		return
+	}
+	if (!registry.spreadsheetMap.has(id)) {
+		return
+	}
+	if (registry.spreadsheetArraysMapMap == undefined) {
+		registry.spreadsheetArraysMapMap = new Map()
+	}
+	var spreadsheetArraysMap = undefined
+	if (registry.spreadsheetArraysMapMap.has(id)) {
+		spreadsheetArraysMap = registry.spreadsheetArraysMapMap.get(id)
+	}
+	else {
+		spreadsheetArraysMap = getSpreadsheetArraysMap(registry.spreadsheetMap.get(id))
+		registry.spreadsheetArraysMapMap.set(id, spreadsheetArraysMap)
+	}
+	for (var arrayEntry of spreadsheetArraysMap) {
+		var rows = arrayEntry[1]
+		for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+			rows[rowIndex] = rows[rowIndex].join(';')
+		}
+		statement.attributeMap.set(arrayEntry[0], rows.join(' '))
+	}
+}
+
 function setAttributeByID(registry, statement, key, id, value) {
 	return getStatementByID(registry, statement, id).attributeMap.set(key, value)
 }
@@ -696,8 +723,8 @@ function setAttributesTable(registry, statement, id, rowIndex, tableID) {
 		var tableNumber = 0
 		for (var spreadsheetRowIndex = 0; spreadsheetRowIndex < rows.length; spreadsheetRowIndex++) {
 			var row = rows[spreadsheetRowIndex]
-			if (table == undefined) {
-				if (row.length > 0) {
+			if (row.length > 0) {
+				if (table == undefined) {
 					if (row[0] == '_table') {
 						table = {rows:[], titles:[]}
 						if (row.length > 1) {
@@ -710,9 +737,7 @@ function setAttributesTable(registry, statement, id, rowIndex, tableID) {
 						titleIndex = spreadsheetRowIndex + 1
 					}
 				}
-			}
-			else {
-				if (row.length > 0) {
+				else {
 					if (row[0].startsWith('_end')) {
 						table = undefined
 					}
@@ -748,8 +773,15 @@ function setAttributesTable(registry, statement, id, rowIndex, tableID) {
 		return
 	}
 	var row = table.rows[rowIndex]
+	var titles = table.titles
+	if (titles.length < row.length) {
+		titles.length = row.length
+	}
 	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
-		statement.attributeMap.set(table.titles[columnIndex], row[columnIndex])
+		if (getIsEmpty(titles[columnIndex])) {
+			titles[columnIndex] = 'Column_' + getBaseAlphabet(columnIndex)
+		}
+		statement.attributeMap.set(titles[columnIndex], row[columnIndex])
 	}
 }
 
