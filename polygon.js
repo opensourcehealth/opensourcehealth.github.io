@@ -1952,22 +1952,6 @@ function getPolygonByFacet(facet, points) {
 	return polygon
 }
 
-function getPolygonByFacets(facets, points) {
-	var polygons = new Array(facets.length)
-	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		polygons[facetIndex] = getPolygonByFacet(facets[facetIndex], points)
-	}
-	return polygons
-}
-
-function getPolygonsByFacetIndexes(facetIndexes, facets, points) {
-	var polygons = new Array(facetIndexes.length)
-	for (var facetIndexIndex = 0; facetIndexIndex < facetIndexes.length; facetIndexIndex++) {
-		polygons[facetIndexIndex] = getPolygonByFacet(facets[facetIndexes[facetIndexIndex]], points)
-	}
-	return polygons
-}
-
 function getPolygonGroups(polygons) {
 	var polygonIndexGroups = getPolygonIndexGroups(polygons)
 	var polygonGroups = new Array(polygonIndexGroups.length)
@@ -2089,10 +2073,18 @@ function getPolygonsByArrowMap(arrowMap, pointMap) {
 	return polygons
 }
 
+function getPolygonsByFacetIndexes(facetIndexes, facets, points) {
+	var polygons = new Array(facetIndexes.length)
+	for (var facetIndexIndex = 0; facetIndexIndex < facetIndexes.length; facetIndexIndex++) {
+		polygons[facetIndexIndex] = getPolygonByFacet(facets[facetIndexes[facetIndexIndex]], points)
+	}
+	return polygons
+}
+
 function getPolygonsByFacets(facets, points) {
 	var polygons = new Array(facets.length)
-	for (var polygonIndex = 0; polygonIndex < facets.length; polygonIndex++) {
-		polygons[polygonIndex] = getPolygonByFacet(facets[polygonIndex], points)
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		polygons[facetIndex] = getPolygonByFacet(facets[facetIndex], points)
 	}
 	return polygons
 }
