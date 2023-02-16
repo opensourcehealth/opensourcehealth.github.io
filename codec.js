@@ -9,6 +9,7 @@ var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
 var gCurrentKey = null
 var gDate = null
 var gEscapeTable = {
+	'%09':'\t',
 	'%0A':'\n',
 	'%0D':'\r',
 	'%20':' ',
@@ -58,13 +59,12 @@ function browse(input) {
 }
 
 function getBracketReplacedLinesByText(wordString) {
-//	wordString = wordString.replace(gBracketExpression, function(find) {return gBracketTable[find]})
 	return wordString.split(getEndOfLine(wordString))
 }
 
 function getCompressToEncodedURI(text) {
 //	if (text.length < gURLMaximumLength) {
-		return text.replace(/\n/g, '%0A').replace(/,/g, '%2C')
+		return text.replace(/\n/g, '%0A').replace(/,/g, '%2C').replace(/\t/g, '%09')
 //	}
 /*
 	var compressedText = gLZStringHeader + LZString.compressToEncodedURIComponent(text)
@@ -229,7 +229,11 @@ function undo() {
 
 function update() {
 	var wordString = document.getElementById('wordAreaID').value
-	updateWordArea(wordString)
+	var updateString = updateWordArea(wordString)
+	if (updateString != undefined) {
+		wordString = updateString
+		document.getElementById('wordAreaID').value = updateString
+	}
 	if (gCurrentKey == null) {
 		var localWordString = localStorage.getItem(gTitle)
 		if (localWordString != null) {		
