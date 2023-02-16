@@ -206,6 +206,21 @@ function getAttributeValue(key, statement) {
 	return undefined
 }
 
+function getBaseAlphabet(number) {
+	var baseAlphabet = ''
+	for (var whileCount = 0; whileCount < 7; whileCount++) {
+		var remainder = number % 26
+		baseAlphabet = String.fromCharCode(65 + remainder) + baseAlphabet
+		if (number < 26) {
+			return baseAlphabet
+		}
+		else {
+			number = (number - remainder) / 26
+		}
+	}
+	return baseAlphabet
+}
+
 function getBooleanByDefault(defaultValue, key, registry, statement, tag) {
 	return getBooleanByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
 }
