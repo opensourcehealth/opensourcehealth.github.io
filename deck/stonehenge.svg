@@ -1,12 +1,12 @@
 <svg font-family="freeserif,Palatino" font-size="4.5" id="svg" style="padding:0mm" viewBox="0 0 215.9 1676.4" width="216mm" height="1676mm" xmlns="http://www.w3.org/2000/svg">
-<default id="_default" grid="corner:1;cornerLength:1.5;edgeLength:1.5" list="dy:0;left:2;right:57;x:29.5;y:0"/>
+<default id="_default" grid="corner:1;cornerLength:0;edgeLength:0;lineLength:2;insideLength:2;outsideLength:0" list="dy:0;left:2;right:57;x:29.5;y:0"/>
 <g date="20.09.16" id="Stonehenge" project="Deck" skip2D="true" transform="translate(0,0)" style="fill:black;stroke:black;stroke-width:0.0" font-weight="normal" skip3D="true">
   <var ANSI_A_Width="215.9" ANSI_A_Height="279.4" id="var"/>
   <var grid_cellWidth="59" grid_cellHeight="90" grid_columns="3" grid_rows="3" id="var_Stonehenge"/>
   <var halfCellWidth="29.5" translateX="19.450000000000003" translateY="4.699999999999989" id="var_Stonehenge_halfCellWidth"/>
   <license type="ShareAlike 1.0 Generic (CC SA 1.0)" href="https://creativecommons.org/licenses/sa/1.0/" id="license"/>
   <string list_formats="name:image;dx:-24;height:32;image:true;suffix:.jpg;y:4" list_transform="translate(cellX(),cellY())" id="string"/>
-  <g id="grid" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
+  <g id="grid" insideLength="0" lineLength="0" outsideLength="0" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
     <g image="stonehenge.jpg" id="list" transform="translate(0,0)" text-anchor="middle">
       <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_stonehenge.jpg"/>
     </g>
@@ -34,363 +34,159 @@
     <g image="stonehenge.jpg" id="list_grid_image_7" transform="translate(118,180)" text-anchor="middle">
       <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_image_7_stonehenge.jpg"/>
     </g>
-    <g id="gridGroup" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-      <polyline points="-3,0 1.5,0" id="gridGroup_polyline_0"/>
-      <polyline points="175.5,0 180,0" id="gridGroup_polyline_1"/>
-      <polyline points="-3,270 1.5,270" id="gridGroup_polyline_2"/>
-      <polyline points="175.5,270 180,270" id="gridGroup_polyline_3"/>
-      <polyline points="0,-3 0,1.5" id="gridGroup_polyline_4"/>
-      <polyline points="177,-3 177,1.5" id="gridGroup_polyline_5"/>
-      <polyline points="0,268.5 0,273" id="gridGroup_polyline_6"/>
-      <polyline points="177,268.5 177,273" id="gridGroup_polyline_7"/>
-      <polyline points="59,-3 59,1.5" id="gridGroup_polyline_8"/>
-      <polyline points="59,268.5 59,273" id="gridGroup_polyline_9"/>
-      <polyline points="57.5,0 60.5,0" id="gridGroup_polyline_10"/>
-      <polyline points="57.5,270 60.5,270" id="gridGroup_polyline_11"/>
-      <polyline points="118,-3 118,1.5" id="gridGroup_polyline_12"/>
-      <polyline points="118,268.5 118,273" id="gridGroup_polyline_13"/>
-      <polyline points="116.5,0 119.5,0" id="gridGroup_polyline_14"/>
-      <polyline points="116.5,270 119.5,270" id="gridGroup_polyline_15"/>
-      <polyline points="-3,90 1.5,90" id="gridGroup_polyline_16"/>
-      <polyline points="175.5,90 180,90" id="gridGroup_polyline_17"/>
-      <polyline points="0,88.5 0,91.5" id="gridGroup_polyline_18"/>
-      <polyline points="177,88.5 177,91.5" id="gridGroup_polyline_19"/>
-      <polyline points="-3,180 1.5,180" id="gridGroup_polyline_20"/>
-      <polyline points="175.5,180 180,180" id="gridGroup_polyline_21"/>
-      <polyline points="0,178.5 0,181.5" id="gridGroup_polyline_22"/>
-      <polyline points="177,178.5 177,181.5" id="gridGroup_polyline_23"/>
-      <polyline points="57.8,90 60.2,90" id="gridGroup_polyline_24"/>
-      <polyline points="59,88.8 59,91.2" id="gridGroup_polyline_25"/>
-      <polyline points="116.8,90 119.2,90" id="gridGroup_polyline_26"/>
-      <polyline points="118,88.8 118,91.2" id="gridGroup_polyline_27"/>
-      <polyline points="57.8,180 60.2,180" id="gridGroup_polyline_28"/>
-      <polyline points="59,178.8 59,181.2" id="gridGroup_polyline_29"/>
-      <polyline points="116.8,180 119.2,180" id="gridGroup_polyline_30"/>
-      <polyline points="118,178.8 118,181.2" id="gridGroup_polyline_31"/>
-    </g>
   </g>
   <g transform="translate(0,279.4)" id="g">
-    <g id="grid_grid" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
-      <g image="stonehenge.jpg" id="list_grid_grid" transform="translate(0,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_stonehenge.jpg"/>
+    <g skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" id="grid_g">
+      <g image="stonehenge.jpg" id="list_grid_g" transform="translate(0,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image" transform="translate(59,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image" transform="translate(59,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_2" transform="translate(118,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_2_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_2" transform="translate(118,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_3" transform="translate(0,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_3_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_3" transform="translate(0,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_4" transform="translate(59,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_4_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_4" transform="translate(59,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_4_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_5" transform="translate(118,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_5_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_5" transform="translate(118,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_5_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_6" transform="translate(0,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_6_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_6" transform="translate(0,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_6_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_7" transform="translate(59,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_7_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_7" transform="translate(59,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_7_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_image_8" transform="translate(118,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_image_8_stonehenge.jpg"/>
-      </g>
-      <g id="gridGroup_2" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-        <polyline points="-3,0 1.5,0" id="gridGroup_2_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_2_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_2_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_2_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_2_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_2_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_2_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_2_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_2_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_2_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_2_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_2_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_2_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_2_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_2_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_2_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_2_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_2_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_2_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_2_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_2_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_2_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_2_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_2_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_2_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_2_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_2_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_2_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_2_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_2_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_2_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_2_polyline_31"/>
+      <g image="stonehenge.jpg" id="list_grid_g_image_8" transform="translate(118,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_image_8_stonehenge.jpg"/>
       </g>
     </g>
   </g>
   <g transform="translate(0,558.8)" id="g_Stonehenge">
-    <g id="grid_grid_g_Stonehenge" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge" transform="translate(0,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_stonehenge.jpg"/>
+    <g skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" id="grid_g_Stonehenge">
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge" transform="translate(0,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image" transform="translate(59,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image" transform="translate(59,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_2" transform="translate(118,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_2_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_2" transform="translate(118,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_3" transform="translate(0,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_3_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_3" transform="translate(0,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_4" transform="translate(59,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_4_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_4" transform="translate(59,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_4_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_5" transform="translate(118,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_5_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_5" transform="translate(118,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_5_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_6" transform="translate(0,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_6_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_6" transform="translate(0,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_6_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_7" transform="translate(59,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_7_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_7" transform="translate(59,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_7_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_image_8" transform="translate(118,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_image_8_stonehenge.jpg"/>
-      </g>
-      <g id="gridGroup_3" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-        <polyline points="-3,0 1.5,0" id="gridGroup_3_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_3_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_3_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_3_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_3_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_3_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_3_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_3_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_3_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_3_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_3_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_3_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_3_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_3_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_3_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_3_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_3_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_3_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_3_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_3_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_3_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_3_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_3_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_3_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_3_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_3_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_3_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_3_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_3_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_3_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_3_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_3_polyline_31"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_image_8" transform="translate(118,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_image_8_stonehenge.jpg"/>
       </g>
     </g>
   </g>
   <g transform="translate(0,838.1999999999999)" id="g_Stonehenge_transform">
-    <g id="grid_grid_g_Stonehenge_transform" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform" transform="translate(0,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_stonehenge.jpg"/>
+    <g skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" id="grid_g_Stonehenge_transform">
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform" transform="translate(0,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image" transform="translate(59,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image" transform="translate(59,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_2" transform="translate(118,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_2_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_2" transform="translate(118,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_3" transform="translate(0,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_3_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_3" transform="translate(0,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_4" transform="translate(59,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_4_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_4" transform="translate(59,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_4_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_5" transform="translate(118,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_5_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_5" transform="translate(118,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_5_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_6" transform="translate(0,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_6_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_6" transform="translate(0,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_6_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_7" transform="translate(59,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_7_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_7" transform="translate(59,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_7_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_image_8" transform="translate(118,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_image_8_stonehenge.jpg"/>
-      </g>
-      <g id="gridGroup_4" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-        <polyline points="-3,0 1.5,0" id="gridGroup_4_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_4_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_4_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_4_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_4_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_4_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_4_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_4_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_4_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_4_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_4_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_4_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_4_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_4_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_4_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_4_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_4_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_4_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_4_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_4_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_4_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_4_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_4_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_4_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_4_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_4_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_4_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_4_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_4_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_4_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_4_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_4_polyline_31"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_image_8" transform="translate(118,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_image_8_stonehenge.jpg"/>
       </g>
     </g>
   </g>
   <g transform="translate(0,1117.6)" id="g_Stonehenge_transform_2">
-    <g id="grid_grid_g_Stonehenge_transform_2" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2" transform="translate(0,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_stonehenge.jpg"/>
+    <g skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" id="grid_g_Stonehenge_transform_2">
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2" transform="translate(0,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image" transform="translate(59,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image" transform="translate(59,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_2" transform="translate(118,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_2_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_2" transform="translate(118,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_3" transform="translate(0,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_3_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_3" transform="translate(0,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_4" transform="translate(59,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_4_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_4" transform="translate(59,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_4_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_5" transform="translate(118,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_5_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_5" transform="translate(118,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_5_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_6" transform="translate(0,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_6_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_6" transform="translate(0,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_6_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_7" transform="translate(59,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_7_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_7" transform="translate(59,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_7_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_2_image_8" transform="translate(118,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_2_image_8_stonehenge.jpg"/>
-      </g>
-      <g id="gridGroup_5" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-        <polyline points="-3,0 1.5,0" id="gridGroup_5_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_5_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_5_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_5_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_5_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_5_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_5_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_5_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_5_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_5_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_5_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_5_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_5_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_5_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_5_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_5_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_5_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_5_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_5_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_5_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_5_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_5_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_5_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_5_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_5_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_5_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_5_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_5_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_5_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_5_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_5_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_5_polyline_31"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_2_image_8" transform="translate(118,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_2_image_8_stonehenge.jpg"/>
       </g>
     </g>
   </g>
   <g transform="translate(0,1397)" id="g_Stonehenge_transform_3">
-    <g id="grid_grid_g_Stonehenge_transform_3" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" transform="translate(19.450000000000003,4.699999999999989)">
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3" transform="translate(0,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_stonehenge.jpg"/>
+    <g skip2D="true" transform="translate(19.450000000000003,4.699999999999989)" id="grid_g_Stonehenge_transform_3">
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3" transform="translate(0,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image" transform="translate(59,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image" transform="translate(59,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_2" transform="translate(118,0)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_2_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_2" transform="translate(118,0)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_2_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_3" transform="translate(0,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_3_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_3" transform="translate(0,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_3_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_4" transform="translate(59,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_4_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_4" transform="translate(59,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_4_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_5" transform="translate(118,90)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_5_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_5" transform="translate(118,90)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_5_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_6" transform="translate(0,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_6_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_6" transform="translate(0,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_6_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_7" transform="translate(59,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_7_stonehenge.jpg"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_7" transform="translate(59,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_7_stonehenge.jpg"/>
       </g>
-      <g image="stonehenge.jpg" id="list_grid_grid_g_Stonehenge_transform_3_image_8" transform="translate(118,180)" text-anchor="middle">
-        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_grid_g_Stonehenge_transform_3_image_8_stonehenge.jpg"/>
-      </g>
-      <g id="gridGroup_6" insideLength="1.2" lineLength="1.5" outsideLength="3" skip2D="true" style="stroke-width:1">
-        <polyline points="-3,0 1.5,0" id="gridGroup_6_polyline_0"/>
-        <polyline points="175.5,0 180,0" id="gridGroup_6_polyline_1"/>
-        <polyline points="-3,270 1.5,270" id="gridGroup_6_polyline_2"/>
-        <polyline points="175.5,270 180,270" id="gridGroup_6_polyline_3"/>
-        <polyline points="0,-3 0,1.5" id="gridGroup_6_polyline_4"/>
-        <polyline points="177,-3 177,1.5" id="gridGroup_6_polyline_5"/>
-        <polyline points="0,268.5 0,273" id="gridGroup_6_polyline_6"/>
-        <polyline points="177,268.5 177,273" id="gridGroup_6_polyline_7"/>
-        <polyline points="59,-3 59,1.5" id="gridGroup_6_polyline_8"/>
-        <polyline points="59,268.5 59,273" id="gridGroup_6_polyline_9"/>
-        <polyline points="57.5,0 60.5,0" id="gridGroup_6_polyline_10"/>
-        <polyline points="57.5,270 60.5,270" id="gridGroup_6_polyline_11"/>
-        <polyline points="118,-3 118,1.5" id="gridGroup_6_polyline_12"/>
-        <polyline points="118,268.5 118,273" id="gridGroup_6_polyline_13"/>
-        <polyline points="116.5,0 119.5,0" id="gridGroup_6_polyline_14"/>
-        <polyline points="116.5,270 119.5,270" id="gridGroup_6_polyline_15"/>
-        <polyline points="-3,90 1.5,90" id="gridGroup_6_polyline_16"/>
-        <polyline points="175.5,90 180,90" id="gridGroup_6_polyline_17"/>
-        <polyline points="0,88.5 0,91.5" id="gridGroup_6_polyline_18"/>
-        <polyline points="177,88.5 177,91.5" id="gridGroup_6_polyline_19"/>
-        <polyline points="-3,180 1.5,180" id="gridGroup_6_polyline_20"/>
-        <polyline points="175.5,180 180,180" id="gridGroup_6_polyline_21"/>
-        <polyline points="0,178.5 0,181.5" id="gridGroup_6_polyline_22"/>
-        <polyline points="177,178.5 177,181.5" id="gridGroup_6_polyline_23"/>
-        <polyline points="57.8,90 60.2,90" id="gridGroup_6_polyline_24"/>
-        <polyline points="59,88.8 59,91.2" id="gridGroup_6_polyline_25"/>
-        <polyline points="116.8,90 119.2,90" id="gridGroup_6_polyline_26"/>
-        <polyline points="118,88.8 118,91.2" id="gridGroup_6_polyline_27"/>
-        <polyline points="57.8,180 60.2,180" id="gridGroup_6_polyline_28"/>
-        <polyline points="59,178.8 59,181.2" id="gridGroup_6_polyline_29"/>
-        <polyline points="116.8,180 119.2,180" id="gridGroup_6_polyline_30"/>
-        <polyline points="118,178.8 118,181.2" id="gridGroup_6_polyline_31"/>
+      <g image="stonehenge.jpg" id="list_grid_g_Stonehenge_transform_3_image_8" transform="translate(118,180)" text-anchor="middle">
+        <image href="stonehenge.jpg" x="5.5" y="4" height="32" id="list_grid_g_Stonehenge_transform_3_image_8_stonehenge.jpg"/>
       </g>
     </g>
   </g>
