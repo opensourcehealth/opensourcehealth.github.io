@@ -10,6 +10,31 @@ const gSetR = new Set(['r'])
 const gSetS = new Set(['s'])
 const gSetRS = new Set(['r', 's'])
 
+function addEntriesToStatementLine(entries, registry, statement) {
+	var line = registry.lines[statement.lineIndex]
+	for (var entry of entries) {
+		var key = entry[0]
+		var arrays = entry[1]
+		var joinedArrays = new Array(arrays.length)
+		for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+			joinedArrays[arrayIndex] = arrays[arrayIndex].join(',')
+		}
+		statement.attributeMap.set(key, joinedArrays.join(' '))
+	}
+	if (line.trim().startsWith('<')) {
+		line = getLineByStatement(statement)
+	}
+	else {
+		var attributePairs = []
+		for (var entry of statement.attributeMap.entries()) {
+			attributePairs.push(entry[0] + '=' + entry[1])
+		}
+		line = statement.tag + ' ' + attributePairs.join(' ')
+	}
+	registry.lines[statement.lineIndex] = line
+	registry.lineUpdated = true
+}
+
 function addFunctionsToVariableEntries(functionsToAdd, optionSet) {
 	for (var functionToAdd of functionsToAdd) {
 		addFunctionToVariableEntries(functionToAdd, optionSet)
@@ -27,6 +52,47 @@ function addFunctionToVariableEntries(functionToAdd, optionSet) {
 function addFunctionToEntriesByName(functionToAdd, mapEntries, name, optionSet) {
 	functionToAdd.optionSet = optionSet
 	mapEntries.push([name, functionToAdd])
+}
+
+function addMeshToStatement(inputArea, mesh, registry, statement) {
+	if (mesh == null) {
+		var facets = getPointsByKey('facets', registry, statement)
+		var points = getPointsByKey('points', registry, statement)
+		if (facets != undefined && points != undefined) {
+			mesh = {facets:facets, points:points}
+		}
+	}
+	else {
+		if (getBooleanByDefault(false, 'updateStatement', registry, statement, statement.tag)) {
+			addEntriesToStatementLine([['points', mesh.points], ['facets', mesh.facets]], registry, statement)
+			inputArea.value = ''
+		}
+	}
+	if (mesh != null) {
+		analyzeOutputMesh(mesh, registry, statement)
+	}
+}
+
+function addOutputArea(text, title) {
+	if (getIsEmpty(text)) {
+		return
+	}
+	var textAreaID = 'output_area_' + title
+	var textArea = document.getElementById(textAreaID)
+	if (textArea == null) {
+		var heading = document.createElement('H3')
+		heading.appendChild(document.createTextNode('Output - ' + title))
+		document.body.appendChild(heading)
+		textArea = document.createElement('textarea')
+		textArea.cols = 120
+		textArea.id = textAreaID
+		textArea.rows = 4
+		textArea.value = text
+		document.body.appendChild(textArea)	
+	}
+	else {
+		textArea.value = text
+	}
 }
 
 function addStatementRecursively(depth, parent, registry, workStatement) {
@@ -148,6 +214,22 @@ function getGroupBoundingBox(caller, registry, statement) {
 function getGroupBoundingBoxByArguments(id, registry, statement) {
 	statement = getStatementByID(registry, statement, id)
 	return getGroupBoundingBox(statement, registry, statement)
+}
+
+function getInputArea(title) {
+	var textAreaID = 'input_area_' + title
+	var textArea = document.getElementById(textAreaID)
+	if (textArea == null) {
+		var heading = document.createElement('H3')
+		heading.appendChild(document.createTextNode('Input - ' + title))
+		document.body.appendChild(heading)
+		textArea = document.createElement('textarea')
+		textArea.cols = 120
+		textArea.id = textAreaID
+		textArea.rows = 4
+		document.body.appendChild(textArea)	
+	}
+	return textArea
 }
 
 function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
@@ -380,6 +462,20 @@ function getSuffixedString(root, suffix) {
 	return root + suffix
 }
 
+function replaceRows(lines, registry, statement) {
+	var endMinusLine = statement.endIndex - statement.lineIndex
+	if (endMinusLine == 0) {
+		var endLine = '}'
+		if (registry.lines[statement.lineIndex].trim().startsWith('<')) {
+			endLine = '</>'
+		}
+		lines.splice(statement.lineIndex + 1, 0, endLine)
+	}
+	lines.splice(statement.lineIndex + 1, endMinusLine - 1)
+	spliceArray(lines, statement.lineIndex + 1, statement.rows)
+	registry.lineUpdated = true
+}
+
 function setClosestStatementRecursively(closestDistanceStatement, depth, location, registry, statement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in getClosestStatementRecursively reached, no further statements will be searched.'
@@ -586,29 +682,6 @@ var gCopy = {
 	}
 }
 
-var gCSV = {
-	alterMesh: function(mesh, registry, statement) {
-		var id = getOutputOrWorkOrID(statement.attributeMap)
-		var date = getNullOrValue('date', registry.dataMap)
-		addOutputArea(getCSVMeshString(date, id, mesh, getNullOrValue('project', registry.dataMap)), 'CSV - ' + id)
-	},
-	initialize: function() {
-		gAlterMeshMap.set(this.name, this)
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'csv',
-	processStatement: function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No workMesh could be found for csv in meta.', statement])
-		}
-		else {
-			alterMeshExcept(workMesh, registry, statement)
-			this.alterMesh(workMesh, registry, statement)
-		}
-	}
-}
-
 var gDelete = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
@@ -767,38 +840,85 @@ var gSpreadsheet = {
 	},
 	name: 'spreadsheet',
 	processStatement: function(registry, statement) {
-		var delimiter = ';'
+		var delimiter = '\t'
 		if (statement.attributeMap.has('delimiter')) {
 			delimiter = statement.attributeMap.get('delimiter')
 		}
-		var rows = []
 		statement.tag = 'g'
-		for (var child of statement.children) {
-			if (child.tag == 'row') {
-				if (child.attributeMap.has('line')) {
-					rows.push(child.attributeMap.get('line').split(delimiter))
+		var id = statement.attributeMap.get('id')
+		var spreadsheetInputArea = getInputArea('Spreadsheet - ' + id)
+		var text = spreadsheetInputArea.value
+		var lines = []
+		if (text.length > 0) {
+			lines = text.split(getEndOfLine(text))
+			for (var lineIndex = lines.length - 1; lineIndex > -1; lineIndex--) {
+				if (lines[lineIndex].length == 0) {
+					lines.length -= 1
+				}
+				else {
+					break
+				}
+			}
+		}
+		var rows = null
+		if (lines.length == 0) {
+			rows = []
+			for (var child of statement.children) {
+				if (child.tag == 'row') {
+					if (child.attributeMap.has('line')) {
+						rows.push(child.attributeMap.get('line').split(delimiter))
+					}
+				}
+			}
+		}
+		else {
+			rows = new Array(lines.length)
+			statement.rows = new Array(lines.length)
+			for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+				rows[lineIndex] = lines[lineIndex].split(delimiter)
+				statement.rows[lineIndex] = 'row line=' + lines[lineIndex]
+			}
+			if (getBooleanByDefault(false, 'updateStatement', registry, statement, statement.tag)) {
+				if (registry.indexStatements == undefined) {
+					registry.indexStatements = []
+				}
+				var indexStatement = [statement.lineIndex, statement]
+				registry.indexStatements.push(indexStatement)
+				spreadsheetInputArea.value = ''
+				if (statement.nestingIncrement > 0) {
+					statement.endIndex = statement.lineIndex + 1
+					for (; statement.endIndex < registry.lines.length; statement.endIndex++) {
+						var lineStatement = getStatement(registry.lines[statement.endIndex])
+						if (lineStatement.nestingIncrement < 0) {
+							break
+						}
+					}
+				}
+				else {
+					statement.endIndex = statement.lineIndex
+					var line = registry.lines[statement.lineIndex].trim()
+					if (line.startsWith('<')) {
+						if (line.endsWith('/>')) {
+							registry.lines[statement.lineIndex] = line.slice(0, line.length - 2) + '>'
+						}
+					}
+					else {
+						registry.lines[statement.lineIndex] += ' {'
+					}
+					convertToGroup(statement)
+				}
+				var idStart = id + '_row_'
+				statement.children.length = 0
+				for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+					var rowStatement = getStatementByParentTag(new Map([['line', lines[lineIndex]]]), 0, statement, 'row')
+					getUniqueID(idStart + lineIndex.toString(), registry, rowStatement)
 				}
 			}
 		}
 		if (registry.spreadsheetMap == undefined) {
 			registry.spreadsheetMap = new Map()
 		}
-		registry.spreadsheetMap.set(statement.attributeMap.get('id'), rows)
-	}
-}
-
-var gSTLInput = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'stlInput',
-	processStatement: function(registry, statement) {
-		var stlInputString = document.getElementById('stlInputID').value
-		var id = statement.attributeMap.get('id')
-		var mesh = getMeshBySTL(id, stlInputString)
-		if (mesh != null) {
-			analyzeOutputMesh(mesh, registry, statement)
-		}
+		registry.spreadsheetMap.set(id, rows)
 	}
 }
 
@@ -821,6 +941,18 @@ var gSTL = {
 			alterMeshExcept(workMesh, registry, statement)
 			this.alterMesh(workMesh, registry, statement)
 		}
+	}
+}
+
+var gSTLInput = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'stlInput',
+	processStatement: function(registry, statement) {
+		var id = statement.attributeMap.get('id')
+		var stlInputArea = getInputArea('STL - ' + id)
+		addMeshToStatement(stlInputArea, getMeshBySTL(id, stlInputArea.value), registry, statement)
 	}
 }
 
@@ -904,7 +1036,42 @@ var gTriangleAnalysis = {
 	}
 }
 
-/*
+var gTSV = {
+	alterMesh: function(mesh, registry, statement) {
+		var id = getOutputOrWorkOrID(statement.attributeMap)
+		var date = getNullOrValue('date', registry.dataMap)
+		addOutputArea(getTSVMeshString(date, id, mesh, getNullOrValue('project', registry.dataMap)), 'TSV - ' + id)
+	},
+	initialize: function() {
+		gAlterMeshMap.set(this.name, this)
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'tsv',
+	processStatement: function(registry, statement) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh == null) {
+			noticeByList(['No workMesh could be found for tsv in meta.', statement])
+		}
+		else {
+			alterMeshExcept(workMesh, registry, statement)
+			this.alterMesh(workMesh, registry, statement)
+		}
+	}
+}
+
+var gTSVInput = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'tsvInput',
+	processStatement: function(registry, statement) {
+		var id = statement.attributeMap.get('id')
+		var tsvInputArea = getInputArea('TSV - ' + id)
+		addMeshToStatement(tsvInputArea, getMeshByTSV(tsvInputArea.value), registry, statement)
+	}
+}
+
+/* deprecated24
 var gURL = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
@@ -971,7 +1138,7 @@ var gVar = {
 		addFunctionToVariableEntries(polar_Check, null)
 		addFunctionToVariableEntries(rightByID, gSetRS)
 		addFunctionsToVariableEntries([reverseSigns_Check, rotate2DAngle_Check, rotate2DVector_Check, getRotation2DVector_Check], null)
-		addFunctionsToVariableEntries([setAttributeByID, setAttributesRowTable, setAttributesTable], gSetRS)
+		addFunctionsToVariableEntries([setAttributesArrays, setAttributeByID, setAttributesRowTable, setAttributesTable], gSetRS)
 		addFunctionsToVariableEntries([sideHypoteneuse_Check, sideHypoteneuseSquared_Check], null)
 		addFunctionToVariableEntries(sineWaveXFromToCycles, null)
 		addFunctionToVariableEntries(sineYXFromToCycles, null)
@@ -1073,22 +1240,6 @@ var gWindow = {
 }
 
 var gMetaProcessors = [
-	gAbstract,
-	gCopy,
-	gCSV,
-	gDelete,
-	gGroup,
-	gMatrix2D,
-	gMatrix3D,
-	gPolygonAnalysis,
-	gRow,
-	gSpreadsheet,
-	gSTLInput,
-	gSTL,
-	gString,
-	gTable,
-	gTriangleAnalysis,
-//	gURL,
-	gVar,
-	gView,
-	gWindow]
+	gAbstract, gCopy, gDelete, gGroup, gMatrix2D, gMatrix3D, gPolygonAnalysis,
+	gRow, gSpreadsheet, gSTLInput, gSTL, gString, gTable, gTriangleAnalysis, gTSV, gTSVInput, gVar, gView, gWindow
+]
