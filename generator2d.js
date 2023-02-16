@@ -40,6 +40,10 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 	}
 	var yString = getAttributeValue('y', monad)
 	var text = getJoinedWordByWordLengths(wordLengths)
+	var spaceString = getAttributeValue('space', monad)
+	if (spaceString != undefined) {
+		text = text.replace(/ /g, String.fromCharCode(parseInt(spaceString)))
+	}
 	var textLength = 0
 	for (var wordLength of wordLengths) {
 		textLength += wordLength.length
@@ -48,6 +52,9 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 	var textAttributeMap = new Map([['innerHTML', text], ['x', x.toString()], ['y', yString]])
 	var fontSize = getAttributeFloat('font-size', root)
 	var localFontSize = getAttributeFloat('font-size', monad)
+	if (wordLengths.length > 0) {
+		textLength += (wordLengths.length - 1) * getTextLength(' ') * localFontSize
+	}
 	yString = getNextYString(localFontSize, monad, yString)
 	var writableWidth = getAttributeFloat('right', monad) - getAttributeFloat('left', monad)
 	if (textLength > writableWidth) {
@@ -60,7 +67,7 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 	if (localTextAnchor != getAttributeValue('text-anchor', root)) {
 		textAttributeMap.set('text-anchor', localTextAnchor)
 	}
-	var textStatement = getStatementByParentTag(textAttributeMap, 0, statement, 'text')
+ 	var textStatement = getStatementByParentTag(textAttributeMap, 0, statement, 'text')
 	var idStart = getAttributeValue('id', monad)
 	var name = getAttributeValue('name', monad)
 	if (name != undefined) {
@@ -74,6 +81,7 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 function addTextStatements(format, registry, statement, text) {
 	var textMonadMap = new Map([['b', BoldMonad], ['i', ItalicMonad], ['p', ParagraphMonad], ['sub', SubscriptMonad]])
 	textMonadMap.set('sup', SuperscriptMonad)
+	textMonadMap.set('table', TableMonad)
 	var monad = new PlainMonad()
 	monad.parent = format
 	var words = text.split(' ').filter(lengthCheck)
@@ -130,13 +138,14 @@ function closeByDYMultiplier(dyMultiplier, monad, registry, statement) {
 }
 
 function createCharacterPolylineMap() {
-	gLetteringSet = new Set(['B', 'K', 'R', 'X'])
+	gLetteringSet = new Set('.3568BKRX'.split(''))
 	gLetteringMap = new Map()
 	var bottomDiagonal = [[0, 1], [1, 0]]
 	var bottomHorizontalSemicircle = arcFromTo(1, 0.5, 0, 0.5, 0.5)
 	var bottomLeftArc = arcFromTo(1.0, 0.03, 0.5, 0, 0.8)
 	var bottomLine = [[0, 0], [1, 0]]
 	var bottomSemicircle = multiplyArraysByIndex(arcFromTo(0, 1, 0, 0, 0.5), 2.0, 0)
+	var center = [[0.5, 1]]
 	var diagonalDown = [[0, 2], [1, 0]]
 	var diagonalUp = [[0, 0], [1, 2]]
 	var leftBisectedPolyline = [[0, 0], [0, 1], [0, 2]]
@@ -153,34 +162,62 @@ function createCharacterPolylineMap() {
 	var topLine = [[0, 2], [1, 2]]
 	var topRightArc = arcFromTo(0.5, 2, 1.0, 1.97, 0.8)
 	var topSemicircle = multiplyArraysByIndex(arcFromTo(0, 2, 0, 1, 0.5), 2.0, 0)
-	gLetteringMap.set('A', [[[0, 0], [0.2, 0.8], [0.5, 2], [0.8, 0.8], [1, 0]], [[0.2,0.8], [0.8,0.8]]])
+	gLetteringMap.set('.', [arcCenterRadius(0, 0, 0.015, 0, 360, 12)])
+	gLetteringMap.set('0', [leftTallSemicircle, rightTallSemicircle, arcCenterRadius(0.5, 1, 0.015, 0, 360, 12)])
+	gLetteringMap.set('1', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
+	gLetteringMap.set('2', [arcCenterRadius(0.5, 1.5, 0.5, 165, -45).concat(bottomLine)])
+	var three = arcCenterRadius(0.5, 1.5, 0.5, 165, -90).concat([[0.45, 1]]).concat(arcCenterRadius(0.5, 0.5, 0.5, 90, -90))
+	gLetteringMap.set('3', [three.concat(arcCenterRadius(0.5, 1.5, 1.5, -90, -109))])
+	gLetteringMap.set('4', [[[0.75, 0], [, 0.43], [, 2], [0, 0.43], [0.75,], [1,]]])
+	gLetteringMap.set('5', [[[1, 2], [0.45, 2]].concat(arcFromTo(0.2, 1.27, 0.1, 0.03, -0.653))])
+	var six = arcFromTo(0.005, 0.5, 1, 0.55, 0.4982).concat(arcFromTo(1, 0.5, 0.005, 0.45, 0.4982))
+	gLetteringMap.set('6', [six.concat(arcFromTo(0.005, 0.45, 0.2, 1.6, 1.3)).concat(arcFromTo(0.2, 1.6, 1, 2, 1.05))])
+	gLetteringMap.set('7', [arcFromTo(0.2, 0, 1, 2, 4).concat([[0, 2]])])
+	var eight = center.concat(arcCenterRadius(0.5, 1.5, 0.5, 240, -60)).concat(center)
+	gLetteringMap.set('8', [eight.concat(arcCenterRadius(0.5, 0.5, 0.5, 60, -240)).concat(center)])
+	gLetteringMap.set('9', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
+	gLetteringMap.set('A', [[[,], [0.2, 0.8], [0.5, 2], [0.8, 0.8], [1, 0]], [[0.2, 0.8], [0.8,]]])
 	gLetteringMap.set('B', [bottomSemicircle, leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('C', [bottomLeftArc, leftTallSemicircle, topRightArc])
 	gLetteringMap.set('D', [arcFromTo(0, 2, 0, 0, 1), leftLine])
 	gLetteringMap.set('E', [bottomLine, leftBisectedPolyline, middleLine, topLine])
 	gLetteringMap.set('F', [leftBisectedPolyline, middleLine, topLine])
-	gLetteringMap.set('G', [[[0.7, 0.9], [1.0, 0.9], [1.0, 0.03]], bottomLeftArc, leftTallSemicircle, topRightArc])
+	gLetteringMap.set('G', [[[0.7, 0.9], [1.0, 0.9], [, 0.03]], bottomLeftArc, leftTallSemicircle, topRightArc])
 	gLetteringMap.set('H', [leftBisectedPolyline, middleLine, rightBisectedPolyline])
-	gLetteringMap.set('I', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 2], [0.5, 2], [0.75, 2]]])
-	gLetteringMap.set('J', [[[0.5, 2], [1, 2]], lowRightLine, bottomHorizontalSemicircle])
+	gLetteringMap.set('I', [[[0.25,], [0.5,], [0.75,]], middleVerticalLine, [[0.25, 2], [0.5,], [0.75,]]])
+	gLetteringMap.set('J', [[[0.5, 2], [1,]], lowRightLine, bottomHorizontalSemicircle])
 	gLetteringMap.set('K', [leftBisectedPolyline, bottomDiagonal, topDiagonal])
 	gLetteringMap.set('L', [bottomLine, leftLine])
-	gLetteringMap.set('M', [leftLine, [[0, 2], [0.75, 0.2]], [[0.75, 0.2], [1.5, 2]], [[1.5, 2], [1.5, 0]]])
+	gLetteringMap.set('M', [[[,], [, 2], [0.75, 0.2], [1.5, 2], [, 0]]])
 	gLetteringMap.set('N', [leftLine, diagonalDown, rightLine])
 	gLetteringMap.set('O', [leftTallSemicircle, rightTallSemicircle])
 	gLetteringMap.set('P', [leftBisectedPolyline, topSemicircle])
-	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5, 0], [0.9, -0.15]]])
+	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5,], [0.9, -0.15]]])
 	gLetteringMap.set('R', [leftBisectedPolyline, topSemicircle, bottomDiagonal])
 	var s = [arcFromTo(0.5, 0, 0.1, 0.03, 0.8), arcFromTo(0.853, 0.853, 0.5, 0, 0.5), [[0.853, 0.853], [0.147, 1.147]]]
 	pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
 	gLetteringMap.set('S', s)
-	gLetteringMap.set('T', [middleVerticalLine, [[0, 2], [0.5, 2], [1, 2]]])
+	gLetteringMap.set('T', [middleVerticalLine, [[, 2], [0.5, 2], [1,]]])
 	gLetteringMap.set('U', [lowRightLine, bottomHorizontalSemicircle, lowLeftLine])
-	gLetteringMap.set('V', [[[0, 2], [0.5, 0], [1, 2]]])
-	gLetteringMap.set('W', [[[0, 2], [0.375, 0], [0.75, 1.8], [1.125, 0], [1.5, 2]]])
+	gLetteringMap.set('V', [[[, 2], [0.5, 0], [1, 2]]])
+	gLetteringMap.set('W', [[[, 2], [0.375, 0], [0.75, 1.8], [1.125, 0], [1.5, 2]]])
 	gLetteringMap.set('X', [diagonalDown, diagonalUp])
-	gLetteringMap.set('Y', [[[0.5, 0], [0.5, 1]], [[0, 2], [0.5, 1], [1, 2]]])
+	gLetteringMap.set('Y', [[[0.5,], [, 1]], [[0, 2], [0.5, 1], [1, 2]]])
 	gLetteringMap.set('Z', [bottomLine, diagonalUp, topLine])
+	gLetteringMap.set('z', [[[, 1.28], [0.64,], [0, 0], [0.64,]]])
+	for (var polylines of gLetteringMap.values()) {
+		for (var polyline of polylines) {
+			var oldPoint = [0, 0]
+			for (var point of polyline) {
+				for (var vertexIndex = 0; vertexIndex < 2; vertexIndex++) {
+					if (point[vertexIndex] == undefined) {
+						point[vertexIndex] = oldPoint[vertexIndex]
+					}
+				}
+				oldPoint = point
+			}
+		}
+	}
 }
 
 function getAnchorFontParent(registry, statement) {
@@ -353,10 +390,10 @@ function getTextLength(text) {
 		for (var characterIndex = 0; characterIndex < characterLengths.length; characterIndex += 2) {
 			gCharacterLengthMap.set(characterLengths[characterIndex], 0.001 * parseFloat(characterLengths[characterIndex + 1]))
 		}
+		gCharacterLengthMap.set(' ', 0.2)
+		gCharacterLengthMap.set("'", 0.266)
+		gCharacterLengthMap.set('"', 0.332)
 	}
-	gCharacterLengthMap.set(' ', 0.249)
-	gCharacterLengthMap.set("'", 0.266)
-	gCharacterLengthMap.set('"', 0.332)
 	var textLength = 0.0
 	for (var character of text) {
 		if (gCharacterLengthMap.has(character)) {
@@ -388,6 +425,7 @@ function lineIsTooLong(cellWidth, fontSize, line) {
 
 function ParagraphMonad() {
 	this.close = function(registry, statement) {
+		var shrink = getAttributeValue('overflow', this) == 'shrink'
 		var textAnchor = getAttributeValue('text-anchor', this)
 		var fontSize = getAttributeFloat('font-size', this)
 		var left = getAttributeFloat('left', this)
@@ -406,30 +444,56 @@ function ParagraphMonad() {
 		var oldLength = 0.0
 		var oldWordLengths = []
 		for (var wordLength of this.wordLengths) {
-			if (wordLength.length > writableWidth) {
-				if (oldWordLengths.length > 0) {
-					addTextStatement(this, registry, statement, oldWordLengths)
-					oldLength = 0
-				}
-				addTextStatement(this, registry, statement, [wordLength])
+			oldLength += wordLength.length
+			if (oldWordLengths.length > 0) {
+				oldLength += getTextLength(' ') * fontSize
 			}
-			else {
-				oldLength += wordLength.length
-				if (oldWordLengths.length > 0) {
-					oldLength += getTextLength(' ') * fontSize
+			oldWordLengths.push(wordLength)
+			if (oldLength > writableWidth) {
+				var statementWordLengths = oldWordLengths
+				if (oldWordLengths.length == 1 || shrink) {
+					oldLength = 0.0
+					oldWordLengths = []
 				}
-				oldWordLengths.push(wordLength)
-				if (oldLength > writableWidth) {
-					oldWordLengths.pop()
-					addTextStatement(this, registry, statement, oldWordLengths)
+				else {
+					statementWordLengths = oldWordLengths.slice(0)
+					statementWordLengths.pop()
 					oldLength = wordLength.length
 					oldWordLengths = [wordLength]
+				}
+				addTextStatement(this, registry, statement, statementWordLengths)
+			}
+		}
+		var end = getAttributeValue('end', this)
+		if (end != undefined && oldWordLengths.length > 0) {
+			end = ' ' + end
+			var remainingLength = writableWidth
+			for (var oldWordLength of oldWordLengths) {
+				remainingLength -= oldWordLength.length
+			}
+			remainingLength -= (oldWordLengths.length - 1) * getTextLength(' ') * fontSize
+			var endingWord = ''
+			var textLength = 0.0
+			for (var characterIndex = 0; characterIndex < gLengthLimit; characterIndex++) {
+				var character = end[characterIndex % end.length]
+				textLength += getTextLength(character) * fontSize
+				endingWord += character
+				if (textLength >= remainingLength) {
+					oldWordLengths.push({length:textLength, word:endingWord.slice(0, endingWord.length - 1)})
+					break
 				}
 			}
 		}
 		addTextStatement(this, registry, statement, oldWordLengths)
 		var yString = getAttributeValue('y', this)
-		setAttributeValue('y', this, getNextYString(getAttributeFloat('font-size', this), this, yString))
+		var marginString = getAttributeValue('margin', this)
+		if (marginString == undefined) {
+			yString = getNextYString(getAttributeFloat('font-size', this), this, yString)
+		}
+		else {
+			yString = (parseFloat(yString) + parseFloat(marginString)).toString()
+		}
+		setAttributeValue('y', this, yString)
 	}
 	this.initialize = function(registry, statement) {
 		this.parent.close(registry, statement)
@@ -461,6 +525,52 @@ function SubscriptMonad() {
 		closeByDYMultiplier(0.15, this, registry, statement)
 	}
 	this.initialize = function(registry, statement) {
+	}
+}
+
+function TableMonad() {
+	this.close = function(registry, statement) {
+		var src = getAttributeValue('src', this)
+		if (!registry.idMap.has(src)) {
+			return
+		}
+		var fontSize = getAttributeFloat('font-size', this)
+		var sourceStatement = registry.idMap.get(src)
+		var sourceChildren = sourceStatement.children
+		var numberOfColumns = parseInt(getValueByDefault('1', getAttributeValue('columns', this)))
+		var x = getAttributeFloat('left', this)
+		var numberOfRows = parseInt(getValueByDefault('1', getAttributeValue('rows', this)))
+		var numberOfCells = Math.min(numberOfColumns * numberOfRows, sourceChildren.length)
+		var remainingLength = sourceChildren.length - numberOfCells
+		var tableChildren = sourceChildren.slice(remainingLength)
+		tableChildren.reverse()
+		sourceChildren.length = remainingLength
+		var endIndex = Math.ceil(1.0 * numberOfCells / numberOfColumns)
+		var rowIndex = 0
+		var originalYString = getAttributeValue('y', this)
+		var yString = originalYString
+		pushArray(statement.children, tableChildren)
+		console.log(endIndex)
+		for (var cellIndex = 0; cellIndex < numberOfCells; cellIndex++) {
+			var child = tableChildren[cellIndex]
+			if (rowIndex == endIndex) {
+				rowIndex = 0
+				numberOfColumns--
+				x += 100
+				yString = originalYString
+				endIndex = Math.ceil(1.0 * (numberOfCells - cellIndex) / numberOfColumns)
+			}
+		console.log('x')
+		console.log(x)
+		console.log(yString)
+			child.attributeMap.set('x', x.toString())
+			child.attributeMap.set('y', yString)
+			yString = getNextYString(fontSize, this, yString)
+			rowIndex++
+		}
+	}
+	this.initialize = function(registry, statement) {
+		this.parent.close(registry, statement)
 	}
 }
 
@@ -499,12 +609,18 @@ var gFormattedText = {
 	},
 	name: 'formattedText',
 	processStatement: function(registry, statement) {
-		if (statement.attributeMap.has('text')) {
-			addTextStatements(getTextFormatMonad(registry, statement), registry, statement, statement.attributeMap.get('text'))
-			convertToGroup(statement)
+		if (!statement.attributeMap.has('text')) {
+			noticeByList(['No text could be found for formattedText in generator2d.', statement])
 			return
 		}
-		noticeByList(['No text could be found for formattedText in generator2d.', statement])
+		addTextStatements(getTextFormatMonad(registry, statement), registry, statement, statement.attributeMap.get('text'))
+		convertToGroup(statement)
+		if (getBooleanByDefault(false, 'hideReverse', registry, statement, this.name)) {
+			if (!statement.attributeMap.has('display')) {
+				statement.attributeMap.set('display', 'none')
+			}
+			statement.children.reverse()
+		}
 	}
 }
 
@@ -633,7 +749,7 @@ var gLettering = {
 	name: 'lettering',
 	processStatement:function(registry, statement) {
 		var fontHeight = getFloatByDefault(12.0, 'fontHeight', registry, statement, this.name)
-		var strokeWidth = getFloatByDefault(2.0, 'strokeWidth', registry, statement, this.name)
+		var strokeWidth = getFloatByDefault(1.5, 'strokeWidth', registry, statement, this.name)
 		var text = getValueByKeyDefault('TEXT', 'text', registry, statement, this.name)
 		var textAlign = getFloatByDefault(0.0, 'textAlign', registry, statement, this.name)
 		var outlines = getLetteringOutlines(fontHeight, strokeWidth, text, textAlign)
@@ -656,7 +772,7 @@ var gList = {
 		var children = []
 		var parent = statement.parent
 		var variableValue = getVariableValue('list_children', parent)
-		if (variableValue != undefined) {
+		if (!getIsEmpty(variableValue)) {
 			children = variableValue.split(' ')
 		}
 		var margin = getVariableFloatByDefault(2.0, 'list_margin', parent)
@@ -700,7 +816,7 @@ var gList = {
 						var key = formatEntry[0]
 						if (key.length > 0) {
 							formatAttributeMap.set(key, formatEntry[1])
-							if (key.startsWith('image')) {
+							if (key == 'image') {
 								formatMonad.isImage = true
 							}
 						}
@@ -721,39 +837,49 @@ var gList = {
 			if (attributeMap.has(name)) {
 				var value = attributeMap.get(name)
 				value = getValueByDefault(value, getVariableValue(value, statement))
-				var keyValue = getAttributeValue('key', formatMonad)
-				if (keyValue != undefined) {
+				var key = getAttributeValue('key', formatMonad)
+				if (key != undefined) {
 					value = value.trim()
 					if (value.length == 0) {
-						if (attributeMap.has(keyValue)) {
-							value = attributeMap.get(keyValue)
+						if (attributeMap.has(key)) {
+							value = attributeMap.get(key)
 						}
 					}
 				}
-				var lowerValue = getAttributeValue('lower', formatMonad)
-				if (lowerValue != undefined) {
-					if (getBooleanByString(lowerValue)) {
+				var lower = getAttributeValue('lower', formatMonad)
+				if (lower != undefined) {
+					if (getBooleanByString(lower)) {
 						value = value.toLowerCase()
 					}
 				}
-				var compressedValue = getAttributeValue('compressed', formatMonad)
-				if (compressedValue != undefined) {
-					if (getBooleanByString(compressedValue)) {
+				var compressed = getAttributeValue('compressed', formatMonad)
+				if (compressed != undefined) {
+					if (getBooleanByString(compressed)) {
 						value = value.trim().replace(/ /g, '')
 					}
 				}
+				var prefix = getAttributeValue('prefix', formatMonad)
+				if (prefix != undefined) {
+					value = prefix + value
+				}
+				var suffix = getAttributeValue('suffix', formatMonad)
+				if (suffix != undefined) {
+					if (suffix == '$colon') {
+						value += ':'
+					}
+					else {
+						value += suffix
+					}
+				}
+				attributeMap.set(name, value)
 				if (formatMonad.isImage) {
 					var x = getAttributeFloat('x', formatMonad) + parseFloat(getValueByDefault('0.0', getAttributeValue('dx', formatMonad)))
 					var yString = getAttributeValue('y', formatMonad)
-					var imagePrefix = getAttributeValue('imagePrefix', formatMonad)
-					if (imagePrefix != undefined) {
-						value = imagePrefix + value
-					}
-					var imageSuffix = getAttributeValue('imageSuffix', formatMonad)
-					if (imageSuffix != undefined) {
-						value += imageSuffix
-					}
 					var imageMap = new Map([['href', value], ['x', x.toString()], ['y', yString]])
+					var height = getAttributeValue('height', formatMonad)
+					if (height != undefined) {
+						imageMap.set('height', height)
+					}
 					var imageStatement = getStatementByParentTag(imageMap, 0, statement, 'image')
 					var idStart = getAttributeValue('id', formatMonad)
 					if (value != undefined) {
