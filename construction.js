@@ -913,6 +913,8 @@ var gEmboss = {
 		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
 		embossMeshesByTransform2Ds(matrix2Ds, matrix3D, false, stratas, bottomTools, workMesh)
 		embossMeshesByTransform2Ds(matrix2Ds, matrix3D, true, stratas, topTools, workMesh)
+//		console.log(getDifferenceWorkMap(workMesh.facets))
+	addFacetsByWorkMap(workMesh.facets, getDifferenceWorkMap(workMesh.facets))
 		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
 	}
 }
