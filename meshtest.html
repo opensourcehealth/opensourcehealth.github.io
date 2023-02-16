@@ -30,8 +30,8 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
-// getUniqueIDByMonad, platonic, svg
-// astronomy: gravity, temperature, day
+// platonic, svg
+// fix nodeOrder in getOutlinesQuickly for figure 8
 // cell outline
 // polygonJoin, brickwork
 // outset point before fillet, outsetField
@@ -39,6 +39,7 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // view split, polygon, fractal
 // make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
 // upload
+// console.log(oldWordLengths[0].word+=String.fromCharCode(9618))
 //
 // split bent polygons
 // maybe triangulateBentFacets vertically if possible
@@ -231,7 +232,8 @@ function drawXYPolygon(xyPolygon, rgb) {
 		}
 	}
 	var polygonString = '<polygon points="' + pointStrings.join(' ') + '" style="stroke:rgb(' + rgb.join(',') + ')"'
-	polygonString += 'marker-mid="url(#arrowhead)" />'
+	polygonString += ' marker-mid="url(#arrowhead)" />'
+	polygonString += ' />'
 	document.writeln(polygonString)
 }
 
@@ -664,7 +666,13 @@ function testLength() {
 
 function testLettering() {
 	console.log('testLettering')
-	console.log('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+	var letteringStringA = '0.12345678'
+	var letteringStringB = 'ABCDEF GHIJKLM'
+	var letteringStringC = 'NOPQRSTUVWXYZ '
+	var letteringStringD = 'z'
+	console.log(letteringStringA)
+	console.log(letteringStringB)
+	console.log(letteringStringC)
 //	console.log('arcFromToCenter()')
 //	var arc = arcFromToCenter(0, 1, 0, -2, 5)
 //	console.log(arc)
@@ -676,8 +684,14 @@ function testLettering() {
 //	if (polylines != null) {
 //		drawXYPolylines(polylines)
 //	}
-	var letteringOutlines = getLetteringOutlines(1.2, 0.15, ' ABCDEF GHIJKLMNOPQRSTUVWXYZ ', 0.2)
+	var letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringA, 0.2)
 	drawXYPolygons(letteringOutlines)
+	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringB, 0.2)
+	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -5.0]))
+	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringC, 0.2)
+	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -10.0]))
+	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringD, 0.2)
+	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -15.0]))
 }
 
 function testLinkMap() {
@@ -1374,8 +1388,8 @@ function createSVGTest() {
 //	testFormattedText()
 //	testIntercircle()
 //	testJoin()
-	testLength()
-//	testLettering()
+//	testLength()
+	testLettering()
 //	testLinkMap()
 //	testLoop()
 //	testMeshBoolean()
