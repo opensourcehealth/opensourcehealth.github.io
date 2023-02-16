@@ -39,8 +39,14 @@ function addToDescendantsInsideFirst(descendants, statement) {
 	}
 	if (statement.children != null) {
 		for (var child of statement.children) {
-			addToDescendantsInsideFirst(descendants, child)
-			descendants.push(child)
+			if (gParentFirstSet.has(child.tag)) {
+				descendants.push(child)
+				addToDescendantsInsideFirst(descendants, child)
+			}
+			else {
+				addToDescendantsInsideFirst(descendants, child)
+				descendants.push(child)
+			}
 		}
 	}
 }
@@ -76,7 +82,7 @@ function createDefault(registry, rootStatement) {
 	if (registry.idMap.has('_default')) {
 		return
 	}
-	var defaultStatement = getStatementByParentTag(new Map([['id', '_default']]), 0, null, 'default')
+	var defaultStatement = getStatementByParentTag(new Map([['id', '_default']]), 0, undefined, 'default')
 	defaultStatement.parent = rootStatement
 	rootStatement.children.splice(0, 0, defaultStatement)
 	registry.idMap.set('_default', defaultStatement)
@@ -138,13 +144,20 @@ function getConcatenatedUniqueID(id, registry, statement) {
 }
 
 function getDocumentRoot(lines, tag) {
-	var lastParent = null
-	for (var line of lines) {
+	var lastParent = undefined
+	for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		var line = lines[lineIndex]
 		var statement = getStatement(line)
-		if (lastParent == null) {
+		if (statement.nestingIncrement > -1) {
+			statement.lineIndex = lineIndex
+		}
+		if (lastParent == undefined) {
 			if (statement.tag != null) {
-				if (statement.tag != tag) {
-					statement.parent = getStatementByParentTag(new Map(), 1, null, tag)
+				if (statement.tag == tag) {
+					statement.nestingIncrement = 1
+				}
+				else {
+					statement.parent = getStatementByParentTag(new Map(), 1, undefined, tag)
 					statement.parent.children.push(statement)
 				}
 				if (statement.nestingIncrement == 1) {
@@ -162,7 +175,7 @@ function getDocumentRoot(lines, tag) {
 			}
 			else {
 				if (statement.nestingIncrement == -1) {
-					if (lastParent.parent != null) {
+					if (lastParent.parent != undefined) {
 						lastParent = lastParent.parent
 					}
 				}
@@ -173,15 +186,15 @@ function getDocumentRoot(lines, tag) {
 		}
 	}
 	if (lastParent == null) {
-		return null
+		return undefined
 	}
 	for (var remainingIndex = 0; remainingIndex < gLengthLimit; remainingIndex++) {
-		if (lastParent.parent == null) {
+		if (lastParent.parent == undefined) {
 			return lastParent
 		}
 		lastParent = lastParent.parent
 	}
-	return null
+	return undefined
 }
 
 function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchSuffix) {
@@ -304,10 +317,10 @@ function getQuoteSeparatedSnippets(line) {
 function getStatement(line) {
 	line = line.trim()
 	if (line.startsWith('</') || line.startsWith('}')) {
-		return getStatementByParentTag(null, -1, null, null)
+		return getStatementByParentTag(undefined, -1, undefined, null)
 	}
 	if (line.length < 2) {
-		return getStatementByParentTag(null, 0, null, null)
+		return getStatementByParentTag(undefined, 0, undefined, null)
 	}
 	var lastCharacter = line[line.length - 1]
 	var nestingIncrement = 0
@@ -329,7 +342,7 @@ function getStatement(line) {
 		tag = tag.slice(0, indexOfSpace)
 	}
 	if (tag.length == 0) {
-		return getStatementByParentTag(null, 0, null, null)
+		return getStatementByParentTag(undefined, 0, undefined, null)
 	}
 	line = line.slice(indexOfSpace + 1).trim()
 	var innerHTML = null
@@ -348,7 +361,7 @@ function getStatement(line) {
 	var quoteSeparatedSnippets = getQuoteSeparatedSnippets(line)
 	var tag = getCapitalizedKey(tag)
 	if (quoteSeparatedSnippets.length == 0) {
-		return getStatementByParentTag(new Map(), nestingIncrement, null, tag)
+		return getStatementByParentTag(new Map(), nestingIncrement, undefined, tag)
 	}
 	var attributes = getAttributes(quoteSeparatedSnippets)
 	if (innerHTML != null) {
@@ -367,7 +380,7 @@ function getStatement(line) {
 			}
 		}
 	}
-	return getStatementByParentTag(new Map(attributes), nestingIncrement, null, tag)
+	return getStatementByParentTag(new Map(attributes), nestingIncrement, undefined, tag)
 }
 
 function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
@@ -503,15 +516,15 @@ function getValueByKeyTag(attributeMap, key, tag) {
 }
 
 function getWorkStatement(registry, statement) {
+	return getWorkStatementByKey('work', registry, statement)
+}
+
+function getWorkStatementByKey(key, registry, statement) {
 	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('work')) {
-		return null
+	if (!attributeMap.has(key)) {
+		return undefined
 	}
-	var workID = attributeMap.get('work')
-	if (!registry.idMap.has(workID)) {
-		return null
-	}
-	return registry.idMap.get(workID)
+	return registry.idMap.get(attributeMap.get(key))
 }
 
 function getWorkStatements(registry, statement) {
