@@ -73,7 +73,7 @@
 //Asteroid, firestorm, volcano, flood, fish, plague, global warming, biodiversity
 //view from flight, aerovator
 
-function updateSVGArea() {
+function updateWordArea(wordString) {
 	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
 	var dataMap = new Map()
 	dataMap.set('selectedEntity', null)
@@ -116,10 +116,6 @@ function updateSVGArea() {
 	document.getElementById('xmlArea').value = xmlString
 	terrainViewer.start(registry.dataMap.get('terrainViewer.maximumHeight'))
 	return xmlString
-}
-
-function updateWordArea(wordString) {
-	updateSVGArea()
 }
 
 var gParentFirstSet = new Set()
