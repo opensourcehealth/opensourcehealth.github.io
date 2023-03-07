@@ -1,7 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 const gAlterationsDisplay = ['alterations', 'display']
-const gAlterationsSet = new Set(gAlterationsDisplay)
 const gLowerCharacterSet = new Set('abcdefghijklmnopqrstuvwxyz_'.split(''))
 const gIDTransformWork = ['id', 'transform', 'transform3D', 'work']
 const gIDPointsTransformWorkSet = new Set(gIDTransformWork.concat(['points', 'pointsHD']))
@@ -13,13 +12,7 @@ const gSetRS = new Set(['r', 's'])
 function addEntriesToStatementLine(entries, registry, statement) {
 	var line = registry.lines[statement.lineIndex]
 	for (var entry of entries) {
-		var key = entry[0]
-		var arrays = entry[1]
-		var joinedArrays = new Array(arrays.length)
-		for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
-			joinedArrays[arrayIndex] = arrays[arrayIndex].join(',')
-		}
-		statement.attributeMap.set(key, joinedArrays.join(' '))
+		statement.attributeMap.set(entry[0], entry[1])
 	}
 	if (line.trim().startsWith('<')) {
 		line = getLineByStatement(statement)
@@ -54,6 +47,34 @@ function addFunctionToEntriesByName(functionToAdd, mapEntries, name, optionSet) 
 	mapEntries.push([name, functionToAdd])
 }
 
+function addMeshesRecursively(depth, meshes, registry, statement) {
+	if (depth > gRecursionLimit) {
+		noticeByList(['Recursion limit of 1000 in addMeshesRecursively reached.', statement, meshes.slice(0, 10)])
+		return
+	}
+	var mesh = getMeshByID(statement.attributeMap.get('id'), registry)
+	if (mesh != null) {
+		mesh = getMeshCopy(mesh)
+		transform3DPoints(getChainMatrix3D(registry, statement), mesh.points)
+		meshes.push(mesh)
+	}
+	depth += 1
+	for (var child of statement.children) {
+		addMeshesRecursively(depth, meshes, registry, child)
+	}
+	return meshes
+}
+
+function addMeshesToGroupStatement(idStart, meshes, registry, statement) {
+	for (var mesh of meshes) {
+		var meshStatement = getStatementByParentTag(new Map(), 0, statement, 'mesh')
+		copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, meshStatement.attributeMap)
+		getUniqueID(idStart, registry, meshStatement)
+		analyzeOutputMesh(getMeshCopy(mesh), registry, statement)
+	}
+	deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+}
+
 function addMeshToStatement(inputArea, mesh, registry, statement) {
 	if (mesh == null) {
 		var facets = getPointsByKey('facets', registry, statement)
@@ -64,7 +85,8 @@ function addMeshToStatement(inputArea, mesh, registry, statement) {
 	}
 	else {
 		if (getBooleanByDefault(false, 'updateStatement', registry, statement, statement.tag)) {
-			addEntriesToStatementLine([['points', mesh.points], ['facets', mesh.facets]], registry, statement)
+			var pointsString = getStringByArrays(mesh.points)
+			addEntriesToStatementLine([['points', pointsString], ['facets', getStringByArrays(mesh.facets)]], registry, statement)
 			inputArea.value = ''
 		}
 	}
@@ -95,19 +117,36 @@ function addOutputArea(text, title) {
 	}
 }
 
+function addPointsToGroupStatement(idStart, pointsStatements, registry, statement) {
+	for (var pointsStatement of pointsStatements) {
+		var tagStatement = getStatementByParentTag(new Map(), 0, statement, pointsStatement.statement.tag)
+		copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, tagStatement.attributeMap)
+		getUniqueID(idStart, registry, tagStatement)
+		setPointsExcept(getArraysCopy(pointsStatement.points), registry, tagStatement)
+	}
+	deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+}
+
 function addStatementRecursively(depth, parent, registry, workStatement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in addStatementRecursively reached, no further statements will be added.'
 		warningByList([warningText, parent, gRecursionLimit])
 		return
 	}
+	if (workStatement.tag == 'copy' || workStatement.tag == 'row') {
+		noticeByList(['Will not add a copy type statement in addStatementRecursively in meta.', statement, workStatement])
+		return
+	}
 	var statement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, parent, workStatement.tag)
 	getUniqueID(parent.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, statement)
 	copyMissingKeysExcept(gAlterationsDisplayIDTransformWorkSet, workStatement.attributeMap, statement.attributeMap)
-	createMeshCopy(registry, statement, workStatement)
 	var work2DMatrix = getMatrix2D(registry, workStatement)
 	if (work2DMatrix != null) {
 		statement.attributeMap.set('transform', 'matrix(' + work2DMatrix.toString() + ')')
+	}
+	var work3DMatrix = getMatrix3D(registry, workStatement)
+	if (work3DMatrix != null) {
+		statement.attributeMap.set('transform3D', 'matrix(' + work3DMatrix.toString() + ')')
 	}
 	depth += 1
 	for (var child of workStatement.children) {
@@ -130,7 +169,7 @@ function addVariableObjectToEntries(map, variableObject) {
 }
 
 function alterStatementPoints(registry, statement) {
-	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	var mesh = getMeshByID(statement.attributeMap.get('id'), registry)
 	if (mesh != null) {
 		alterMeshExcept(mesh, registry, statement)
 		return
@@ -141,7 +180,7 @@ function alterStatementPoints(registry, statement) {
 	}
 }
 
-function copyAlterRecursively(depth, registry, rootStatement, statement) {
+function copyAlterOrProcessRecursively(depth, registry, rootStatement, statement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in copyAlterRecursively reached, no further statements will be added.'
 		warningByList([warningText, statement, gRecursionLimit])
@@ -149,19 +188,25 @@ function copyAlterRecursively(depth, registry, rootStatement, statement) {
 	}
 	depth += 1
 	for (var child of statement.children) {
-		copyAlterRecursively(depth, registry, rootStatement, child)
+		copyAlterOrProcessRecursively(depth, registry, rootStatement, child)
 	}
-	copyKeysExcept(gIDPointsTransformWorkSet, rootStatement.attributeMap, statement.attributeMap)
-	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
-	if (mesh != null) {
-		transform3DPoints(getChainMatrix3D(registry, statement), mesh.points)
+	if (depth <= getIntByDefault(gLengthLimit, 'attributeDepth', registry, rootStatement, rootStatement.tag) + 1) {
+		copyKeysExcept(gIDPointsTransformWorkSet, rootStatement.attributeMap, statement.attributeMap)
 	}
-	alterStatementPoints(registry, statement)
+	if (getBooleanByDefault(false, 'process', registry, rootStatement, rootStatement.tag)) {
+		processStatementByTagMap(new Set(), registry, statement, gTagCenterMap)
+	}
+	else {
+		alterStatementPoints(registry, statement)
+	}
 }
 
 function copyStatementRecursively(registry, statement, workStatement) {
+	if (workStatement.tag == 'copy' || workStatement.tag == 'row') {
+		noticeByList(['Will not copy a copy type statement in copyStatementRecursively in meta.', statement, workStatement])
+		return
+	}
 	copyMissingKeysExcept(gAlterationsDisplayIDTransformWorkSet, workStatement.attributeMap, statement.attributeMap)
-	createMeshCopy(registry, statement, workStatement)
 	var work2DMatrix = getChainSkipMatrix2D(registry, workStatement)
 	if (work2DMatrix != null) {
 		var statement2DMatrix = getMatrix2D(registry, statement)
@@ -170,21 +215,22 @@ function copyStatementRecursively(registry, statement, workStatement) {
 		}
 		statement.attributeMap.set('transform', 'matrix(' + work2DMatrix.toString() + ')')
 	}
+	var work3DMatrix = getChainMatrix3D(registry, workStatement)
+	if (work3DMatrix != null) {
+		var statement3DMatrix = getMatrix3D(registry, statement)
+		if (statement3DMatrix != null) {
+			work3DMatrix = getMultiplied3DMatrix(statement3DMatrix, work3DMatrix)
+		}
+		statement.attributeMap.set('transform3D', 'matrix(' + work3DMatrix.toString() + ')')
+	}
 	for (var child of workStatement.children) {
 		addStatementRecursively(0, statement, registry, child)
 	}
 }
 
-function createMeshCopy(registry, statement, workStatement) {
-	var mesh = getWorkMeshByID(workStatement.attributeMap.get('id'), registry)
-	if (mesh != null) {
-		registry.meshMap.set(statement.attributeMap.get('id'), getMeshCopy(mesh))
-	}
-}
-
 function getDistanceSquaredToStatement(location, registry, statement) {
 	var points = getPointsHD(registry, statement)
-	var workMesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
+	var workMesh = getMeshByID(statement.attributeMap.get('id'), registry)
 	if (workMesh != null) {
 		points = workMesh.points
 	}
@@ -212,8 +258,20 @@ function getGroupBoundingBox(caller, registry, statement) {
 }
 
 function getGroupBoundingBoxByArguments(id, registry, statement) {
-	statement = getStatementByID(registry, statement, id)
-	return getGroupBoundingBox(statement, registry, statement)
+	var groupStatement = getStatementByID(registry, statement, id)
+	if (statement != groupStatement) {
+		for (var whileCount = 0; whileCount < gLengthLimitRoot; whileCount++) {
+			if (statement.attributeMap.get('id') == id) {
+				noticeByList(['Infinitely nested bounding box in getGroupBoundingBoxByArguments in function.', id, statement])
+				return [[0.0, 0.0], [0.0, 0.0]]
+			}
+			statement = statement.parent
+			if (statement == undefined) {
+				break
+			}
+		}
+	}
+	return getGroupBoundingBox(groupStatement, registry, groupStatement)
 }
 
 function getInputArea(title) {
@@ -314,15 +372,6 @@ function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
 	return matrix2Ds
 }
 
-function getMatrix3DsByChildren(children, registry) {
-	var matrix3DsByChildren = []
-	for (var child of children) {
-		matrix3Ds = getPointsByTag('matrix3Ds', registry, child, 'matrix3D')
-		matrix3DsByChildren = getPushArray(matrix3DsByChildren, matrix3Ds)
-	}
-	return matrix3DsByChildren
-}
-
 function getMatrix3DsBySuffix(attributeMap, registry, statement, suffix) {
 	var matrix3Ds = getPointsByKey(getSuffixedString('matrix3Ds', suffix), registry, statement)
 	if (matrix3Ds == null) {
@@ -413,6 +462,19 @@ function getMatrix3DsBySuffix(attributeMap, registry, statement, suffix) {
 	return matrix3Ds
 }
 
+function getMeshByID(id, registry) {
+	if (!registry.meshMap.has(id)) {
+		return null
+	}
+	return registry.meshMap.get(id)
+}
+
+function getMeshesRecursively(registry, statement) {
+	var meshes = []
+	addMeshesRecursively(0, meshes, registry, statement)
+	return meshes
+}
+
 function getOutputOrWorkOrID(attributeMap) {
 	if (attributeMap.has('output')) {
 		return attributeMap.get('output')
@@ -462,6 +524,12 @@ function getSuffixedString(root, suffix) {
 	return root + suffix
 }
 
+function getTagKeys() {
+	var tagKeys = Array.from(gTagCenterMap.keys())
+	tagKeys.sort()
+	return tagKeys
+}
+
 function replaceRows(lines, registry, statement) {
 	var endMinusLine = statement.endIndex - statement.lineIndex
 	if (endMinusLine == 0) {
@@ -488,7 +556,7 @@ function setClosestStatementRecursively(closestDistanceStatement, depth, locatio
 		closestDistanceStatement.statement = statement
 	}
 	depth += 1
-	if (getWorkMeshByID(statement.attributeMap.get('id'), registry) == null) {
+	if (getMeshByID(statement.attributeMap.get('id'), registry) == null) {
 		for (var child of statement.children) {
 			setClosestStatementRecursively(closestDistanceStatement, depth, location, registry, child)
 		}
@@ -567,7 +635,7 @@ function workMesh(registry, statement, propertyName) {
 	if (work.endsWith("'") || work.endsWith('"')) {
 		work = work.slice(0, -1)
 	}
-	var workMesh = getWorkMeshByID(work, registry)
+	var workMesh = getMeshByID(work, registry)
 	if (workMesh == null) {
 		return null
 	}
@@ -591,7 +659,7 @@ var gAbstract = {
 		setMapIfMissing('skip3D', attributeMap, 'true')
 		setMapIfMissing('style', attributeMap, 'fill:none;stroke:black;stroke-width:1')
 		var flipY = getFloatByStatement('flipY', registry, statement)
-		if (flipY != null) {
+		if (flipY != undefined) {
 			scaleString = 'scale(' + flipY + ',' + (-flipY) + ')'
 			attributeMap.set('transform', scaleString)
 		}
@@ -655,7 +723,7 @@ var gCopy = {
 			statement.nestingIncrement = workStatement.nestingIncrement
 			statement.tag = workStatement.tag
 			copyStatementRecursively(registry, statement, workStatement)
-			copyAlterRecursively(0, registry, statement, statement)
+			copyAlterOrProcessRecursively(0, registry, statement, statement)
 			return
 		}
 		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
@@ -670,15 +738,118 @@ var gCopy = {
 			getUniqueID(statement.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, matrixStatement)
 			matrixStatement.attributeMap.set('transform', 'matrix(' + matrix2D.toString() + ')')
 			copyStatementRecursively(registry, matrixStatement, workStatement)
-			copyAlterRecursively(0, registry, statement, matrixStatement)
+			copyAlterOrProcessRecursively(0, registry, statement, matrixStatement)
 		}
 		for (var matrix3D of matrix3Ds) {
 			var matrixStatement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, statement, workStatement.tag)
 			getUniqueID(statement.attributeMap.get('id') + '_' + workStatement.attributeMap.get('id'), registry, matrixStatement)
 			matrixStatement.attributeMap.set('transform3D', 'matrix(' + matrix3D.toString() + ')')
 			copyStatementRecursively(registry, matrixStatement, workStatement)
-			copyAlterRecursively(0, registry, statement, matrixStatement)
+			copyAlterOrProcessRecursively(0, registry, statement, matrixStatement)
 		}
+	}
+}
+
+
+var gCopyMesh = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'copyMesh',
+	processStatement: function(registry, statement) {
+		var workID = statement.attributeMap.get('work')
+		if (!registry.idMap.has(workID)) {
+			noticeByList(['No work could be found for copyMesh in meta.', statement])
+			return
+		}
+		var meshes = getMeshesRecursively(registry, registry.idMap.get(workID))
+		if (getIsEmpty(meshes)) {
+			noticeByList(['No meshes could be found for copyMesh in meta.', statement])
+			return
+		}
+		var idStart = statement.attributeMap.get('id') + '_' + workID
+		if (statement.nestingIncrement == 0) {
+			if (meshes.length == 1) {
+				statement.tag = 'mesh'
+				analyzeOutputMesh(getMeshCopy(meshes[0]), registry, statement)
+				return
+			}
+			convertToGroup(statement)
+			addMeshesToGroupStatement(idStart, meshes, registry, statement)
+			return
+		}
+		statement.tag = 'g'
+		var matrix3Ds = getMatrix3DsByChildren(statement.children, registry)
+		if (getIsEmpty(matrix3Ds)) {
+			noticeByList(['No matrix3Ds in gCopyMesh in meta.', statement])
+			return
+		}
+		for (var matrix3D of matrix3Ds) {
+			var matrixAttributeMap = new Map([['transform3D', 'matrix(' + matrix3D.toString() + ')']])
+			copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, matrixAttributeMap)
+			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, 'mesh')
+			getUniqueID(idStart, registry, matrixStatement)
+			if (meshes.length == 1) {
+				analyzeOutputMesh(getMeshCopy(meshes[0]), registry, matrixStatement)
+			}
+			else {
+				convertToGroup(matrixStatement)
+				addMeshesToGroupStatement(matrixAttributeMap.get('id'), meshes, registry, matrixStatement)
+			}
+		}
+		deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+	}
+}
+
+var gCopyPoints = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'copyPoints',
+	processStatement: function(registry, statement) {
+		var workID = statement.attributeMap.get('work')
+		if (!registry.idMap.has(workID)) {
+			return
+		}
+		var workStatement = registry.idMap.get(workID)
+		var pointsStatements = []
+		addToTagStatementsRecursivelyByDepth(undefined, 0, 1, pointsStatements, registry, workStatement, 'polygon')
+		addToTagStatementsRecursivelyByDepth(undefined, 0, 1, pointsStatements, registry, workStatement, 'polyline')
+		if (getIsEmpty(pointsStatements)) {
+			noticeByList(['No points statements could be found for gCopyPoints in meta.', statement])
+			return
+		}
+		var idStart = statement.attributeMap.get('id') + '_' + workID
+		if (statement.nestingIncrement == 0) {
+			if (pointsStatements.length == 1) {
+				statement.tag = pointsStatements[0].statement.tag
+				setPointsExcept(getArraysCopy(pointsStatements[0].points), registry, statement)
+				return
+			}
+			convertToGroup(statement)
+			addPointsToGroupStatement(idStart, pointsStatements, registry, statement)
+			return
+		}
+		statement.tag = 'g'
+		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
+		if (getIsEmpty(matrix2Ds)) {
+			noticeByList(['No matrix2Ds in gCopyPoints in meta.', statement])
+			return
+		}
+		for (var matrix2D of matrix2Ds) {
+			var matrixAttributeMap = new Map([['transform', 'matrix(' + matrix2D.toString() + ')']])
+			copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, matrixAttributeMap)
+			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, pointsStatements[0].statement.tag)
+			getUniqueID(idStart, registry, matrixStatement)
+			if (pointsStatements.length == 1) {
+				setPointsExcept(getArraysCopy(pointsStatements[0].points), registry, matrixStatement)
+			}
+			else {
+				convertToGroup(matrixStatement)
+				addPointsToGroupStatement(matrixAttributeMap.get('id'), pointsStatements, registry, matrixStatement)
+			}
+		}
+		deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
 	}
 }
 
@@ -705,6 +876,16 @@ var gGroup = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
 		getMatrix2D(registry, statement)
+	}
+}
+
+var gHelp = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'help',
+	processStatement: function(registry, statement) {
+		console.log(getTagKeys())
 	}
 }
 
@@ -780,7 +961,7 @@ var gPolygonAnalysis = {
 		if (mesh == null) {
 			return
 		}
-		var normal = get3DPointByStatement('normal', registry, statement)
+		var normal = getPoint3DByStatement('normal', registry, statement)
 		var analysisStatement = getStatementByParentTag(getMeshAnalysis(mesh, normal), 0, statement, 'polygonAnalysis')
 		setIDMapSet(statement.attributeMap.get('id') + '_polygonAnalysis', registry, analysisStatement)
 	},
@@ -795,7 +976,7 @@ var gPolygonAnalysis = {
 			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
 		}
 		else {
-			copyMissingKeys(getMeshAnalysis(workMesh, get3DPointByStatement('normal', registry, statement)), statement.attributeMap)
+			copyMissingKeys(getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)), statement.attributeMap)
 		}
 	}
 }
@@ -824,9 +1005,8 @@ var gRow = {
 						var workStatement = registry.idMap.get(cell)
 						var child = getStatementByParentTag(new Map(), workStatement.nestingIncrement, groupStatement, workStatement.tag)
 						getStatementID(registry, child)
-						copyMissingKeysExcept(gAlterationsSet, workStatement.attributeMap, child.attributeMap)
 						copyStatementRecursively(registry, child, workStatement)
-						copyAlterRecursively(0, registry, statement, child)
+						copyAlterOrProcessRecursively(0, registry, statement, child)
 					}
 				}
 			}
@@ -878,7 +1058,7 @@ var gSpreadsheet = {
 				rows[lineIndex] = lines[lineIndex].split(delimiter)
 				statement.rows[lineIndex] = 'row line=' + lines[lineIndex]
 			}
-			if (getBooleanByDefault(false, 'updateStatement', registry, statement, statement.tag)) {
+			if (getBooleanByDefault(false, 'updateStatement', registry, statement, this.name)) {
 				if (registry.indexStatements == undefined) {
 					registry.indexStatements = []
 				}
@@ -1015,7 +1195,7 @@ var gTable = {
 
 var gTriangleAnalysis = {
 	alterMesh: function(mesh, registry, statement) {
-		var normal = get3DPointByStatement('normal', registry, statement)
+		var normal = getPoint3DByStatement('normal', registry, statement)
 		var analysisStatement = getStatementByParentTag(getMeshAnalysis(getTriangleMesh(mesh), normal), 0, statement, 'triangleAnalysis')
 		setIDMapSet(statement.attributeMap.get('id') + '_triangleAnalysis', registry, analysisStatement)
 	},
@@ -1027,11 +1207,11 @@ var gTriangleAnalysis = {
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == null) {
-			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
+			noticeByList(['No workMesh could be found for triangleAnalysis in meta.', statement])
 		}
 		else {
 			workMesh = getTriangleMesh(workMesh)
-			copyMissingKeys(getMeshAnalysis(workMesh, get3DPointByStatement('normal', registry, statement)), statement.attributeMap)
+			copyMissingKeys(getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)), statement.attributeMap)
 		}
 	}
 }
@@ -1240,6 +1420,6 @@ var gWindow = {
 }
 
 var gMetaProcessors = [
-	gAbstract, gCopy, gDelete, gGroup, gMatrix2D, gMatrix3D, gPolygonAnalysis,
+	gAbstract, gCopy, gCopyMesh, gCopyPoints, gDelete, gGroup, gHelp, gMatrix2D, gMatrix3D, gPolygonAnalysis,
 	gRow, gSpreadsheet, gSTLInput, gSTL, gString, gTable, gTriangleAnalysis, gTSV, gTSVInput, gVar, gView, gWindow
 ]
