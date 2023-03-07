@@ -546,25 +546,41 @@ function initializeProcessors(processors) {
 	}
 }
 
-function processDescendants(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendantsInsideFirst(descendants, rootStatement)
-	for (var statement of descendants) {
-		processStatementByTagMap(registry, statement, tagMap)
-	}
-}
-
 function processDescendantsByTagMap(registry, rootStatement, tagMap) {
 	var descendants = [rootStatement]
 	addToDescendantsInsideFirst(descendants, rootStatement)
+	var missingProcessorSet = new Set()
 	for (var statement of descendants) {
-		processStatementByTagMap(registry, statement, tagMap)
+		processStatementByTagMap(missingProcessorSet, registry, statement, tagMap)
+	}
+	missingProcessorSet.delete('default')
+	missingProcessorSet.delete('layer')
+	missingProcessorSet.delete('license')
+	missingProcessorSet.delete('svg')
+	var missingProcessors = []
+	for (var element of missingProcessorSet) {
+		if (!element.startsWith('_')) {
+			missingProcessors.push(element)
+		}
+	}
+	if (missingProcessors.length > 0) {
+		var processorString = 'Could not find a processor for the tag:'
+		if (missingProcessors.length > 1) {
+			processorString = 'Could not find processors for the tags:'
+		}
+		console.log(processorString)
+		console.log(missingProcessors)
+		console.log('The following processors are available:')
+		console.log(getTagKeys())
 	}
 }
 
-function processStatementByTagMap(registry, statement, tagMap) {
+function processStatementByTagMap(missingProcessorSet, registry, statement, tagMap) {
 	if (tagMap.has(statement.tag)) {
 		tagMap.get(statement.tag).processStatement(registry, statement)
+	}
+	else {
+		missingProcessorSet.add(statement.tag)
 	}
 }
 
