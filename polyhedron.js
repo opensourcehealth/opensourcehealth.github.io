@@ -171,7 +171,7 @@ function addMeshToAssembledMesh(assembledMesh, meshCopy) {
 			assembledMesh.splitIndexesMap = new Map(meshCopy.splitIndexesMap.entries())
 		}
 		else {
-			addMapToMapArray(meshCopy.splitIndexesMap, assembledMesh.intersectionIndexesMap)
+			addMapToMapArray(meshCopy.splitIndexesMap, assembledMesh.splitIndexesMap)
 		}
 	}
 }
@@ -263,6 +263,22 @@ function addPointsToFacets(mesh, segmentMap) {
 			var forwardKey = facet[vertexIndex].toString() + ' ' + facet[endIndex].toString()
 			if (arrowMap.has(forwardKey)) {
 				spliceArray(facet, endIndex, arrowMap.get(forwardKey))
+			}
+		}
+	}
+}
+
+function addPointsToIndexSet(pointIndexSet, points, polygons) {
+	if (polygons != null) {
+		for (var polygon of polygons) {
+			var boundingBox = getBoundingBox(polygon)
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				var point = points[pointIndex]
+				if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
+					if (getIsPointInsidePolygonOrClose(point, polygon)) {
+						pointIndexSet.add(pointIndex)
+					}
+				}
 			}
 		}
 	}
@@ -1589,10 +1605,10 @@ function getMeshByTSV(tsvInputString) {
 function getMeshCopy(mesh) {
 	var meshCopy = {facets:getArraysCopy(mesh.facets), points:getArraysCopy(mesh.points)}
 	if (mesh.intersectionIndexesMap != undefined) {
-		meshCopy.intersectionIndexesMap = new Map(mesh.intersectionIndexesMap.entries())
+		meshCopy.intersectionIndexesMap = getMapArraysCopy(mesh.intersectionIndexesMap)
 	}
 	if (mesh.splitIndexesMap != undefined) {
-		meshCopy.splitIndexesMap = new Map(mesh.splitIndexesMap.entries())
+		meshCopy.splitIndexesMap = getMapArraysCopy(mesh.splitIndexesMap)
 	}
 	return meshCopy
 }
