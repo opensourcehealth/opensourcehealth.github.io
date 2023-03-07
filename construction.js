@@ -45,23 +45,6 @@ function addIntersectionsToMesh(facets, id, originalLoneArrowSet, workMesh) {
 	}
 }
 
-function addMeshesRecursively(depth, meshes, registry, statement) {
-	if (depth > gRecursionLimit) {
-		var warningText = 'Recursion limit of 1,000 in addMeshesRecursively reached, no further statements will be added.'
-		warningByList([warningText, statement, gRecursionLimit])
-		return
-	}
-	var mesh = getWorkMeshByID(statement.attributeMap.get('id'), registry)
-	if (mesh != null) {
-		meshes.push(mesh)
-	}
-	depth += 1
-	for (var child of statement.children) {
-		addMeshesRecursively(depth, meshes, registry, child)
-	}
-	return meshes
-}
-
 function addSeparatedFacets(facet, mesh) {
 	var arrowMap = new Map()
 	var points = mesh.points
@@ -574,7 +557,7 @@ function getFacetIntersections(strata, toolPolygon, workMesh) {
 function getMeshesByChildren(children, registry) {
 	var meshes = []
 	for (var child of children) {
-		var mesh = getWorkMeshByID(child.attributeMap.get('id'), registry)
+		var mesh = getMeshByID(child.attributeMap.get('id'), registry)
 		if (mesh != null) {
 			meshes.push(mesh)
 		}
@@ -823,13 +806,7 @@ var gAssembly = {
 	name: 'assembly',
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
-		var meshes = []
-		for (var child of statement.children) {
-			var mesh = getWorkMeshByID(child.attributeMap.get('id'), registry)
-			if (mesh != null) {
-				meshes.push(mesh)
-			}
-		}
+		var meshes = getMeshesRecursively(registry, statement)
 		if (getIsEmpty(meshes)) {
 			noticeByList(['No meshes could be found for assembly in construction.', statement])
 			return
@@ -869,7 +846,7 @@ var gDifference = {
 		}
 		var workPolygons = getWorkPolygons(registry, statement)
 		if (workPolygons.length == 0) {
-			noticeByList(['No work polygon could be found for difference in construction.', statement])
+			noticeByList(['No work polygon or mesh could be found for difference in construction.', statement])
 			return
 		}
 		deleteStatementsByTagDepth(0, registry, statement, 'polygon')
