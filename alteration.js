@@ -35,6 +35,23 @@ function addFilletedPoints(checkLength, filletedPolygon, minimumAngle, numberOfS
 	beforePoint, beginPoint, centerPoint, endPoint, afterPoint, filletedPolygon, minimumAngle, numberOfSides, radius)
 }
 
+function addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength) {
+	var afterPoint = null
+	var beforePoint = null
+	var point = points[pointIndex]
+	if (checkLength) {
+		beforePoint = points[(pointIndex - 2 + points.length) % points.length]
+		afterPoint = points[(pointIndex + 2) % points.length]
+	}
+	var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
+	var endPoint = points[(pointIndex + 1) % points.length]
+	var remainingPoints = points.slice(pointIndex + 1)
+	points.length = pointIndex
+	addFilletedPointsByQuintuple(
+	beforePoint, beginPoint, point, endPoint, afterPoint, points, gDoublePi / numberOfSides, numberOfSides, radius)
+	pushArray(points, remainingPoints)
+}
+
 function addFilletedPointsByQuintuple
 (beforePoint, beginPoint, centerPoint, endPoint, afterPoint, filletedPolygon, minimumAngle, numberOfSides, radius) {
 	var centerBegin = getSubtraction2D(beginPoint, centerPoint)
@@ -374,19 +391,7 @@ function getBoundedPoints2D(equations, points, polygons, registry, statement) {
 			}
 		}
 	}
-	if (polygons != null) {
-		for (var polygon of polygons) {
-			var boundingBox = getBoundingBox(polygon)
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
-					if (getIsPointInsidePolygonOrClose(point, polygon)) {
-						pointIndexSet.add(pointIndex)
-					}
-				}
-			}
-		}
-	}
+	addPointsToIndexSet(pointIndexSet, points, polygons)
 	return getBoundedPointsBySet(pointIndexSet, points)
 }
 
@@ -934,7 +939,7 @@ var gBend = {
 		var amplitudes = getPointsByKey('amplitudes', registry, statement)
 		var center = getFloatsByStatement('center', registry, statement)
 		var translationEquations = getEquations('translations', statement)
-		var vector = get3DPointByStatement('vector', registry, statement)
+		var vector = getPoint3DByStatement('vector', registry, statement)
 		transformPoints2DByEquation(amplitudes, center, boundedPoints, registry, statement, translationEquations, vector)
 		return points
 	},
@@ -1032,6 +1037,23 @@ var gFillet = {
 		var checkLength = getBooleanByDefault(true, 'checkLength', registry, statement, this.name)
 		var numberOfSides = getFloatByDefault(this.sides, 'sides', registry, statement, this.name)
 		var radius = getFloatByDefault(1.0, 'radius', registry, statement, this.name)
+		if (statement.attributeMap.has('region')) {
+			var regionID = statement.attributeMap.get('region')
+			if (!registry.idMap.has(regionID)) {
+				noticeByList(['No region could be found for fillet in alteration.', regionID, statement])
+			}
+			else {
+				var polygons = getPolygonsHDRecursively(registry, registry.idMap.get(regionID))
+				var pointIndexSet = new Set()
+				addPointsToIndexSet(pointIndexSet, points, polygons)
+				var pointIndexes = Array.from(pointIndexSet)
+				pointIndexes.sort(compareNumberDescending)
+				for (var pointIndex of pointIndexes) {
+					addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength)
+				}
+			}
+			return points
+		}
 		return getFilletedPolygon(numberOfSides, points, radius, checkLength)
 	},
 	initialize: function() {
@@ -1142,20 +1164,7 @@ var gMirrorJoin = {
 var gMove = {
 	alterMesh: function(mesh, registry, statement) {
 		var matrix3D = getChainMatrix3D(registry, statement)
-		mesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
-		var rotation = getFloatsByStatement('rotation', registry, statement)
-		if (!getIsEmpty(rotation)) {
-			if (rotation.length == 1) {
-				rotation = polarCounterclockwise(rotation[0] * gRadiansPerDegree)
-			}
-			var rotationLength = length2D(rotation)
-			if (rotationLength != 0.0) {
-				divide2DScalar(rotation, rotationLength)
-				for (var point of mesh.points) {
-					rotate2DVector(point, rotation)
-				}
-			}
-		}
+		mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 		var boundingBox = getMeshBoundingBox(mesh)
 		var lowerLeft = getFloatsByStatement('lowerLeft', registry, statement)
 		if (getIsEmpty(lowerLeft)) {
@@ -1192,7 +1201,6 @@ var gMove = {
 			statement.attributeMap.set('lowerLeft', lowerLeft.toString())
 		}
 		statement.attributeMap.set('boundingBox', getMeshBoundingBox(mesh).toString())
-		mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
