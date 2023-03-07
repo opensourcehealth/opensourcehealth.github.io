@@ -9,7 +9,7 @@ function noticeByList(notices) {
 	for (var notice of notices) {
 		console.log(notice)
 	}
-	console.log('caller: ' + noticeByList.caller.toString())
+	console.log('Caller:\n' + noticeByList.caller.toString().split('\n').slice(0,10).join('\n'))
 }
 
 function warning(text, variables) {
