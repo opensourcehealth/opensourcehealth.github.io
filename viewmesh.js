@@ -266,11 +266,11 @@ function mouseDownSwivel(control, event, viewer) {
 		context.textAlign = 'left'
 		var y = 2 * viewBroker.textSpace + viewBroker.analysisBottom
 		drawArray(context, 'X: Y: Z:'.split(' '), viewBroker.textSpace, viewBroker.analysisCharacterBegin, y)
-		context.fillText('Mouse', viewBroker.analysisSizeBegin, viewBroker.textSpace + viewBroker.analysisBottom)
-		drawNumericArray(context, mousePoint, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
+		context.fillText('Mouse', viewBroker.analysisLowerBegin, viewBroker.textSpace + viewBroker.analysisBottom)
+		drawNumericArray(context, mousePoint, viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
 		if (viewMesh.choiceControl.last != undefined) {
-			context.fillText('Last', viewBroker.analysisLowerBegin, viewBroker.textSpace + viewBroker.analysisBottom)
-			drawNumericArray(context, viewMesh.choiceControl.last, viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
+			context.fillText('Last', viewBroker.analysisSizeBegin, viewBroker.textSpace + viewBroker.analysisBottom)
+			drawNumericArray(context, viewMesh.choiceControl.last, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
 			context.fillText('Change', viewBroker.analysisUpperBegin, viewBroker.textSpace + viewBroker.analysisBottom)
 			drawNumericArray(context, change, viewBroker.textSpace, viewBroker.analysisUpperBegin, y)
 		}
@@ -478,7 +478,7 @@ function ViewMesh() {
 	this.start = function() {
 		var controls = []
 		var height = viewBroker.canvas.height
-		this.mesh = getWorkMeshByID(this.id, viewBroker.registry)
+		this.mesh = getMeshByID(this.id, viewBroker.registry)
 		var viewMesh = {controls:controls}
 		viewBroker.viewMesh = viewMesh
 		var intervals = intervalsFromToQuantity(0.0, height, 4, false)
