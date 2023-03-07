@@ -42,13 +42,14 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 	var text = getJoinedWordByWordLengths(wordLengths)
 	var spaceString = getAttributeValue('space', monad)
 	if (spaceString != undefined) {
-		text = text.replace(/ /g, String.fromCharCode(parseInt(spaceString)))
+		// hair space is 8202
+		text = text.replaceAll(' ', String.fromCharCode(parseInt(spaceString)))
 	}
 	var textLength = 0
 	for (var wordLength of wordLengths) {
 		textLength += wordLength.length
 	}
-	var x = getAttributeFloat('x', monad) + parseFloat(getValueByDefault('0.0', getAttributeValue('dx', monad)))
+	var x = getAttributeFloatByDefault(0.0, 'x', monad) + getAttributeFloatByDefault(0.0, 'dx', monad)
 	var textAttributeMap = new Map([['innerHTML', text], ['x', x.toString()], ['y', yString]])
 	var fontSize = getAttributeFloat('font-size', root)
 	var localFontSize = getAttributeFloat('font-size', monad)
@@ -56,7 +57,7 @@ function addTextStatement(monad, registry, statement, wordLengths) {
 		textLength += (wordLengths.length - 1) * getTextLength(' ') * localFontSize
 	}
 	yString = getNextYString(localFontSize, monad, yString)
-	var writableWidth = getAttributeFloat('right', monad) - getAttributeFloat('left', monad)
+	var writableWidth = getAttributeFloat('width', monad) - 2.0 * getAttributeFloat('padding', monad)
 	if (textLength > writableWidth) {
 		localFontSize *= writableWidth / textLength
 	}
@@ -229,6 +230,8 @@ function getAnchorFontParent(registry, statement) {
 	}
 	attributeMap.set('font-size', fontSize)
 	attributeMap.set('id', statement.attributeMap.get('id'))
+	attributeMap.set('overflow', getAttributeValue('overflow', statement))
+	attributeMap.set('space', getAttributeValue('space', statement))
 	var textAnchor = getAttributeValue('text-anchor', statement)
 	if (textAnchor == undefined) {
 		textAnchor = 'middle'
@@ -362,15 +365,14 @@ function getNextYString(fontSize, monad, yString) {
 function getTextFormatMonad(registry, statement) {
 	var monad = getAnchorFontParent(registry, statement)
 	var attributeMap = monad.attributeMap
-	setFloatByKeyStatement(attributeMap, 0.0, 'dx', registry, statement)
-	setFloatByKeyStatement(attributeMap, 0.0, 'left', registry, statement)
+	attributeMap.set('padding', getFloatByDefault(0.0, 'padding', registry, statement, statement.tag).toString())
+	attributeMap.set('width', getFloatByDefault(100.0, 'width', registry, statement, statement.tag).toString())
 	var lineHeight = getFloatByStatement('lineHeight', registry, statement)
-	if (!getIsEmpty(lineHeight)) {
+	if (lineHeight != undefined) {
 		attributeMap.set('lineHeight', lineHeight.toString())
 	}
-	setFloatByKeyStatement(attributeMap, 0.0, 'right', registry, statement)
-	setFloatByKeyStatement(attributeMap, 0.0, 'x', registry, statement)
-	setFloatByKeyStatement(attributeMap, 0.0, 'y', registry, statement)
+	attributeMap.set('x', getFloatByDefault(0.0, 'x', registry, statement, statement.tag).toString())
+	attributeMap.set('y', getFloatByDefault(0.0, 'y', registry, statement, statement.tag).toString())
 	return monad
 }
 
@@ -428,16 +430,16 @@ function ParagraphMonad() {
 		var shrink = getAttributeValue('overflow', this) == 'shrink'
 		var textAnchor = getAttributeValue('text-anchor', this)
 		var fontSize = getAttributeFloat('font-size', this)
-		var left = getAttributeFloat('left', this)
-		var right = getAttributeFloat('right', this)
-		var writableWidth = right - left
-		var x = left
+		var padding = getAttributeFloat('padding', this)
+		var width = getAttributeFloat('width', this)
+		var writableWidth = width - 2.0 * padding
+		var x = padding
 		if (textAnchor == 'end' ) {
-			x = right
+			x = width - padding
 		}
 		else {
 			if (textAnchor == 'middle' ) {
-				x = 0.5 * (left + right)
+				x = 0.5 * width
 			}
 		}
 		this.attributeMap.set('x', x.toString())
@@ -538,9 +540,10 @@ function TableMonad() {
 		var sourceStatement = registry.idMap.get(src)
 		var sourceChildren = sourceStatement.children
 		var numberOfColumns = parseInt(getValueByDefault('1', getAttributeValue('columns', this)))
-		var x = getAttributeFloat('left', this)
+		var x = getAttributeFloat('padding', this)
 		var numberOfRows = parseInt(getValueByDefault('1', getAttributeValue('rows', this)))
 		var numberOfCells = Math.min(numberOfColumns * numberOfRows, sourceChildren.length)
+		var width = getAttributeFloat('width', this)
 		var remainingLength = sourceChildren.length - numberOfCells
 		var tableChildren = sourceChildren.slice(remainingLength)
 		tableChildren.reverse()
@@ -548,21 +551,18 @@ function TableMonad() {
 		var endIndex = Math.ceil(1.0 * numberOfCells / numberOfColumns)
 		var rowIndex = 0
 		var originalYString = getAttributeValue('y', this)
+		var xAdvance = width / numberOfColumns
 		var yString = originalYString
 		pushArray(statement.children, tableChildren)
-		console.log(endIndex)
 		for (var cellIndex = 0; cellIndex < numberOfCells; cellIndex++) {
 			var child = tableChildren[cellIndex]
 			if (rowIndex == endIndex) {
 				rowIndex = 0
 				numberOfColumns--
-				x += 100
+				x += xAdvance
 				yString = originalYString
 				endIndex = Math.ceil(1.0 * (numberOfCells - cellIndex) / numberOfColumns)
 			}
-		console.log('x')
-		console.log(x)
-		console.log(yString)
 			child.attributeMap.set('x', x.toString())
 			child.attributeMap.set('y', yString)
 			yString = getNextYString(fontSize, this, yString)
@@ -609,11 +609,84 @@ var gFormattedText = {
 	},
 	name: 'formattedText',
 	processStatement: function(registry, statement) {
-		if (!statement.attributeMap.has('text')) {
+		var formattedTextInputArea = null
+		var id = statement.attributeMap.get('id')
+		var text = ''
+		if (getBooleanByDefault(false, 'input', registry, statement, this.name)) {
+			formattedTextInputArea = getInputArea('Formatted Text - ' + id)
+			text = formattedTextInputArea.value
+			if (text != '') {
+				var textPhrases = text.replaceAll('\n', " ").replaceAll('"', "'").split('<p>')
+				for (var textPhraseIndex = 0; textPhraseIndex < textPhrases.length; textPhraseIndex++) {
+					var textPhrase = textPhrases[textPhraseIndex].trim()
+					var indexOfEnd = textPhrase.indexOf('</p>')
+					if (indexOfEnd == -1) {
+						textPhrases[textPhraseIndex] = null
+					}
+					else {
+						textPhrase = textPhrase.slice(0, indexOfEnd)
+						if (textPhrase.indexOf('</') != -1) {
+							var previousCharacter = ' '
+							textPhrase = textPhrase.split('')
+							var bracketDepth = 0
+							var tagDepth = 0
+							for (var characterIndex = 0; characterIndex < textPhrase.length; characterIndex++) {
+								var character = textPhrase[characterIndex]
+								var nextCharacter = ' '
+								if (characterIndex + 1 < textPhrase.length) {
+									nextCharacter = textPhrase[characterIndex + 1]
+								}
+								if (character == '<') {
+									if (nextCharacter != '/' && nextCharacter != ' ') {
+										bracketDepth = 1
+										tagDepth += 1
+									}
+								}
+								if (character == '<') {
+									if (nextCharacter == '/') {
+										tagDepth -= 1
+									}
+								}
+								if (bracketDepth > 0) {
+									textPhrase[characterIndex] = null
+								}
+								if (character == '>') {
+									if (previousCharacter != ' ') {
+										if (tagDepth == 0) {
+											bracketDepth = 0
+										}
+									}
+								}
+								previousCharacter = character
+							}
+							removeNulls(textPhrase)
+							textPhrase = textPhrase.join('')
+						}
+						textPhrases[textPhraseIndex] = textPhrase
+					}
+				}
+				removeNulls(textPhrases)
+				text = '<p> ' + textPhrases.join(' </p> <p> ') + ' </p>'
+			}
+		}
+		if (text == '') {
+			if (statement.attributeMap.has('text')) {
+				text = statement.attributeMap.get('text')
+			}
+		}
+		else {
+			if (getBooleanByDefault(false, 'updateStatement', registry, statement, this.name)) {
+				addEntriesToStatementLine([['text', '" ' + text + ' "']], registry, statement)
+				if (formattedTextInputArea != null) {
+					formattedTextInputArea.value = ''
+				}
+			}
+		}
+		if (text == '') {
 			noticeByList(['No text could be found for formattedText in generator2d.', statement])
 			return
 		}
-		addTextStatements(getTextFormatMonad(registry, statement), registry, statement, statement.attributeMap.get('text'))
+		addTextStatements(getTextFormatMonad(registry, statement), registry, statement, text)
 		convertToGroup(statement)
 		if (getBooleanByDefault(false, 'hideReverse', registry, statement, this.name)) {
 			if (!statement.attributeMap.has('display')) {
@@ -775,13 +848,14 @@ var gList = {
 		if (!getIsEmpty(variableValue)) {
 			children = variableValue.split(' ')
 		}
-		var margin = getVariableFloatByDefault(2.0, 'list_margin', parent)
+		var padding = getVariableFloatByDefault(2.0, 'list_padding', parent)
+		padding = getVariableFloatByDefault(padding, 'list_margin', parent)
 		var transform = getVariableValue('list_transform', parent)
 		if (attributeMap.has('transform')) {
 			transform = attributeMap.get('transform')
 		}
-		var cellWidth = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
-		var x = 0.5 * cellWidth
+		var width = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
+		var x = 0.5 * width
 		if (!getIsEmpty(transform)) {
 			attributeMap.set('transform', transform)
 		}
@@ -797,9 +871,9 @@ var gList = {
 		var anchorFontParent = getAnchorFontParent(registry, statement)
 		var parentAttributeMap = anchorFontParent.attributeMap
 		setFloatByKeyStatement(parentAttributeMap, 0.0, 'dy', registry, statement)
-		setFloatByKeyStatement(parentAttributeMap, margin, 'left', registry, statement)
-		setFloatByKeyStatement(parentAttributeMap, cellWidth - margin, 'right', registry, statement)
-		setFloatByKeyStatement(parentAttributeMap, 0.5 * cellWidth, 'x', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, padding, 'padding', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, width, 'width', registry, statement)
+		setFloatByKeyStatement(parentAttributeMap, 0.5 * width, 'x', registry, statement)
 		setFloatByKeyStatement(parentAttributeMap, 0.0, 'y', registry, statement)
 
 		var formatMonads = []
@@ -873,7 +947,7 @@ var gList = {
 				}
 				attributeMap.set(name, value)
 				if (formatMonad.isImage) {
-					var x = getAttributeFloat('x', formatMonad) + parseFloat(getValueByDefault('0.0', getAttributeValue('dx', formatMonad)))
+					var x = getAttributeFloatByDefault(0.0, 'x', formatMonad) + getAttributeFloatByDefault(0.0, 'dx', formatMonad)
 					var yString = getAttributeValue('y', formatMonad)
 					var imageMap = new Map([['href', value], ['x', x.toString()], ['y', yString]])
 					var height = getAttributeValue('height', formatMonad)
@@ -1062,52 +1136,55 @@ var gText = {
 	},
 	name: 'text',
 	processStatement: function(registry, statement) {
-		var x = getFloatByDefault(0.0, 'x', registry, statement, this.name)
-		var y = getFloatByDefault(0.0, 'y', registry, statement, this.name)
-		statement.attributeMap.set('x', x.toString())
-		statement.attributeMap.set('y', y.toString())
+		statement.attributeMap.set('x', getFloatByDefault(0.0, 'x', registry, statement, this.name).toString())
+		statement.attributeMap.set('y', getFloatByDefault(0.0, 'y', registry, statement, this.name).toString())
 	}
 }
 
-var gVerticalHole = {
+var gTruncatedTeardrop = {
 	initialize: function() {
 		addToCapitalizationMap('sagAngle')
 		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set('verticalHole', this)
 	},
-	name: 'verticalHole',
+	name: 'truncatedTeardrop',
 	processStatement: function(registry, statement) {
 		var overhangAngle = getFloatByDefault(40.0, 'overhangAngle', registry, statement, this.name) * gRadiansPerDegree
 		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
 		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
+		var maximumBridge = getFloatByStatement('maximumBridge', registry, statement)
 		var radius = getFloatByDefault(1.0, 'r', registry, statement, this.name)
-		var sagAngle = getFloatByDefault(15.0, 'sagAngle', registry, statement, this.name) * gRadiansPerDegree
+		var sag = getFloatByDefault(0.2, 'sag', registry, statement, this.name)
 		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
+		var tipDirection = getFloatByDefault(90.0, 'tipDirection', registry, statement, this.name)
 		var points = []
-		var beginAngle = Math.PI / 2.0 - overhangAngle
-		var endAngle = 1.5 * Math.PI + overhangAngle
+		var beginAngle = Math.PI - overhangAngle
+		var endAngle = gDoublePi + overhangAngle
 		var maximumIncrement = 2.0 * Math.PI / sides
 		var deltaAngle = endAngle - beginAngle
-		var arcSides = Math.ceil(deltaAngle / maximumIncrement - 0.001 * overhangAngle)
+		var arcSides = Math.ceil(deltaAngle / maximumIncrement - gClose * overhangAngle)
 		var angleIncrement = deltaAngle / arcSides
 		var halfAngleIncrement = 0.5 * angleIncrement
 		beginAngle -= halfAngleIncrement
 		endAngle += halfAngleIncrement + 0.001 * overhangAngle
-		var outerRadius = radius / Math.cos(0.5 * angleIncrement)
+		var outerRadius = radius / Math.cos(halfAngleIncrement)
 		for (var pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
-			points.push([cx + Math.sin(pointAngle) * outerRadius, cy + Math.cos(pointAngle) * outerRadius])
+			points.push(polarRadius(pointAngle, outerRadius))
 		}
-		var topY = cy + radius
-		var deltaBegin = getSubtraction2D(points[0], points[1])
-		var sagRunOverRise = Math.cos(sagAngle) / Math.sin(sagAngle)
-		var segmentRunOverRise = deltaBegin[0] / deltaBegin[1]
-		var approachRunOverRise = sagRunOverRise - segmentRunOverRise
-		var topMinusSegment = topY - points[0][1]
-		var topX = topMinusSegment * segmentRunOverRise + points[0][0]
-		var aboveMinusTopY = (topX - cx) / approachRunOverRise
-		var sagDeltaX = aboveMinusTopY * sagRunOverRise
-		var aboveY = topY + aboveMinusTopY
-		points[0] = [cx + sagDeltaX, aboveY]
-		points[points.length - 1] = [cx - sagDeltaX, aboveY]
+		var segmentRunOverRise = (points[0][0] - points[1][0]) / (points[0][1] - points[1][1])
+		var top = radius + sag
+		var side = points[points.length - 1][0] - segmentRunOverRise * (top - points[0][1])
+		if (maximumBridge != undefined) {
+			var halfBridge = 0.5 * maximumBridge
+			if (side > halfBridge) {
+				top += (side - halfBridge) / segmentRunOverRise
+				side = halfBridge
+			}
+		}
+		points[0] = [-side, top]
+		points[points.length - 1] = [side, top]
+		rotate2DsVector(points, polarCounterclockwise((tipDirection - 90) * gRadiansPerDegree))
+		add2Ds(points, [cx, cy])
 		for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			point = points[pointIndex]
 			points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
@@ -1119,4 +1196,4 @@ var gVerticalHole = {
 
 var gGenerator2DProcessors = [
 gCircle, gFormattedText, gFractal2D, gGrid, gImage, gLettering, gList, gOutline,
-gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gVerticalHole]
+gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gText, gTruncatedTeardrop]
