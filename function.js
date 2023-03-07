@@ -225,25 +225,12 @@ function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberO
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 		var point = points[pointIndex]
 		if (point.length > 1) {
-			if (point[0] - pointX == 0.0 && point[1] - pointY == 0.0) {
-				var afterPoint = null
-				var beforePoint = null
-				if (checkLength) {
-					beforePoint = points[(pointIndex - 2 + points.length) % points.length]
-					afterPoint = points[(pointIndex + 2) % points.length]
-				}
-				var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
-				var endPoint = points[(pointIndex + 1) % points.length]
-				var remainingPoints = points.slice(pointIndex + 1)
-				points.length = pointIndex
-				addFilletedPointsByQuintuple(
-				beforePoint, beginPoint, point, endPoint, afterPoint, points, gDoublePi / numberOfSides, numberOfSides, radius)
-				pushArray(points, remainingPoints)
+			if (point[0] == pointX && point[1] == pointY) {
+				addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength)
 				return [points.pop()]
 			}
 		}
 	}
-	return [[]]
 }
 
 //deprecated23
@@ -1254,7 +1241,7 @@ function stepsToBetween(registry, statement, to, alongs) {
 	return stepsFromToBetween(registry, statement, new Array(fromLength), to, alongs)
 }
 
-function stepsToQuantity(registry, statement, to, quantity, includeFrom, includeTo) {
+function stepsToQuantity(registry, statement, to, quantity, includeTo) {
 	var fromLength = 2
 	if (Array.isArray(to)) {
 		fromLength = to.length
