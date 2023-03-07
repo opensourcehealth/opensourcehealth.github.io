@@ -47,7 +47,7 @@ function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists,
 		warning(warningText, warningVariables)
 		return
 	}
-	if (statement.attributeMap != null && statement.tag == tag) {
+	if (!getIsEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
 		if (getIsLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
@@ -73,7 +73,7 @@ function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagS
 		warning(warningText, warningVariables)
 		return
 	}
-	if (statement.attributeMap != null && statement.tag == tag) {
+	if (!getIsEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
 		if (getIsLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
@@ -92,103 +92,16 @@ function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagS
 	}
 }
 
-function get3DMatrix(registry, statement) {
-	var attributeMap = statement.attributeMap
-	if (!statement.attributeMap.has('transform3D')) {
-		return null
-	}
-	var matrix = null
-	var separatedWords = getBracketSeparatedWords(attributeMap.get('transform3D'))
-	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
-		var entry = getBracketedEntry(separatedWords[wordIndex])
-		if (entry != null) {
-			var transformType = entry[0]
-			if (g3DTransformMap.has(transformType)) {
-				var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
-				var bracketMatrix = g3DTransformMap.get(transformType)(floats)
-				if (matrix == null) {
-					matrix = bracketMatrix
-				}
-				else {
-					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
-				}
-			}
-			if (g3DPointTransformMap.has(transformType)) {
-				var points = get3DPoints(registry, statement, entry[1])
-				separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
-				var bracketMatrix = g3DPointTransformMap.get(transformType)(points)
-				if (matrix == null) {
-					matrix = bracketMatrix
-				}
-				else {
-					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
-				}
-			}
-		}
-	}
-	attributeMap.set('transform3D', separatedWords.join(' '))
-	return matrix
-}
-
-function get3DPointByStatement(key, registry, statement) {
-	if (!statement.attributeMap.has(key)) {
-		return undefined
-	}
-	var value = statement.attributeMap.get(key)
-	if (value.length == 0) {
-		return undefined
-	}
-	var update = false
-	if (gXYZMap.has(value[0])) {
-		value = gXYZMap.get(value[0])
-		update = true
-	}
-	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
-	var floats = floatsUpdate[0]
-	var pointString = floats.toString()
-	if (update || floatsUpdate[1]) {
-		statement.attributeMap.set(key, pointString)
-	}
-	if (pointString.length == 0) {
-		return undefined
-	}
-	var originalLength = floats.length
-	for (var arrayIndex = originalLength; arrayIndex < 3; arrayIndex++) {
-		floats.push(0.0)
-		statement.attributeMap.set(key, floats.toString())
-	}
-	return floats
-}
-
-function get3DPoints(registry, statement, value) {
-	if (value.length < 2) {
-		return null
-	}
-	var characters = value.split('')
-	if (gXYZMap.has(characters[0])) {
-		if (gBracketSpaceSet.has(characters[1])) {
-			characters[0] = gXYZMap.get(characters[0])
-		}
-	}
-	for (var characterIndex = 1; characterIndex < characters.length - 1; characterIndex++) {
-		if (gXYZMap.has(characters[characterIndex])) {
-			if (gBracketSpaceSet.has(characters[characterIndex - 1]) && gBracketSpaceSet.has(characters[characterIndex + 1])) {
-				characters[characterIndex] = gXYZMap.get(characters[characterIndex])
-			}
-		}
-	}
-	var character = characters[characters.length - 1]
-	if (gXYZMap.has(character)) {
-		if (gBracketSpaceSet.has(characters[characters.length - 2])) {
-			characters[characters.length - 1] = gXYZMap.get(character)
-		}
-	}
-	return getPointsByValue(registry, statement, characters.join(''))
-}
-
 function getAttributeFloat(key, statement) {
 	return parseFloat(getAttributeValue(key, statement))
+}
+
+function getAttributeFloatByDefault(defaultValue, key, statement) {
+	var value = getAttributeValue(key, statement)
+	if (value == undefined) {
+		return defaultValue
+	}
+	return parseFloat(value)
 }
 
 function getAttributeValue(key, statement) {
@@ -233,6 +146,12 @@ function getBooleanByStatement(key, registry, statement) {
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
+	if (value == false || value == 0) {
+		return false
+	}
+	if (value == true || value == 1) {
+		return true
+	}
 	value = value.trim()
 	if (value.length == 0) {
 		return undefined
@@ -263,7 +182,7 @@ function getBooleanByString(text) {
 }
 
 function getChainMatrix3D(registry, statement) {
-	var transformedMatrix = get3DMatrix(registry, statement)
+	var transformedMatrix = getMatrix3D(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		var statement = statement.parent
 		if (statement == undefined) {
@@ -274,7 +193,7 @@ function getChainMatrix3D(registry, statement) {
 				return transformedMatrix
 			}
 		}
-		var statementMatrix = get3DMatrix(registry, statement)
+		var statementMatrix = getMatrix3D(registry, statement)
 		if (statementMatrix != null) {
 			if (transformedMatrix == null) {
 				transformedMatrix = statementMatrix
@@ -352,7 +271,7 @@ function getChainSkipMatrix2DUntil(caller, registry, statement) {
 }
 
 function getChainSkipMatrix3D(registry, statement) {
-	var transformedMatrix = get3DMatrix(registry, statement)
+	var transformedMatrix = getMatrix3D(registry, statement)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		var statement = statement.parent
 		if (statement == undefined) {
@@ -368,7 +287,7 @@ function getChainSkipMatrix3D(registry, statement) {
 			skip3D = getBooleanByStatementValue('skip3D', registry, statement, statement.attributeMap.get('skip3D'))
 		}
 		if (skip3D != true) {
-			var statementMatrix = get3DMatrix(registry, statement)
+			var statementMatrix = getMatrix3D(registry, statement)
 			if (statementMatrix != null) {
 				if (transformedMatrix == null) {
 					transformedMatrix = statementMatrix
@@ -798,6 +717,54 @@ function getMatrix2DUntil(caller, registry, statement) {
 	return matrix2DUntil
 }
 
+function getMatrix3D(registry, statement) {
+	var attributeMap = statement.attributeMap
+	if (!statement.attributeMap.has('transform3D')) {
+		return null
+	}
+	var matrix = null
+	var separatedWords = getBracketSeparatedWords(attributeMap.get('transform3D'))
+	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
+		var entry = getBracketedEntry(separatedWords[wordIndex])
+		if (entry != null) {
+			var transformType = entry[0]
+			if (g3DTransformMap.has(transformType)) {
+				var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
+				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
+				var bracketMatrix = g3DTransformMap.get(transformType)(floats)
+				if (matrix == null) {
+					matrix = bracketMatrix
+				}
+				else {
+					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
+				}
+			}
+			if (g3DPointTransformMap.has(transformType)) {
+				var points = getPoints3D(registry, statement, entry[1])
+				separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
+				var bracketMatrix = g3DPointTransformMap.get(transformType)(points)
+				if (matrix == null) {
+					matrix = bracketMatrix
+				}
+				else {
+					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
+				}
+			}
+		}
+	}
+	attributeMap.set('transform3D', separatedWords.join(' '))
+	return matrix
+}
+
+function getMatrix3DsByChildren(children, registry) {
+	var matrix3DsByChildren = []
+	for (var child of children) {
+		matrix3Ds = getPointsByTag('matrix3Ds', registry, child, 'matrix3D')
+		matrix3DsByChildren = getPushArray(matrix3DsByChildren, matrix3Ds)
+	}
+	return matrix3DsByChildren
+}
+
 function getPath2DByStatement(registry, statement) {
 	if (statement.attributeMap.has('path')) {
 		return removeIdentical2DPoints(getPointsByValue(registry, statement, statement.attributeMap.get('path')))
@@ -809,12 +776,68 @@ function getPath2DByStatement(registry, statement) {
 	return removeIdentical2DPoints(getPointsHDByStatementOnly(registry, workStatement))
 }
 
+function getPoint3DByStatement(key, registry, statement) {
+	if (!statement.attributeMap.has(key)) {
+		return undefined
+	}
+	var value = statement.attributeMap.get(key)
+	if (value.length == 0) {
+		return undefined
+	}
+	var update = false
+	if (gXYZMap.has(value[0])) {
+		value = gXYZMap.get(value[0])
+		update = true
+	}
+	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
+	var floats = floatsUpdate[0]
+	var pointString = floats.toString()
+	if (update || floatsUpdate[1]) {
+		statement.attributeMap.set(key, pointString)
+	}
+	if (pointString.length == 0) {
+		return undefined
+	}
+	var originalLength = floats.length
+	for (var arrayIndex = originalLength; arrayIndex < 3; arrayIndex++) {
+		floats.push(0.0)
+		statement.attributeMap.set(key, floats.toString())
+	}
+	return floats
+}
+
 function getPointByDefault(defaultValue, key, registry, statement, tag) {
 	var point = getFloatsByDefault(defaultValue, key, registry, statement, tag)
 	if (point.length == 1) {
 		point.push(point[0])
 	}
 	return point
+}
+
+function getPoints3D(registry, statement, value) {
+	if (value.length < 2) {
+		return null
+	}
+	var characters = value.split('')
+	if (gXYZMap.has(characters[0])) {
+		if (gBracketSpaceSet.has(characters[1])) {
+			characters[0] = gXYZMap.get(characters[0])
+		}
+	}
+	for (var characterIndex = 1; characterIndex < characters.length - 1; characterIndex++) {
+		if (gXYZMap.has(characters[characterIndex])) {
+			if (gBracketSpaceSet.has(characters[characterIndex - 1]) && gBracketSpaceSet.has(characters[characterIndex + 1])) {
+				characters[characterIndex] = gXYZMap.get(characters[characterIndex])
+			}
+		}
+	}
+	var character = characters[characters.length - 1]
+	if (gXYZMap.has(character)) {
+		if (gBracketSpaceSet.has(characters[characters.length - 2])) {
+			characters[characters.length - 1] = gXYZMap.get(character)
+		}
+	}
+	return getPointsByValue(registry, statement, characters.join(''))
 }
 
 function getPointsByDefault(defaultValue, key, registry, statement, tag) {
@@ -963,7 +986,7 @@ function getVariableValue(key, statement) {
 }
 
 function getVector2DByStatement(registry, statement) {
-	var vector = get3DPointByStatement('vector', registry, statement)
+	var vector = getPoint3DByStatement('vector', registry, statement)
 	if (getIsEmpty(vector)) {
 		return [1.0, 0.0]
 	}
@@ -979,7 +1002,7 @@ function getVector2DByStatement(registry, statement) {
 }
 
 function getVector3DByStatement(registry, statement) {
-	var vector = get3DPointByStatement('vector', registry, statement)
+	var vector = getPoint3DByStatement('vector', registry, statement)
 	if (getIsEmpty(vector)) {
 		return [1.0, 0.0, 0.0]
 	}
