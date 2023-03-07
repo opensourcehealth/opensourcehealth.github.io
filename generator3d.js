@@ -734,7 +734,7 @@ function getTops(registry, statement) {
 
 function getWorkMesh(registry, statement) {
 	var attributeMap = statement.attributeMap
-	var workMesh = getWorkMeshByID(attributeMap.get('work'), registry)
+	var workMesh = getMeshByID(attributeMap.get('work'), registry)
 	if (workMesh == null) {
 		return null
 	}
@@ -744,19 +744,12 @@ function getWorkMesh(registry, statement) {
 	return workMesh
 }
 
-function getWorkMeshByID(id, registry) {
-	if (!registry.meshMap.has(id)) {
-		return null
-	}
-	return registry.meshMap.get(id)
-}
-
 function getWorkMeshes(registry, statement) {
 	var workIDs = getStrings('work', statement)
 	var shouldCopy = getBooleanByDefault(false, 'copy', registry, statement, statement.tag)
 	var workMeshes = []
 	for (var workID of workIDs) {
-		var workMesh = getWorkMeshByID(workID, registry)
+		var workMesh = getMeshByID(workID, registry)
 		if (workMesh != null) {
 			if (shouldCopy) {
 				workMesh = getMeshCopy(workMesh)
