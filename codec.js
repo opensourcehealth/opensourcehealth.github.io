@@ -37,7 +37,9 @@ var gEscapeTable = {
 	'%7C':'|',
 	'%7E':'~',
 	'%27':'\'',
-	'%2C':','}
+	'%2C':',',
+	'%E2%80%9C':'“',
+	'%E2%80%9D':'”'}
 var gEscapeExpression = new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
 const gLZStringHeader = 'lz_'
 var gProject = null
@@ -270,7 +272,7 @@ function update() {
 					break
 				}
 			}
-			gCurrentKey = firstDifferenceIndex.toString() + ' - ' + gCurrentKey
+			gCurrentKey = gCurrentKey + ' - ' + firstDifferenceIndex.toString()
 			gRedoMap.set(oldQueryKey, gCurrentKey)
 			gUndoMap.set(gCurrentKey, oldQueryKey)
 			sessionStorage.setItem('redoMapKey@', getStringByMap(gRedoMap))
