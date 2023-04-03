@@ -30,8 +30,8 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
 
+// thread
 // format text
-// fix '1+2*1*0.1' should be 1.2 but is 0.3
 // platonic, svg
 // fix nodeOrder in getOutlinesQuickly for figure 8
 // cell outline
@@ -57,6 +57,9 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // after version 4 is printed, remove unused variables
 //
 // low priority
+// clockwise for polygons in sculpture
+// make triangles in scuplture than polygonate them
+// check out addFacetsByWorkMap in emboss
 // test getEquation from fence and road
 // arrayFunctionX
 // polygonGroup for sculpture
@@ -68,7 +71,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // add notice if nothing is embossed, look beyond stratas
 // add noticeByList for tags outside of alteration, meta, generator2d
 // add notice for other missing and getStatementID whileIndex?
-// bug when difference polygon point is on facet
 // change remaining XY to 2D
 // use warningByList instead of warning
 // z set polygon points to z
@@ -83,7 +85,7 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // outset check for intersections
 // more matrix functions _Check..
 // delete getPolygonateMesh
-// analyze volume and surface area
+// analyze volume
 //
 // maybe add notice
 // viewer new/delete/move for polygon poins
@@ -406,7 +408,7 @@ function testEquation() {
 //	var valueString = ' ( 3 % 2 ) * .3 * Math.min(8,11) + stringLength( testString ) '
 //	var valueString = ' -Math.min(8,11) -Math.min(8,11) -Math.min(8,11) '
 //	var valueString = ' min(8,1.5*max(3,4)) '
-//	var valueString = 'intervalsFromToIncrement(0,3.5,1)[0]'
+//	var valueString = 'intervalsFromToIncrement(0,3.5,1)[1]'
 //	var valueString = ' -2+1 '
 //	var valueString = ' true && false '
 //	var valueString = ' 4, '
@@ -416,7 +418,9 @@ function testEquation() {
 //	var valueString = ' intervalsFromToIncrement(0,3.5,1) '
 //	var valueString = ' testMap.value '
 //	var valueString = ' testMap.value + Math.sin(0.1) * testMap.value '
-	var valueString = '1+2*1*0.1'
+//	var valueString = '1+2*2'
+	var valueString = '1+2*2*0.1'
+//	var valueString = '7-2-1'
 //	var valueString = ' Math.sin(1) '
 //	var valueString = ' testArray[0][0] '
 //	var valueString = ',2'
@@ -1191,6 +1195,14 @@ function testTransforms() {
 
 function testTriangulate() {
 	console.log('testTriangulate')
+	var facet = [0,1,2,3]
+//	var facet = [3,2,1,0]
+	var points = [[0,0,0], [0,1,0], [1,1,0], [1,0,0]]
+//	var points = [[0,0,0], [0,0,1], [0,1,1], [0,1,0]]
+//	var points = [[0,0,0], [0,0,1], [1,0,1], [1,0,0]]
+	var triangleFacets = getTriangle3DFacets(facet, points, new Array(points.length))
+
+return	
 //	var pointString = '0,0,0 0,4,0 4,4,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 1,2,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 4,3,0 1,3,0 1,1,0 4,1,0 4,0,0'
@@ -1267,7 +1279,6 @@ function testTriangulate() {
 	return
 	console.log(triangleFacets)
 //	rotateXYZParametersByPoints(1, points)
-	var triangleFacets = getTriangle3DFacets(facet, points, new Array(points.length))
 	var triangles = getPolygonsByFacets(triangleFacets, points)
 //	rotateXYZParametersByPoints(-1, points)
 	console.log('triangles')
@@ -1383,7 +1394,7 @@ function createSVGTest() {
 //	testDrillByMesh()
 //	testDrillByPolygon()
 //	testExpand()
-	testEquation()
+//	testEquation()
 //	testExtrusion()
 //	testFace()
 //	testFacetSubtraction()
@@ -1393,7 +1404,7 @@ function createSVGTest() {
 //	testIntercircle()
 //	testJoin()
 //	testLength()
-//	testLettering()
+	testLettering()
 //	testLinkMap()
 //	testLoop()
 //	testMeshBoolean()
