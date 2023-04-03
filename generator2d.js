@@ -169,7 +169,7 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('2', [arcCenterRadius(0.5, 1.5, 0.5, 165, -45).concat(bottomLine)])
 	var three = arcCenterRadius(0.5, 1.5, 0.5, 165, -90).concat([[0.45, 1]]).concat(arcCenterRadius(0.5, 0.5, 0.5, 90, -90))
 	gLetteringMap.set('3', [three.concat(arcCenterRadius(0.5, 1.5, 1.5, -90, -109))])
-	gLetteringMap.set('4', [[[0.75, 0], [, 0.43], [, 2], [0, 0.43], [0.75,], [1,]]])
+	gLetteringMap.set('4', [[[0.75,], [, 0.7], [, 2]], [[, 2], [, 0.7], [0.75,], [1,]]])
 	gLetteringMap.set('5', [[[1, 2], [0.45, 2]].concat(arcFromTo(0.2, 1.27, 0.1, 0.03, -0.653))])
 	var six = arcFromTo(0.005, 0.5, 1, 0.55, 0.4982).concat(arcFromTo(1, 0.5, 0.005, 0.45, 0.4982))
 	gLetteringMap.set('6', [six.concat(arcFromTo(0.005, 0.45, 0.2, 1.6, 1.3)).concat(arcFromTo(0.2, 1.6, 1, 2, 1.05))])
@@ -177,7 +177,7 @@ function createCharacterPolylineMap() {
 	var eight = center.concat(arcCenterRadius(0.5, 1.5, 0.5, 240, -60)).concat(center)
 	gLetteringMap.set('8', [eight.concat(arcCenterRadius(0.5, 0.5, 0.5, 60, -240)).concat(center)])
 	gLetteringMap.set('9', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
-	gLetteringMap.set('A', [[[,], [0.2, 0.8], [0.5, 2], [0.8, 0.8], [1, 0]], [[0.2, 0.8], [0.8,]]])
+	gLetteringMap.set('A', [[[,], [0.15, 0.4], [0.75, 2], [1.35, 0.4], [1.5, 0]], [[0.15, 0.4], [1.35,]]])
 	gLetteringMap.set('B', [bottomSemicircle, leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('C', [bottomLeftArc, leftTallSemicircle, topRightArc])
 	gLetteringMap.set('D', [arcFromTo(0, 2, 0, 0, 1), leftLine])
@@ -360,6 +360,24 @@ function getNextYString(fontSize, monad, yString) {
 		fontSize = parseFloat(lineHeightString)
 	}
 	return (parseFloat(yString) + fontSize).toString()
+}
+
+function getRegularPolygon(center, isClockwise, outsideness, radius, sideOffset, sides, startAngle) {
+	var angleIncrement = gDoublePi / sides
+	startAngle += sideOffset * angleIncrement
+	radius *= (1.0 - outsideness) / Math.cos(0.5 * angleIncrement) + outsideness
+	var points = new Array(sides)
+	if (isClockwise) {
+		angleIncrement = -angleIncrement
+		startAngle = -startAngle
+	}
+	var point = polarRadius(startAngle, radius)
+	var rotation = polarCounterclockwise(angleIncrement)
+	for (var vertexIndex = 0; vertexIndex < sides; vertexIndex++) {
+		points[vertexIndex] = getAddition2D(point, center)
+		rotate2DVector(point, rotation)
+	}
+	return points
 }
 
 function getTextFormatMonad(registry, statement) {
@@ -1081,27 +1099,16 @@ var gRegularPolygon = {
 	},
 	name: 'regularPolygon',
 	processStatement: function(registry, statement) {
+		var isClockwise = getBooleanByDefault(true, 'clockwise', registry, statement, this.name)
 		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
 		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
-		var outsideness = getFloatByDefault(1.0, 'outsideness', registry, statement, this.name)
+		var outsideness = getFloatByDefault(0.0, 'outsideness', registry, statement, this.name)
 		var radius = getFloatByDefault(1.0, 'r', registry, statement, this.name)
 		var sideOffset = getFloatByDefault(0.0, 'sideOffset', registry, statement, this.name)
 		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
-		var startAngle = getFloatByDefault(0.0, 'startAngle', registry, statement, this.name)
-		startAngle *= gRadiansPerDegree
-		var angleIncrement = gDoublePi / sides
-		startAngle += sideOffset * angleIncrement
-		var center = [cx, cy]
-		radius *= outsideness / Math.cos(0.5 * angleIncrement) + 1.0 - outsideness
-		var points = new Array(sides)
-		var point = polarRadius(startAngle, radius)
-		var rotation = polarCounterclockwise(angleIncrement)
-		for (var vertexIndex = 0; vertexIndex < sides; vertexIndex++) {
-			points[vertexIndex] = getAddition2D(point, center)
-			rotate2DVector(point, rotation)
-		}
+		var startAngle = getFloatByDefault(0.0, 'startAngle', registry, statement, this.name) * gRadiansPerDegree
 		statement.tag = 'polygon'
-		setPointsExcept(points, registry, statement)
+		setPointsExcept(getRegularPolygon([cx, cy], isClockwise, outsideness, radius, sideOffset, sides, startAngle), registry, statement)
 	}
 }
 
