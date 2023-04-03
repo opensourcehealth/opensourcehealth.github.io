@@ -652,6 +652,28 @@ function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, re
 	return pointIndexSet
 }
 
+function getPointIndexSetByOutside(center, isOutside, points, mesh) {
+	var pointIndexSet = new Set()
+	for (var facet of mesh.facets) {
+		var facetCenter = getCenter(facet, points)
+		var normal = getNormalByFacet(facet, points)
+		var centerFacet = getSubtraction2D(facetCenter, center)
+		var centerFacetLength = length2D(centerFacet)
+		if (centerFacetLength > 0.0) {
+			divide3DScalar(centerFacet, centerFacetLength)
+		}
+		var dotProduct = dotProduct2D(normal, centerFacet)
+		if (Math.abs(dotProduct) > gClose) {
+			if (dotProduct > 0.0 == isOutside) {
+				for (var pointIndex of facet) {
+					pointIndexSet.add(pointIndex)
+				}
+			}
+		}
+	}
+	return pointIndexSet
+}
+
 function getPointsExcept(points, registry, statement) {
 	if (statement.attributeMap.has('alterations')) {
 		var alterations = statement.attributeMap.get('alterations').split(',').filter(lengthCheck)
@@ -803,7 +825,179 @@ function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
 	mesh.points = originalPoints
 }
 
-function transformPoints2DByEquation(amplitudes, center, points, registry, statement, translationEquations, vector) {
+function threadPointByAxials(axials, center, heights, point, taperAngle, translations) {
+	var centerPoint = getSubtraction2D(point, center)
+	var centerPointLength = length2D(centerPoint)
+	if (centerPointLength == 0.0) {
+		return
+	}
+	var angle = Math.atan2(centerPoint[1], centerPoint[0]) * gDegreesPerRadian
+	if (angle < axials[0][0]) {
+		angle += 360.0
+	}
+	else {
+		if (angle > axials[axials.length - 1][0]) {
+			angle -= 360.0
+		}
+	}
+	if (angle < axials[0][0]) {
+		return
+	}
+	if (angle > axials[axials.length - 1][0]) {
+		return
+	}
+	var bottom = translations[0][0]
+	var radialMultiplier = 1.0
+	var top = translations[translations.length - 1][0]
+	var deltaZ = top - bottom
+	var z = point[2]
+	var axialInterpolation = additionInterpolation3D(angle, axials)
+	var cycle = 0
+	var angleDifference = angle - axials[0][0]
+	if (angleDifference < taperAngle) {
+		radialMultiplier = angleDifference / taperAngle
+	}
+	else {
+		angleDifference = axials[axials.length - 1][0] - angle
+		if (angleDifference < taperAngle) {
+			radialMultiplier = angleDifference / taperAngle
+		}
+	}
+	z -= axialInterpolation[1]
+	if (Math.abs(deltaZ) > 0.0) {
+		var axialBottom = Number.MAX_VALUE
+		var axialTop = -Number.MAX_VALUE
+		for (var axial of axials) {
+			axialBottom = Math.min(axialBottom, axial[1])
+			axialTop = Math.max(axialTop, axial[1])
+		}
+		axialBottom += bottom
+		axialTop += top
+		if (z > top) {
+			cycle += Math.ceil((z - top) / deltaZ)
+		}
+		else {
+			if (bottom > z) {
+				cycle -= Math.ceil((bottom - z) / deltaZ)
+			}
+		}
+		z -= deltaZ * cycle
+		if (!getIsEmpty(heights)) {
+			var cycleEnd = cycle - (heights[0] - bottom) / deltaZ
+			if (cycleEnd < gClose) {
+				return
+			}
+			if (heights.length > 1) {
+				cycleEnd = (heights[1] - axialTop) / deltaZ - cycle
+				if (cycleEnd < gClose) {
+					return
+				}
+			}
+		}
+	}
+	var interpolation = additionInterpolation3D(z, translations)
+	multiply2DScalar(centerPoint, radialMultiplier * (interpolation[1] + axialInterpolation[2]) / centerPointLength)
+	add2D(point, centerPoint)
+	var rotationVector = polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
+	subtract2D(point, center)
+	rotate2DVector(point, rotationVector)
+	add2D(point, center)
+	point[2] += interpolation[0]
+}
+
+function threadPointByTranslations(center, heights, numberOfThreads, point, taperPortion, translations) {
+	var centerPoint = getSubtraction2D(point, center)
+	var centerPointLength = length2D(centerPoint)
+	if (centerPointLength == 0.0) {
+		return
+	}
+	var bottom = translations[0][0]
+	var radialMultiplier = 1.0
+	var top = translations[translations.length - 1][0]
+	var deltaZ = top - bottom
+	var z = point[2]
+	var angle = Math.atan2(centerPoint[1], centerPoint[0])
+	if (angle < 0.0) {
+		angle += gDoublePi
+	}
+	var cycle = numberOfThreads * angle / gDoublePi
+	z -= deltaZ * cycle
+	if (Math.abs(deltaZ) > 0.0) {
+		if (z > top) {
+			var above = Math.ceil((z - top) / deltaZ)
+			cycle += above
+			z -= deltaZ * above
+		}
+		else {
+			if (bottom > z) {
+				var below = Math.ceil((bottom - z) / deltaZ)
+				cycle -= below
+				z += deltaZ * below
+			}
+		}
+		if (!getIsEmpty(heights)) {
+			var cycleEnd = cycle - (heights[0] - bottom) / deltaZ
+			if (cycleEnd < gClose) {
+				return
+			}
+			if (cycleEnd < taperPortion) {
+				radialMultiplier = cycleEnd / taperPortion
+			}
+			if (heights.length > 1) {
+				cycleEnd = (heights[1] - top) / deltaZ - cycle
+				if (cycleEnd < gClose) {
+					return
+				}
+				if (cycleEnd < taperPortion) {
+					radialMultiplier = cycleEnd / taperPortion
+				}
+			}
+		}
+	}
+	var interpolation = additionInterpolation3D(z, translations)
+	multiply2DScalar(centerPoint, radialMultiplier * interpolation[1] / centerPointLength)
+	add2D(point, centerPoint)
+	var rotationVector = polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
+	subtract2D(point, center)
+	rotate2DVector(point, rotationVector)
+	add2D(point, center)
+	point[2] += interpolation[0]
+}
+
+function threadPoints(axials, center, heights, numberOfThreads, points, taperAngle, translations) {
+	var maximumLength = 0
+	for (var translation of translations) {
+		maximumLength = Math.max(maximumLength, translation.length)
+	}
+	for (var translation of translations) {
+		translation.length = maximumLength
+		setUndefinedElementsToValue(translation, 0)
+	}
+	if (getIsEmpty(axials)) {
+		var taperPortion = taperAngle / 360.0
+		console.log(center)
+		console.log(points)
+		console.log(translations)
+		for (var point of points) {
+			threadPointByTranslations(center, heights, numberOfThreads, point, taperPortion, translations)
+		}
+		return
+	}
+	maximumLength = 2
+	for (var axial of axials) {
+		maximumLength = Math.max(maximumLength, axial.length)
+	}
+	for (var axial of axials) {
+		axial.length = maximumLength
+		setUndefinedElementsToValue(axial, 0)
+	}
+	for (var point of points) {
+		threadPointByAxials(axials, center, heights, point, taperAngle, translations)
+	}
+
+}
+
+function transformPoints2DByEquation(center, points, registry, statement, translationEquations, translations, vector) {
 	if (!getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
 			var variableMap = getVariableMapByStatement(statement)
@@ -824,28 +1018,22 @@ function transformPoints2DByEquation(amplitudes, center, points, registry, state
 			}
 		}
 	}
-	if (getIsEmpty(amplitudes)) {
+	if (getIsEmpty(translations)) {
 		return
 	}
 	if (getIsEmpty(center)) {
 		center = [0.0, 0.0]
-	}
-	if (center.length == 1) {
-		center.push(0.0)
-	}
-	if (getIsEmpty(vector)) {
-		vector = [1.0, 0.0]
 	}
 	if (vector.length == 1) {
 		vector.push(0.0)
 	}
 	normalize2D(vector)
 	for (var point of points) {
-		add2D(point, additionInterpolation2D(dotProduct2D(vector, getSubtraction2D(point, center)), amplitudes))
+		add2D(point, additionInterpolation2D(dotProduct2D(vector, getSubtraction2D(point, center)), translations))
 	}
 }
 
-function transformPoints3DByEquation(amplitudes, center, points, registry, statement, translationEquations, vector) {
+function transformPoints3DByEquation(center, points, registry, statement, translationEquations, translations, vector) {
 	if (!getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
 			var variableMap = getVariableMapByStatement(statement)
@@ -869,20 +1057,11 @@ function transformPoints3DByEquation(amplitudes, center, points, registry, state
 			}
 		}
 	}
-	if (getIsEmpty(amplitudes)) {
+	if (getIsEmpty(translations)) {
 		return
 	}
-	if (getIsEmpty(center)) {
-		center = [0.0, 0.0]
-	}
-	if (center.length == 1) {
-		center.push(0.0)
-	}
-	if (center.length == 2) {
-		center.push(0.0)
-	}
 	for (var point of points) {
-		add3D(point, additionInterpolation3D(dotProduct3D(vector, getSubtraction3D(point, center)), amplitudes))
+		add3D(point, additionInterpolation3D(dotProduct3D(vector, getSubtraction3D(point, center)), translations))
 	}
 }
 
@@ -921,11 +1100,14 @@ var gBend = {
 			return
 		}
 		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
-		var amplitudes = getPointsByKey('amplitudes', registry, statement)
-		var center = getFloatsByStatement('center', registry, statement)
-		var translationEquations = getEquations('translations', statement)
+		var translations = getPointsByKey('translations', registry, statement)
+		if (getIsEmpty(translations)) {
+			translations = getPointsByKey('amplitudes', registry, statement)
+		}
+		var center = getFloatsByDefault([0.0, 0.0, 0.0], 'center', registry, statement, statement.tag)
+		var translationEquations = getEquations('translationEquations', statement)
 		var vector = getVector3DByStatement(registry, statement)
-		transformPoints3DByEquation(amplitudes, center, boundedPoints, registry, statement, translationEquations, vector)
+		transformPoints3DByEquation(center, boundedPoints, registry, statement, translationEquations, translations, vector)
 		mesh.points = get3DsBy3DMatrix(matrix3D, points)
 		removeClosePoints(mesh)
 	},
@@ -936,11 +1118,14 @@ var gBend = {
 		if (getIsEmpty(boundedPoints)) {
 			return points
 		}
-		var amplitudes = getPointsByKey('amplitudes', registry, statement)
-		var center = getFloatsByStatement('center', registry, statement)
-		var translationEquations = getEquations('translations', statement)
+		var translations = getPointsByKey('translations', registry, statement)
+		if (getIsEmpty(translations)) {
+			translations = getPointsByKey('amplitudes', registry, statement)
+		}
+		var center = getFloatsByDefault([0.0, 0.0], 'center', registry, statement, statement.tag)
+		var translationEquations = getEquations('translationEquations', statement)
 		var vector = getPoint3DByStatement('vector', registry, statement)
-		transformPoints2DByEquation(amplitudes, center, boundedPoints, registry, statement, translationEquations, vector)
+		transformPoints2DByEquation(center, boundedPoints, registry, statement, translationEquations, translations, vector)
 		return points
 	},
 	initialize: function() {
@@ -1678,6 +1863,41 @@ var gTaper = {
 	}
 }
 
+var gThread = {
+	alterMesh: function(mesh, registry, statement) {
+		var axials = getPointsByKey('axials', registry, statement)
+		var center = getFloatsByDefault([0.0, 0.0], 'center', registry, statement, this.name)
+		var matrix3D = getChainMatrix3D(registry, statement)
+		var isOutside = getBooleanByDefault(true, 'outside', registry, statement, this.name)
+		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+		var pointIndexSet = getPointIndexSetByOutside(center, isOutside, points, mesh)
+		if (pointIndexSet.size == 0) {
+			return
+		}
+		var heights = getHeights(registry, statement, this.name)
+		var numberOfThreads = getIntByDefault(1, 'threads', registry, statement, this.name)
+		var taperAngle = getFloatByDefault(30.0, 'taperAngle', registry, statement, this.name)
+		var translations = getPointsByKey('translations', registry, statement)
+		threadPoints(axials, center, heights, numberOfThreads, getBoundedPointsBySet(pointIndexSet, points), taperAngle, translations)
+		mesh.points = get3DsBy3DMatrix(matrix3D, points)
+		removeClosePoints(mesh)
+	},
+	initialize: function() {
+		gAlterMeshMap.set(this.name, this)
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'thread',
+	processStatement:function(registry, statement) {
+		var workMesh = getWorkMesh(registry, statement)
+		if (workMesh == null) {
+			noticeByList(['No work mesh could be found for thread in alteration.', statement])
+			return
+		}
+		this.alterMesh(workMesh, registry, statement)
+		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+	}
+}
+
 var gTriangulate = {
 	alterMesh: function(mesh, registry, statement) {
 		mesh.facets = getAllTriangleFacets(mesh)
@@ -1744,6 +1964,6 @@ var gWedge = {
 
 var gAlterationProcessors = [
 gBend, gBevel, gExpand, gFillet, gMirror, gMirrorJoin, gMove, gMultiplyJoin,
-gOutset, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, gSplit, gTaper, gTriangulate, gWedge]
+gOutset, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, gSplit, gTaper, gThread, gTriangulate, gWedge]
 var gAlterMeshMap = new Map()
 var gGetPointsMap = new Map()
