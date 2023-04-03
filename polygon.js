@@ -364,6 +364,23 @@ function directPolygonGroup(polygonGroup) {
 	}
 }
 
+function getAxesByNormal(normal) {
+	var axes = [1, 2]
+	var greatestProduct = normal[0]
+	if (Math.abs(normal[1]) > Math.abs(greatestProduct)) {
+		greatestProduct = normal[1]
+		axes = [2, 0]
+	}
+	if (Math.abs(normal[2]) > Math.abs(greatestProduct)) {
+		greatestProduct = normal[2]
+		axes = [0, 1]
+	}
+	if (greatestProduct < 0.0) {
+		swapXYPoint(axes)
+	}
+	return axes
+}
+
 function getBoundingBox(polygon) {
 	if (getIsEmpty(polygon)) {
 		return null
@@ -580,9 +597,8 @@ function getCrossProductByPolygon(polygon) {
 	}
 	var center = polygon[0]
 	var oldVector = getSubtraction3D(polygon[1], center)
-	var vector = null
 	for (var vertexIndex = 2; vertexIndex < polygon.length; vertexIndex++) {
-		vector = getSubtraction3D(polygon[vertexIndex], center)
+		var vector = getSubtraction3D(polygon[vertexIndex], center)
 		add3D(product, crossProduct(oldVector, vector))
 		oldVector = vector
 	}
@@ -620,6 +636,17 @@ function getDistanceToLine(begin, end, point) {
 	}
 	divide2DScalar(delta, deltaLength)
 	return Math.abs(point[1] * delta[0] - point[0] * delta[1] - begin[1] * delta[0] + begin[0] * delta[1])
+}
+
+function getDouble3DPolygonArea(polygon) {
+	var polygonArea = 0.0
+	var center = polygon[0]
+	for (var pointIndex = 0; pointIndex < polygon.length - 2; pointIndex++) {
+		var begin = polygon[(pointIndex + 1) % polygon.length]
+		var end = polygon[(pointIndex + 2) % polygon.length]
+		polygonArea += length3D(crossProduct(getSubtraction3D(begin, center), getSubtraction3D(end, center)))
+	}
+	return polygonArea
 }
 
 function getDoublePolygonArea(polygon) {
@@ -1122,6 +1149,9 @@ function getIsClear(side, sideOther, xIntersections) {
 }
 
 function getIsClockwise(polygon) {
+	if (polygon.length < 3) {
+		return true
+	}
 	return getDoublePolygonArea(polygon) > 0.0
 }
 
@@ -1823,6 +1853,7 @@ function getOutsetPolygonsByDirection(baseLocation, baseMarker, checkIntersectio
 	return outlines.filter(getIsWiddershins)
 }
 
+// not used but might be useful sometimes
 function getPlaneByNormal(normal) {
 	var furthestAxis = [1.0, 0.0, 0.0]
 	var smallestDotProduct = Math.abs(dotProduct3D(normal, furthestAxis))
