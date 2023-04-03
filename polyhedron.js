@@ -397,43 +397,6 @@ function addToArrowsMap(arrowsMap, edges) {
 	addElementToMapArray(edges[0], edges[1], arrowsMap)
 }
 
-function addTriangulated3DPolygons(polygon, triangulatedPolygons) {
-	if (polygon.length < 4) {
-		return
-	}
-	polygon = getPolygon3D(polygon)
-	var normal = getNormalByPolygon(polygon)
-	if (normal == null) {
-		return
-	}
-	var plane = getPlaneByNormal(normal)
-	var facet = getSequence(polygon.length)
-	var xyPoints = new Array(polygon.length)
-	for (var pointIndex of facet) {
-		xyPoints[pointIndex] = [dotProduct3D(polygon[pointIndex], plane[0]), dotProduct3D(polygon[pointIndex], plane[1])]
-	}
-	var facets = getXYTriangleFacets(facet, xyPoints)
-	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		facets[facetIndex] = getPolygonByFacet(facets[facetIndex], polygon)
-	}
-	for (var facet of facets) {
-		for (var point of facet) {
-			if (point.length > 2) {
-				if (point.length > 3 || point[2] != 0.0) {
-					pushArray(triangulatedPolygons, facets)
-					return
-				}
-			}
-		}
-	}
-	for (var facet of facets) {
-		for (var point of facet) {
-			point.length = 2
-		}
-	}
-	pushArray(triangulatedPolygons, facets)
-}
-
 function getToolMeshIndexByFacet(directedIndex, facetIntersection, facetVertexIndexes, toolPolygon, workMesh) {
 	var facetVertexIndex = facetVertexIndexes.facet[directedIndex]
 	var pointIndex = facetVertexIndexes.pointIndexes[facetVertexIndex]
@@ -581,18 +544,21 @@ function getArrowsMap(facets) {
 	return arrowMap
 }
 
+function getCenter(facet, points) {
+	var center = [0.0, 0.0, 0.0]
+	for (var pointIndex of facet) {
+		add3D(center, points[pointIndex])
+	}
+	divide3DScalar(center, facet.length)
+	return center
+}
+
 function getCenters(mesh) {
 	var centers = new Array(mesh.facets.length)
 	var facets = mesh.facets
 	var points = mesh.points
 	for (var facetIndex = 0; facetIndex < centers.length; facetIndex++) {
-		var center = [0.0, 0.0, 0.0]
-		var facet = facets[facetIndex]
-		for (var pointIndex of facet) {
-			add3D(center, points[pointIndex])
-		}
-		divide3DScalar(center, facet.length)
-		centers[facetIndex] = center
+		centers[facetIndex] = getCenter(facets[facetIndex], points)
 	}
 	return centers
 }
@@ -796,6 +762,14 @@ function getConnectedPolygon(polygons) {
 	}
 	var mesh = getMeshByPolygons(polygons)
 	return getPolygonByFacet(getConnectedFacet(mesh.facets, mesh.points), mesh.points)
+}
+
+function getDoubleMeshArea(mesh) {
+	var polygonArea = 0.0
+	for (var facet of mesh.facets) {
+		polygonArea += Math.abs(getDouble3DPolygonArea(getPolygonByFacet(facet, mesh.points)))
+	}
+	return polygonArea
 }
 
 function getEdgeKey(aString, bString) {
@@ -1127,6 +1101,48 @@ function getIsPolygonInStratas(polygon, stratas) {
 	return false
 }
 
+function getJoinedFacetArrays(facets, points) {
+	var facetsMap = new Map()
+	var linkMap = new Map()
+	var normals = new Array(facets.length)
+
+	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
+		var facet = facets[facetIndex]
+		var normal = getNormalByFacet(facet, points)
+		if (normal != null) {
+			normals[facetIndex] = normal
+			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
+				var nextIndex = (vertexIndex + 1) % facet.length
+				var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
+				addElementToMapArray(facetIndex, edgeKey, facetsMap)
+			}
+		}
+	}
+
+	for (var facetIndexes of facetsMap.values()) {
+		if (facetIndexes.length == 2) {
+			var facetIndex0 = facetIndexes[0]
+			var facetIndex1 = facetIndexes[1]
+			if (distanceSquared3D(normals[facetIndex0], normals[facetIndex1]) < gCloseSquared) {
+				addToLinkMap(facetIndex0, facetIndex1, linkMap)
+			}
+		}
+	}
+
+	var joinedMap = getJoinedMap(facets.length, linkMap)
+	var joinedFacetArrays = new Array(joinedMap.size)
+	var joinedFacetArraysLength = 0
+
+	for (var joined of joinedMap.values()) {
+		for (var facetIndexIndex = 0; facetIndexIndex < joined.length; facetIndexIndex++) {
+			joined[facetIndexIndex] = facets[joined[facetIndexIndex]]
+		}
+		joinedFacetArrays[joinedFacetArraysLength++] = getJoinedFacets(joined)
+	}
+
+	return joinedFacetArrays
+}
+
 function getLoneArrowSet(facets) {
 	var loneArrowSet = new Set()
 	for (var facet of facets) {
@@ -1422,6 +1438,7 @@ function getMeshAnalysis(mesh, normal) {
 		attributeMap.set('loneEdges', loneEdges.join(' '))
 	}
 	var meshBoundingBox = getMeshBoundingBox(mesh)
+	attributeMap.set('area', (0.5 * getDoubleMeshArea(mesh)).toString())
 	attributeMap.set('boundingBox', meshBoundingBox[0].toString() + ' ' + meshBoundingBox[1].toString())
 	attributeMap.set('numberOfEdges', numberOfEdges.toString())
 	attributeMap.set('numberOfErrors', numberOfErrors.toString())
@@ -1938,19 +1955,11 @@ function getTriangle3DFacets(facet, points, xyPoints) {
 	if (normal == null) {
 		return []
 	}
-	var plane = getPlaneByNormal(normal)
+	var axes = getAxesByNormal(normal)
 	for (var pointIndex of facet) {
-		xyPoints[pointIndex] = [dotProduct3D(points[pointIndex], plane[0]), dotProduct3D(points[pointIndex], plane[1])]
+		xyPoints[pointIndex] = [points[pointIndex][axes[0]], points[pointIndex][axes[1]]]
 	}
 	return getXYTriangleFacets(facet, xyPoints)
-}
-
-function getTriangulated3DPolygons(polygons) {
-	var triangulatedPolygons = []
-	for (var polygon of polygons) {
-		addTriangulated3DPolygons(polygon, triangulatedPolygons)
-	}
-	return triangulatedPolygons
 }
 
 function getTriangleMesh(mesh) {
@@ -2121,46 +2130,25 @@ function nullifyFacets(facets, indexBegin, indexEnd) {
 	}
 }
 
+function polygonateFacets(facets, points) {
+	var joinedFacetArrays = getJoinedFacetArrays(facets, points)
+	for (var joinedFacets of joinedFacetArrays) {
+		if (joinedFacets.length > 0) {
+			overwriteArray(joinedFacets, joinedFacets[0])
+		}
+	}
+	overwriteArray(facets, joinedFacetArrays)
+}
+
 function polygonateMesh(mesh) {
 	var facets = mesh.facets
-	var facetsMap = new Map()
-	var linkMap = new Map()
-	var normals = new Array(facets.length)
 	var points = mesh.points
-	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		var facet = facets[facetIndex]
-		var normal = getNormalByFacet(facet, points)
-		if (normal != null) {
-			normals[facetIndex] = normal
-			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
-				var nextIndex = (vertexIndex + 1) % facet.length
-				var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
-				addElementToMapArray(facetIndex, edgeKey, facetsMap)
-			}
-		}
-	}
-	for (var facetIndexes of facetsMap.values()) {
-		if (facetIndexes.length == 2) {
-			var facetIndex0 = facetIndexes[0]
-			var facetIndex1 = facetIndexes[1]
-			if (distanceSquared3D(normals[facetIndex0], normals[facetIndex1]) < gCloseSquared) {
-				addToLinkMap(facetIndex0, facetIndex1, linkMap)
-			}
-		}
-	}
+	var joinedFacetArrays = getJoinedFacetArrays(facets, points)
 	var collinearities = new Array(points.length).fill(true)
-	var joinedMap = getJoinedMap(facets.length, linkMap)
-	var joinedFacetArrays = new Array(joinedMap.size)
-	var joinedFacetArraysLength = 0
-	for (var joined of joinedMap.values()) {
-		for (var facetIndexIndex = 0; facetIndexIndex < joined.length; facetIndexIndex++) {
-			joined[facetIndexIndex] = facets[joined[facetIndexIndex]]
-		}
-		var joinedFacets = getJoinedFacets(joined)
+	for (var joinedFacets of joinedFacetArrays) {
 		for (var joinedFacet of joinedFacets) {
 			addFacetToCollinearities(collinearities, joinedFacet, points)
 		}
-		joinedFacetArrays[joinedFacetArraysLength++] = joinedFacets
 	}
 	for (var joinedFacets of joinedFacetArrays) {
 		if (joinedFacets.length > 0) {
@@ -2171,11 +2159,11 @@ function polygonateMesh(mesh) {
 				points2D = points
 			}
 			else {
-				var plane = getPlaneByNormal(normal)
+				var axes = getAxesByNormal(normal)
 				points2D = new Array(points.length)
 				for (var facet of joinedFacets) {
 					for (var pointIndex of facet) {
-						points2D[pointIndex] = [dotProduct3D(points[pointIndex], plane[0]), dotProduct3D(points[pointIndex], plane[1])]
+						points2D[pointIndex] = [points[pointIndex][axes[0]], points[pointIndex][axes[1]]]
 					}
 				}
 			}
