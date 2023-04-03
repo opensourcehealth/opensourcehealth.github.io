@@ -165,151 +165,209 @@ function addHolesToFence(bottoms, mesh, overhangAngle, thickness, tops, width) {
 	}
 }
 
-function addOrJoinFacet(arrowHigh, arrowLow, arrowMap, facets) {
+function addOrJoinFacet(arrowHigh, arrowLow, arrowMap, facets, points) {
 	arrowMap.set(arrowHigh.join(' '), facets.length)
-	facets.push(pushArray(arrowLow, arrowHigh))
+	var joinedFacets = []
+	var shortestIndex = 0
+
+	if (arrowHigh.length > 1) {
+		var shortestDiagonalLength = Number.MAX_VALUE
+		var arrowHighZeroPoint = points[arrowHigh[0]]
+		var arrowHighOnePoint = points[arrowHigh[1]]
+		for (var vertexIndex = 0; vertexIndex < arrowLow.length; vertexIndex++) {
+			var point = points[arrowLow[vertexIndex]]
+			var diagonalLength = Math.max(distanceSquared2D(point, arrowHighZeroPoint), distanceSquared2D(point, arrowHighOnePoint))
+			if (diagonalLength < shortestDiagonalLength) {
+				shortestDiagonalLength = diagonalLength
+				shortestIndex = vertexIndex
+			}
+		}
+		joinedFacets.push(arrowHigh.concat(arrowLow[shortestIndex]))
+	}
+
+	for (var vertexIndex = 0; vertexIndex < shortestIndex; vertexIndex++) {
+		var facet = arrowLow.slice(vertexIndex, vertexIndex + 2)
+		facet.push(arrowHigh[arrowHigh.length - 1])
+		joinedFacets.push(facet)
+	}
+
+	for (var vertexIndex = shortestIndex; vertexIndex < arrowLow.length - 1; vertexIndex++) {
+		var facet = arrowLow.slice(vertexIndex, vertexIndex + 2)
+		facet.push(arrowHigh[0])
+		joinedFacets.push(facet)
+	}
+
+	polygonateFacets(joinedFacets, points)
+	pushArray(facets, joinedFacets)
 }
 
-function addPolygonToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets, pointLayerMap, previousLayer, registry, sculpture) {
-	var statement = sculpture.statementMap.get(id)
-	var connectionAngle = getValueByDefault(layer.connectionAngle, getBooleanByStatement('connectionAngle', registry, statement))
-	var connectionIDs = getStrings('connectionIDs', statement)
+function addPolygonsToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets, pointLayerMap, previousLayer, registry, sculpture) {
+	var statement = undefined
+	if (sculpture.statementMap != undefined) {
+		statement = sculpture.statementMap.get(id)
+	}
+	var connectionAngle = layer.connectionAngle
+	var connectionIDs = []
+	var vertical = layer.vertical
+	var polygons = sculpture.polygonMap.get(id)
+	var isClockwise = getIsClockwise(polygons[0])
+	if (statement != undefined) {
+		connectionAngle = getValueByDefault(connectionAngle, getFloatByStatement('connectionAngle', registry, statement))
+		connectionIDs = getStrings('connectionIDs', statement)
+		vertical = getValueByDefault(vertical, getBooleanByStatement('vertical', registry, statement))
+		if (polygons[0].length < 3) {
+			isClockwise = getValueByDefault(isClockwise, getBooleanByStatement('clockwise', registry, statement))
+		}
+	}
 	var connectionProduct = undefined
 	if (connectionAngle != undefined) {
 		connectionProduct = Math.cos(connectionAngle * gRadiansPerDegree)
 	}
-	var points = mesh.points
-	var polygons = sculpture.polygonMap.get(id)
 	for (var polygon of polygons) {
-		var connectionFacet = []
-		var isClockwise = getIsClockwise(polygon)
-		var oldGridMap = oldArrowGridFacets.gridMap
-		var oldTopFacets = oldArrowGridFacets.topFacetsDirections[1 * isClockwise]
-		if (connectionIDs.length > 0) {
-			oldGridMap = new Map()
-			oldTopFacets = []
-			for (var connectionID of connectionIDs) {
-				if (sculpture.facetsMap.has(connectionID)) {
-					var facets = sculpture.facetsMap.get(connectionID)
-					pushArray(oldTopFacets, facets)
-					for (var facet of facets) {
-						for (var pointIndex of facet) {
-							addPointIndexToGridMapArray(oldGridMap, gHalfMinusOver, points[pointIndex], pointIndex)
-						}
+		addPolygonToLayer(arrowGridFacets, connectionIDs, connectionProduct, id, isClockwise, layer, mesh,
+		oldArrowGridFacets, pointLayerMap, polygon, previousLayer, sculpture, vertical)
+	}
+}
+
+function addPolygonToLayer(arrowGridFacets, connectionIDs, connectionProduct, id, isClockwise, layer, mesh,
+oldArrowGridFacets, pointLayerMap, polygon, previousLayer, sculpture, vertical) {
+	var connectionFacet = []
+	var oldGridMap = oldArrowGridFacets.gridMap
+	var oldTopFacets = oldArrowGridFacets.topFacetsDirections[1 * isClockwise]
+	var points = mesh.points
+
+	if (connectionIDs.length > 0) {
+		oldGridMap = new Map()
+		oldTopFacets = []
+		for (var connectionID of connectionIDs) {
+			if (sculpture.facetsMap.has(connectionID)) {
+				var facets = sculpture.facetsMap.get(connectionID)
+				pushArray(oldTopFacets, facets)
+				for (var facet of facets) {
+					for (var pointIndex of facet) {
+						addPointIndexToGridMapArray(oldGridMap, gHalfMinusOver, points[pointIndex], pointIndex)
 					}
 				}
-				else {
-					noticeByList(['No facets could be found for addPolygonToLayer in generator3d.', id, statement])
-					console.log(sculpture.facetsMap)
-				}
-			}
-		}
-		var topFacet = []
-		var vertical = getValueByDefault(layer.vertical, getBooleanByStatement('vertical', registry, statement))
-		if (vertical) {
-			var alongIndexesMap = new Map()
-			var meetingMap = new Map()
-			for (var id of previousLayer.ids) {
-				var previousPolygons = sculpture.polygonMap.get(id)
-				for (var previousPolygon of previousPolygons) {
-					addMeetingsByPolygon(alongIndexesMap, meetingMap, previousPolygon, polygon)
-				}
-			}
-			sortAlongIndexesMap(alongIndexesMap)
-			for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
-				var key = 'w ' + vertexIndex.toString()
-				if (alongIndexesMap.has(key)) {
-					var alongIndexes = alongIndexesMap.get(key)
-					for (var alongIndexIndex = alongIndexes.length - 1; alongIndexIndex > -1; alongIndexIndex--) {
-						var meeting = meetingMap.get(alongIndexes[alongIndexIndex][1])
-						if (!meeting.isWorkNode) {
-							polygon.splice(vertexIndex + 1, 0, meeting.point)
-						}
-					}
-				}
-			}
-		}
-		removeIdentical2DPoints(polygon)
-		var polygon3D = getPolygon3D(polygon, 0.0)
-		for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
-			var point = polygon3D[vertexIndex]
-			if (vertical) {
-				addToVerticalConnection(connectionFacet, mesh, oldArrowGridFacets.arrowMap, oldGridMap, point, pointLayerMap, previousLayer)
 			}
 			else {
-				addToSlopedConnection(connectionProduct, connectionFacet, oldTopFacets, point, points, polygon3D, vertexIndex)
+				noticeByList(['No facets could be found for addPolygonToLayer in generator3d.', id, sculpture.facetsMap, statement])
 			}
-			topFacet.push(points.length)
-			addPointIndexToGridMapArray(arrowGridFacets.gridMap, gHalfMinusOver, point, points.length)
-			pointLayerMap.set(points.length, layer)
-			layer.pointIndexes.push(points.length)
-			points.push(point)
 		}
+	}
+
+	var topFacet = []
+
+	if (vertical) {
+		var alongIndexesMap = new Map()
+		var meetingMap = new Map()
+		for (var id of previousLayer.ids) {
+			var previousPolygons = sculpture.polygonMap.get(id)
+			for (var previousPolygon of previousPolygons) {
+				addMeetingsByPolygon(alongIndexesMap, meetingMap, previousPolygon, polygon)
+			}
+		}
+		sortAlongIndexesMap(alongIndexesMap)
+		for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
+			var key = 'w ' + vertexIndex.toString()
+			if (alongIndexesMap.has(key)) {
+				var alongIndexes = alongIndexesMap.get(key)
+				for (var alongIndexIndex = alongIndexes.length - 1; alongIndexIndex > -1; alongIndexIndex--) {
+					var meeting = meetingMap.get(alongIndexes[alongIndexIndex][1])
+					if (!meeting.isWorkNode) {
+						polygon.splice(vertexIndex + 1, 0, meeting.point)
+					}
+				}
+			}
+		}
+	}
+
+	removeIdentical2DPoints(polygon)
+	var polygon3D = getPolygon3D(polygon, 0.0)
+
+	for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
+		var point = polygon3D[vertexIndex]
 		if (vertical) {
-			for (var connectionIndex = 0; connectionIndex < connectionFacet.length; connectionIndex++) {
-				var connection = connectionFacet[connectionIndex]
-				var nextConnection = connectionFacet[(connectionIndex + 1) % connectionFacet.length]
-				var arrowLow = [nextConnection.low]
-				var connectionPoint = points[connection.low]
-				var nextConnectionPoint = points[nextConnection.low]
-				var delta = normalize2D(getSubtraction2D(connectionPoint, nextConnectionPoint))
-				var reverseRotation = [delta[0], -delta[1]]
-				var nextRotated = getRotation2DVector(nextConnectionPoint, reverseRotation)
-				var rotatedX = connectionPoint[0] * reverseRotation[0] - connectionPoint[1] * reverseRotation[1]
-				var rotatedY = connectionPoint[0] * reverseRotation[1] + connectionPoint[1] * reverseRotation[0]
-				var segmentIndexes = []
-				for (var previousFacets of oldArrowGridFacets.topFacetsDirections) {
-					for (var previousFacet of previousFacets) {
-						for (var pointIndex of previousFacet) {
-							var point = points[pointIndex]
-							var pointRotated = getRotation2DVector(point, reverseRotation)
-							if (Math.abs(pointRotated[1] - nextRotated[1]) < gHalfClose) {
-								if (distanceSquared2D(point, connectionPoint) > gCloseSquared) {
-									if (distanceSquared2D(point, nextConnectionPoint) > gCloseSquared) {
-										if (pointRotated[0] > nextRotated[0] && pointRotated[0] < rotatedX) {
-											var nextVector = normalize2D(getSubtraction2D(connectionPoint, nextConnectionPoint))
-											segmentIndexes.push([dotProduct2D(nextVector, point), pointIndex])
-										}
+			addToVerticalConnection(connectionFacet, mesh, oldArrowGridFacets.arrowMap, oldGridMap, point, pointLayerMap, previousLayer)
+		}
+		else {
+			addToSlopedConnection(connectionProduct, connectionFacet, oldTopFacets, point, points, polygon3D, vertexIndex)
+		}
+		topFacet.push(points.length)
+		addPointIndexToGridMapArray(arrowGridFacets.gridMap, gHalfMinusOver, point, points.length)
+		pointLayerMap.set(points.length, layer)
+		layer.pointIndexes.push(points.length)
+		points.push(get3DBy3DMatrix(layer.matrix3D, point))
+	}
+
+	if (vertical) {
+		for (var connectionIndex = 0; connectionIndex < connectionFacet.length; connectionIndex++) {
+			var connection = connectionFacet[connectionIndex]
+			var nextConnection = connectionFacet[(connectionIndex + 1) % connectionFacet.length]
+			var arrowLow = [nextConnection.low]
+			var connectionPoint = points[connection.low]
+			var nextConnectionPoint = points[nextConnection.low]
+			var delta = normalize2D(getSubtraction2D(connectionPoint, nextConnectionPoint))
+			var reverseRotation = [delta[0], -delta[1]]
+			var nextRotated = getRotation2DVector(nextConnectionPoint, reverseRotation)
+			var rotatedX = connectionPoint[0] * reverseRotation[0] - connectionPoint[1] * reverseRotation[1]
+			var rotatedY = connectionPoint[0] * reverseRotation[1] + connectionPoint[1] * reverseRotation[0]
+			var segmentIndexes = []
+			for (var previousFacets of oldArrowGridFacets.topFacetsDirections) {
+				for (var previousFacet of previousFacets) {
+					for (var pointIndex of previousFacet) {
+						var point = points[pointIndex]
+						var pointRotated = getRotation2DVector(point, reverseRotation)
+						if (Math.abs(pointRotated[1] - nextRotated[1]) < gHalfClose) {
+							if (distanceSquared2D(point, connectionPoint) > gCloseSquared) {
+								if (distanceSquared2D(point, nextConnectionPoint) > gCloseSquared) {
+									if (pointRotated[0] > nextRotated[0] && pointRotated[0] < rotatedX) {
+										var nextVector = normalize2D(getSubtraction2D(connectionPoint, nextConnectionPoint))
+										segmentIndexes.push([dotProduct2D(nextVector, point), pointIndex])
 									}
 								}
 							}
 						}
 					}
 				}
-				segmentIndexes.sort(compareFirstElementAscending)
-				for (var segmentIndexIndex = 0; segmentIndexIndex < segmentIndexes.length; segmentIndexIndex++) {
-					segmentIndexes[segmentIndexIndex] = segmentIndexes[segmentIndexIndex][1]
-				}
-				pushArray(arrowLow, segmentIndexes)
-				arrowLow.push(connection.low)
-				addOrJoinFacet([connection.high, nextConnection.high], arrowLow, arrowGridFacets.arrowMap, mesh.facets)
 			}
-		}
-		else {
-			for (var connectionIndex = 0; connectionIndex < connectionFacet.length; connectionIndex++) {
-				var connection = connectionFacet[connectionIndex]
-				var nextConnection = connectionFacet[(connectionIndex + 1) % connectionFacet.length]
-				var arrowLow = [nextConnection.low]
-				if (connection.topFacetIndex == nextConnection.topFacetIndex) {
-					var oldTopFacet = oldTopFacets[connection.topFacetIndex]
-					var topFacetLength = oldTopFacet.length
-					for (var extraIndex = 0; extraIndex < topFacetLength; extraIndex++) {
-						var totalIndex = (nextConnection.vertexIndex - extraIndex + topFacetLength) % topFacetLength
-						if (totalIndex == connection.vertexIndex) {
-							break
-						}
-						arrowLow.push(oldTopFacet[(totalIndex - 1 + topFacetLength) % topFacetLength])
-					}
-				}
-				else {
-					arrowLow.push(connection.low)
-				}
-				addOrJoinFacet([connection.high, nextConnection.high], arrowLow, arrowGridFacets.arrowMap, mesh.facets)
+			segmentIndexes.sort(compareFirstElementAscending)
+			for (var segmentIndexIndex = 0; segmentIndexIndex < segmentIndexes.length; segmentIndexIndex++) {
+				segmentIndexes[segmentIndexIndex] = segmentIndexes[segmentIndexIndex][1]
 			}
+			pushArray(arrowLow, segmentIndexes)
+			arrowLow.push(connection.low)
+			addOrJoinFacet([connection.high, nextConnection.high], arrowLow, arrowGridFacets.arrowMap, mesh.facets, points)
 		}
-		addElementToMapArray(topFacet, id, sculpture.facetsMap)
-		arrowGridFacets.topFacetsDirections[1 * isClockwise].push(topFacet)
 	}
+	else {
+		for (var connectionIndex = 0; connectionIndex < connectionFacet.length; connectionIndex++) {
+			var connection = connectionFacet[connectionIndex]
+			var nextConnection = connectionFacet[(connectionIndex + 1) % connectionFacet.length]
+			var arrowLow = [nextConnection.low]
+			if (connection.topFacetIndex == nextConnection.topFacetIndex) {
+				var oldTopFacet = oldTopFacets[connection.topFacetIndex]
+				var topFacetLength = oldTopFacet.length
+				for (var extraIndex = 0; extraIndex < topFacetLength; extraIndex++) {
+					var totalIndex = (nextConnection.vertexIndex - extraIndex + topFacetLength) % topFacetLength
+					if (totalIndex == connection.vertexIndex && polygon3D.length > 1) {
+						break
+					}
+					arrowLow.push(oldTopFacet[(totalIndex - 1 + topFacetLength) % topFacetLength])
+				}
+			}
+			else {
+				arrowLow.push(connection.low)
+			}
+			var arrowHigh = [connection.high]
+			if (connection.high != nextConnection.high) {
+				arrowHigh.push(nextConnection.high)
+			}
+			addOrJoinFacet(arrowHigh, arrowLow, arrowGridFacets.arrowMap, mesh.facets, points)
+		}
+	}
+
+	addElementToMapArray(topFacet, id, sculpture.facetsMap)
+	arrowGridFacets.topFacetsDirections[1 * isClockwise].push(topFacet)
 }
 
 function addToExtrusionMesh(isJoined, matrices, mesh, polygon3DGroup) {
@@ -324,10 +382,10 @@ function addToExtrusionMesh(isJoined, matrices, mesh, polygon3DGroup) {
 		points.length += facetVertexIndexes.length * matrices.length
 		for (var matrixIndex = 0; matrixIndex < matrices.length; matrixIndex++) {
 			var horizontalFacet = addArrayScalar(facetVertexIndexes.facet.slice(0), pointIndex)
-			var matrix = matrices[matrixIndex]
+			var matrix3D = matrices[matrixIndex]
 			for (var vertexIndexIndex = 0; vertexIndexIndex < facetVertexIndexes.vertexIndexes.length; vertexIndexIndex++) {
 				var vertexIndex = facetVertexIndexes.vertexIndexes[vertexIndexIndex]
-				points[pointIndex++] = get3DBy3DMatrix(matrix, polygon3D[vertexIndex])
+				points[pointIndex++] = get3DBy3DMatrix(matrix3D, polygon3D[vertexIndex])
 			}
 			horizontalFacets[matrixIndex] = horizontalFacet
 		}
@@ -406,7 +464,7 @@ function addToVerticalConnection(connectionFacet, mesh, oldArrowMap, oldGridMap,
 		closestIndex = points.length
 		pointLayerMap.set(closestIndex, previousLayer)
 		previousLayer.pointIndexes.push(closestIndex)
-		points.push(lowPoint)
+		points.push(get3DBy3DMatrix(previousLayer.matrix3D, lowPoint))
 		for (var arrowKey of oldArrowMap.keys()) {
 			var arrowString = arrowKey.split(' ')
 			var beginIndex = parseInt(arrowString[0])
@@ -431,7 +489,7 @@ function addToVerticalConnection(connectionFacet, mesh, oldArrowMap, oldGridMap,
 	connectionFacet.push({low:closestIndex, high:points.length})
 }
 
-function convertPlankToRoad(betweens, centers, curve, matrix, mesh, registry, statement) {
+function convertPlankToRoad(betweens, centers, curve, matrix3D, mesh, registry, statement) {
 	var top = mesh.points[0][2]
 	//y>z -z>y
 	for (var point of mesh.points) {
@@ -512,7 +570,7 @@ function convertPlankToRoad(betweens, centers, curve, matrix, mesh, registry, st
 	return mesh
 }
 
-function convertPlankToFence(betweens, bottoms, curve, matrix, mesh, registry, statement, tops) {
+function convertPlankToFence(betweens, bottoms, curve, matrix3D, mesh, registry, statement, tops) {
 	var deltaZs = new Array(tops.length)
 	tops = getPolygon3D(tops, 1.0)
 	for (var topIndex = 0; topIndex < tops.length; topIndex++) {
@@ -559,7 +617,7 @@ function convertPlankToFence(betweens, bottoms, curve, matrix, mesh, registry, s
 		point[0] = oneMinusAlong * inset[0] + along * nextInset[0]
 		point[1] = oneMinusAlong * inset[1] + along * nextInset[1]
 	}
-	mesh.points = get3DsBy3DMatrix(matrix, mesh.points)
+	mesh.points = get3DsBy3Dmatrix3D(matrix3D, mesh.points)
 }
 
 function getBottoms(registry, statement, tops) {
@@ -577,7 +635,7 @@ function getBottoms(registry, statement, tops) {
 	return bottoms
 }
 
-function getExtrusionMesh(isJoined, matrices, matrix, polygons) {
+function getExtrusionMesh(isJoined, matrices, matrix3D, polygons) {
 	if (polygons.length == 0) {
 		return null
 	}
@@ -591,7 +649,7 @@ function getExtrusionMesh(isJoined, matrices, matrix, polygons) {
 		}
 		addToExtrusionMesh(isJoined, matrices, mesh, polygon3DGroup)
 	}
-	return removeTriangulateTransform(matrix, mesh)
+	return removeTriangulateTransform(matrix3D, mesh)
 }
 
 function getHorizontalFacetIndexes(mesh) {
@@ -615,7 +673,7 @@ function getHorizontalFacetIndexes(mesh) {
 	return horizontalFacetIndexes
 }
 
-function getPillarMesh(heights, matrix, polygons) {
+function getPillarMesh(heights, matrix3D, polygons) {
 	if (polygons.length == 0) {
 		return null
 	}
@@ -629,7 +687,7 @@ function getPillarMesh(heights, matrix, polygons) {
 		}
 		addToPillarMesh(heights, mesh, polygon3DGroup)
 	}
-	mesh.points = get3DsBy3DMatrix(matrix, mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	return mesh
 }
 
@@ -660,7 +718,107 @@ function getPlankMesh(heights, id, length) {
 	return mesh
 }
 
+function getIDsByMap(elements, map) {
+	var ids = []
+	for (var element of elements) {
+		var id = map.size.toString()
+		ids.push(id)
+		map.set(id, element)
+	}
+	return ids
+}
+
+function getPolyhedronMesh(matrix3D, outsideness, radius, sides) {
+	var center = [0.0, 0.0]
+
+	if (sides == 4) {
+		var bottom = getRegularPolygon(center, true, 0.0, radius, 0.75, 3, 0.0)
+		var layers = []
+		layers.push({matrix3D:gUnitMatrix3D, polygons:[bottom], vertical:true})
+		var matrix3DZ = getMatrix3DByTranslateZ([Math.sqrt(8.0) * radius])
+		layers.push({matrix3D:matrix3DZ, polygons:[[center]], vertical:false})
+		return getSculptureMesh(layers, matrix3D, null, {polygonMap:new Map()})
+	}
+
+	if (sides == 8) {
+		var middle = getRegularPolygon(center, true, 0.0, radius, 0.5, 4, 0.0)
+		var middleHeight = Math.sqrt(2.0) * radius
+		var layers = []
+		layers.push({matrix3D:gUnitMatrix3D, polygons:[[center]], vertical:true})
+		layers.push({matrix3D:getMatrix3DByTranslateZ([middleHeight]), polygons:[middle], vertical:false})
+		layers.push({matrix3D:getMatrix3DByTranslateZ([2.0 * middleHeight]), polygons:[[center]], vertical:false})
+		return getSculptureMesh(layers, matrix3D, null, {polygonMap:new Map()})
+	}
+
+	if (sides == 12) {
+		var bottom = getRegularPolygon(center, true, 0.0, radius, 0.0, 5, 0.0)
+		var leftX = bottom[2][0]
+		var leftY = bottom[2][1]
+		var rightX = bottom[0][0]
+		var lowerMiddleMultiplier = bottom[1][1] / leftY
+		var lowerPentagon = getRegularPolygon(center, true, 0.0, radius * lowerMiddleMultiplier, 0.0, 5, 0.0)
+		var lowerPentagonTurned = getRegularPolygon(center, true, 0.0, radius * lowerMiddleMultiplier, 0.5, 5, 0.0)
+		var outward = lowerPentagon[0][0] - rightX
+		var lowerMiddleHeight = Math.sqrt(4.0 * leftY * leftY - outward * outward)
+		var upperMiddleHeight = lowerMiddleHeight * (rightX - leftX) / (bottom[1][0] - leftX)
+		var middle = new Array(10)
+		for (var vertexIndex = 0; vertexIndex < 5; vertexIndex++) {
+			var doubleIndex = vertexIndex + vertexIndex
+			middle[doubleIndex] = lowerPentagon[vertexIndex].slice(0)
+			middle[doubleIndex].push(lowerMiddleHeight)
+			middle[doubleIndex + 1] = lowerPentagonTurned[vertexIndex].slice(0)
+			middle[doubleIndex + 1].push(upperMiddleHeight)
+		}
+		var upper = getRegularPolygon(center, true, 0.0, radius, 0.5, 5, 0.0)
+		var upper3DMatrix = getMatrix3DByTranslateZ([upperMiddleHeight + lowerMiddleHeight])
+		var layers = []
+		layers.push({matrix3D:gUnitMatrix3D, polygons:[bottom], vertical:true})
+		layers.push({matrix3D:gUnitMatrix3D, polygons:[middle], vertical:false})
+		layers.push({matrix3D:upper3DMatrix, polygons:[upper], vertical:false})
+		return polygonateMesh(getSculptureMesh(layers, matrix3D, null, {polygonMap:new Map()}))
+	}
+
+	if (sides == 20) {
+		var middle = getRegularPolygon(center, true, 0.0, radius, 0.0, 5, 0.0)
+		var leftY = middle[2][1]
+		var rightX = middle[0][0]
+		var middleHeight = Math.sqrt(4.0 * leftY * leftY - rightX * rightX)
+		var upperMiddle = getRegularPolygon(center, true, 0.0, radius, 0.5, 5, 0.0)
+		var outward = rightX + middle[2][0]
+		var upperMiddleHeight = middleHeight + Math.sqrt(3.0 * leftY * leftY - outward * outward)
+		var layers = []
+		var polygonMap = new Map()
+		layers.push({matrix3D:gUnitMatrix3D, polygons:[[center]], vertical:true})
+		layers.push({matrix3D:getMatrix3DByTranslateZ([middleHeight]), polygons:[middle], vertical:false})
+		layers.push({matrix3D:getMatrix3DByTranslateZ([upperMiddleHeight]), polygons:[upperMiddle], vertical:false})
+		layers.push({matrix3D:getMatrix3DByTranslateZ([upperMiddleHeight + middleHeight]), polygons:[[center]], vertical:false})
+		return getSculptureMesh(layers, matrix3D, null, {polygonMap:polygonMap})
+	}
+
+	return getPillarMesh([0.0, 2.0 * radius], matrix3D, [getRegularPolygon(center, true, 0.0, radius, 0.5, 4, 0.0)])
+}
+
 function getSculptureMesh(layers, matrix3D, registry, sculpture) {
+	sculpture.facetsMap = new Map()
+	for (var layer of layers) {
+		if (layer.polygons != undefined) {
+			if (layer.ids == undefined) {
+				layer.ids = []
+			}
+			for (var polygon of layer.polygons) {
+				var id = sculpture.polygonMap.size.toString()
+				layer.ids.push(id)
+				sculpture.polygonMap.set(id, polygon)
+			}
+		}
+	}
+	for (var key of sculpture.polygonMap.keys()) {
+		var separatedPolygons = getSeparatedPolygons(sculpture.polygonMap.get(key))
+		for (var separatedPolygon of separatedPolygons) {
+			removeIdentical2DPoints(separatedPolygon)
+		}
+		sculpture.polygonMap.set(key, separatedPolygons)
+	}
 	var mesh = {facets:[], points:[]}
 	var oldArrowGridFacets = {arrowMap:new Map(), gridMap:new Map(), topFacetsDirections:[[], []]}
 	var pointLayerMap = new Map()
@@ -673,6 +831,12 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 		for (var polygon of polygons) {
 			layer.pointIndexes = []
 			var isClockwise = getIsClockwise(polygon)
+			if (sculpture.statementMap != undefined) {
+				statement = sculpture.statementMap.get(id)
+				if (statement != undefined && polygon.length < 3) {
+					isClockwise = getValueByDefault(isClockwise, getBooleanByStatement('clockwise', registry, statement))
+				}
+			}
 			var polygon3D = getPolygon3D(polygon, 0.0)
 			var topFacet = []
 			for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
@@ -681,7 +845,7 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 				pointLayerMap.set(points.length, layer)
 				topFacet.push(points.length)
 				layer.pointIndexes.push(points.length)
-				points.push(point)
+				points.push(get3DBy3DMatrix(layer.matrix3D, point))
 			}
 			oldArrowGridFacets.topFacetsDirections[1 * isClockwise].push(topFacet)
 		}
@@ -695,18 +859,13 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 		layer.pointIndexes = []
 		var previousLayer = layers[layerIndex - 1]
 		for (var id of layer.ids) {
-			addPolygonToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets, pointLayerMap, previousLayer, registry, sculpture)
+			addPolygonsToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets, pointLayerMap, previousLayer, registry, sculpture)
 		}
 		oldArrowGridFacets.arrowMap = arrowGridFacets.arrowMap
 		oldArrowGridFacets.gridMap = arrowGridFacets.gridMap
 		oldArrowGridFacets.topFacetsDirections = arrowGridFacets.topFacetsDirections
 	}
 	addFacetsAlongLoneEdges(layers, mesh, pointLayerMap)
-	for (var layer of layers) {
-		for (var pointIndex of layer.pointIndexes) {
-			points[pointIndex] = get3DBy3DMatrix(layer.matrix3D, points[pointIndex])
-		}
-	}
 	return removeTriangulateTransform(matrix3D, mesh)
 }
 
@@ -831,10 +990,10 @@ function removeTooThinFacets(mesh) {
 	}
 }
 
-function removeTriangulateTransform(matrix, mesh) {
-//	removeTooThinFacets(mesh)
-//	triangulateBentFacets(mesh)
-	mesh.points = get3DsBy3DMatrix(matrix, mesh.points)
+function removeTriangulateTransform(matrix3D, mesh) {
+	removeTooThinFacets(mesh)
+	triangulateBentFacets(mesh)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	return mesh
 }
 
@@ -870,13 +1029,13 @@ var gExtrusion = {
 		statement.tag = 'g'
 		var isJoined = getBooleanByDefault(false, 'join', registry, statement, this.name)
 		var matrices = getMatrices3DAndZeroHeight(registry, statement, null)
-		var matrix = getChainMatrix3D(registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
 			noticeByList(['No polygons could be found for extrusion in generator3d.', statement])
 			return
 		}
-		analyzeOutputMesh(getExtrusionMesh(isJoined, matrices, matrix, polygons), registry, statement)
+		analyzeOutputMesh(getExtrusionMesh(isJoined, matrices, matrix3D, polygons), registry, statement)
 	}
 }
 
@@ -886,7 +1045,7 @@ var gFence = {
 		var bottoms = getBottoms(registry, statement, tops)
 		var betweens = getFloatsByStatement('betweens', registry, statement)
 		var curve = getEquation('curve', statement)
-		var matrix = getChainMatrix3D(registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
 		convertPlankToFence(betweens, bottoms, curve, null, mesh, registry, statement, tops)
 	},
 	initialize: function() {
@@ -916,13 +1075,13 @@ var gPillar = {
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
 		var heights = getHeights(registry, statement, this.name)
-		var matrix = getChainMatrix3D(registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
 		if (getIsEmpty(polygons)) {
 			noticeByList(['No polygons could be found for pillar in generator3d.', statement])
 			return
 		}
-		analyzeOutputMesh(getPillarMesh(heights, matrix, polygons), registry, statement)
+		analyzeOutputMesh(getPillarMesh(heights, matrix3D, polygons), registry, statement)
 	}
 }
 
@@ -934,10 +1093,25 @@ var gPlank = {
 	processStatement:function(registry, statement) {
 		var length = getIntByDefault(1, 'length', registry, statement, this.name)
 		var heights = getHeights(registry, statement, this.name)
-		var matrix = getChainMatrix3D(registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
 		var mesh = getPlankMesh(heights, statement.attributeMap.get('id'), length)
-		mesh.points = get3DsBy3DMatrix(matrix, mesh.points)
+		mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 		analyzeOutputMesh(mesh, registry, statement)
+	}
+}
+
+var gPolyhedron = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'polyhedron',
+	processStatement:function(registry, statement) {
+		var matrix3D = getChainMatrix3D(registry, statement)
+		var outsideness = getFloatByDefault(1.0, 'outsideness', registry, statement, this.name)
+		var radius = getFloatByDefault(1.0, 'radius', registry, statement, this.name)
+		var sideOffset = getFloatByDefault(0.0, 'sideOffset', registry, statement, this.name)
+		var sides = getFloatByDefault(24.0, 'sides', registry, statement, this.name)
+		analyzeOutputMesh(getPolyhedronMesh(matrix3D, outsideness, radius, sides), registry, statement)
 	}
 }
 
@@ -946,8 +1120,8 @@ var gRoad = {
 		var betweens = getFloatsByStatement('betweens', registry, statement)
 		var centers = getPointsByDefault([[0, 0, 2], [10, 0]], 'centers', registry, statement, 'road')
 		var curve = getEquation('curve', statement)
-		var matrix = getChainMatrix3D(registry, statement)
-		convertPlankToRoad(betweens, centers, curve, matrix, mesh, registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
+		convertPlankToRoad(betweens, centers, curve, matrix3D, mesh, registry, statement)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -971,7 +1145,7 @@ var gSculpture = {
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
 		var connectionAngle = undefined
-		var sculpture = {facetsMap:new Map(), polygonMap:new Map(), statementMap:new Map()}
+		var sculpture = {polygonMap:new Map(), statementMap:new Map()}
 		var vertical = true
 		var layerMap = new Map()
 		var layers = []
@@ -979,7 +1153,7 @@ var gSculpture = {
 			if (child.tag == 'layer') {
 				connectionAngle = getValueByDefault(connectionAngle, getFloatByStatement('connectionAngle', registry, child))
 				var childMatrices = getMatrices3D(registry, child, null)
-				var polygonStatements = getPolygonStatementsRecursively(registry, child)
+				var polygonStatements = getPolygonStatementsRecursively(registry, child, 1)
 				vertical = getValueByDefault(vertical, getBooleanByStatement('vertical', registry, child))
 				var id = child.attributeMap.get('id')
 				var workIDs = getStrings('work', child)
@@ -1000,11 +1174,7 @@ var gSculpture = {
 						var layerPolygons = []
 						for (var polygonStatement of polygonStatements) {
 							var polygonStatementID = polygonStatement.statement.attributeMap.get('id')
-							var separatedPolygons = getSeparatedPolygons(polygonStatement.points)
-							for (var separatedPolygon of separatedPolygons) {
-								removeIdentical2DPoints(separatedPolygon)
-							}			
-							sculpture.polygonMap.set(polygonStatementID, separatedPolygons)
+							sculpture.polygonMap.set(polygonStatementID, polygonStatement.points)
 							sculpture.statementMap.set(polygonStatementID, polygonStatement.statement)
 							ids.push(polygonStatementID)
 						}
@@ -1028,4 +1198,4 @@ var gSculpture = {
 	}
 }
 
-var gGenerator3DProcessors = [gExtrusion, gFence, gPillar, gPlank, gRoad, gSculpture]
+var gGenerator3DProcessors = [gExtrusion, gFence, gPillar, gPlank, gPolyhedron, gRoad, gSculpture]
