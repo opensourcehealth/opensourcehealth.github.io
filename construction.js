@@ -874,7 +874,9 @@ var gEmboss = {
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var stratas = getStratas(registry, statement)
 		var bottomTools = getMeshesByKey('bottomTools', registry, statement)
+		pushArray(bottomTools, getMeshesByKey('bottomTool', registry, statement))
 		var topTools = getMeshesByKey('topTools', registry, statement)
+		pushArray(topTools, getMeshesByKey('topTool', registry, statement))
 		var tools = getMeshesByChildren(statement.children, registry)
 		pushArray(tools, getMeshesByKey('tools', registry, statement))
 		if (isTop) {
