@@ -897,9 +897,10 @@ function getPolygonsHDRecursively(registry, statement) {
 	return getChainPointListsHDRecursively(statement, 3, registry, statement, 'polygon')
 }
 
-function getPolygonStatementsRecursively(registry, statement) {
+function getPolygonStatementsRecursively(registry, statement, minimumLength) {
+	minimumLength = getValueByDefault(3, minimumLength)
 	var polygonStatements = []
-	addToTagStatementsRecursivelyByDepth(statement, 0, 3, polygonStatements, registry, statement, 'polygon')
+	addToTagStatementsRecursivelyByDepth(statement, 0, minimumLength, polygonStatements, registry, statement, 'polygon')
 	return polygonStatements
 }
 
