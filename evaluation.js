@@ -44,7 +44,7 @@ function getArrayByMonad(monad, registry, statement) {
 			elements.reverse()
 			return elements
 		}
-		if (monad.previousMonad.precedenceLevel >= 20) {
+		if (monad.previousMonad.precedence >= 20) {
 			elements.reverse()
 			return elements
 		}
@@ -84,7 +84,7 @@ function getNextMonadPrecedenceProcessByMap(character, monad, monadMap, preceden
 	if (monadMap.has(character)) {
 		monad.operatorString = monad.operatorString.trim()
 		if (precedenceMap.has(monad.operatorString)) {
-			monad.precedenceLevel = precedenceMap.get(monad.operatorString)
+			monad.precedence = precedenceMap.get(monad.operatorString)
 		}
 		updateIfPrecedenceHigher(monad, registry, statement)
 		nextMonad = new (monadMap.get(character))()
@@ -105,13 +105,20 @@ function getNextMonadProcessByMap(character, monad, monadMap, registry, statemen
 }
 
 function getResultByMonad(monad, registry, statement) {
+	return getResultByMonadPrecedence(monad, -1, registry, statement)
+}
+
+function getResultByMonadPrecedence(monad, precedence, registry, statement) {
 	var value = monad.getValue(registry, statement)
 	for (var whileIndex = 0; whileIndex < gLengthLimit; whileIndex++) {
 		if (monad.previousMonad == null) {
 			return value
 		}
-		var previousLevel = monad.previousMonad.precedenceLevel
-		if (previousLevel == 21 || previousLevel == 20 || previousLevel == 1) {
+		var previousPrecedence = monad.previousMonad.precedence
+		if (previousPrecedence == 21 || previousPrecedence == 20 || previousPrecedence == 1) {
+			return value
+		}
+		if (previousPrecedence < precedence) {
 			return value
 		}
 		value = monad.previousMonad.getResult(registry, statement, value)
@@ -138,17 +145,11 @@ function getValueByEquation(registry, statement, valueString) {
 	return getArrayByMonad(monad, registry, statement)
 }
 
-function processCharacterOperator(character, monad, registry, statement) {
-	monad.operatorString += character
-	if (monad.previousMonad.previousMonad == null) {
-		return
-	}
-}
-
 function updateIfPrecedenceHigher(monad, registry, statement) {
-	if (monad.previousMonad.previousMonad != null) {
-		if (monad.previousMonad.previousMonad.precedenceLevel >= monad.precedenceLevel) {
-			getResultUpdatePrevious(monad.previousMonad, registry, statement)
+	var previousMonad = monad.previousMonad
+	if (previousMonad.previousMonad != null) {
+		if (previousMonad.previousMonad.precedence >= monad.precedence) {
+			previousMonad.setValue(getResultByMonadPrecedence(previousMonad, monad.precedence, registry, statement))
 		}
 	}
 }
@@ -169,7 +170,7 @@ function AdditionSubtractionMonad() {
 		return previousValue - value
 	}
 	this.operatorCharacter = null
-	this.precedenceLevel = 14
+	this.precedence = 14
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.operatorCharacter = character
@@ -205,10 +206,10 @@ function BooleanMonad() {
 		return null
 	}
 	this.operatorString = ''
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
-		processCharacterOperator(character, this, registry, statement)
+		this.operatorString += character
 	}
 }
 
@@ -219,7 +220,7 @@ function BracketCloseMonad() {
 	this.getValue = function(registry, statement) {
 		return this.value
 	}
-	this.precedenceLevel = 21
+	this.precedence = 21
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		if (this.value != null) {
@@ -232,7 +233,7 @@ function BracketCloseMonad() {
 			return
 		}
 		var result = getResultUpdatePrevious(this.previousMonad, registry, statement)
-		if (this.previousMonad.previousMonad.precedenceLevel == 1) {
+		if (this.previousMonad.previousMonad.precedence == 1) {
 			result = getArrayByMonad(this.previousMonad, registry, statement)
 		}
 		else {
@@ -254,7 +255,7 @@ function BracketOpenMonad() {
 	this.getResult = function(registry, statement, value) {
 		return value
 	}
-	this.precedenceLevel = 21
+	this.precedence = 21
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 	}
@@ -274,7 +275,7 @@ function BracketOpenFunctionMonad() {
 		return this.functionInformation.apply(null, value)
 	}
 	this.monadMap = gValueMonadMap
-	this.precedenceLevel = 21
+	this.precedence = 21
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.functionInformation = this.previousMonad.getRawValue(statement)
@@ -304,7 +305,7 @@ function CommaMonad() {
 	this.getValue = function(registry, statement) {
 		return createCommaReturnUndefined(this)
 	}
-	this.precedenceLevel = 1
+	this.precedence = 1
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		updateIfPrecedenceHigher(this, registry, statement)
@@ -335,10 +336,10 @@ function DivisionMultiplicationMonad() {
 		return null
 	}
 	this.operatorString = ''
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
-		processCharacterOperator(character, this, registry, statement)
+		this.operatorString += character
 	}
 }
 
@@ -358,10 +359,10 @@ function EqualityMonad() {
 		return null
 	}
 	this.operatorString = ''
-	this.precedenceLevel = 11
+	this.precedence = 11
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
-		processCharacterOperator(character, this, registry, statement)
+		this.operatorString += character
 	}
 }
 
@@ -396,10 +397,10 @@ function GreaterLessMonad() {
 		return null
 	}
 	this.operatorString = ''
-	this.precedenceLevel = 12
+	this.precedence = 12
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
-		processCharacterOperator(character, this, registry, statement)
+		this.operatorString += character
 	}
 }
 
@@ -414,7 +415,7 @@ function MemberMonad() {
 		}
 		return this
 	}
-	this.precedenceLevel = 20
+	this.precedence = 20
 	this.previousMap = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
@@ -444,7 +445,7 @@ function NegativeMonad() {
 	this.getResult = function(registry, statement, value) {
 		return -value
 	}
-	this.precedenceLevel = 17
+	this.precedence = 17
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 	}
@@ -470,7 +471,7 @@ function NotMonad() {
 		return ~value
 	}
 	this.operatorCharacter = null
-	this.precedenceLevel = 17
+	this.precedence = 17
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.operatorCharacter = character
@@ -481,7 +482,7 @@ function NullMonad() {
 	this.getValue = function(registry, statement) {
 		return null
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.setValue = function(value) {
 	}
@@ -510,7 +511,7 @@ function NumberMonad() {
 		}
 		return this.value
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.valueString += character
@@ -538,7 +539,7 @@ function QuoteMonad() {
 	this.getValue = function(registry, statement) {
 		return this.valueString
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.quoteCharacter = character
@@ -558,7 +559,7 @@ function SquareCloseMonad() {
 	this.getValue = function(registry, statement) {
 		return this.value
 	}
-	this.precedenceLevel = 20
+	this.precedence = 20
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		if (this.value != null) {
@@ -586,7 +587,7 @@ function SquareOpenArrayMonad() {
 	this.getResult = function(registry, statement, value) {
 		return this.previousMonadValue[value[0]]
 	}
-	this.precedenceLevel = 20
+	this.precedence = 20
 	this.previousMonad = null
 	this.previousMonadValue = null
 	this.processCharacter = function(character, registry, statement) {
@@ -602,7 +603,7 @@ function SquareOpenMonad() {
 	this.getResult = function(registry, statement, value) {
 		return value
 	}
-	this.precedenceLevel = 20
+	this.precedence = 20
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 	}
@@ -626,7 +627,7 @@ function StringMonad() {
 	this.getValue = function(registry, statement) {
 		return this.valueString
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		this.valueString = this.valueString.concat(character)
@@ -647,7 +648,7 @@ function UndefinedCommaMonad() {
 	this.getValue = function(registry, statement) {
 		return createCommaReturnUndefined(this)
 	}
-	this.precedenceLevel = 1
+	this.precedence = 1
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
 		var undefinedMonad = new UndefinedMonad()
@@ -662,7 +663,7 @@ function UndefinedMonad() {
 	this.getValue = function(registry, statement) {
 		return undefined
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMonad = null
 	this.setValue = function(value) {
 	}
@@ -717,7 +718,7 @@ function VariableMonad() {
 		}
 		return this.value
 	}
-	this.precedenceLevel = null
+	this.precedence = null
 	this.previousMap = null
 	this.previousMonad = null
 	this.processCharacter = function(character, registry, statement) {
