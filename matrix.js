@@ -124,7 +124,7 @@ function get3DByKey(key) {
 }
 
 function get3DsBy3DMatrix(matrix, points) {
-	if (matrix == null) {
+	if (getIsEmpty(matrix)) {
 		return points
 	}
 	var xyzs = new Array(points.length)
@@ -179,16 +179,17 @@ function getInteriorAngle(begin, end, radius) {
 	return 2.0 * Math.asin(halfDistance / radius)
 }
 
-function getInverseRotation3D(originalMatrix) {
+function getInverseRotation3D(matrix3D) {
 //	0 4 8  12
 //	1 5 9  13
 //	2 6 10 14
 //	3 7 11 15
-	if (originalMatrix == null) {
+	if (matrix3D == null) {
 		return null
 	}
 	var determinant = 0.0
-	var inverseMatrix = getUnitMatrix3D()
+	var inverseMatrix3D = getUnitMatrix3D()
+
 	for (var columnIndex = 0; columnIndex < 3; columnIndex++) {
 		for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
 			var elementIndex = 4 * columnIndex + rowIndex
@@ -198,23 +199,26 @@ function getInverseRotation3D(originalMatrix) {
 			var rowEnd = 2 - (rowIndex == 2)
 			var quadrupleBegin = 4 * columnBegin
 			var quadrupleEnd = 4 * columnEnd
-			inverseMatrix[elementIndex] = originalMatrix[quadrupleBegin + rowBegin] * originalMatrix[quadrupleEnd + rowEnd]
-			inverseMatrix[elementIndex] -= originalMatrix[quadrupleEnd + rowBegin] * originalMatrix[quadrupleBegin + rowEnd]
+			inverseMatrix3D[elementIndex] = matrix3D[quadrupleBegin + rowBegin] * matrix3D[quadrupleEnd + rowEnd]
+			inverseMatrix3D[elementIndex] -= matrix3D[quadrupleEnd + rowBegin] * matrix3D[quadrupleBegin + rowEnd]
 			if ((columnIndex + rowIndex) % 2 == 1) {
-				inverseMatrix[elementIndex] = -inverseMatrix[elementIndex]
+				inverseMatrix3D[elementIndex] = -inverseMatrix3D[elementIndex]
 			}
 		}
 	}
+
 	for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
-		determinant += inverseMatrix[rowIndex] * originalMatrix[rowIndex]
+		determinant += inverseMatrix3D[rowIndex] * matrix3D[rowIndex]
 	}
 //	using 1.0 / determinant gives approximate matrix but exact point when inverted
 	determinant = 1.0 / determinant
+
 	for (var columnIndex = 0; columnIndex < 3; columnIndex++) {
 		for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
-			inverseMatrix[4 * columnIndex + rowIndex] *= determinant
+			inverseMatrix3D[4 * columnIndex + rowIndex] *= determinant
 		}
 	}
+
 	for (var step = 1; step < 4; step++) {
 		var columnOriginal = step
 		var rowOriginal = 0
@@ -223,12 +227,35 @@ function getInverseRotation3D(originalMatrix) {
 			rowOriginal = 1
 		}
 		var originalIndex = 4 * columnOriginal + rowOriginal
-		var originalValue = inverseMatrix[originalIndex]
+		var originalValue = inverseMatrix3D[originalIndex]
 		var swapIndex = 4 * rowOriginal + columnOriginal
-		inverseMatrix[originalIndex] = inverseMatrix[swapIndex]
-		inverseMatrix[swapIndex] = originalValue
+		inverseMatrix3D[originalIndex] = inverseMatrix3D[swapIndex]
+		inverseMatrix3D[swapIndex] = originalValue
 	}
-	return inverseMatrix
+	return inverseMatrix3D
+}
+
+function getInverseRotationTranslation3D(matrix3D) {
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	if (matrix3D == null) {
+		return null
+	}
+	var inverseMatrix3D = getInverseRotation3D(matrix3D)
+	var multiplied3Ds = new Array(3).fill(0.0)
+
+	for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
+		for (var otherIndex = 0; otherIndex < 4; otherIndex++) {
+			multiplied3Ds[rowIndex] += inverseMatrix3D[rowIndex + otherIndex * 4] * matrix3D[12 + otherIndex]
+		}
+	}
+
+	for (var rowIndex = 0; rowIndex < 3; rowIndex++) {
+		inverseMatrix3D[12 + rowIndex] -= multiplied3Ds[rowIndex]
+	}
+	return inverseMatrix3D
 }
 
 function getMatrices3DByPath(points) {
