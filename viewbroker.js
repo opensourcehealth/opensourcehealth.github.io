@@ -29,7 +29,43 @@ function clearFillBoundingBox(boundingBox, context) {
 	strokeRoundRect(boundingBox[0][0] + 1, boundingBox[0][1] + 1, context, boundingBox[1][0] - 1, boundingBox[1][1] - 1)
 }
 
-function drawArray(context, elements, textSpace, x, y) {
+function downloadCanvas() {
+	var oldCanvas = viewBroker.canvas
+	var oldContext = viewBroker.context
+	viewBroker.canvas = document.createElement('canvas')
+	viewBroker.canvas.width = oldCanvas.width
+	viewBroker.canvas.height = oldCanvas.height
+	viewBroker.context = viewBroker.canvas.getContext('2d')
+	wordscapeViewerDraw()
+	var boundingBox = viewBroker.view.controlBoundingBox
+	var filename = viewBroker.view.id + '.png'
+	var size = getSubtraction2D(boundingBox[1], boundingBox[0])
+	var imageData = viewBroker.context.getImageData(boundingBox[0][0], boundingBox[0][1], size[0], size[1])
+	viewBroker.canvas = oldCanvas
+	viewBroker.context = oldContext
+	var temporaryCanvas = document.createElement('canvas')
+	temporaryCanvas.width = size[0]
+	temporaryCanvas.height = size[1]
+	var temporaryContext = temporaryCanvas.getContext('2d')
+	temporaryContext.putImageData(imageData, 0, 0)
+	temporaryCanvas.toBlob(function(blob) {saveAs(blob, filename)})
+}
+
+function drawArray(context, element, x, y) {
+	if (Array.isArray(element)) {
+		if (element.length > 0) {
+			var text = element[0]
+			for (var parameterIndex = 1; parameterIndex < element.length; parameterIndex++) {
+				text += ', ' + element[parameterIndex]
+			}
+			context.fillText(text, x, y)
+		}
+		return
+	}
+	context.fillText(element, x, y)
+}
+
+function drawArrays(context, elements, textSpace, x, y) {
 	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
 		var element = elements[elementIndex]
 		if (Array.isArray(element)) {
@@ -206,22 +242,24 @@ function drawHorizontalSliderWide(control, viewer) {
 	context.fill()
 }
 
-function drawNumericArray(context, elements, textSpace, x, y, decimalPlaces) {
+function drawNumericArray(context, element, x, y, decimalPlaces) {
 	decimalPlaces = getValueByDefault(0, decimalPlaces)
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		var element = elements[elementIndex]
-		if (Array.isArray(element)) {
-			if (element.length > 0) {
-				var text = element[0].toFixed()
-				for (var parameterIndex = 1; parameterIndex < element.length; parameterIndex++) {
-					text += ', ' + element[parameterIndex].toFixed(decimalPlaces)
-				}
-				context.fillText(text, x, y)
+	if (Array.isArray(element)) {
+		if (element.length > 0) {
+			var text = getSignificant(decimalPlaces, element[0])
+			for (var parameterIndex = 1; parameterIndex < element.length; parameterIndex++) {
+				text += ', ' + getSignificant(decimalPlaces, element[parameterIndex])
 			}
+			context.fillText(text, x, y)
 		}
-		else {
-			context.fillText(element.toFixed(decimalPlaces), x, y)
-		}
+		return
+	}
+	context.fillText(getSignificant(decimalPlaces, element), x, y)
+}
+
+function drawNumericArrays(context, elements, textSpace, x, y, decimalPlaces) {
+	for (var element of elements) {
+		drawNumericArray(context, element, x, y, decimalPlaces)
 		y += textSpace
 	}
 }
@@ -463,7 +501,7 @@ function roundRectPath(beginX, beginY, context, endX, endY, outset) {
 }
 
 function setTextContext(context) {
-	context.font = '12px Palatino'
+	context.font = viewBroker.textHeight.toString() + 'px freeserif,Palatino'
 	context.fillStyle = 'black'
 }
 
@@ -520,6 +558,13 @@ function typeSelectChanged() {
 
 function updateView() {
 	var isViewHidden = !getSessionBoolean('isViewHidden@')
+	var isDownloadHidden = isViewHidden
+	if (viewBroker.view != null) {
+		if (viewBroker.view.isDownloadHidden != undefined) {
+			isDownloadHidden = viewBroker.view.isDownloadHidden
+		}
+	}
+	document.getElementById('downloadCanvasButtonID').hidden = isDownloadHidden
 	document.getElementById('typeSelectID').hidden = isViewHidden
 	document.getElementById('viewSelectID').hidden = isViewHidden
 }
@@ -552,6 +597,7 @@ function viewerMouseUp(event) {
 function viewSelectChanged() {
 	var viewSelect = document.getElementById('viewSelectID')
 	viewBroker.setView(viewSelect.selectedIndex)
+	updateView()
 	wordscapeViewerDraw()
 }
 
@@ -641,16 +687,11 @@ var viewBroker = {
 		this.canvas = document.getElementById(id)
 		this.canvas.height = height
 		this.canvas.width = height + 17.0 * this.textHeight
-		var isDisabled = (views.length == 0)
 		this.mouseDown2D = null
 		this.mouseMoveManipulator = null
 		this.types = ['Solid Polyhedral', 'Solid Triangular', 'Wireframe Polyhedral', 'Wireframe Triangular']
 		this.type = this.types[this.typeSelectedIndex]
 		this.view = null
-		document.getElementById(id).hidden = isDisabled
-		document.getElementById('typeSelectID').disabled = isDisabled
-		document.getElementById('viewSelectID').disabled = isDisabled
-		updateView()
 		if (views.length == 0) {
 			return
 		}
@@ -685,8 +726,9 @@ var viewBroker = {
 		this.analysisLowerBegin = this.analysisBoundingBox[0][0] + 7 * this.textHeight
 		this.analysisUpperBegin = this.analysisBoundingBox[0][0] + 12 * this.textHeight
 		for (var view of views) {
-			view.start(this)
+			view.start()
 		}
+		updateView()
 		wordscapeViewerDraw()
 		if (id != this.canvasID) {
 			this.canvasID = id
