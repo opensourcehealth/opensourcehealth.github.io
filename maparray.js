@@ -43,6 +43,12 @@ function addMapToMapArray(mapFrom, mapTo) {
 	}
 }
 
+function addRangeToSet(aSet, from, to) {
+	for (var rangeIndex = from; rangeIndex < to; rangeIndex++) {
+		aSet.add(rangeIndex)
+	}
+}
+
 function arrayIsClose(elements, others) {
 	if (elements.length != others.length) {
 		return false
