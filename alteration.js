@@ -39,6 +39,7 @@ function addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, che
 	var afterPoint = null
 	var beforePoint = null
 	var point = points[pointIndex]
+
 	if (checkLength) {
 		beforePoint = points[(pointIndex - 2 + points.length) % points.length]
 		afterPoint = points[(pointIndex + 2) % points.length]
@@ -58,7 +59,7 @@ function addFilletedPointsByQuintuple
 	var centerBeginLength = length2D(centerBegin)
 	var centerEnd = getSubtraction2D(endPoint, centerPoint)
 	var centerEndLength = length2D(centerEnd)
-	if (centerBeginLength == 0.0 || centerEndLength == 0.0) {
+	if (centerBeginLength == 0.0 || centerEndLength == 0.0 || radius <= 0.0) {
 		filletedPolygon.push(centerPoint)
 		return
 	}
@@ -255,9 +256,82 @@ function addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons) {
 	}
 }
 
+function addToRegion(region, regionID, registry, statement) {
+	if (regionID == 'this') {
+		var polygons = []
+		for (var child of statement.children) {
+			pushArray(polygons, getPolygonsHDRecursively(registry, child))
+		}
+		if (polygons.length > 0) {
+			pushArray(region.polygons, polygons)
+		}
+		else {
+			noticeByList(['No polygons could be found for addToRegion in alteration.', regionID, statement])
+		}
+		return
+	}
+
+	if (regionID.startsWith('equation.')) {
+		var equation = getVariableValue(regionID.slice('equation.'.length), statement)
+		if (getIsEmpty(equation)) {
+			noticeByList(['No equation could be found for addToRegion in alteration.', regionID, statement])
+		}
+		else {
+			region.equations.push(equation)
+		}
+		return
+	}
+
+	if (regionID.startsWith('point.')) {
+		var point = getValueByEquation(registry, statement, regionID.slice('point.'.length))
+		if (getIsEmpty(point)) {
+			noticeByList(['No point could be found for addToRegion in alteration.', regionID, statement])
+		}
+		else {
+			region.pointStringSet.add(point.slice(0,2).toString())
+		}
+		return
+	}
+
+	if (!registry.idMap.has(regionID)) {
+		noticeByList(['No statement could be found for addToRegion in alteration.', regionID, statement])
+		return
+	}
+	var regionStatement = registry.idMap.get(regionID)
+	var polygons = getPolygonsHDRecursively(registry, regionStatement)
+
+	if (polygons.length > 0) {
+		pushArray(region.polygons, polygons)
+		return
+	}
+	var polylines = getChainPointListsHDRecursively(regionStatement, 1, registry, regionStatement, 'polyline')
+
+	if (polylines.length == 0) {
+		noticeByList(['No polygons or polylines could be found for addToRegion in alteration.', regionID, statement])
+		return
+	}
+
+	for (var polyline of polylines) {
+		for (var point of polyline) {
+			region.pointStringSet.add(point.slice(0,2).toString())
+		}
+	}
+}
+
 function alterMeshExcept(mesh, registry, statement) {
-	if (statement.attributeMap.has('alterations')) {
-		var alterations = statement.attributeMap.get('alterations').split(',').filter(lengthCheck)
+//	if (statement.attributeMap.has('alteration')) {
+//		var alterations = statement.attributeMap.get('alteration').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+
+//deprecated24
+	if (statement.attributeMap.has('alteration') || statement.attributeMap.has('alterations')) {
+		var alterations = null
+		if (statement.attributeMap.has('alteration')) {
+			alterations = statement.attributeMap.get('alteration').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+		}
+		else {
+			alterations = statement.attributeMap.get('alterations').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+		}
+
 		for (var alteration of alterations) {
 			alteration = alteration.trim()
 			if (gAlterMeshMap.has(alteration)) {
@@ -274,9 +348,9 @@ function analyzeOutputMesh(mesh, registry, statement) {
 	alterMeshExcept(mesh, registry, statement)
 }
 
-function bevelPoints(bevels, matrix3D, mesh, pointIndexSet, points, splits) {
+function bevelPoints(bevels, mesh, pointIndexSet, points) {
 	var facets = mesh.facets
-	bevels = getPushArray(bevels, splits)
+//	bevels = getPushArray(bevels, splits)
 	if (bevels == null) {
 		return
 	}
@@ -359,7 +433,7 @@ function expandMesh(expansionBottom, expansionXY, expansionTop, matrix3D, mesh) 
 		expansionXY.push(expansionXY[0])
 	}
 	var facets = mesh.facets
-	mesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	var directionMapZ = getDirectionMapZ(facets, mesh.points)
 	var horizontalDirectionMap = directionMapZ.horizontalDirectionMap
 	for (var key of horizontalDirectionMap.keys()) {
@@ -372,26 +446,15 @@ function expandMesh(expansionBottom, expansionXY, expansionTop, matrix3D, mesh) 
 	for (var point of mesh.points) {
 		point[2] += point[2] * zMultiplier + zAddition
 	}
-	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
+	mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), mesh.points)
 }
 
-function getBoundedPoints2D(equations, points, polygons, registry, statement) {
-	if (getIsEmpty(equations) && getIsEmpty(polygons)) {
+function getBoundedPoints2D(points, region, registry, statement) {
+	if (getIsEmpty(region)) {
 		return points
 	}
 	var pointIndexSet = new Set()
-	if (equations != null) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var equation of equations) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				variableMap.set('point', points[pointIndex].toString())
-				if (getValueByEquation(registry, statement, equation)) {
-					pointIndexSet.add(pointIndex)
-				}
-			}
-		}
-	}
-	addPointsToIndexSet(pointIndexSet, points, polygons)
+	addPointsToIndexSet(pointIndexSet, points, region.polygons)
 	return getBoundedPointsBySet(pointIndexSet, points)
 }
 
@@ -560,14 +623,14 @@ function getInsideInterpolationAlongBeginEnd(x, points) {
 	return null
 }
 
-function getOutsetPolygons(points, registry, statement) {
+function getOutsetPolygons(points, registry, statement, tag) {
 	var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
-	var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, this.name)
+	var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, tag)
 	var clockwise = getBooleanByStatement('clockwise', registry, statement)
 	if (clockwise == undefined) {
 		clockwise = getIsClockwise(points)
 	}
-	var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
+	var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, tag)
 	var marker = getPointsByKey('marker', registry, statement)
 	var baseMarker = getPointsByKey('baseMarker', registry, statement)
 	var tipMarker = getPointsByKey('tipMarker', registry, statement)
@@ -577,15 +640,15 @@ function getOutsetPolygons(points, registry, statement) {
 	if (getIsEmpty(tipMarker)) {
 		tipMarker = marker
 	}
-	var outsets = getOutsets(registry, statement)
+	var outsets = getOutsets(registry, statement, tag)
 	return getOutsetPolygonsByDirection(baseLocation, baseMarker, checkIntersection, clockwise, markerAbsolute, outsets, points, tipMarker)
 }
 
-function getOutsets(registry, statement) {
+function getOutsets(registry, statement, tag) {
 	var outsets = getPointsByKey('outsets', registry, statement)
 	if (getIsEmpty(outsets)) {
-		var outset = getPointByDefault([1.0, 1.0], 'radius', registry, statement, this.name)
-		outset = getPointByDefault(outset, 'outset', registry, statement, this.name)
+		var outset = getPointByDefault([1.0, 1.0], 'radius', registry, statement, tag)
+		outset = getPointByDefault(outset, 'outset', registry, statement, tag)
 		outsets = [outset]
 	}
 	else {
@@ -598,14 +661,26 @@ function getOutsets(registry, statement) {
 	return outsets
 }
 
-function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas) {
+function getPointIndexSet(antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas) {
 	var pointIndexSet = new Set()
-	if (getIsEmpty(equations) && getIsEmpty(intersectionIDs) && getIsEmpty(polygons) && getIsEmpty(splitIDs)) {
-		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-			pointIndexSet.add(pointIndex)
+
+	if (getIsEmpty(intersectionIDs) && region == undefined && getIsEmpty(splitIDs)) {
+		if (getIsEmpty(stratas)) {
+			addRangeToSet(pointIndexSet, 0, points.length)
+		}
+		else {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				var z = points[pointIndex][2]
+				for (var strata of stratas) {
+					if (getIsInStrata(strata, z)) {
+						pointIndexSet.add(pointIndex)
+					}
+				}
+			}
 		}
 		return pointIndexSet
 	}
+
 	if (mesh.intersectionIndexesMap != undefined) {
 		for (var id of intersectionIDs) {
 			if (mesh.intersectionIndexesMap.has(id)) {
@@ -613,6 +688,7 @@ function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, re
 			}
 		}
 	}
+
 	if (mesh.splitIndexesMap != undefined) {
 		for (var id of splitIDs) {
 			if (mesh.splitIndexesMap.has(id)) {
@@ -620,28 +696,34 @@ function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, re
 			}
 		}
 	}
-	if (equations != null) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var equation of equations) {
+
+	if (region != undefined) {
+		for (var polygon of region.polygons) {
+			var boundingBox = getBoundingBox(polygon)
 			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				variableMap.set('point', points[pointIndex].toString())
-				if (getValueByEquation(registry, statement, equation)) {
+				var point = points[pointIndex]
+				if (getIsInStratas(stratas, point[2])) {
+					if (isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon)) {
+						pointIndexSet.add(pointIndex)
+					}
+				}
+			}
+		}
+		if (region.pointStringSet.size > 0) {
+			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+				if (region.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
 					pointIndexSet.add(pointIndex)
 				}
 			}
 		}
-	}
-	if (polygons == null) {
-		return pointIndexSet
-	}
-	for (var polygon of polygons) {
-		var boundingBox = getBoundingBox(polygon)
-		for (var strata of stratas) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (getIsInStrata(strata, point[2])) {
-					if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
-						if (getIsPointInsidePolygonOrClose(point, polygon)) {
+		if (region.equations.length > 0) {
+			var variableMap = getVariableMapByStatement(statement)
+			for (var equation of region.equations) {
+				for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+					var point = points[pointIndex]
+					if (getIsInStratas(stratas, point[2])) {
+						variableMap.set('point', point.toString())
+						if (getValueByEquation(registry, statement, equation)) {
 							pointIndexSet.add(pointIndex)
 						}
 					}
@@ -649,6 +731,7 @@ function getPointIndexSet(equations, intersectionIDs, points, polygons, mesh, re
 			}
 		}
 	}
+	removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points)
 	return pointIndexSet
 }
 
@@ -675,8 +758,19 @@ function getPointIndexSetByOutside(center, isOutside, points, mesh) {
 }
 
 function getPointsExcept(points, registry, statement) {
-	if (statement.attributeMap.has('alterations')) {
-		var alterations = statement.attributeMap.get('alterations').split(',').filter(lengthCheck)
+//	if (statement.attributeMap.has('alteration')) {
+//		var alterations = statement.attributeMap.get('alteration').split(',').filter(lengthCheck)
+
+//deprecated24
+	if (statement.attributeMap.has('alteration') || statement.attributeMap.has('alterations')) {
+		var alterations = null
+		if (statement.attributeMap.has('alteration')) {
+			alterations = statement.attributeMap.get('alteration').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+		}
+		else {
+			alterations = statement.attributeMap.get('alterations').replace(/,/g, ' ').split(' ').filter(lengthCheck)
+		}
+
 		for (var alteration of alterations) {
 			if (gGetPointsMap.has(alteration)) {
 				points = gGetPointsMap.get(alteration).getPoints(points, registry, statement)
@@ -684,6 +778,19 @@ function getPointsExcept(points, registry, statement) {
 		}
 	}
 	return points
+}
+
+function getRegion(key, registry, statement) {
+	var value = getAttributeValue(key, statement)
+	if (value == undefined) {
+		return undefined
+	}
+	var regionIDs = value.split(' ').filter(lengthCheck)
+	var region = {equations:[], polygons:[], pointStringSet:new Set()}
+	for (var regionID of regionIDs) {
+		addToRegion(region, regionID, registry, statement)
+	}
+	return region
 }
 
 function getTopSegments(parameterIndex, polygonSegments, splitHeight) {
@@ -709,11 +816,11 @@ function mirrorByCenterDirectionRotation(centerDirection, point) {
 
 function mirrorMesh(centerDirection, matrix3D, mesh) {
 	addRotationToCenterDirection(centerDirection)
-	mesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	for (var point of mesh.points) {
 		mirrorByCenterDirectionRotation(centerDirection, point)
 	}
-	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
+	mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), mesh.points)
 	for (var facet of mesh.facets) {
 		facet.reverse()
 	}
@@ -723,27 +830,27 @@ function setPointsExcept(points, registry, statement) {
 	setPointsHD(getPointsExcept(points, registry, statement), statement)
 }
 
-function splitMesh(equations, id, matrix3D, mesh, polygons, registry, splitHeights, statement, stratas) {
+function splitMesh(boundaryEquations, id, matrix3D, mesh, polygons, registry, splitHeights, statement, stratas) {
 	if (mesh == null || getIsEmpty(splitHeights)) {
 		return
 	}
-	mesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	var facets = mesh.facets
 	var points = mesh.points
-	if (getIsEmpty(equations) && getIsEmpty(polygons)) {
+	if (getIsEmpty(boundaryEquations) && getIsEmpty(polygons)) {
 		addSplitIndexes(id, splitHeights, mesh)
 	}
 	else {
 		for (var splitHeight of splitHeights) {
 			var facetIndexSet = new Set()
-			if (equations != null) {
+			if (boundaryEquations != null) {
 				var variableMap = getVariableMapByStatement(statement)
-				for (var equation of equations) {
+				for (var boundaryEquation of boundaryEquations) {
 					for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
 						var facet = facets[facetIndex]
 						for (var pointIndex of facet) {
 							variableMap.set('point', points[pointIndex].toString())
-							if (getValueByEquation(registry, statement, equation)) {
+							if (getValueByEquation(registry, statement, boundaryEquation)) {
 								facetIndexSet.add(facetIndex)
 								break
 							}
@@ -763,18 +870,7 @@ function splitMesh(equations, id, matrix3D, mesh, polygons, registry, splitHeigh
 			addSplitIndexesByFacetSet(facetIndexSet, id, splitHeight, mesh)
 		}
 	}
-	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
-}
-		
-function splitMeshByBevels(boundaryEquations, id, matrix3D, mesh, polygons, registry, splitBevels, statement) {
-	if (getIsEmpty(splitBevels)) {
-		return
-	}
-	var splitHeights = []
-	for (var splitBevel of splitBevels) {
-		splitHeights.push(splitBevel[0])
-	}
-	splitMesh(boundaryEquations, id, matrix3D, mesh, polygons, registry, splitHeights, statement, null)
+	mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), mesh.points)
 }
 
 function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
@@ -788,7 +884,7 @@ function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
 	overhangAngle *= gRadiansPerDegree
 	sagAngle *= gRadiansPerDegree
 	var originalPoints = mesh.points
-	var inversePoints = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), originalPoints)
+	var inversePoints = get3DsBy3DMatrix(matrix3D, originalPoints)
 	var highestFacetIndex = 0
 	var highestFacetZ = -Number.MAX_VALUE
 	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
@@ -821,7 +917,7 @@ function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
 	}
 	addFacetsByBottomTopFacet(highestFacet, facets, insetFacet)
 	facets[highestFacetIndex] = insetFacet.reverse()
-	pushArray(originalPoints, get3DsBy3DMatrix(matrix3D, inversePoints.slice(originalPoints.length, inversePoints.length)))
+	pushArray(originalPoints, get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), inversePoints.slice(originalPoints.length, inversePoints.length)))
 	mesh.points = originalPoints
 }
 
@@ -1073,7 +1169,7 @@ function wedgeMesh(inset, matrix3D, mesh) {
 		inset = [inset[0], inset[0]]
 	}
 	var facets = mesh.facets
-	mesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	var directionMapZ = getDirectionMapZ(facets, mesh.points)
 	var horizontalDirectionMap = directionMapZ.horizontalDirectionMap
 	var oneOverDeltaZ = 1.0 / directionMapZ.deltaZ
@@ -1082,48 +1178,42 @@ function wedgeMesh(inset, matrix3D, mesh) {
 		var insetAtZ = getMultiplication2DScalar(inset, (directionMapZ.minimumZ - centerPoint[2]) * oneOverDeltaZ)
 		mesh.points[key] = add2D(centerPoint.slice(0), getMultiplication2D(horizontalDirectionMap.get(key), insetAtZ))
 	}
-	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
+	mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), mesh.points)
 }
 
 var gBend = {
 	alterMesh: function(mesh, registry, statement) {
-		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var intersectionIDs = getStrings('intersectionIDs', statement)
+		var antiregion = getRegion('antiregion', registry, statement)
+		var intersectionIDs = getStrings('intersectionID', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
-		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
-		var polygons = getPolygonsHDRecursively(registry, statement)
-		var splitIDs = getStrings('splitIDs', statement)
+		var points = get3DsBy3DMatrix(matrix3D, mesh.points)
+		var region = getRegion('region', registry, statement)
+		var splitIDs = getStrings('splitID', statement)
 		var stratas = getStratas(registry, statement)
-		var pointIndexSet = getPointIndexSet(
-		boundaryEquations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas)
+		var pointIndexSet = getPointIndexSet(antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas)
 		if (pointIndexSet.size == 0) {
 			return
 		}
 		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
-		var translations = getPointsByKey('translations', registry, statement)
-		if (getIsEmpty(translations)) {
-			translations = getPointsByKey('amplitudes', registry, statement)
-		}
+		var translations = getPointsByKey('translation', registry, statement)
 		var center = getFloatsByDefault([0.0, 0.0, 0.0], 'center', registry, statement, statement.tag)
-		var translationEquations = getEquations('translationEquations', statement)
+		var translationEquations = getEquations('translationEquation', statement)
 		var vector = getVector3DByStatement(registry, statement)
 		transformPoints3DByEquation(center, boundedPoints, registry, statement, translationEquations, translations, vector)
-		mesh.points = get3DsBy3DMatrix(matrix3D, points)
+		mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), points)
 		removeClosePoints(mesh)
 	},
 	getPoints: function(points, registry, statement) {
-		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var polygons = getPolygonsHDRecursively(registry, statement)
-		var boundedPoints = getBoundedPoints2D(boundaryEquations, points, polygons, registry, statement)
+		var antiregion = getRegion('antiregion', registry, statement)
+
+		var region = getRegion('region', registry, statement)
+		var boundedPoints = getBoundedPoints2D(points, region, registry, statement)
 		if (getIsEmpty(boundedPoints)) {
 			return points
 		}
-		var translations = getPointsByKey('translations', registry, statement)
-		if (getIsEmpty(translations)) {
-			translations = getPointsByKey('amplitudes', registry, statement)
-		}
+		var translations = getPointsByKey('translation', registry, statement)
 		var center = getFloatsByDefault([0.0, 0.0], 'center', registry, statement, statement.tag)
-		var translationEquations = getEquations('translationEquations', statement)
+		var translationEquations = getEquations('translationEquation', statement)
 		var vector = getPoint3DByStatement('vector', registry, statement)
 		transformPoints2DByEquation(center, boundedPoints, registry, statement, translationEquations, translations, vector)
 		return points
@@ -1136,41 +1226,59 @@ var gBend = {
 	name: 'bend',
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		var points = getPointsHD(registry, statement)
-		if (points == null) {
-			noticeByList(['No work mesh or points could be found for bend in alteration.', statement])
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in bend in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
-		points = this.getPoints(points, registry, statement)
-		setPointsExcept(points, registry, statement)
+		noticeByList(['No work mesh or points could be found for bend in alteration.', statement])
 	}
 }
 
 var gBevel = {
 	alterMesh: function(mesh, registry, statement) {
-		var bevels = getPointsByKey('bevels', registry, statement)
-		var boundaryEquations = getEquations('boundaryEquations', statement)
-		var intersectionIDs = getStrings('intersectionIDs', statement)
+		var antiregion = getRegion('antiregion', registry, statement)
+		var bevels = getPointsByKey('bevel', registry, statement)
+		var intersectionIDs = getStrings('intersectionID', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
-		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
-		var polygons = getPolygonsHDRecursively(registry, statement)
-		var splitBevels = getPointsByKey('splitBevels', registry, statement)
-		var splitIDs = getStrings('splitIDs', statement)
+		var points = get3DsBy3DMatrix(matrix3D, mesh.points)
+
+		//deprecated24
+//		var polygons = getPolygonsHDRecursively(registry, statement)
+
+//		var splitBevels = getPointsByKey('splitBevel', registry, statement)
+//		if (getIsEmpty(splitBevels)) {
+//			splitBevels = getPointsByKey('splitBevels', registry, statement)
+//		}
+
+		var region = getRegion('region', registry, statement)
+		var splitIDs = getStrings('splitID', statement)
 		var stratas = getStratas(registry, statement)
-		splitMeshByBevels(boundaryEquations, statement.attributeMap.get('id'), matrix3D, mesh, polygons, registry, splitBevels, stratas)
-		var pointIndexSet = getPointIndexSet(
-		boundaryEquations, intersectionIDs, points, polygons, mesh, registry, splitIDs, statement, stratas)
+		var pointIndexSet = getPointIndexSet(antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas)
 		if (pointIndexSet.size == 0) {
 			return
 		}
-		bevelPoints(bevels, matrix3D, mesh, pointIndexSet, points, splitBevels)
-		mesh.points = get3DsBy3DMatrix(matrix3D, points)
+		bevelPoints(bevels, mesh, pointIndexSet, points)
+		mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), points)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -1179,13 +1287,15 @@ var gBevel = {
 	name: 'bevel',
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for bevel in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for bevel in alteration.', statement])
 	}
 }
 
@@ -1207,39 +1317,62 @@ var gExpand = {
 	},
 	name: 'expand',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for expand in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for expand in alteration.', statement])
 	}
 }
 
 var gFillet = {
 	getPoints: function(points, registry, statement) {
+		var antiregion = getRegion('antiregion', registry, statement)
 		var checkLength = getBooleanByDefault(true, 'checkLength', registry, statement, this.name)
 		var numberOfSides = getFloatByDefault(this.sides, 'sides', registry, statement, this.name)
 		var radius = getFloatByDefault(1.0, 'radius', registry, statement, this.name)
-		if (statement.attributeMap.has('region')) {
-			var regionID = statement.attributeMap.get('region')
-			if (!registry.idMap.has(regionID)) {
-				noticeByList(['No region could be found for fillet in alteration.', regionID, statement])
-			}
-			else {
-				var polygons = getPolygonsHDRecursively(registry, registry.idMap.get(regionID))
-				var pointIndexSet = new Set()
-				addPointsToIndexSet(pointIndexSet, points, polygons)
-				var pointIndexes = Array.from(pointIndexSet)
-				pointIndexes.sort(compareNumberDescending)
-				for (var pointIndex of pointIndexes) {
-					addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength)
+		var region = getRegion('region', registry, statement)
+
+		if (antiregion == undefined && region == undefined) {
+			return getFilletedPolygon(numberOfSides, points, radius, checkLength)
+		}
+		var pointIndexSet = new Set()
+
+		if (region == undefined) {
+			addRangeToSet(pointIndexSet, 0, points.length)
+		}
+		else {
+			addPointsToIndexSet(pointIndexSet, points, region.polygons)
+			if (region.pointStringSet.size > 0) {
+				for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+					if (region.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
+						pointIndexSet.add(pointIndex)
+					}
 				}
 			}
-			return points
+			if (region.equations.length > 0) {
+				var variableMap = getVariableMapByStatement(statement)
+				for (var equation of region.equations) {
+					for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+						variableMap.set('point', points[pointIndex].toString())
+						if (getValueByEquation(registry, statement, equation)) {
+							pointIndexSet.add(pointIndex)
+						}
+					}
+				}
+			}
 		}
-		return getFilletedPolygon(numberOfSides, points, radius, checkLength)
+		removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points)
+		var pointIndexes = Array.from(pointIndexSet)
+		pointIndexes.sort(compareNumberDescending)
+		for (var pointIndex of pointIndexes) {
+			addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength)
+		}
+		return points
 	},
 	initialize: function() {
 		gGetPointsMap.set(this.name, this)
@@ -1247,14 +1380,21 @@ var gFillet = {
 	},
 	name: 'fillet',
 	processStatement:function(registry, statement) {
-		var points = getPointsHD(registry, statement)
-		if (points == null) {
-			noticeByList(['No points could be found for fillet in alteration.', statement])
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in fillet in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
-		statement.tag = 'polygon'
-		points = this.getPoints(points, registry, statement)
-		setPointsExcept(points, registry, statement)
 	},
 	sides: 12
 }
@@ -1285,13 +1425,32 @@ var gMirror = {
 	},
 	name: 'mirror',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
+			return
+		}
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in mirror in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No work mesh or points could be found for mirror in alteration.', statement])
 			return
@@ -1329,12 +1488,30 @@ var gMirrorJoin = {
 	},
 	name: 'mirrorJoin',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in mirrorJoin in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
+			return
+		}
+
 		var points = getPointsHD(registry, statement)
 		if (points == null) {
 			noticeByList(['No work mesh or points could be found for mirrorJoin in alteration.', statement])
@@ -1393,13 +1570,15 @@ var gMove = {
 	},
 	name: 'move',
 	processStatement: function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for move in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for move in alteration.', statement])
 	}
 }
 
@@ -1467,13 +1646,31 @@ var gMultiplyJoin = {
 	},
 	name: 'multiplyJoin',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
+			return
+		}
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in multiplyJoin in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No work mesh or points could be found for multiplyJoin in alteration.', statement])
 			return
@@ -1486,7 +1683,7 @@ var gMultiplyJoin = {
 
 var gOutset = {
 	getPoints: function(points, registry, statement) {
-		var outsetPolygons = getOutsetPolygons(points, registry, statement)
+		var outsetPolygons = getOutsetPolygons(points, registry, statement, this.name)
 		if (outsetPolygons.length == 0) {
 			return []
 		}
@@ -1498,17 +1695,35 @@ var gOutset = {
 	},
 	name: 'outset',
 	processStatement:function(registry, statement) {
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in outset in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
+			return
+		}
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No points could be found for outset in alteration.', statement])
 			return
 		}
 		statement.tag = 'polygon'
-		var outsetPolygons = getOutsetPolygons(points, registry, statement)
+		var outsetPolygons = getOutsetPolygons(points, registry, statement, this.name)
+
 		if (getIsEmpty(outsetPolygons)) {
 			setPointsExcept([], registry, statement)
 			return
 		}
+
 		if (outsetPolygons.length == 1) {
 			setPointsExcept(outsetPolygons[0], registry, statement)
 			return
@@ -1528,13 +1743,15 @@ var gPolygonate = {
 	},
 	name: 'polygonate',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for polygonate in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for polygonate in alteration.', statement])
 	}
 }
 
@@ -1653,13 +1870,32 @@ var gPolygonJoin = {
 	},
 	name: 'polygonJoin',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
+			return
+		}
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in polygonJoin in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No work mesh or points could be found for polygonJoin in alteration.', statement])
 			return
@@ -1767,13 +2003,32 @@ var gPolylineJoin = {
 	},
 	name: 'polylineJoin',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
+			return
+		}
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in polylineJoin in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
 			return
 		}
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No work mesh or points could be found for polylineJoin in alteration.', statement])
 			return
@@ -1794,7 +2049,24 @@ var gReverse = {
 	},
 	name: 'reverse',
 	processStatement:function(registry, statement) {
+		var workStatements = getWorkStatements(registry, statement)
+
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == null) {
+					noticeByList(['No points could be found for the workStatement in reverse in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
+			return
+		}
+
 		var points = getPointsHD(registry, statement)
+
 		if (points == null) {
 			noticeByList(['No points could be found for reverse in alteration.', statement])
 			return
@@ -1807,12 +2079,18 @@ var gReverse = {
 
 var gSplit = {
 	alterMesh: function(mesh, registry, statement) {
-		var equations = getEquations('boundary', statement)
+		var boundaryEquations = getEquations('boundaryEquation', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
-		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+		var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
+
+		//deprecated24
+		if (getIsEmpty(splitHeights)) {
+			splitHeights = getPointsByKey('splitHeights', registry, statement)
+		}
+
 		var stratas = getStratas(registry, statement)
-		splitMesh(equations, statement.attributeMap.get('id'), matrix3D, mesh, polygons, registry, splitHeights, statement, stratas)
+		splitMesh(boundaryEquations, statement.attributeMap.get('id'), matrix3D, mesh, polygons, registry, splitHeights, statement, stratas)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -1821,10 +2099,12 @@ var gSplit = {
 	name: 'split',
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
 		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
@@ -1832,7 +2112,13 @@ var gSplit = {
 			noticeByList(['No work mesh or polygons could be found for split in alteration.', statement])
 			return
 		}
-		var splitHeights = getFloatsByStatement('splitHeights', registry, statement)
+		var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
+
+		//deprecated24
+		if (getIsEmpty(splitHeights)) {
+			splitHeights = getPointsByKey('splitHeights', registry, statement)
+		}
+
 		var splitPolygons = []
 		addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons)
 		addPolygonsToGroup(splitPolygons, registry, statement)
@@ -1853,23 +2139,25 @@ var gTaper = {
 	},
 	name: 'taper',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for taper in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for taper in alteration.', statement])
 	}
 }
 
 var gThread = {
 	alterMesh: function(mesh, registry, statement) {
-		var axials = getPointsByKey('axials', registry, statement)
+		var axials = getPointsByKey('axial', registry, statement)
 		var center = getFloatsByDefault([0.0, 0.0], 'center', registry, statement, this.name)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var isOutside = getBooleanByDefault(true, 'outside', registry, statement, this.name)
-		var points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), mesh.points)
+		var points = get3DsBy3DMatrix(matrix3D, mesh.points)
 		var pointIndexSet = getPointIndexSetByOutside(center, isOutside, points, mesh)
 		if (pointIndexSet.size == 0) {
 			return
@@ -1879,7 +2167,7 @@ var gThread = {
 		var taperAngle = getFloatByDefault(30.0, 'taperAngle', registry, statement, this.name)
 		var translations = getPointsByKey('translations', registry, statement)
 		threadPoints(axials, center, heights, numberOfThreads, getBoundedPointsBySet(pointIndexSet, points), taperAngle, translations)
-		mesh.points = get3DsBy3DMatrix(matrix3D, points)
+		mesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), points)
 		removeClosePoints(mesh)
 	},
 	initialize: function() {
@@ -1888,13 +2176,15 @@ var gThread = {
 	},
 	name: 'thread',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh == null) {
-			noticeByList(['No work mesh could be found for thread in alteration.', statement])
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
-		this.alterMesh(workMesh, registry, statement)
-		analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		noticeByList(['No work mesh could be found for thread in alteration.', statement])
 	}
 }
 
@@ -1908,10 +2198,12 @@ var gTriangulate = {
 	},
 	name: 'triangulate',
 	processStatement:function(registry, statement) {
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
 		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
@@ -1943,10 +2235,12 @@ var gWedge = {
 	name: 'wedge',
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
-		var workMesh = getWorkMesh(registry, statement)
-		if (workMesh != null) {
-			this.alterMesh(workMesh, registry, statement)
-			analyzeOutputMesh(getMeshCopy(workMesh), registry, statement)
+		var workMeshes = getWorkMeshes(registry, statement)
+		if (workMeshes.length > 0) {
+			for (var workMesh of workMeshes) {
+				this.alterMesh(workMesh, registry, statement)
+				analyzeOutputMesh(workMesh, registry, statement)
+			}
 			return
 		}
 		var polygons = getPolygonsHDRecursively(registry, statement)
