@@ -589,6 +589,13 @@ function getConnectionSegments(endMap, nodeBeginKey, toolNodeMap, toolPolygonSeg
 	return null
 }
 
+function getCounterDirectedPolygon(counterClockwise, polygon) {
+	if (getIsCounterclockwise(polygon) == counterClockwise) {
+		return polygon
+	}
+	return polygon.slice(0).reverse()
+}
+
 function getCrossProductByPolygon(polygon) {
 	removeIdentical3DPoints(polygon)
 	var product = [0.0, 0.0, 0.0]
@@ -653,7 +660,7 @@ function getDoublePolygonArea(polygon) {
 	var polygonArea = 0.0
 	for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
 		var nextPoint = polygon[(pointIndex + 1) % polygon.length]
-		polygonArea += polygon[pointIndex][1] * nextPoint[0] - polygon[pointIndex][0] * nextPoint[1]
+		polygonArea += polygon[pointIndex][0] * nextPoint[1] - polygon[pointIndex][1] * nextPoint[0]
 	}
 	return polygonArea
 }
@@ -1150,9 +1157,16 @@ function getIsClear(side, sideOther, xIntersections) {
 
 function getIsClockwise(polygon) {
 	if (polygon.length < 3) {
+		return false
+	}
+	return getDoublePolygonArea(polygon) < 0.0
+}
+
+function getIsCounterclockwise(polygon) {
+	if (polygon.length < 3) {
 		return true
 	}
-	return getDoublePolygonArea(polygon) > 0.0
+	return getDoublePolygonArea(polygon) >= 0.0
 }
 
 function getIsPointInsidePolygon(point, polygon) {
@@ -1299,10 +1313,6 @@ function getIsTriangleTooThin(triangle) {
 		}
 	}
 	return false
-}
-
-function getIsWiddershins(polygon) {
-	return getDoublePolygonArea(polygon) < 0.0
 }
 
 function getIsXYSegmentClose(begin, end, point) {
@@ -1850,7 +1860,7 @@ function getOutsetPolygonsByDirection(baseLocation, baseMarker, checkIntersectio
 	if (clockwise) {
 		return outlines.filter(getIsClockwise)
 	}
-	return outlines.filter(getIsWiddershins)
+	return outlines.filter(getIsCounterclockwise)
 }
 
 // not used but might be useful sometimes
@@ -2397,6 +2407,13 @@ function isPointInsideBoundingBoxOrClose(boundingBox, point) {
 		return false
 	}
 	return point[1] < boundingBox[1][1] + gClose
+}
+
+function isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon) {
+	if (!isPointInsideBoundingBoxOrClose(boundingBox, point)) {
+		return false
+	}
+	return getIsPointInsidePolygonOrClose(point, polygon)
 }
 
 function isPointOutsideOrBorderingCircles(gridMap, halfMinusOver, linkSet, point, points, radiusSquared) {
