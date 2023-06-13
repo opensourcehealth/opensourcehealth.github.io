@@ -30,6 +30,7 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
 
+// workMeshes
 // thread
 // format text
 // platonic, svg
@@ -321,10 +322,10 @@ function getXYPointStringsByXYZ(points) {
 
 function testBend() {
 	console.log('testBend')
-	var amplitudes = [[0,1,1], [2,3,3]]
+	var translations = [[0,1,1], [2,3,3]]
 	console.log('additionInterpolation')
-	console.log(additionInterpolation(0.5, amplitudes, 2))
-	console.log(zoomInterpolation(0.5, amplitudes, [undefined, undefined, 5.0], undefined, 3))
+	console.log(additionInterpolation(0.5, translations, 2))
+	console.log(zoomInterpolation(0.5, translations, [undefined, undefined, 5.0], undefined, 3))
 //	var pointString = '-2,-2 -2,9 12,-2 0,-1 0,7 10,-1 1,0 1,5 6,0 2,1 4,1 2,3 11,1 13,1 11,3'
 	var pointString = '-2,-2,0 -2,6,0 5,-2,0'
 //	var pointString = '-2,-2 -2,6 5,-2 4,-2 3,-2 2,-2 1.5,-2 1,-2 0,-2 -1,-2'
@@ -339,19 +340,15 @@ function testBend() {
 	var statement = {parent:parent}
 	drawXYPolygons(boundaryPolygons)
 	var stratas = [[-5,-3]]
-	var amplitudes = [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0, -3.0]]
+	var translations = [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0, -3.0]]
 	var boundedPoints = points
-//	var pointIndexSet = new Set()
-//	var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
-//	var boundedPoints = getBoundedPoints2D([boundaryEquation], points, boundaryPolygons, null, statement)
-//	var boundedPoints = getBoundedPoints2D(null, points, [[[-3,-3], [-3,2], [2,-3]]])
 	console.log('boundedPoints')
 	console.log(getArraysCopy(boundedPoints))
 	console.log(getArraysCopy(points))
 	console.log(boundaryPolygons)
-//	transformPoints2DByEquation(amplitudes, null, boundedPoints, null, statement, null, null)
-	transformPoints2DByEquation(amplitudes, [0.0, -5.0], boundedPoints, null, statement, null, [0.0, 1.0])
-//	transformPoints3DByEquation(amplitudes, null, boundedPoints, null, statement, [translationEquation], null)
+//	transformPoints2DByEquation(null, boundedPoints, null, statement, null, translations, null)
+	transformPoints2DByEquation([0.0, -5.0], boundedPoints, null, statement, null, translations, [0.0, 1.0])
+//	transformPoints3DByEquation(null, boundedPoints, null, statement, [translationEquation], translations, null)
 	console.log(boundedPoints)
 	drawXYPolygon(points, getRGB())
 	console.log(points)
@@ -360,16 +357,13 @@ function testBend() {
 function testBevel() {
 	console.log('testBevel')
 	var bevels = [[0.0, 0.3], [1.2, 0.2]]
-	var boundaryEquations = null
-	var mesh = getPillarMesh([0.0, 6.0], getUnitMatrix3D(), [[[0,-1,0], [0,4,0], [2,5,0], [3,4,0], [4,-1,0], [2,-3,0]]])
+	var mesh = getPillarMesh([0.0, 6.0], undefined, [[[0,-1,0], [0,4,0], [2,5,0], [3,4,0], [4,-1,0], [2,-3,0]]])
 //	drawMesh(mesh)
-	var polygons = [[[-1,1], [-1,-5], [9,-5], [9,1]]]
-	var splitBevels = [[2.5, 0.4]]
-	splitMeshByBevels(boundaryEquations, 'testBevel', null, mesh, polygons, null, splitBevels, null)
-	var pointIndexSet = getPointIndexSet(boundaryEquations, [], mesh.points, polygons, mesh, null, [], null, [[-1,1]])
+	var region = {equations:[], pointStringSet:new Set(), polygons:[[[-1,1], [-1,-5], [9,-5], [9,1]]]}
+	var pointIndexSet = getPointIndexSet(undefined, [], mesh.points, mesh, region, null, [], null, [[-1,1]])
 	console.log(pointIndexSet)
 	console.log(mesh)
-	bevelPoints(bevels, null, mesh, pointIndexSet, mesh.points, splitBevels)
+	bevelPoints(bevels, mesh, pointIndexSet, mesh.points)
 	drawMesh(mesh)
 }
 
@@ -395,7 +389,7 @@ function testDrillByMesh() {
 	var facets = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
 	var points = getPointsByString(pointString)
 	var centerPolygon = [[4, 1], [6, 1], [5, 3]]
-	var centerMesh = getPillarMesh([0.0, 1.0], getUnitMatrix3D(), [centerPolygon])
+	var centerMesh = getPillarMesh([0.0, 1.0], undefined, [centerPolygon])
 //	drawMesh(centerMesh)
 //	drawXYPolygon(centerPolygon, getRGB())
 	drillByMesh(centerMesh, null, getUnitMatrix3D(), {facets:facets, points:points})
@@ -463,7 +457,7 @@ function testExpand() {
 	var polygon3D = getPointsByString(pointString)
 	var heights = [0.0, 1.0]
 //	var heights = [0.0, 0.5, 1.0]
-	var pillarMesh = getPillarMesh(heights, null, [polygon3D])
+	var pillarMesh = getPillarMesh(heights, undefined, [polygon3D])
 	drawMesh(pillarMesh)
 	console.log('pillarMesh points')
 	console.log(pillarMesh.points)
@@ -540,8 +534,8 @@ function testFacetSubtraction() {
 	console.log('testFacetSubtraction')
 //	in future facet normal hint for intersections - acceptance angle
 	var lowerToolPolygon = getPointsByString('4,0 4,2 0,2 0,0')
-	var workMesh = getPillarMesh([0,5], null, [getPointsByString('0,3 4,3 4,0 0,0')])
-//	var workMesh = getPillarMesh([0,4], null, [getPointsByString('0,0 0,5 10,5 10,0')])
+	var workMesh = getPillarMesh([0,5], undefined, [getPointsByString('0,3 4,3 4,0 0,0')])
+//	var workMesh = getPillarMesh([0,4], undefined, [getPointsByString('0,0 0,5 10,5 10,0')])
 //	workMesh.facets = [workMesh.facets[0]]
 	console.log('workMesh.facets')
 	console.log(workMesh.facets.slice(0))
@@ -637,10 +631,10 @@ function testJoin() {
 //	var leftString = '0,-4,0 0,5,0 9,-4,0'
 	var leftString = '-2,-4,0 -2,5,0 2,5,0 2,-4,0'
 	var heights = [0.0, 4.0]
-	var leftMesh = getPillarMesh(heights, null, [getPointsByString(leftString)])
+	var leftMesh = getPillarMesh(heights, undefined, [getPointsByString(leftString)])
 //	drawMesh(leftMesh)
 	var rightString = '4,-4,0 4,5,0 9,5,0 9,-4,0'
-	var rightMesh = getPillarMesh(heights, null, [getPointsByString(rightString)])
+	var rightMesh = getPillarMesh(heights, undefined, [getPointsByString(rightString)])
 //	drawMesh(rightMesh)
 	console.log('leftMesh points')
 	console.log(leftMesh.points)
@@ -692,13 +686,13 @@ function testLettering() {
 //	if (polylines != null) {
 //		drawXYPolylines(polylines)
 //	}
-	var letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringA, 0.2)
+	var letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringA, 0.2)
 	drawXYPolygons(letteringOutlines)
-	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringB, 0.2)
+	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringB, 0.2)
 	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -5.0]))
-	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringC, 0.2)
+	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringC, 0.2)
 	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -10.0]))
-	letteringOutlines = getLetteringOutlines(2.4, 0.3, letteringStringD, 0.2)
+	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringD, 0.2)
 	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -15.0]))
 }
 
@@ -736,6 +730,24 @@ function testLoop() {
 }
 */
 
+function testMatrix() {
+	console.log('testMatrix')
+	var point = [1,2,3]
+	var matrix3D = getMatrix3DByTranslate([5,6,7])
+	console.log(matrix3D.slice(0))
+	matrix3D = getMultiplied3DMatrix(getMatrix3DByRotateY([70]), matrix3D)
+	console.log(matrix3D.slice(0))
+	matrix3D = getMultiplied3DMatrix(getMatrix3DByRotateX([40]), matrix3D)
+	console.log(matrix3D.slice(0))
+	point = get3DBy3DMatrix(matrix3D, point)
+	var inverseMatrix3D = getInverseRotationTranslation3D(matrix3D)
+	console.log(inverseMatrix3D.slice(0))
+	console.log(getMultiplied3DMatrix(inverseMatrix3D, matrix3D))
+	point = get3DBy3DMatrix(inverseMatrix3D, point)
+	console.log('point')
+	console.log(point)
+}
+
 function testMeshBoolean() {
 	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
 	var pointsA = getPointsByString(pointString)
@@ -768,7 +780,7 @@ function testMirrorJoin() {
 	console.log('testMirrorJoin')
 	var leftString = '-2,-4,0 -2,5,0 2,5,0 2,-4,0'
 	var heights = [0.0, 4.0]
-	var leftMesh = getPillarMesh(heights, null, [getPointsByString(leftString)])
+	var leftMesh = getPillarMesh(heights, undefined, [getPointsByString(leftString)])
 //	drawMesh(leftMesh)
 	var mirroredMesh = getMeshCopy(leftMesh)
 	mirrorMesh(getCenterDirectionByCenterDirection([3.0], null), null, mirroredMesh)
@@ -884,7 +896,7 @@ function testPolygonate() {
 	var pointString = '0,-4,0 0,5,0 9,-4,0'
 	var polygon3D = getPointsByString(pointString)
 	var heights = [0.0, 4.0]
-	var pillarMesh = getPillarMesh(heights, null, [polygon3D])
+	var pillarMesh = getPillarMesh(heights, undefined, [polygon3D])
 //	drawMesh(pillarMesh)
 	console.log('pillarMesh points')
 	console.log(pillarMesh.points)
@@ -1020,7 +1032,7 @@ function testSculptureVertical() {
 //	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [10,4]]], vertical:false})
 	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [2,1], [4,1], [6,1], [6,0], [4,0], [2,0]]], vertical:true})
 //	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [6,1], [6,0]]], vertical:true})
-	var meshNew = getSculptureMesh(layersNew, getUnitMatrix3D())
+	var meshNew = getSculptureMesh(layersNew, undefined)
 	console.log(layersNew)
 	console.log(meshNew)
 	drawMesh(meshNew)
@@ -1031,7 +1043,7 @@ function testSplitPoints() {
 //	var pointString = '11,0,4 8,0,4 8,0,14 11,0,14'
 //	var points = getPointsByString(pointString)
 //	points.reverse()
-	var workMesh = getPillarMesh([0,10], null, [getPointsByString('0,0 0,5 10,5 10,0')])
+	var workMesh = getPillarMesh([0,10], undefined, [getPointsByString('0,0 0,5 10,5 10,0')])
 //	differenceByPolygon('triangle', [], [], null, getPointsByString('8,-1 12,-1 12,2'), workMesh)
 	differenceByPolygon('triangle', [], [], null, getPointsByString('8,-1 12,-1 12,2 8,2'), workMesh)
 	addSplitIndexes('testSplitPoints', [3], workMesh)
@@ -1140,13 +1152,13 @@ function testTaper() {
 	var polygon3D = getPointsByString(pointString)
 	var heights = [0.0, 1.0]
 	var mesh = {facets:[], points:[]}
-	addToPillarMesh(heights, mesh, polygon3D)
-	var pillarMesh = getPillarMesh(heights, [polygon3D], getUnitMatrix3D())
+	addToPillarMesh(heights, mesh, [polygon3D])
+	var pillarMesh = getPillarMesh(heights, undefined, [polygon3D])
 //	drawMesh(pillarMesh)
 	console.log('pillarMesh points')
 	console.log(pillarMesh.points)
 	console.log(pillarMesh.facets)
-	taperMesh(getUnitMatrix3D(), 2.0, 40.0, 15.5, pillarMesh)
+	taperMesh(getUnitMatrix3D(), 2.0, pillarMesh, 40.0, 15.5)
 	drawMesh(pillarMesh)
 }
 
@@ -1187,7 +1199,7 @@ function testTransforms() {
 	layers.push({connection:'s', height:2, matrix:matrices[1], polynodes:polynodes, transform3D:null})
 	polynodes = [[{point:[0, 0]}, {point:[0, 5]}, {point:[10, 0]}]]
 	layers.push({connection:'s', height:4, matrix:matrices[2], polynodes:polynodes, transform3D:null})
-	var sculptureMesh = getSculptureMesh(layers, getUnitMatrix3D())
+	var sculptureMesh = getSculptureMesh(layers, undefined)
 	console.log(layers)
 	console.log(sculptureMesh)
 	drawMesh(sculptureMesh)
@@ -1364,6 +1376,21 @@ function testVoxelBoolean() {
 //	console.log(getMeshAnalysis(meshC))
 }
 
+function testWedge() {
+	console.log('testWedge')
+	var pointString = '0,-4,0 4,2.92820323,0 8,-4,0'
+	var polygon3D = getPointsByString(pointString)
+	var heights = [0.0, 1.0]
+	var mesh = {facets:[], points:[]}
+	addToPillarMesh(heights, mesh, [polygon3D])
+	var pillarMesh = getPillarMesh(heights, undefined, [polygon3D])
+	console.log('pillarMesh points')
+	console.log(pillarMesh.points)
+	console.log(pillarMesh.facets)
+	wedgeMesh([1.0], getUnitMatrix3D(), pillarMesh)
+	drawMesh(pillarMesh)
+}
+
 function writeLengths(characters, numberLength) {
 	var line = ''
 	document.writeln('<g font-family=freeserif,Palatino font-size="1000" font-weight="normal" id="group" style="fill:black;stroke:black;stroke-width:0.0">')
@@ -1404,9 +1431,10 @@ function createSVGTest() {
 //	testIntercircle()
 //	testJoin()
 //	testLength()
-	testLettering()
+//	testLettering()
 //	testLinkMap()
 //	testLoop()
+	testMatrix()
 //	testMeshBoolean()
 //	testMirrorJoin()
 //	testOutline()
