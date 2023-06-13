@@ -50,7 +50,7 @@ registry, statement, beforeX, beforeY, fromX, fromY, toX, toY, numberOfSides, in
 }
 
 function arcCenterRadius(centerX, centerY, radius, fromAngle, toAngle, numberOfSides, includeFrom, includeTo) {
-	return spiralCenterRadius([centerX, centerY], radius, fromAngle, toAngle, undefined, numberOfSides, includeFrom, includeTo)
+	return spiralCenterRadius([centerX, centerY], radius, fromAngle, toAngle, numberOfSides, undefined, includeFrom, includeTo)
 }
 
 function arcFromToAngle(registry, statement, fromX, fromY, toX, toY, angle, numberOfSides, includeFrom, includeTo) {
@@ -134,7 +134,7 @@ function ellipseFromToRadius(registry, statement, from, to, radius, numberOfSide
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
 	from.length = Math.max(2, from.length, to.length)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -159,7 +159,7 @@ function ellipseFromToRadius(registry, statement, from, to, radius, numberOfSide
 		return arc
 	}
 	var right = divide2DScalar([centerFrom[1], -centerFrom[0]], centerFromLength * Math.sqrt(centerFromLength))
-	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(Math.PI) / gDoublePi)
+	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(Math.PI) / gDoublePi - gClose)
 	var zAddition = null
 	if (from.length > 2) {
 		zAddition = (to[2] - from[2]) / numberOfArcSides
@@ -189,50 +189,6 @@ function ellipseToRadius(registry, statement, to, radius, numberOfSides, include
 	return ellipseFromToRadius(registry, statement, [undefined, undefined], to, radius, numberOfSides, false, includeTo)
 }
 
-function fillet(registry, statement, pointX, pointY, radius, numberOfSides, checkLength) {
-	return filletPoint(registry, statement, [pointX, pointY], radius, numberOfSides, checkLength)
-}
-
-function filletPoint(registry, statement, point, radius, numberOfSides, checkLength) {
-	checkLength = getValueByDefault(true, checkLength)
-	numberOfSides = getValueByDefault(gFillet.sides, numberOfSides)
-	radius = getValueByDefault(1.0, radius)
-	var variableMap = getVariableMapByStatement(statement.parent)
-	if (variableMap.has('_points')) {
-		var points = variableMap.get('_points')
-		if (points.length > 0) {
-			setUndefinedElementsToArray(point, points[points.length - 1])
-		}
-	}
-	setUndefinedElementsToValue(point, 0.0)
-	if (variableMap.has('_values')) {
-		var values = variableMap.get('_values')
-		values.push('filletTaggedPoints(' + point[0] + ',' + point[1] + ',' + radius + ',' + numberOfSides + ',' + checkLength + ')')
-	}
-	else {
-		noticeByList(['No values could be found for fillet in function.', statement])
-	}
-	return [point]
-}
-
-function filletTaggedPoints(registry, statement, pointX, pointY, radius, numberOfSides, checkLength) {
-	var variableMap = getVariableMapByStatement(statement.parent)
-	if (!variableMap.has('_points')) {
-		noticeByList(['No points could be found for fillet in function.', statement])
-		return [[]]
-	}
-	var points = variableMap.get('_points')
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		var point = points[pointIndex]
-		if (point.length > 1) {
-			if (point[0] == pointX && point[1] == pointY) {
-				addFilletedPointsByIndex(pointIndex, points, radius, numberOfSides, checkLength)
-				return [points.pop()]
-			}
-		}
-	}
-}
-
 //deprecated23
 function floatByKeyID(registry, statement, key, id) {
 	return floatByIDKey(registry, statement, id, key)
@@ -257,6 +213,63 @@ function getParabolicFrom(from, fromTo, levelStart, x, xMultiplier, zAddition) {
 		from[2] += zAddition * x
 	}
 	return from
+}
+
+function getSpreadsheetTable(registry, spreadsheetID, tableID) {
+	if (registry.spreadsheetMap == undefined) {
+		return undefined
+	}
+	if (!registry.spreadsheetMap.has(spreadsheetID)) {
+		return undefined
+	}
+	if (registry.spreadsheetTableMapMap == undefined) {
+		registry.spreadsheetTableMapMap = new Map()
+	}
+	var spreadsheetTableMap = undefined
+	if (registry.spreadsheetTableMapMap.has(spreadsheetID)) {
+		spreadsheetTableMap = registry.spreadsheetTableMapMap.get(spreadsheetID)
+	}
+	else {
+		var spreadsheetStatement = registry.spreadsheetMap.get(spreadsheetID)
+		spreadsheetTableMap = new Map()
+		var titleIndex = null
+		var rows = registry.spreadsheetMap.get(spreadsheetID)
+		var table = undefined
+		var tableNumber = 0
+		for (var spreadsheetRowIndex = 0; spreadsheetRowIndex < rows.length; spreadsheetRowIndex++) {
+			var row = rows[spreadsheetRowIndex]
+			if (row.length > 0) {
+				if (table == undefined) {
+					if (row[0] == '_table') {
+						table = {rows:[], headers:[]}
+						if (row.length > 1) {
+							spreadsheetTableMap.set(row[1], table)
+						}
+						else {
+							spreadsheetTableMap.set('table_' + tableNumber.toString(), table)
+							tableNumber++
+						}
+						titleIndex = spreadsheetRowIndex + 1
+					}
+				}
+				else {
+					if (row[0].startsWith('_end')) {
+						table = undefined
+					}
+					else {
+						if (spreadsheetRowIndex == titleIndex) {
+							table.headers = row
+						}
+						else {
+							table.rows.push(row)
+						}
+					}
+				}
+			}
+		}
+		registry.spreadsheetTableMapMap.set(spreadsheetID, spreadsheetTableMap)
+	}
+	return spreadsheetTableMap.get(tableID)
 }
 
 function insetsHeightAngle(height, overhangAngle, numberOfSegments) {
@@ -453,7 +466,7 @@ function joinPoints(registry, statement, sourcePoints, numberOfJoins, from, unti
 	until = getValueByDefault(3, until)
 	from = getArrayByValue(from)
 	from.length = until
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -477,7 +490,7 @@ function mirror(registry, statement, center, direction) {
 }
 
 function mirrorJoin(registry, statement, center, direction) {
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (!variableMap.has('_points')) {
 		noticeByList(['In mirror in function the variableMap does not have _points:', statement])
 		return [[]]
@@ -530,7 +543,7 @@ function parabolaFromToQuantity(registry, statement, from, to, quantity, levelSt
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
 	from.length = Math.max(2, from.length, to.length)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -552,8 +565,8 @@ function parabolaFromToQuantity(registry, statement, from, to, quantity, levelSt
 	}
 	var fromTo = getSubtractionArray(to, from, 3)
 	if (fromTo[0] == 0.0) {
-		noticeByList(['fromTo[0] is 0 in parabolaFromTo in function.', from, to, radius])
-		return arc
+		noticeByList(['fromTo[0] is 0 in parabolaFromTo in function.', from, to, quantity])
+		return []
 	}
 	var quantity = getValueByDefault(11, quantity)
 	if (quantity < 0.0) {
@@ -562,7 +575,7 @@ function parabolaFromToQuantity(registry, statement, from, to, quantity, levelSt
 	}
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in parabolaFromTo in function.', from, quantity, increments])
+		noticeByList(['quantityFloor is less than 1 in parabolaFromTo in function.', from, to, quantity])
 		return []
 	}
 	var properFraction = quantity - quantityFloor
@@ -616,7 +629,7 @@ function point(registry, statement, name, x, y, z) {
 	for (var argumentIndex = 0; argumentIndex < pointArgumentsLength; argumentIndex++) {
 		point[argumentIndex] = arguments[argumentIndex + 3]
 	}
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -628,8 +641,14 @@ function point(registry, statement, name, x, y, z) {
 	return point
 }
 
-function pointsByID(registry, statement, id) {
-	return getPointsHD(registry, getStatementByID(registry, statement, id))
+function pointsByID(registry, statement, id, x, y, z) {
+	var points = getPointsHD(registry, getStatementByID(registry, statement, id))
+	for (var point of points) {
+		for (var argumentIndex = 0; argumentIndex < arguments.length - 3; argumentIndex++) {
+			point[argumentIndex] += arguments[argumentIndex + 3]
+		}
+	}
+	return points
 }
 
 function rightByID(registry, statement, id) {
@@ -672,103 +691,28 @@ function setAttributeByID(registry, statement, key, id, value) {
 }
 
 function setAttributesRowTable(registry, statement, rowIndex) {
-	if (registry.spreadsheetMap == undefined) {
-		return
-	}
-	if (registry.spreadsheetMap.size == 0) {
-		return
-	}
-	var id = getVariableValue('spreadsheet_id', statement.parent)
-	if (id == undefined) {
-		for (id of registry.spreadsheetMap.keys()) {
-			break
-		}
-	}
-	setAttributesTable(registry, statement, id, rowIndex, getVariableValue('table_id', statement.parent))
+	var id = getVariableValue('spreadsheetID', statement.parent)
+	setAttributesTable(registry, statement, id, rowIndex, getVariableValue('tableID', statement.parent))
 }
 
 function setAttributesTable(registry, statement, id, rowIndex, tableID) {
-	if (registry.spreadsheetMap == undefined) {
+	var table = getSpreadsheetTable(registry, id, tableID)
+	if (table == undefined) {
 		return
-	}
-	if (!registry.spreadsheetMap.has(id)) {
-		return
-	}
-	if (registry.spreadsheetTableMapMap == undefined) {
-		registry.spreadsheetTableMapMap = new Map()
-	}
-	var spreadsheetTableMap = undefined
-	if (registry.spreadsheetTableMapMap.has(id)) {
-		spreadsheetTableMap = registry.spreadsheetTableMapMap.get(id)
-	}
-	else {
-		var spreadsheetStatement = registry.spreadsheetMap.get(id)
-		spreadsheetTableMap = new Map()
-		var titleIndex = null
-		var rows = registry.spreadsheetMap.get(id)
-		var table = undefined
-		var tableNumber = 0
-		for (var spreadsheetRowIndex = 0; spreadsheetRowIndex < rows.length; spreadsheetRowIndex++) {
-			var row = rows[spreadsheetRowIndex]
-			if (row.length > 0) {
-				if (table == undefined) {
-					if (row[0] == '_table') {
-						table = {rows:[], titles:[]}
-						if (row.length > 1) {
-							spreadsheetTableMap.set(row[1], table)
-						}
-						else {
-							spreadsheetTableMap.set(tableNumber.toString(), table)
-							tableNumber++
-						}
-						titleIndex = spreadsheetRowIndex + 1
-					}
-				}
-				else {
-					if (row[0].startsWith('_end')) {
-						table = undefined
-					}
-					else {
-						if (spreadsheetRowIndex == titleIndex) {
-							table.titles = row
-						}
-						else {
-							table.rows.push(row)
-						}
-					}
-				}
-			}
-		}
-		registry.spreadsheetTableMapMap.set(id, spreadsheetTableMap)
-	}
-	if (spreadsheetTableMap.size == 0) {
-		return
-	}
-	var table = undefined
-	if (tableID == undefined) {
-		for (table of spreadsheetTableMap.values()) {
-			break
-		}
-	}
-	else {
-		if (!spreadsheetTableMap.has(tableID)) {
-			return
-		}
-		table = spreadsheetTableMap.get(tableID)
 	}
 	if (rowIndex >= table.rows.length) {
 		return
 	}
 	var row = table.rows[rowIndex]
-	var titles = table.titles
-	if (titles.length < row.length) {
-		titles.length = row.length
+	var headers = table.headers
+	if (headers.length < row.length) {
+		headers.length = row.length
 	}
 	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
-		if (getIsEmpty(titles[columnIndex])) {
-			titles[columnIndex] = 'Column_' + getBaseAlphabet(columnIndex)
+		if (getIsEmpty(headers[columnIndex])) {
+			headers[columnIndex] = 'Column_' + getBaseAlphabet(columnIndex)
 		}
-		statement.attributeMap.set(titles[columnIndex], row[columnIndex])
+		statement.attributeMap.set(headers[columnIndex], row[columnIndex])
 	}
 }
 
@@ -804,7 +748,7 @@ function spiralBeforeFromTo(registry, statement, before, from, to, numberOfSides
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
 	from.length = Math.max(2, from.length, to.length)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 1) {
@@ -843,7 +787,7 @@ function spiralBeforeFromTo(registry, statement, before, from, to, numberOfSides
 	return arc
 }
 
-function spiralCenterRadius(center, radius, fromAngle, toAngle, toZ, numberOfSides, includeFrom, includeTo) {
+function spiralCenterRadius(center, radius, fromAngle, toAngle, numberOfSides, toZ, includeFrom, includeTo) {
 	center = getArrayByElements(center, 2)
 	radius = getValueByDefault(10.0, radius)
 	fromAngle = getValueByDefault(0.0, fromAngle) * gRadiansPerDegree
@@ -852,7 +796,7 @@ function spiralCenterRadius(center, radius, fromAngle, toAngle, toZ, numberOfSid
 	includeTo = getValueByDefault(true, includeTo)
 	var numberOfSides = getValueByDefault(24, numberOfSides)
 	var angleDifference = toAngle - fromAngle
-	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(angleDifference) / gDoublePi)
+	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(angleDifference) / gDoublePi - gClose)
 	var rotator = polarCounterclockwise(angleDifference / numberOfArcSides)
 	var centerFrom = polarRadius(fromAngle, radius)
 	var zAddition = null
@@ -884,7 +828,7 @@ function spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, 
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
 	from.length = Math.max(2, from.length, to.length)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -928,7 +872,7 @@ function spiralFromToAngle(registry, statement, from, to, angle, numberOfSides, 
 	var centerFrom = getSubtraction2D(from, center)
 	var centerFromLength = length2D(centerFrom)
 	multiply2DScalar(centerFrom, radius / centerFromLength)
-	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(angle) / gDoublePi)
+	var numberOfArcSides = Math.ceil(numberOfSides * Math.abs(angle) / gDoublePi - gClose)
 	var zAddition = null
 	if (from.length > 2) {
 		zAddition = (to[2] - from[2]) / numberOfArcSides
@@ -956,7 +900,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, counterclockw
 	to = getArrayByValue(to)
 	from = getArrayByValue(from)
 	from.length = Math.max(2, from.length, to.length)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -998,7 +942,7 @@ function spiralFromToRadius(registry, statement, from, to, radius, counterclockw
 	if (radius < 0.0) {
 		angle = gDoublePi - angle
 	}
-	var numberOfArcSides = Math.ceil(numberOfSides * angle / gDoublePi)
+	var numberOfArcSides = Math.ceil(numberOfSides * angle / gDoublePi - gClose)
 	if (counterclockwise) {
 		angle = -angle
 	}
@@ -1056,7 +1000,7 @@ function stepFromToBetween(registry, statement, from, to, along) {
 
 function stepsFromQuantityIncrement(registry, statement, from, quantity, increments, includeFrom) {
 	from = getArrayByValue(from)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -1118,7 +1062,7 @@ function stepsFromToAlong(registry, statement, from, to, alongs, includeFrom, in
 	alongs = getValueByDefault(0.5, alongs)
 	alongs = getArrayByValue(alongs)
 	from = getArrayByValue(from)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
@@ -1154,7 +1098,7 @@ function stepsFromToBetween(registry, statement, from, to, alongs) {
 
 function stepsFromToQuantity(registry, statement, from, to, quantity, includeFrom, includeTo) {
 	from = getArrayByValue(from)
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
