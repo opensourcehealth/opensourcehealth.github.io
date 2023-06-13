@@ -1,7 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
 var gIDCountMap = new Map()
-const gIDJoinWord = '_'
 
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
@@ -134,7 +133,7 @@ function getConcatenatedUniqueID(id, registry, statement) {
 		whileCount = gIDCountMap.get(id) + 1
 	}
 	for (; whileCount < gLengthLimit; whileCount++) {
-		var check = id + gIDJoinWord + whileCount.toString()
+		var check = id + '_' + whileCount.toString()
 		if (getIsIDUnique(check, registry, statement)) {
 			gIDCountMap.set(id, whileCount)
 			return check
@@ -397,9 +396,10 @@ function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
 }
 
 function getStatementID(registry, statement) {
+	var attributeMap = statement.attributeMap
 	var id = statement.tag
-	if (statement.attributeMap.has('id')) {
-		id = statement.attributeMap.get('id')
+	if (attributeMap.has('id')) {
+		id = attributeMap.get('id')
 		if (registry.idMap.has(id)) {
 			var previousStatement = registry.idMap.get(id)
 			if (registry.generatedIDSet.has(id)) {
@@ -408,15 +408,16 @@ function getStatementID(registry, statement) {
 				registry.idMap.set(id, statement)
 				return
 			}
-			id = statement.tag + gIDJoinWord + id
+			noticeByList(['Duplicate ID in getStatementID in statement, later IDs will be changed.', id, statement])
+			id = statement.tag + '_' + id
 		}
 		else {
 			registry.idMap.set(id, statement)
 			return id
 		}
 	}
-	if (statement.attributeMap.has('output')) {
-		var output = statement.attributeMap.get('output')
+	if (attributeMap.has('output')) {
+		var output = attributeMap.get('output')
 		if (getIsIDUnique(output, registry, statement)) {
 			return output
 		}
@@ -424,26 +425,26 @@ function getStatementID(registry, statement) {
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
-	if (statement.attributeMap.has('work')) {
-		id += gIDJoinWord + statement.attributeMap.get('work')
+	if (attributeMap.has('work')) {
+		id += '_' + attributeMap.get('work')
 	}
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
 	var parentMap = statement.parent.attributeMap
 	if (parentMap.has('id')) {
-		id += gIDJoinWord + parentMap.get('id')
+		id += '_' + parentMap.get('id')
 	}
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
-	for (var key of statement.attributeMap.keys(key)) {
-		id += gIDJoinWord + key
-		if (getIsIDUnique(id, registry, statement)) {
-			return id
-		}
-	}
 	return getConcatenatedUniqueID(id, registry, statement)
+}
+
+function getTagKeys() {
+	var tagKeys = Array.from(gTagCenterMap.keys())
+	tagKeys.sort()
+	return tagKeys
 }
 
 function getTokens(delimeter, searchStrings) {
@@ -468,23 +469,16 @@ function getUniqueID(id, registry, statement) {
 }
 
 function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
-	var attributeMap = statement.attributeMap
-	var value = getValueByKeyTag(attributeMap, key, tag)
-	if (value != null) {
+	var value = getAttributeValue(key, statement)
+	if (value != undefined) {
 		return value
-	}
-	if (attributeMap.has(key)) {
-		value = attributeMap.get(key)
-		if (value.length > 0) {
-			return value
-		}
 	}
 	var defaultMap = registry.idMap.get('_default').attributeMap
 	var value = getValueByKeyTag(defaultMap, key, tag)
-	if (value != null) {
+	if (value != undefined) {
 		return value
 	}
-	if (defaultValue == null || defaultValue == undefined) {
+	if (defaultValue == undefined) {
 		return undefined
 	}
 	var defaultString = defaultValue.toString()
@@ -504,15 +498,11 @@ function getValueByKeyTag(attributeMap, key, tag) {
 		for (var keyValueString of keyValueStrings) {
 			var keyValue = keyValueString.split(':')
 			if (keyValue[0].trim() == key) {
-				var value = keyValue[1].trim()
-				if (value.length > 0) {
-					return value
-				}
-				return null
+				return keyValue[1].trim()
 			}
 		}
 	}
-	return null
+	return undefined
 }
 
 function getWorkStatement(registry, statement) {
@@ -524,7 +514,7 @@ function getWorkStatementByKey(key, registry, statement) {
 	if (!attributeMap.has(key)) {
 		return undefined
 	}
-	return registry.idMap.get(attributeMap.get(key))
+	return registry.idMap.get(statement.attributeMap.get(key))
 }
 
 function getWorkStatements(registry, statement) {
@@ -534,6 +524,9 @@ function getWorkStatements(registry, statement) {
 		workID = workID.trim()
 		if (registry.idMap.has(workID)) {
 			workStatements.push(registry.idMap.get(workID))
+		}
+		else {
+			noticeByList(['Could not find workStatement in getWorkStatements in statement.', workID, statement])
 		}
 	}
 	return workStatements
@@ -546,17 +539,16 @@ function initializeProcessors(processors) {
 	}
 }
 
-function processDescendantsByTagMap(registry, rootStatement, tagMap) {
+function processRootStatementByTagMap(registry, rootStatement, tagMap) {
 	var descendants = [rootStatement]
 	addToDescendantsInsideFirst(descendants, rootStatement)
 	var missingProcessorSet = new Set()
-	for (var statement of descendants) {
-		processStatementByTagMap(missingProcessorSet, registry, statement, tagMap)
-	}
+	processStatementsByTagMap(missingProcessorSet, registry, descendants, gTagCenterMap)
 	missingProcessorSet.delete('default')
 	missingProcessorSet.delete('layer')
 	missingProcessorSet.delete('license')
 	missingProcessorSet.delete('svg')
+	missingProcessorSet.delete('xml')
 	var missingProcessors = []
 	for (var element of missingProcessorSet) {
 		if (!element.startsWith('_')) {
@@ -575,12 +567,14 @@ function processDescendantsByTagMap(registry, rootStatement, tagMap) {
 	}
 }
 
-function processStatementByTagMap(missingProcessorSet, registry, statement, tagMap) {
-	if (tagMap.has(statement.tag)) {
-		tagMap.get(statement.tag).processStatement(registry, statement)
-	}
-	else {
-		missingProcessorSet.add(statement.tag)
+function processStatementsByTagMap(missingProcessorSet, registry, statements, tagMap) {
+	for (var statement of statements) {
+		if (tagMap.has(statement.tag)) {
+			tagMap.get(statement.tag).processStatement(registry, statement)
+		}
+		else {
+			missingProcessorSet.add(statement.tag)
+		}
 	}
 }
 
