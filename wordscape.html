@@ -24,7 +24,7 @@
 <tr>
 <td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
 <td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
-<td><select hidden="true"></select><td>
+<td><button hidden="true" id="downloadCanvasButtonID" onclick="downloadCanvas()" type="button">Download Canvas</button><td>
 </tr>
 <tr>
 <td><select hidden="true" id="loadASessionID" onchange ="loadASessionChanged()"></select><td>
@@ -141,10 +141,8 @@ function updateWordArea(wordString) {
 		}
 	}
 	createDefault(registry, svgStatement)
-	descendants = [svgStatement]
-	addToDescendantsInsideFirst(descendants, svgStatement)
 //	var before = new Date().getTime()
-	processDescendantsByTagMap(registry, svgStatement, gTagCenterMap)
+	processRootStatementByTagMap(registry, svgStatement, gTagCenterMap)
 //	console.log('Execution time')
 //	console.log(new Date().getTime() - before)
 	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
