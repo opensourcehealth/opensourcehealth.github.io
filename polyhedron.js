@@ -269,16 +269,15 @@ function addPointsToFacets(mesh, segmentMap) {
 }
 
 function addPointsToIndexSet(pointIndexSet, points, polygons) {
-	if (polygons != null) {
-		for (var polygon of polygons) {
-			var boundingBox = getBoundingBox(polygon)
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (isPointInsideBoundingBoxOrClose(boundingBox, point)) {
-					if (getIsPointInsidePolygonOrClose(point, polygon)) {
-						pointIndexSet.add(pointIndex)
-					}
-				}
+	if (getIsEmpty(polygons)) {
+		return
+	}
+	for (var polygon of polygons) {
+		var boundingBox = getBoundingBox(polygon)
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			var point = points[pointIndex]
+			if (isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon)) {
+				pointIndexSet.add(pointIndex)
 			}
 		}
 	}
@@ -709,16 +708,16 @@ function getConcaveFacet(facet, isClockwise, xyPoints) {
 				}
 			}
 		}
-		else {
-			if (centerBeginLength == 0.0) {
-				var polygon = getPolygonByFacet(facet, xyPoints)
-				noticeByList(['Identical points, centerBeginLength = 0.0 in polyhedron/getConcaveFacet', polygon, beginPoint, centerPoint])
-			}
-			if (centerEndLength == 0.0) {
-				var polygon = getPolygonByFacet(facet, xyPoints)
-				noticeByList(['Identical points, centerEndLength = 0.0 in polyhedron/getConcaveFacet', polygon, centerPoint, endPoint])
-			}
-		}
+//		else {
+//			if (centerBeginLength == 0.0) {
+//				var polygon = getPolygonByFacet(facet, xyPoints)
+//				noticeByList(['Identical points, centerBeginLength = 0.0 in polyhedron/getConcaveFacet', polygon, beginPoint, centerPoint])
+//			}
+//			if (centerEndLength == 0.0) {
+//				var polygon = getPolygonByFacet(facet, xyPoints)
+//				noticeByList(['Identical points, centerEndLength = 0.0 in polyhedron/getConcaveFacet', polygon, centerPoint, endPoint])
+//			}
+//		}
 	}
 	return null
 }
@@ -1085,6 +1084,18 @@ function getIsInStrata(strata, z) {
 		}
 	}
 	return true
+}
+
+function getIsInStratas(stratas, z) {
+	if (getIsEmpty(stratas)) {
+		return true
+	}
+	for (var strata of stratas) {
+		if (getIsInStrata(strata, z)) {
+			return true
+		}
+	}
+	return false
 }
 
 function getIsPolygonInStratas(polygon, stratas) {
@@ -1810,13 +1821,9 @@ function getSlicePolygonsMapByMesh(mesh) {
 	return xyPolygonsMap
 }
 
-
-
-
 function getSplitFacet(bisector, facet, vertexIndex, xyPoints) {
 	var distanceExtras = []
 	var polygon = getPolygonByFacet(facet, xyPoints)
-	var doublePolygonArea = Math.abs(getDoublePolygonArea(polygon))
 	var point = polygon[vertexIndex]
 	for (var extraIndex = 2; extraIndex < facet.length - 1; extraIndex++) {
 		var checkIndex = (vertexIndex + extraIndex) % facet.length
@@ -2101,7 +2108,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 	}
 	var joinedMesh = meshes[0]
 	if (!getIsEmpty(matrices)) {
-		joinedMesh.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), joinedMesh.points)
+		joinedMesh.points = get3DsBy3DMatrix(matrix3D, joinedMesh.points)
 	}
 	for (var meshesIndex = 1; meshesIndex < meshes.length; meshesIndex++) {
 		var otherMesh = meshes[meshesIndex]
@@ -2112,7 +2119,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 			for (var matrix of matrices) {
 				if (!isUnitMatrix(matrix)) {
 					var otherMeshCopy = getMeshCopy(otherMesh)
-					otherMeshCopy.points = get3DsBy3DMatrix(getInverseRotation3D(matrix3D), otherMeshCopy.points)
+					otherMeshCopy.points = get3DsBy3DMatrix(matrix3D, otherMeshCopy.points)
 					transform2DOr3DPoints(matrix, otherMeshCopy.points)
 					addMeshToJoinedMesh(joinedMesh, otherMeshCopy)
 				}
@@ -2120,7 +2127,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 		}
 	}
 	if (!getIsEmpty(matrices)) {
-		joinedMesh.points = get3DsBy3DMatrix(matrix3D, joinedMesh.points)
+		joinedMesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), joinedMesh.points)
 	}
 }
 
@@ -2181,6 +2188,47 @@ function removeArrowFromMap(arrows, arrowsMap, key) {
 	}
 	else {
 		arrows.shift()
+	}
+}
+
+function removePointsFromIndexSet(pointIndexSet, points, polygons) {
+	for (var polygon of polygons) {
+		var boundingBox = getBoundingBox(polygon)
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			var point = points[pointIndex]
+			if (isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon)) {
+				pointIndexSet.delete(pointIndex)
+			}
+		}
+	}
+}
+
+function removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points) {
+	if (antiregion == undefined) {
+		return
+	}
+	removePointsFromIndexSet(pointIndexSet, points, antiregion.polygons)
+
+	if (antiregion.pointStringSet.size > 0) {
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			if (antiregion.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
+				pointIndexSet.delete(pointIndex)
+			}
+		}
+	}
+
+	if (antiregion.equations.length == 0) {
+		return
+	}
+	var variableMap = getVariableMapByStatement(statement)
+
+	for (var equation of antiregion.equations) {
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			variableMap.set('point', points[pointIndex].toString())
+			if (getValueByEquation(registry, statement, equation)) {
+				pointIndexSet.delete(pointIndex)
+			}
+		}
 	}
 }
 
