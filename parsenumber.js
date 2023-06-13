@@ -5,6 +5,7 @@ const gClose = 0.0000001
 const gCloseSquared = gClose * gClose
 const gDegreesPerRadian = 180.0 / Math.PI
 const gDoublePi = Math.PI + Math.PI
+const gFalseSet = new Set(['false', '0'])
 const gHashMultiplier = 1.0 / 65537
 const gHashRemainderMultiplier = (1.0 - (65536.0 * gHashMultiplier)) / 65536.0
 const gHalfClose = 0.5 * gClose
@@ -16,6 +17,8 @@ const gOneMinusClose = 1.0 - gClose
 const gQuarterCloseSquared = 0.25 * gCloseSquared
 const gRadiansPerDegree = Math.PI / 180.0
 const gRecursionLimit = 1000
+const gSVGExceptionSet = new Set(['height', 'width'])
+const gTrueSet = new Set(['true', '1'])
 const gXYZMap = new Map([['x', '1,0,0'], ['y', '0,1,0'], ['z', '0,0,1']])
 
 function addMatrices3DByWord(matrices3D, registry, statement, word) {
@@ -92,20 +95,21 @@ function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagS
 	}
 }
 
+function getAlignment(key, registry, statement, tag) {
+	var alignmentTable = new Map([['left', 0.0], ['start', 0.0], ['center', 0.5], ['middle', 0.5], ['end', 1.0], ['right', 1.0]])
+	var value = getValueByKeyDefault('0.0', key, registry, statement, tag)
+	if (alignmentTable.has(value)) {
+		value = alignmentTable.get(value)
+	}
+	return getFloatByStatementValue(key, registry, statement, value)
+}
+
 function getAttributeFloat(key, statement) {
 	return parseFloat(getAttributeValue(key, statement))
 }
 
-function getAttributeFloatByDefault(defaultValue, key, statement) {
-	var value = getAttributeValue(key, statement)
-	if (value == undefined) {
-		return defaultValue
-	}
-	return parseFloat(value)
-}
-
 function getAttributeValue(key, statement) {
-	for (var parentLevel = 0; parentLevel < gLengthLimit; parentLevel++) {
+	for (var parentLevel = 0; parentLevel < gRecursionLimit; parentLevel++) {
 		if (statement.attributeMap != undefined) {
 			if (statement.attributeMap.has(key)) {
 				return statement.attributeMap.get(key)
@@ -114,6 +118,11 @@ function getAttributeValue(key, statement) {
 		statement = statement.parent
 		if (statement == undefined) {
 			return undefined
+		}
+		if (statement.tag == 'svg') {
+			if (gSVGExceptionSet.has(key)) {
+				return undefined
+			}
 		}
 	}
 	return undefined
@@ -135,7 +144,8 @@ function getBaseAlphabet(number) {
 }
 
 function getBooleanByDefault(defaultValue, key, registry, statement, tag) {
-	return getBooleanByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
+	var boolean = getValueByKeyDefault(defaultValue, key, registry, statement, tag)
+	return getValueByDefault(defaultValue, getBooleanByStatementValue(key, registry, statement, boolean))
 }
 
 function getBooleanByStatement(key, registry, statement) {
@@ -146,36 +156,30 @@ function getBooleanByStatement(key, registry, statement) {
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
-	if (value == false || value == 0) {
+	value = value.trim()
+	if (gFalseSet.has(value)) {
 		return false
 	}
-	if (value == true || value == 1) {
+	if (gTrueSet.has(value)) {
 		return true
 	}
-	value = value.trim()
 	if (value.length == 0) {
 		return undefined
 	}
-	if (value == 'false' || value == '0') {
-		return false
-	}
-	if (value == 'true' || value == '1') {
-		return true
-	}
 	var boolean = getValueByEquation(registry, statement, value)
+	if (boolean == undefined) {
+		return undefined
+	}
 	statement.attributeMap.set(key, boolean.toString())
 	return boolean
 }
 
-function getBooleanByString(text) {
-	text = text.trim()
-	if (text.length == 0) {
-		return undefined
-	}
-	if (text == 'false' || text == '0') {
+function getBooleanByString(value) {
+	value = value.trim()
+	if (gFalseSet.has(value)) {
 		return false
 	}
-	if (text == 'true' || text == '1') {
+	if (gTrueSet.has(value)) {
 		return true
 	}
 	return undefined
@@ -403,7 +407,7 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 			values.push(token)
 		}
 	}
-	var variableMap = getVariableMapByStatement(statement.parent)
+	var variableMap = getVariableMapByStatement(statement)
 	var update = false
 	variableMap.set('_points', points)
 	variableMap.set('_values', values)
@@ -485,7 +489,7 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 				var equationValue = getValueByEquation(registry, statement, floatWord)
 				if (getIsEmpty(equationValue)) {
 					var noticeDescription = 'No equationValue could be found for getFloatsUpdateByStatementValue in parsenumber.'
-					noticeByList([noticeDescription, floatWord, value, statement])
+					noticeByList([noticeDescription, floatWord, floatWords.slice(0), value, statement])
 					floats.push(undefined)
 				}
 				else {
@@ -529,10 +533,20 @@ function getHashInt(multiplier, text) {
 }
 
 function getHeights(registry, statement, tag) {
-	var heights = getFloatsByDefault([0.0, 1.0], 'heights', registry, statement, tag)
+	//deprecated24
+	var key = 'height'
+	if (statement.attributeMap.has('heights') && !statement.attributeMap.has('height')) {
+		key = 'heights'
+	}
+	var heights = getFloatsByDefault([1.0], key, registry, statement, tag)
 	if (heights.length == 1) {
-		heights.splice(0, 0, 0.0)
-		statement.attributeMap.set('heights', heights.toString())
+		if (heights[0] > 0.0) {
+			heights.splice(0, 0, 0.0)
+		}
+		else {
+			heights.push(0.0)
+		}
+		statement.attributeMap.set(key, heights.toString())
 	}
 	replaceElements(heights, undefined, 0.0)
 	return heights
@@ -603,8 +617,13 @@ function getIntsUpdateByStatementValue(registry, statement, value) {
 }
 
 function getMatrices3D(registry, statement, tag) {
-	if (statement.attributeMap.has('heights')) {
-		var heights = getFloatsUpdateByStatementValue(registry, statement, statement.attributeMap.get('heights'))[0]
+	//deprecated24
+	var key = 'height'
+	if (statement.attributeMap.has('heights') && !statement.attributeMap.has('height')) {
+		key = 'heights'
+	}
+	if (statement.attributeMap.has(key)) {
+		var heights = getFloatsUpdateByStatementValue(registry, statement, statement.attributeMap.get(key))[0]
 		if (!getIsEmpty(heights)) {
 			return getMatrices3DByHeights(heights, registry, statement)
 		}
@@ -613,7 +632,12 @@ function getMatrices3D(registry, statement, tag) {
 }
 
 function getMatrices3DAndZeroHeight(registry, statement, tag) {
-	if (statement.attributeMap.has('heights')) {
+	//deprecated24
+	var key = 'height'
+	if (statement.attributeMap.has('heights') && !statement.attributeMap.has('height')) {
+		key = 'heights'
+	}
+	if (statement.attributeMap.has(key)) {
 		var heights = getHeights(registry, statement, tag)
 		if (!getIsEmpty(heights)) {
 			return getMatrices3DByHeights(heights, registry, statement)
@@ -691,7 +715,7 @@ function getMatrix2D(registry, statement) {
 function getMatrix2DsByChildren(children, registry) {
 	var matrix2DsByChildren = []
 	for (var child of children) {
-		matrix2Ds = getPointsByTag('matrix2Ds', registry, child, 'matrix2D')
+		matrix2Ds = getPointsByTag('matrix2D', registry, child, 'matrix2D')
 		matrix2DsByChildren = getPushArray(matrix2DsByChildren, matrix2Ds)
 	}
 	return matrix2DsByChildren
@@ -759,7 +783,7 @@ function getMatrix3D(registry, statement) {
 function getMatrix3DsByChildren(children, registry) {
 	var matrix3DsByChildren = []
 	for (var child of children) {
-		matrix3Ds = getPointsByTag('matrix3Ds', registry, child, 'matrix3D')
+		matrix3Ds = getPointsByTag('matrix3D', registry, child, 'matrix3D')
 		matrix3DsByChildren = getPushArray(matrix3DsByChildren, matrix3Ds)
 	}
 	return matrix3DsByChildren
@@ -777,11 +801,8 @@ function getPath2DByStatement(registry, statement) {
 }
 
 function getPoint3DByStatement(key, registry, statement) {
-	if (!statement.attributeMap.has(key)) {
-		return undefined
-	}
-	var value = statement.attributeMap.get(key)
-	if (value.length == 0) {
+	var value = getAttributeValue(key, statement)
+	if (getIsEmpty(value)) {
 		return undefined
 	}
 	var update = false
@@ -869,15 +890,19 @@ function getPointsByValue(registry, statement, value) {
 }
 
 function getPointsHD(registry, statement) {
-	var points = getPointsHDByStatementOnly(registry, statement)
-	if (points != null) {
-		return points
-	}
-	var workStatement = getWorkStatement(registry, statement)
-	if (workStatement == undefined) {
-		return null
-	}
-	return getPointsHDByStatementOnly(registry, workStatement)
+	return getPointsHDByStatementOnly(registry, statement)
+
+//deprecated 24
+//	var points = getPointsHDByStatementOnly(registry, statement)
+//	if (points != null) {
+//		return points
+//	}
+//	var workStatement = getWorkStatement(registry, statement)
+//	if (workStatement == undefined) {
+//		return null
+//	}
+//	return getPointsHDByStatementOnly(registry, workStatement)
+
 }
 
 function getPointsHDByStatementOnly(registry, statement) {
@@ -912,6 +937,13 @@ function getRotated32Bit(a, rotation)
 function getRotatedLow24Bit(a, rotation)
 {
 	return (a << 8) >>> (8 + rotation) | (a << (-rotation & 31)) >>> 8 | (a >>> 24) << 24
+}
+
+function getSignificant(decimalPlaces, value) {
+	if (Math.abs(value) >= 10.0) {
+		return value.toFixed(decimalPlaces)
+	}
+	return value.toFixed(Math.max(decimalPlaces, 1))
 }
 
 function getString(value) {
