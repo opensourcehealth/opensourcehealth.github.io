@@ -8,33 +8,33 @@ function drawAnalysis(control, viewer) {
 	var y = 2 * viewBroker.textSpace
 	setTextContext(context)
 	context.textAlign = 'left'
-	drawArray(context, 'X: Y: Z:'.split(' '), viewBroker.textSpace, viewBroker.analysisCharacterBegin, y)
+	drawArrays(context, 'X: Y: Z:'.split(' '), viewBroker.textSpace, viewBroker.analysisCharacterBegin, y)
 	context.fillText('Size', viewBroker.analysisSizeBegin, viewBroker.textSpace)
-	drawNumericArray(context, size, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
+	drawNumericArrays(context, size, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
 	context.fillText('Lower', viewBroker.analysisLowerBegin, viewBroker.textSpace)
-	drawNumericArray(context, meshBoundingBox[0], viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
+	drawNumericArrays(context, meshBoundingBox[0], viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
 	context.fillText('Upper', viewBroker.analysisUpperBegin, viewBroker.textSpace)
-	drawNumericArray(context, meshBoundingBox[1], viewBroker.textSpace, viewBroker.analysisUpperBegin, y)
+	drawNumericArrays(context, meshBoundingBox[1], viewBroker.textSpace, viewBroker.analysisUpperBegin, y)
 }
 
 function drawGrid(boundingBox, canvasRotationMatrix, context, viewer) {
+	var heightMinusOver = getHeightMinusOver(viewer)
+	var gap = getIntegerStep(0.2 * heightMinusOver)
 	var directionIndex = getMatrixDirectionIndex(viewer.rotationMatrix)
 	var halfDirectionIndex = Math.floor(directionIndex / 2)
 	var xDimension = [2, 0, 0][halfDirectionIndex]
 	var yDimension = [1, 2, 1][halfDirectionIndex]
 	var zDimension = [0, 1, 2][halfDirectionIndex]
-	var heightMinusOver = 1.8 * viewBroker.halfHeightMinus / viewer.scale / viewBroker.viewMesh.zoomControl.value
-	var step = getIntegerStep(0.2 * heightMinusOver)
-	var directionXOver = -viewer.centerOffset[xDimension] / step
-	var directionYOver = -viewer.centerOffset[yDimension] / step
-	heightMinusOver /= step
-	var halfStep = 0.5 * step
-	var floorX = step * Math.floor(directionXOver - heightMinusOver)
-	var ceilX = step * Math.ceil(directionXOver + heightMinusOver)
-	var ceilXPlus = ceilX + halfStep
-	var floorY = step * Math.floor(directionYOver - heightMinusOver)
-	var ceilY = step * Math.ceil(directionYOver + heightMinusOver)
-	var ceilYPlus = ceilY + halfStep
+	var directionXOver = -viewer.centerOffset[xDimension] / gap
+	var directionYOver = -viewer.centerOffset[yDimension] / gap
+	heightMinusOver /= gap
+	var halfGap = 0.5 * gap
+	var floorX = gap * Math.floor(directionXOver - heightMinusOver)
+	var ceilX = gap * Math.ceil(directionXOver + heightMinusOver)
+	var ceilXPlus = ceilX + halfGap
+	var floorY = gap * Math.floor(directionYOver - heightMinusOver)
+	var ceilY = gap * Math.ceil(directionYOver + heightMinusOver)
+	var ceilYPlus = ceilY + halfGap
 	if (viewBroker.viewMesh.colorControl.selectedState) {
 		context.fillStyle = ['#b06060', '#e07070', '#60b060', '#70e070', '#6060b0', '#7070e0'][directionIndex]
 	}
@@ -42,7 +42,7 @@ function drawGrid(boundingBox, canvasRotationMatrix, context, viewer) {
 		context.fillStyle = '#c0c0c0'
 	}
 	var z = -viewer.centerOffset[zDimension]
-	for (var x = floorX; x < ceilXPlus; x += step) {
+	for (var x = floorX; x < ceilXPlus; x += gap) {
 		var bottom = [z, z, z]
 		bottom[xDimension] = x
 		bottom[yDimension] = floorY
@@ -53,7 +53,7 @@ function drawGrid(boundingBox, canvasRotationMatrix, context, viewer) {
 		top = get3DBy3DMatrix(canvasRotationMatrix, top)
 		drawOutsetLine(bottom, context, top, 1)
 	}
-	for (var y = floorY; y < ceilYPlus; y += step) {
+	for (var y = floorY; y < ceilYPlus; y += gap) {
 		var left = [z, z, z]
 		left[xDimension] = floorX
 		left[yDimension] = y
@@ -70,33 +70,54 @@ function drawMesh(control, viewer) {
 	var mesh = viewer.mesh
 	var context = viewBroker.context
 	var viewMesh = viewBroker.viewMesh
+
 	if (viewBroker.type.indexOf('T') != -1) {
 		if (viewer.triangleMesh == null) {
 			viewer.triangleMesh = getTriangleMesh(mesh)
 		}
 		mesh = viewer.triangleMesh
 	}
+
+	var height = viewBroker.canvas.height
+	setTextContext(context)
+	context.textAlign = 'left'
+	var gridSpacingBox = [[height, height - viewBroker.doubleTextSpace], [viewBroker.canvas.width, height]]
+	clearBoundingBox(gridSpacingBox, context)
+
+	if (viewMesh.gridControl.selectedState) {
+		var x = viewBroker.analysisCharacterBegin
+		var y = height - viewBroker.textControlLift
+		var text = 'Grid Spacing:'
+		context.fillText(text, x, y)
+		drawNumericArray(context, getIntegerStep(0.2 * getHeightMinusOver(viewer)), x + getTextLength(text + ' ') * viewBroker.textHeight, y)
+	}
+
 	var boundingBox = control.boundingBox
 	var facets = mesh.facets
 	var zPolygons = []
 	var canvasRotationMatrix = getCanvasRotationMatrix(viewer)
 	clearBoundingBoxClip(boundingBox, context)
-	context.strokeStyle = 'black'
 	var canvasPoints = get3DsBy3DMatrix(canvasRotationMatrix, mesh.points)
+
 	if (viewMesh.gridControl.selectedState) {
 		drawGrid(boundingBox, canvasRotationMatrix, context, viewer)
 	}
+
 	context.fillStyle = '#e0e0e0'
+
 	if (viewBroker.type[0] == 'S') {
 		context.lineWidth = 2.0
 	}
 	else {
 		context.lineWidth = 1.0
 	}
+
 	if (getIsSlice(viewMesh)) {
 		drawSlice(canvasPoints, control, mesh, viewer)
+		context.restore()
 		return
 	}
+
 	for (var facet of facets) {
 		var zPolygon = [new Array(facet.length), facet]
 		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
@@ -104,7 +125,7 @@ function drawMesh(control, viewer) {
 		}
 		zPolygon[0].sort(compareNumberDescending)
 		if (viewBroker.type[0] == 'S') {
-			if (getDoublePolygonArea(getPolygonByFacet(facet, canvasPoints)) > 0.0) {
+			if (getIsClockwise(getPolygonByFacet(facet, canvasPoints))) {
 				zPolygons.push(zPolygon)
 			}
 		}
@@ -112,7 +133,9 @@ function drawMesh(control, viewer) {
 			zPolygons.push(zPolygon)
 		}
 	}
+
 	zPolygons.sort(compareArrayAscending)
+
 	for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
 		context.beginPath()
 		var facet = zPolygons[zPolygonIndex][1]
@@ -141,6 +164,7 @@ function drawMesh(control, viewer) {
 			context.fill()
 		}
 	}
+
 	context.restore()
 }
 
@@ -191,9 +215,17 @@ function getCanvasRotationMatrix(viewer) {
 }
 
 function getCenterRotationMatrix(viewer) {
-	var zoomScalePoint = getMultiplication3DScalar(viewer.scalePoint, viewBroker.viewMesh.zoomControl.value)
+	var zoomScalePoint = getMultiplication3DScalar(viewer.scalePoint, getExponentialZoom())
 	var scaleCenterMatrix = getMultiplied3DMatrix(getMatrix3DByScale3D(zoomScalePoint), getMatrix3DByTranslate(viewer.centerOffset))
 	return getMultiplied3DMatrix(viewer.rotationMatrix, scaleCenterMatrix)
+}
+
+function getExponentialZoom() {
+	return Math.pow(10.0, viewBroker.viewMesh.zoomControl.value)
+}
+
+function getHeightMinusOver(viewer) {
+	return 1.8 * viewBroker.halfHeightMinus / viewer.scale / getExponentialZoom()
 }
 
 function getIsSlice(viewMesh) {
@@ -265,14 +297,14 @@ function mouseDownSwivel(control, event, viewer) {
 		setTextContext(context)
 		context.textAlign = 'left'
 		var y = 2 * viewBroker.textSpace + viewBroker.analysisBottom
-		drawArray(context, 'X: Y: Z:'.split(' '), viewBroker.textSpace, viewBroker.analysisCharacterBegin, y)
+		drawArrays(context, 'X: Y: Z:'.split(' '), viewBroker.textSpace, viewBroker.analysisCharacterBegin, y)
 		context.fillText('Mouse', viewBroker.analysisLowerBegin, viewBroker.textSpace + viewBroker.analysisBottom)
-		drawNumericArray(context, mousePoint, viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
+		drawNumericArrays(context, mousePoint, viewBroker.textSpace, viewBroker.analysisLowerBegin, y)
 		if (viewMesh.choiceControl.last != undefined) {
 			context.fillText('Last', viewBroker.analysisSizeBegin, viewBroker.textSpace + viewBroker.analysisBottom)
-			drawNumericArray(context, viewMesh.choiceControl.last, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
+			drawNumericArrays(context, viewMesh.choiceControl.last, viewBroker.textSpace, viewBroker.analysisSizeBegin, y)
 			context.fillText('Change', viewBroker.analysisUpperBegin, viewBroker.textSpace + viewBroker.analysisBottom)
-			drawNumericArray(context, change, viewBroker.textSpace, viewBroker.analysisUpperBegin, y)
+			drawNumericArrays(context, change, viewBroker.textSpace, viewBroker.analysisUpperBegin, y)
 		}
 		viewMesh.choiceControl.last = mousePoint
 		return
@@ -485,6 +517,9 @@ function ViewMesh() {
 		for (var intervalIndex = 0; intervalIndex < intervals.length; intervalIndex++) {
 			intervals[intervalIndex] = Math.round(intervals[intervalIndex])
 		}
+		this.controlBoundingBox = [[viewBroker.controlWidth, viewBroker.controlWidth], [viewBroker.heightMinus, viewBroker.heightMinus]]
+		viewMesh.meshControl = {boundingBox:this.controlBoundingBox, draw:drawMesh, mouseDown:mouseDownSwivel}
+		controls.push(viewMesh.meshControl)
 		controls.push({boundingBox:[[0, 0], [intervals[0], viewBroker.controlWidth]], mouseDown:mouseDownAlign, text:'Align'})
 		controls.push(
 		{boundingBox:[[intervals[0], 0], [intervals[1], viewBroker.controlWidth]], mouseDown:mouseDownStepTurn, text:'Step Turn'})
@@ -496,15 +531,12 @@ function ViewMesh() {
 		var analysisControl = {boundingBox:viewBroker.analysisBoundingBox, draw:drawAnalysis}
 		controls.push(analysisControl)
 		viewMesh.inspectBoundingBox = [[height, viewBroker.analysisBottom], [viewBroker.canvas.width, height]]
-		var controlBoundingBox = [[viewBroker.controlWidth, viewBroker.controlWidth], [viewBroker.heightMinus, viewBroker.heightMinus]]
-		viewMesh.meshControl = {boundingBox:controlBoundingBox, draw:drawMesh, mouseDown:mouseDownSwivel}
-		controls.push(viewMesh.meshControl)
 		var sliceBoundingBox = [[0, viewBroker.controlWidth], [viewBroker.controlWidth, viewBroker.heightMinus]]
 		viewMesh.sliceControl = getVerticalSlider(sliceBoundingBox, 0.0, 'S', 1.0)
 		viewMesh.sliceControl.controlChanged = drawMeshByViewer
 		controls.push(viewMesh.sliceControl)
 		var zoomBoundingBox = [[viewBroker.heightMinus, viewBroker.controlWidth], [height, viewBroker.heightMinus]]
-		viewMesh.zoomControl = getVerticalSlider(zoomBoundingBox, 1.0, 'Z', 5.0)
+		viewMesh.zoomControl = getVerticalSlider(zoomBoundingBox, 0.0, 'Z', 1.0)
 		viewMesh.zoomControl.controlChanged = drawMeshByViewer
 		controls.push(viewMesh.zoomControl)
 		viewMesh.choiceControl = getChoice([[0, viewBroker.heightMinus], [intervals[2], height]], ['Inspect', 'Move', 'Swivel'], 2)
