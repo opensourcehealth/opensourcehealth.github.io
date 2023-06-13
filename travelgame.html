@@ -105,9 +105,7 @@ function updateWordArea(wordString) {
 		getStatementByParentTag(new Map(), 0, xmlStatement, 'terrainViewer')
 	}
 	createDefault(registry, xmlStatement)
-	descendants = [xmlStatement]
-	addToDescendantsInsideFirst(descendants, xmlStatement)
-	processDescendantsByTagMap(registry, xmlStatement, gTagCenterMap)
+	processRootStatementByTagMap(registry, xmlStatement, gTagCenterMap)
 	var xmlLines = getPassthroughLinesByStatement('xml', xmlStatement)
 	var joinWord = getJoinWord()
 	var xmlString = xmlLines.join(joinWord)
