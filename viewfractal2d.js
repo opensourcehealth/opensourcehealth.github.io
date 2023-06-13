@@ -58,14 +58,14 @@ function drawNumberDisplay(control, viewer) {
 	if (control.decimalPlaces != undefined) {
 		decimalPlaces = control.decimalPlaces
 	}
-	drawNumericArray(context, control.numbers, viewBroker.textSpace, x, boundingBox[0][1] + viewBroker.textSpace, decimalPlaces)
+	drawNumericArrays(context, control.numbers, viewBroker.textSpace, x, boundingBox[0][1] + viewBroker.textSpace, decimalPlaces)
 }
 
 function drawStringDisplay(control, viewer) {
 	var context = viewBroker.context
 	var boundingBox = control.boundingBox
 	var x = getXClearBoxSetContext(boundingBox, context, control)
-	drawArray(context, control.strings, viewBroker.textSpace, x, boundingBox[0][1] + viewBroker.textSpace)
+	drawArrays(context, control.strings, viewBroker.textSpace, x, boundingBox[0][1] + viewBroker.textSpace)
 }
 
 function getEscapeCount(escapeRadius, iterations, point) {
@@ -198,9 +198,9 @@ function ViewFractal2D() {
 		var viewFractal2D = {controls:controls}
 		viewBroker.viewFractal2D = viewFractal2D
 
-		var controlBoundingBox = [[0, 0], [viewBroker.heightMinus, height]]
-		this.controlBoundingBoxSize = getSubtraction2D(controlBoundingBox[1], controlBoundingBox[0])
-		viewFractal2D.fractalControl = {boundingBox:controlBoundingBox, draw:drawFractal2D, mouseDown:mouseDownFractal}
+		this.controlBoundingBox = [[0, 0], [viewBroker.heightMinus, height]]
+		this.controlBoundingBoxSize = getSubtraction2D(this.controlBoundingBox[1], this.controlBoundingBox[0])
+		viewFractal2D.fractalControl = {boundingBox:this.controlBoundingBox, draw:drawFractal2D, mouseDown:mouseDownFractal}
 		controls.push(viewFractal2D.fractalControl)
 
 		var zoomBoundingBox = [[viewBroker.heightMinus, 0], [height, height]]
