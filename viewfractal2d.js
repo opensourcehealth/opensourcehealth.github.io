@@ -118,7 +118,7 @@ function mouseDownFractal(control, event, viewer) {
 
 var moveXYManipulator = {
 	mouseMove: function(event) {
-		if (viewBroker.mouseDown2D == null) {
+		if (viewBroker.mouseDown2D == undefined) {
 			return
 		}
 		var mouseMovement = [event.offsetX - viewBroker.mouseDown2D[0], event.offsetY - viewBroker.mouseDown2D[1]]
@@ -140,12 +140,12 @@ var moveXYManipulator = {
 		this.viewer.y = this.originalY
 		viewFractal2D.xyDisplay.numbers = [this.viewer.x, this.viewer.y]
 		drawNumberDisplay(viewFractal2D.xyDisplay, this.viewer)
-		viewBroker.mouseDown2D = null
+		viewBroker.mouseDown2D = undefined
 		viewBroker.mouseMoveManipulator = null
 		drawFractal2DWithoutArguments()
 	},
 	mouseUp: function(event) {
-		viewBroker.mouseDown2D = null
+		viewBroker.mouseDown2D = undefined
 		viewBroker.mouseMoveManipulator = null
 		drawFractal2DWithoutArguments()
 	}
