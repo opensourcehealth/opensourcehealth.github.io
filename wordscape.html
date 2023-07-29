@@ -7,46 +7,35 @@
 <body>
 <table style="width:60%">
 <tr>
-<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
-<td><button onclick="toggleEdit()" type="button">Edit</button><td>
-<td><button onclick="toggleView()" type="button">View</button><td>
+<td><select id="fileMenuSelectID" onchange ="fileMenuSelectChanged()"></select></td>
+<td><select id="editMenuSelectID" onchange ="editMenuSelectChanged()"></select></td>
+<td><select id="viewMenuSelectID" onchange ="viewMenuSelectChanged()"></select></td>
 </tr>
 <tr>
-<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
-<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
-<td><select hidden="true" id="viewSelectID" onchange ="viewSelectChanged()"></select><td>
+<td><select hidden="true" id="loadSessionID" onchange ="loadSessionChanged()"></select></td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select></td>
+<td><select hidden="true" id="viewSelectID" onchange ="viewSelectChanged()"></select></td>
 </tr>
 <tr>
-<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
-<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/></td>
+<td><a style="font-size:12px" hidden="true" id="queryLinkID" href="index.html">Original Link</a></td>
 <td><select hidden="true" id="typeSelectID" onchange ="typeSelectChanged()"></select></td>
 </tr>
 <tr>
-<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
-<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
-<td><button hidden="true" id="downloadCanvasButtonID" onclick="downloadCanvas()" type="button">Download Canvas</button><td>
-</tr>
-<tr>
-<td><select hidden="true" id="loadASessionID" onchange ="loadASessionChanged()"></select><td>
-<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
-<td><select hidden="true"></select><td>
-</tr>
-<tr>
-<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button></td>
-<td><select hidden="true"></select><td>
-<td><select hidden="true"></select><td>
+<td><select hidden="true" id="deleteSessionID" onchange ="deleteSession()"></select></td>
 </tr>
 </table>
 <table>
 <tr>
-<th><canvas id="viewerCanvas" width="0" height="0" style="border:1px solid black"></canvas></th><th id="paragraphText"></th>
+<td><canvas id="viewerCanvas" width="0" height="0" style="border:1px solid black"></canvas></td><td id="paragraphText"></td>
 </tr>
 </table>
 <table>
 <tr>
-<td><button type="button" onclick="update()">Update</button><td>
-<td><select hidden="true"></select><td>
-<td><select hidden="true"></select><td>
+<td><text hidden="true" id="pointsID">Points</text></td><td><textarea hidden="true" id="pointsInputID" rows="3" cols="80"></textarea></td>
+</tr>
+<tr>
+<td><button onclick="update()">Update</button></td>
 </tr>
 </table>
 <textarea id="wordAreaID" rows="20" cols="120"></textarea><br>
@@ -54,7 +43,6 @@
 <h3>SVG</h3>
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
 <br>
-<script src="arraymath.js"></script>
 <script src="maparray.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
@@ -74,16 +62,17 @@
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
 <script src="statement.js"></script>
+<script src="vector.js"></script>
+<script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
 <script src="viewfractal2d.js"></script>
 <script src="viewmesh.js"></script>
+<script src="viewpoints.js"></script>
 <script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
 //change exterior to voxel and pixel
-//verticalHole should be widdershins, all widdershins should be reversed when making a mesh when on outside
-//view transform3D
 //hidden lines
 //sculpture mosaics=[{transform,[surfacets]}], closed surfacet={indegons, bottom, top} indegon can be indexed x,y,z;index,id,polygonIndex
 //slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
@@ -125,14 +114,15 @@ wordArea.oninput = areaInput
 function updateWordArea(wordString) {
 	var lines = getBracketReplacedLinesByText(wordString)
 	var paragraphTextElement = document.getElementById('paragraphText')
-
-	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idMap:new Map(), lines, meshMap:new Map(), views:[]}
+	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idCountMap:new Map(), idMap:new Map(), lines, meshMap:new Map(), views:[]}
 	var svgStatement = getDocumentRoot(lines, 'svg')
 	if (svgStatement == undefined) {
+		document.getElementById('svgArea').value = ''
 		paragraphTextElement.innerHTML = ''
 		paragraphTextElement.hidden = true
 		return ''
 	}
+
 	var descendants = [svgStatement]
 	addToDescendantsOutsideFirst(descendants, svgStatement)
 	for (var statement of descendants) {
@@ -140,6 +130,7 @@ function updateWordArea(wordString) {
 			getStatementID(registry, statement)
 		}
 	}
+
 	createDefault(registry, svgStatement)
 //	var before = new Date().getTime()
 	processRootStatementByTagMap(registry, svgStatement, gTagCenterMap)
@@ -155,11 +146,13 @@ function updateWordArea(wordString) {
 		heightSuffix = getAlphabeticSuffix(heightString)
 		height = parseFloat(heightString)
 	}
+
 	if (svgStatement.attributeMap.has('width')) {
 		var widthString = svgStatement.attributeMap.get('width')
 		widthSuffix = getAlphabeticSuffix(widthString)
 		width = parseFloat(widthString)
 	}
+
 	var padding = 5
 	var doublePadding = 2 * padding
 	if (height == null) {
@@ -167,55 +160,66 @@ function updateWordArea(wordString) {
 			height = boundingBox[1][1] + doublePadding
 		}
 	}
+
 	if (width == null) {
 		if (boundingBox != null) {
 			width = boundingBox[1][0] + doublePadding
 		}
 	}
+
 	if (height != null) {
 		svgStatement.attributeMap.set('height', height.toFixed() + heightSuffix)
 	}
+
 	if (width != null) {
 		svgStatement.attributeMap.set('width', width.toFixed() + widthSuffix)
 	}
+
 	if (!svgStatement.attributeMap.has('style')) {
 		svgStatement.attributeMap.set('style', 'border:1px solid black;padding:' + padding.toString() + 'px')
 	}
+
 	if (!svgStatement.attributeMap.has('xmlns')) {
 		svgStatement.attributeMap.set('xmlns', 'http://www.w3.org/2000/svg')
 	}
+
 	var svgLines = getPassthroughLinesByStatement('svg', svgStatement)
 	var joinWord = getJoinWord()
 	var svgString = svgLines.join(joinWord)
 	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('svgArea', svgLines)
-	document.getElementById('svgArea').value = svgString
 	if (height == null || width == null) {
 		paragraphTextElement.hidden = true
 	}
 	else {
 		paragraphTextElement.hidden = false
-		paragraphTextElement.innerHTML = svgString
 	}
+
+	document.getElementById('svgArea').value = svgString
+	paragraphTextElement.innerHTML = svgString
 	if (heightSuffix.trim() == 'mm') {
 		height *= 3.7795275591
 	}
+
 	if (height == null) {
 		height = 0
 	}
 	else {
 		height += doublePadding
 	}
+
 	document.getElementById('viewerCanvas').hidden = registry.views.length == 0
 	if (registry.views.length > 0) {
 		viewBroker.start(Math.max(height, viewBroker.minimumHeight), 'viewerCanvas', registry)
 	}
+
 	if (registry.indexStatements != undefined) {
 		registry.indexStatements.sort(compareFirstElementDescending)
 		for (var indexStatement of registry.indexStatements) {
 			replaceRows(lines, registry, indexStatement[1])
 		}
 	}
+
 	if (registry.lineUpdated == true) {
 		return lines.join(getEndOfLine(wordString))
 	}
