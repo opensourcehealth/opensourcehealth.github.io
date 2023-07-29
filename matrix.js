@@ -5,6 +5,15 @@ const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
 
+function add2DAlongAxis(point, addition) {
+	if (Math.abs(addition[0]) > Math.abs(addition[1])) {
+		point[0]  += addition[0]
+	}
+	else {
+		point[1]  += addition[1]
+	}
+}
+
 function add2DArrays(arrays, xy) {
 	for (var array of arrays) {
 		add2Ds(array, xy)
@@ -258,6 +267,28 @@ function getInverseRotationTranslation3D(matrix3D) {
 	return inverseMatrix3D
 }
 
+function getLeftVector(beginPoint, centerPoint, endPoint) {
+	var endCenter = getSubtraction2D(centerPoint, endPoint)
+	var endCenterLength = length2D(endCenter)
+	if (endCenterLength != 0.0) {
+		divide2DScalar(endCenter, endCenterLength)
+	}
+
+	var centerBegin = getSubtraction2D(beginPoint, centerPoint)
+	var centerBeginLength = length2D(centerBegin)
+	if (centerBeginLength != 0.0) {
+		divide2DScalar(centerBegin, centerBeginLength)
+	}
+
+	var totalVector = getAddition2D(endCenter, centerBegin)
+	var totalVectorLength = length2D(totalVector)
+	if (totalVectorLength != 0.0) {
+		divide2DScalar(totalVector, totalVectorLength)
+	}
+
+	return [-totalVector[1], totalVector[0]]
+}
+
 function getMatrices3DByPath(points) {
 //	0 4 8  12
 //	1 5 9  13
@@ -267,9 +298,7 @@ function getMatrices3DByPath(points) {
 		return []
 	}
 	for (var vertexIndex = points.length - 2; vertexIndex > -1; vertexIndex--) {
-		var point = points[vertexIndex]
-		var nextPoint = points[vertexIndex + 1]
-		if (point[0] == nextPoint[0] && point[1] == nextPoint[1] && point[2] == nextPoint[2]) {
+		if (equal3D(points[vertexIndex], points[vertexIndex + 1])) {
 			points.splice(vertexIndex, 1)
 		}
 	}
@@ -1009,21 +1038,6 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 		rowStrings.push(columnStrings.join(','))
 	}
 	return rowStrings.join('\n')
-}
-
-function getNormalizedBisector(centerBegin2D, centerEnd2D) {
-	var bisector = getAddition2D(centerBegin2D, centerEnd2D)
-	var bisectorLength = length2D(bisector)
-	if (bisectorLength == 0.0) {
-		return [centerEnd2D[1], -centerEnd2D[0]]
-	}
-	return divide2DScalar(bisector, bisectorLength)
-}
-
-function getNormalizedBisectorByBeginCenterEnd(beginPoint, centerPoint, endPoint) {
-	var centerBegin2D = normalize2D(getSubtraction2D(beginPoint, centerPoint))
-	var centerEnd2D = normalize2D(getSubtraction2D(endPoint, centerPoint))
-	return getNormalizedBisector(centerBegin2D, centerEnd2D)
 }
 
 function getPositiveModulo(x) {
