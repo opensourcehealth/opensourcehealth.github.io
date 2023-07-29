@@ -2,7 +2,6 @@
 <html lang="en">
 <head><meta charset="utf-8"/></head>
 <body>
-<script src="arraymath.js"></script>
 <script src="maparray.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
@@ -22,15 +21,17 @@
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
 <script src="statement.js"></script>
+<script src="vector.js"></script>
+<script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
 <script src="viewfractal2d.js"></script>
 <script src="viewmesh.js"></script>
+<script src="viewpoints.js"></script>
 <script src="voxel.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
 
-// workMeshes
 // thread
 // format text
 // platonic, svg
@@ -40,8 +41,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // outset point before fillet, outsetField
 // fillet mesh
 // view polygon
-// make hinge given beginAngle, endAngle, overhangAngle, radius, holeRadius, width, gap
-// upload
 // console.log(oldWordLengths[0].word+=String.fromCharCode(9618))
 //
 // split bent polygons
@@ -49,17 +48,12 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // check for unplanar polygons and triangulate
 //
 // test process join to handle matrix3Ds, omit origin
-// ergonomic handle
 // bevelZ
-// make fastener
-// make slot for socket
 // row card pages
-// upload
-// after version 4 is printed, remove unused variables
+// morph facets to facets
 //
 // low priority
 // clockwise for polygons in sculpture
-// make triangles in scuplture than polygonate them
 // check out addFacetsByWorkMap in emboss
 // test getEquation from fence and road
 // arrayFunctionX
@@ -68,7 +62,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // rx/ry and superEllipse for regularPolygon
 // arc ellipse from svg
 // helix rotation
-// if identical declared id is found post notice
 // add notice if nothing is embossed, look beyond stratas
 // add noticeByList for tags outside of alteration, meta, generator2d
 // add notice for other missing and getStatementID whileIndex?
@@ -76,7 +69,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // use warningByList instead of warning
 // z set polygon points to z
 // rename radius to inset or outset as applicable
-// delete model select when models dropped and disabled in viewer
 // replace null with undefined where appropriate especially when parsing
 // view facet by normal
 // speed up getClosestConnectionByFacets by searching first by closest to center of other polygon
@@ -89,7 +81,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // analyze volume
 //
 // maybe add notice
-// viewer new/delete/move for polygon poins
 // engrave: makes it possible to raise the edges
 // add skip3D option to copy
 // later when getting points, transform 2D if any then transform 3D if any
@@ -209,7 +200,7 @@ function drawVoxelMap(voxelMap) {
 }
 
 function drawXYInsetPolygon(xyPolygon, inset) {
-	inset = getValueByDefault(0.2, inset)
+	inset = getValueDefault(inset, 0.2)
 	drawXYPolygon(getOutsetPolygon([inset, inset], getArraysCopy(xyPolygon)), getRGB())
 }
 
@@ -227,7 +218,7 @@ function drawXYLines(lines, pointMap) {
 }
 
 function drawXYPolygon(xyPolygon, rgb) {
-	rgb = getValueByDefault(getRGB(), rgb)
+	rgb = getValueDefault(rgb, getRGB())
 	var pointStrings = new Array(xyPolygon.length)
 	for (var pointIndex = 0; pointIndex < xyPolygon.length; pointIndex++) {
 		if (xyPolygon[pointIndex].length < 3) {
@@ -245,7 +236,7 @@ function drawXYPolygon(xyPolygon, rgb) {
 
 function drawXYPolygons(xyPolygons, increments) {
 	var addition = [0, 0]
-	var increments = getValueByDefault([[0.0, 0.0]], increments)
+	var increments = getValueDefault(increments, [[0.0, 0.0]])
 	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
 		var xyPolygon = xyPolygons[polygonIndex]
 		var xyPolygonCopy = getArraysCopy(xyPolygon)
@@ -365,6 +356,25 @@ function testBevel() {
 	console.log(mesh)
 	bevelPoints(bevels, mesh, pointIndexSet, mesh.points)
 	drawMesh(mesh)
+}
+
+function testBoolean() {
+	var xDensities = [[0,2], [2,-2], [2+gClose*0.1,2], [3,-2], [3.1,2], [3.5,-2]]
+	var xExistences = []
+	unionXDensities(xDensities, xExistences)
+	console.log(xDensities)
+	console.log(xExistences)
+	var xNewExistences = [0, 2, 1, 3, 2, 2.5]
+	console.log(xNewExistences.slice(0))
+	unionXExistences(xNewExistences)
+	console.log(xNewExistences.slice(0))
+	var xNegativeExistences = [1, 2]
+	subtractXExistences(xNewExistences, xNegativeExistences)
+	console.log(xNewExistences.slice(0))
+	xNewExistences = [0, 2]
+	console.log(xNewExistences.slice(0))
+	intersectionXExistences(xNewExistences, [1.9, 3])
+	console.log(xNewExistences.slice(0))
 }
 
 function testConnectedFacet() {
@@ -812,8 +822,7 @@ function testOutline() {
 //	console.log('points')
 //	console.log(points)
 //		drawXYPolygon(points, getRGB())
-	var outlines = getOutlinesQuickly([0.0, 0.0], [[0, 1.2]], true, [[1, 1], [0.5, 0.5]], branches, [[-1.2, 0], [0, 1.2], [1.2, 0]])
-		console.log(outlines)
+	var outlines = getOutlinesQuickly([0.0, 0.0], [[0, 1.2]], true, [[1, 1], [0.5, 0.5]], branches, [[1.2, 0], [0, 1.2], [-1.2, 0]])
 	drawXYPolygons(outlines)
 	for (var outline of outlines) {
 		console.log(outline)
@@ -829,17 +838,17 @@ function testOutline() {
 
 function testOutset() {
 	console.log('testOutset')
-//	var pointString = '0,0 0,4 6,4 6,0'
-	var pointString = '0,0 0,4'
+	var pointString = '0,0 6,0 6,2 6,4 0,4'
+//	var pointString = '0,0 0,4'
 //	var pointString = '0,0 0,2 6,4 6,0'
 //	var pointString = '6,0 6,4 0,2 0,0'
 //	var pointString = '8,-2 3,1 0,6 0,-2'
 //	var pointString = '0,0 40,0 40,20 20,2 0,20'
 	var xyPolygon = getPointsByString(pointString)
 	drawXYPolygon(xyPolygon, getRGB())
-
-	var outsetPolygon = getOutsetPolygonByMarker(null, null, false, [[1.0, 1.0]], xyPolygon, null)
+//	var outsetPolygon = getOutsetPolygonByMarker(null, null, false, [[1.0, 1.0]], xyPolygon, null)
 //	var outsetPolygon = getOutsetPolygon([1.0, 1.0], xyPolygon)
+	var outsetPolygon = getLargestPolygon(getOutsetPolygonsByDirection(undefined, undefined, true, false, false, [[1.0, 1.0]], xyPolygon))
 	console.log('outsetPolygon')
 	console.log(outsetPolygon)
 	drawXYPolygon(outsetPolygon, getRGB())
@@ -1213,8 +1222,6 @@ function testTriangulate() {
 //	var points = [[0,0,0], [0,0,1], [0,1,1], [0,1,0]]
 //	var points = [[0,0,0], [0,0,1], [1,0,1], [1,0,0]]
 	var triangleFacets = getTriangle3DFacets(facet, points, new Array(points.length))
-
-return	
 //	var pointString = '0,0,0 0,4,0 4,4,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 1,2,0 4,0,0'
 //	var pointString = '0,0,0 0,4,0 4,4,0 4,3,0 1,3,0 1,1,0 4,1,0 4,0,0'
@@ -1263,30 +1270,28 @@ return
 		points[entry[1]] = entry[0].split(',').map(parseFloat)
 	}
 	console.log(facet)
-	var concaveFacets = getConcaveFacets(facet.slice(0), points)
-	var xyTriangleFacets = getXYTriangleFacets(facet, points)
-	var triangles = getPolygonsByFacets(xyTriangleFacets, points)
+	var convexFacets = getConvexFacets(facet.slice(0), points)
+//	var xyTriangleFacets = getXYTriangleFacets(facet, points)
+//	var triangles = getPolygonsByFacets(xyTriangleFacets, points)
 	add2Ds(points, [0,60])
 	multiply3DsByScalar(points, 0.2)
 //	drawXYPolygon(getPolygonByFacet(facet, points), getRGB())
-	var concavePolygons = getPolygonsByFacets(concaveFacets, points)
-	for (var triangle of triangles) {
-		if (getNormalByPolygon(triangle) == null) {
-			console.log('too thin triangle')
-			console.log(triangle)
-		}
-	}
-	var arrowsMap = getArrowsMap(xyTriangleFacets)
-	var multiples = []
-	for (var arrows of arrowsMap.values()) {
-		if (arrows.length > 1) {
-			multiples.push(arrows)
-		}
-	}
-	console.log(xyTriangleFacets)
-	console.log(concavePolygons)
-	console.log(multiples)
-	drawXYInsetPolygons(concavePolygons, 0.05)
+	var convexPolygons = getPolygonsByFacets(convexFacets, points)
+//	for (var triangle of triangles) {
+//		if (getNormalByPolygon(triangle) == undefined) {
+//			console.log('too thin triangle')
+//			console.log(triangle)
+//		}
+//	}
+//	var arrowsMap = getArrowsMap(xyTriangleFacets)
+//	var multiples = []
+//	for (var arrows of arrowsMap.values()) {
+//		if (arrows.length > 1) {
+//			multiples.push(arrows)
+//		}
+//	}
+	console.log(convexPolygons)
+	drawXYInsetPolygons(convexPolygons, 0.05)
 //	drawXYInsetPolygons(triangles, 0.05)
 	return
 	console.log(triangleFacets)
@@ -1417,6 +1422,7 @@ function createSVGTest() {
 	var before = new Date().getTime()
 //	testBend()
 //	testBevel()
+//	testBoolean()
 //	testConnectedFacet()
 //	testDrillByMesh()
 //	testDrillByPolygon()
@@ -1434,11 +1440,11 @@ function createSVGTest() {
 //	testLettering()
 //	testLinkMap()
 //	testLoop()
-	testMatrix()
+//	testMatrix()
 //	testMeshBoolean()
 //	testMirrorJoin()
 //	testOutline()
-//	testOutset()
+	testOutset()
 //	testOverlap()
 //	testPixelBoolean()
 //	testPolygonate()
