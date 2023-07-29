@@ -8,29 +8,19 @@
 <body>
 <table style="width:60%">
 <tr>
-<td style="width:15%"><button onclick="toggleFile()" type="button">File</button><td>
-<td><button onclick="toggleEdit()" type="button">Edit</button><td>
+<td><select id="fileMenuSelectID" onchange ="fileMenuSelectChanged()"></select></td>
+<td><select id="editMenuSelectID" onchange ="editMenuSelectChanged()"></select></td>
 </tr>
 <tr>
-<td style="width:15%"><button hidden="true" id="newWindowButtonID" onclick="newWindow()" type="button">New</button><td>
-<td><button hidden="true" id="undoButtonID" type="button" onclick="undo()">Undo</button><td>
+<td><select hidden="true" id="loadSessionID" onchange ="loadSessionChanged()"></select></td>
+<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select></td>
 </tr>
 <tr>
-<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/><td>
-<td><button hidden="true" id="redoButtonID" type="button" onclick="redo()">Redo</button><td>
+<td><input hidden="true" type="file" id="browseID" onchange="browse(this)"/></td>
+<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a></td>
 </tr>
 <tr>
-<td><button hidden="true" id="loadLastSessionButtonID" onclick="loadLastSession()" type="button">Load Last Session</button><td>
-<td><select hidden="true" id="querySelectID" onchange ="querySelectChanged()"></select><td>
-</tr>
-<tr>
-<td><select hidden="true" id="loadASessionID" onchange ="loadASessionChanged()"></select><td>
-<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
-<td><select hidden="true"></select><td>
-</tr>
-<tr>
-<td><button hidden="true" id="saveButtonID" onclick="save()" type="button">Save</button><td>
-<td><a hidden="true" id="queryLinkID" href="index.html">Original Link</a><td>
+<td><select hidden="true" id="deleteSessionID" onchange ="deleteSession()"></select></td>
 </tr>
 </table>
 <table>
@@ -51,7 +41,6 @@
 <br>
 <br>
 <script src="maparray.js"></script>
-<script src="arraymath.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
 <script src="help.js"></script>
@@ -62,6 +51,7 @@
 <script src="statement.js"></script>
 <script src="terrain.js"></script>
 <script src="terrainviewer.js"></script>
+<script src="vector.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
