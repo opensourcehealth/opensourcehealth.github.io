@@ -1,13 +1,12 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gAbstractID = null
-var gBackupNumberOfUpdates = -1
+//var gAbstractID = undefined
 var gBracketTable = {
 	'&lt;':'<',
 	'&gt;':'>'}
 var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
-var gCurrentKey = null
-var gDate = null
+var gCurrentKey = undefined
+//var gDate = undefined
 var gEscapeTable = {
 	'%09':'\t',
 	'%0A':'\n',
@@ -41,13 +40,20 @@ var gEscapeTable = {
 	'%E2%80%9C':'“',
 	'%E2%80%9D':'”'}
 var gEscapeExpression = new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
+var gGoMessage = undefined
 const gLZStringHeader = 'lz_'
-var gProject = null
-var gRedoMap = null
-var gTitle = null
-var gUndoMap = null
-var gWordString = null
+//var gProject = undefined
+var gTitle = undefined
+var gWordString = undefined
 //var gURLMaximumLength = 1900
+
+function addTextsToSelect(select, texts) {
+	for (var text of texts) {
+		var option = document.createElement('option')
+		option.text = text
+		select.add(option)
+	}
+}
 
 function browse(input) {
 	var fileReader = new FileReader()
@@ -57,7 +63,68 @@ function browse(input) {
 		document.getElementById('wordAreaID').value = fileReader.result
 		update()
 	}
+
 	fileReader.readAsText(input.files[0])
+}
+
+function deleteSession() {
+	var deleteSessionSelect = document.getElementById('deleteSessionID')
+	var selectedIndex = deleteSessionSelect.selectedIndex
+	var key = deleteSessionSelect.options[selectedIndex].text
+	deleteSessionSelect.selectedIndex = 0
+	if (getIsEmpty(key) || selectedIndex < 2) {
+		return
+	}
+
+	localStorage.removeItem(key)
+	updateSession()
+}
+
+function editMenuSelectChanged() {
+	var editMenuSelect = document.getElementById('editMenuSelectID')
+	var editMenuText = editMenuSelect.options[editMenuSelect.selectedIndex].text
+	if (editMenuText.endsWith(' Others')) {
+		toggleSessionBoolean('isEditHidden@')
+	}
+	else {
+		if (editMenuText == 'Undo') {
+			undo()
+		}
+		else {
+			if (editMenuText == 'Redo') {
+				redo()
+			}
+		}
+	}
+
+	editMenuSelect.selectedIndex = 0
+	updateEdit()
+}
+
+function fileMenuSelectChanged() {
+	var fileMenuSelect = document.getElementById('fileMenuSelectID')
+	var fileMenuText = fileMenuSelect.options[fileMenuSelect.selectedIndex].text
+	if (fileMenuText.endsWith(' Others')) {
+		toggleSessionBoolean('isFileHidden@')
+	}
+	else {
+		if (fileMenuText == 'New Window') {
+			newWindow()
+		}
+		else {
+			if (fileMenuText == 'Save To Archive') {
+				saveToArchive()
+			}
+			else {
+				if (fileMenuText == 'Save To Download Folder') {
+					saveToDownloadFolder()
+				}
+			}
+		}
+	}
+
+	fileMenuSelect.selectedIndex = 0
+	updateFile()
 }
 
 function getBracketReplacedLinesByText(wordString) {
@@ -74,13 +141,13 @@ function getCompressToEncodedURI(text) {
 		return compressedText
 	}
 	var text = 'abstract'
-	if (gProject != null) {
+	if (gProject != undefined) {
 		text += ' project=' + gProject
 	}
-	if (gAbstractID != null) {
+	if (gAbstractID != undefined) {
 		text += ' part=' + gAbstractID
 	}
-	if (gDate != null) {
+	if (gDate != undefined) {
 		text += ' date=' + gDate
 	}
 	text += ' note=The text is too long to fit into a url.'
@@ -92,63 +159,62 @@ function getDecompressFromEncodedURI(text) {
 	if (text.indexOf('=') == -1) {
 		return LZString.decompressFromEncodedURIComponent(text.slice(text.lastIndexOf('_') + 1))
 	}
+
 	return text
 }
 
-function getMapByString(text) {
-	if (getIsEmpty(text)) {
-		return new Map()
+function getDraftTitle(title) {
+	return '0_Draft_ ' + title
+}
+
+function getIsWordStringNew(wordString) {
+	if (getIsEmpty(wordString) || getIsEmpty(gTitle)) {
+		return false
 	}
-	var entryStrings = text.split('\n')
-	var entryStringListsLength = entryStrings.length / 2
-	var entryStringLists = new Array(entryStringListsLength)
-	for (var entryIndex = 0; entryIndex < entryStringListsLength; entryIndex++) {
-		var stringIndex = entryIndex + entryIndex
-		entryStringLists[entryIndex] = [entryStrings[stringIndex], entryStrings[stringIndex + 1]]
+
+	if (wordString == localStorage.getItem(gTitle)) {
+		return false
 	}
-	return new Map(entryStringLists)
+ 
+ 	return wordString != localStorage.getItem(getDraftTitle(gTitle))
 }
 
 function getSessionBoolean(booleanKey) {
-	if (sessionStorage.getItem(booleanKey) == null) {
+	if (sessionStorage.getItem(booleanKey) == undefined) {
 		return false
 	}
+
 	return true
 }
 
-function getStringByMap(map) {
-	var mapStrings = new Array(map.size + map.size)
-	var mapStringIndex = 0
-	for (var entry of map.entries()) {
-		mapStrings[mapStringIndex] = entry[0]
-		mapStrings[mapStringIndex + 1] = entry[1]
-		mapStringIndex += 2
+function getSessionKey() {
+	var item = sessionStorage.getItem('goCount@')
+	var goCount = 0
+	if (!getIsEmpty(item)) {
+		goCount = parseInt(item) + 1
 	}
-	return mapStrings.join('\n')
+
+	var goCountString = goCount.toString()
+	for (var characterIndex = goCountString.length; characterIndex < 3; characterIndex++) {
+		goCountString = '0' + goCountString
+	}
+
+	sessionStorage.setItem('goCount@', goCountString)
+	return goCountString + ' - '
 }
 
-function getWordStringUpdateStorage() {
-	var wordString = sessionStorage.getItem(gCurrentKey)
-	if (wordString == null) {
-		return null
+function loadSessionChanged() {
+	var loadSessionSelect = document.getElementById('loadSessionID')
+	var selectedIndex = loadSessionSelect.selectedIndex
+	var key = loadSessionSelect.options[selectedIndex].text
+	loadSessionSelect.selectedIndex = 0
+	if (selectedIndex < 2) {
+		return
 	}
-	if (!getIsEmpty(gTitle)) {
-		localStorage.setItem(gTitle, wordString)
-	}
-	sessionStorage.setItem('oldQueryKeyKey@', gCurrentKey)
-	document.getElementById('wordAreaID').value = wordString
-	return wordString
-}
 
-function loadASessionChanged() {
-	var loadASessionSelect = document.getElementById('loadASessionID')
-	document.getElementById('wordAreaID').value = localStorage.getItem(loadASessionSelect.options[loadASessionSelect.selectedIndex].text)
-	update()
-}
-
-function loadLastSession() {
-	document.getElementById('wordAreaID').value = localStorage.getItem('old_' + gTitle)
-	update()
+	gGoMessage = 'Load ' + key
+	document.getElementById('wordAreaID').value = localStorage.getItem(key)
+	updateSession()
 }
 
 function newWindow() {
@@ -163,15 +229,32 @@ function querySelectChanged() {
 }
 
 function redo() {
-	gCurrentKey = gRedoMap.get(gCurrentKey)
+	var querySelect = document.getElementById('querySelectID')
+	if (querySelect.selectedIndex < querySelect.options.length - 1) {
+		querySelect.selectedIndex += 1
+		querySelect.selectedIndex = Math.max(querySelect.selectedIndex, 2)
+	}
+
+	gCurrentKey = querySelect.options[querySelect.selectedIndex].text
 	updateStorageTextLink()
-	updateSelect(document.getElementById('querySelectID'))
 }
 
-function save() {
+function saveToArchive() {
+	var wordString = document.getElementById('wordAreaID').value
+	if (wordString == undefined || getIsEmpty(gTitle)) {
+		return
+	}
+
+	localStorage.setItem(gTitle, wordString)
+	var draftTitle = getDraftTitle(gTitle)
+	localStorage.removeItem(draftTitle)
+	updateSession()
+}
+
+function saveToDownloadFolder() {
 	var blob = new Blob([sessionStorage.getItem(gCurrentKey)], {type: "text/plain;charset=utf-8"});
 	saveAs(blob, gTitle.replace(/\./g, '_').replace(/\//g, '_').replace(/\-/g, '_').replace(/\ /g, '_') + '.txt');
-	update()
+	updateSession()
 }
 
 function setNumberOfRows(id, lines) {
@@ -180,7 +263,50 @@ function setNumberOfRows(id, lines) {
 	for (var line of lines) {
 		numberOfRows += Math.ceil(oneOverColumns * (line.length + 1))
 	}
+
 	document.getElementById(id).rows = numberOfRows
+}
+
+function setOthersMenuLine(isHidden, select) {
+	var othersText = 'Hide Others'
+	if (isHidden) {
+		othersText = 'Show Others'
+	}
+	select.options[2].text = othersText
+}
+
+function setSelectToKeysIndexTitle(select, keys, selectedIndex, title) {
+	setSelectToKeysTitle(select, keys, title)
+	select.selectedIndex = selectedIndex
+}
+
+function setSelectToKeysTitle(select, keys, title) {
+	var options = select.options
+	var titleLength = (title != undefined) * 2
+	var totalLength = keys.length + titleLength
+	var isSame = totalLength == options.length
+	if (isSame) {
+		for (var keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+			if (options[keyIndex + titleLength].text != keys[keyIndex]) {
+				isSame = false
+				break
+			}
+		}
+	}
+
+	if (isSame) {
+		return
+	}
+
+	for (var optionIndex = options.length - 1; optionIndex > -1; optionIndex--) {
+		options.remove(optionIndex)
+	}
+
+	if (title != undefined) {
+		addTextsToSelect(select, [title, ' '])
+	}
+
+	addTextsToSelect(select, keys)
 }
 
 function setTextArea(textAreaID) {
@@ -193,14 +319,16 @@ function setTextArea(textAreaID) {
 		query = query.slice(indexOfQuestionMark + 1)
 		query = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
 		query = getDecompressFromEncodedURI(query)
-		if (query == null) {
+		if (query == undefined) {
 			query = ''
 		}
 	}
+
 	var indexOfNewline = query.indexOf('\n')
 	if (indexOfNewline < 0) {
 		query = query.replace(/></g, '>\n<')
 	}
+
 	document.getElementById(textAreaID).value = query
 }
 
@@ -215,7 +343,7 @@ function toggleFile() {
 }
 
 function toggleSessionBoolean(booleanKey) {
-	if (sessionStorage.getItem(booleanKey) == null) {
+	if (sessionStorage.getItem(booleanKey) == undefined) {
 		sessionStorage.setItem(booleanKey, 't')
 	}
 	else {
@@ -224,33 +352,33 @@ function toggleSessionBoolean(booleanKey) {
 }
 
 function undo() {
-	gCurrentKey = gUndoMap.get(gCurrentKey)
+	var querySelect = document.getElementById('querySelectID')
+	if (querySelect.selectedIndex > 2) {
+		querySelect.selectedIndex -= 1
+	}
+
+	gCurrentKey = querySelect.options[querySelect.selectedIndex].text
 	updateStorageTextLink()
-	updateSelect(document.getElementById('querySelectID'))
 }
 
 function update() {
+	updateSession()
+	if (getIsWordStringNew(gWordString)) {
+		localStorage.setItem(getDraftTitle(gTitle), gWordString)
+		updateFile()
+	}
+}
+
+function updateSession() {
 	var wordString = document.getElementById('wordAreaID').value
 	var updateString = updateWordArea(wordString)
 	if (updateString != undefined) {
 		wordString = updateString
 		document.getElementById('wordAreaID').value = updateString
 	}
-	if (gCurrentKey == null) {
-		var localWordString = localStorage.getItem(gTitle)
-		if (localWordString != null) {		
-			if (localStorage.getItem('update_' + gTitle) == 'true') {		
-				localStorage.setItem('old_' + gTitle, localWordString)
-			}
-		}
-		localStorage.setItem('update_' + gTitle, 'false')
-	}
-	if (gRedoMap == null) {
-		gRedoMap = getMapByString(sessionStorage.getItem('redoMapKey@'))
-		gUndoMap = getMapByString(sessionStorage.getItem('undoMapKey@'))
-	}
+
 	var queryLink = document.getElementById('queryLinkID')
-	gCurrentKey = null
+	gCurrentKey = undefined
 	for (var keyIndex = 0; keyIndex < sessionStorage.length; keyIndex++) {
 		var key = sessionStorage.key(keyIndex)
 		if (sessionStorage.getItem(key) == wordString) {
@@ -258,39 +386,66 @@ function update() {
 			break
 		}
 	}
-	if (gCurrentKey == null) {
-		var oldQueryKey = sessionStorage.getItem('oldQueryKeyKey@')
-		var date = new Date()
-		gCurrentKey = date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
-		if (oldQueryKey != null) {
-			var oldLines = getBracketReplacedLinesByText(sessionStorage.getItem(oldQueryKey))
-			var newLines = getBracketReplacedLinesByText(wordString)
-			var firstDifferenceIndex = Math.min(oldLines.length, newLines.length)
-			for (var differenceIndex = 0; differenceIndex < firstDifferenceIndex; differenceIndex++) {
-				if (oldLines[differenceIndex] != newLines[differenceIndex]) {
-					firstDifferenceIndex = differenceIndex
-					break
+
+	if (gCurrentKey == undefined) {
+		gCurrentKey = getSessionKey()
+		if (gWordString == undefined) {
+			if (gTitle != undefined) {
+				var draftTitle = getDraftTitle(gTitle)
+				var title = undefined
+				if (localStorage.getItem(draftTitle) == undefined) {
+					if (localStorage.getItem(gTitle) != undefined) {
+						title = gTitle
+					}
+				}
+				else {
+					title = draftTitle
+				}
+				if (title != undefined) {
+					if (getIsWordStringNew(wordString)) {
+						sessionStorage.setItem(getSessionKey() + 'Load ' + title, localStorage.getItem(title))
+					}
+				}
+				gCurrentKey += 'Decode ' + gTitle
+			}
+		}
+		else {
+			if (gGoMessage == undefined) {
+				var oldLines = getBracketReplacedLinesByText(gWordString)
+				var lines = getBracketReplacedLinesByText(wordString)
+				var firstDifferenceIndex = Math.min(oldLines.length, lines.length) - 1
+				var differenceIndex = 0
+				for (; differenceIndex < firstDifferenceIndex; differenceIndex++) {
+					if (oldLines[differenceIndex] != lines[differenceIndex]) {
+						break
+					}
+				}
+				gCurrentKey += 'Line: ' + differenceIndex.toString()
+				var statement = getStatement(lines[differenceIndex])
+				if (statement.tag != undefined) {
+					gCurrentKey = gCurrentKey + ' - ' + statement.tag
 				}
 			}
-			gCurrentKey = gCurrentKey + ' - ' + firstDifferenceIndex.toString()
-			gRedoMap.set(oldQueryKey, gCurrentKey)
-			gUndoMap.set(gCurrentKey, oldQueryKey)
-			sessionStorage.setItem('redoMapKey@', getStringByMap(gRedoMap))
-			sessionStorage.setItem('undoMapKey@', getStringByMap(gUndoMap))
+			else {
+				gCurrentKey += gGoMessage
+				gGoMessage = undefined
+			}
 		}
 		sessionStorage.setItem(gCurrentKey, wordString)
-		sessionStorage.setItem('oldQueryKeyKey@', gCurrentKey)
 	}
+
 	var querySelect = document.getElementById('querySelectID')
 	if (sessionStorage.length > 1) {
 		queryLink.hidden = false
 		querySelect.hidden = false
 	}
+
 	var options = querySelect.options
 	var optionSet = new Set()
 	for (var optionIndex = 0; optionIndex < options.length; optionIndex++) {
 		optionSet.add(options[optionIndex].text)
 	}
+
 	var sessionKeys = []
 	for (var keyIndex = 0; keyIndex < sessionStorage.length; keyIndex++) {
 		var key = sessionStorage.key(keyIndex)
@@ -298,84 +453,66 @@ function update() {
 			sessionKeys.push(key)
 		}
 	}
-	sessionKeys.sort()
-	for (var key of sessionKeys) {
-		if (!optionSet.has(key)) {
-			var option = document.createElement('option')
-			option.text = key
-			querySelect.add(option)
-		}
-	}
+
+	setSelectToKeysTitle(querySelect, sessionKeys.sort(), 'Go')
 	updateFile()
-	updateEdit()
-	getWordStringUpdateStorage()
-	updateLink(wordString)
 	updateSelect(querySelect)
-	if (gWordString != null) {
-		if (gWordString != wordString && gTitle != null) {
-			localStorage.setItem('update_' + gTitle, 'true')
-		}
-	}
+	updateEdit()
+	updateLink(wordString)
 	gWordString = wordString
 }
 
 function updateEdit() {
-	var redoButton = document.getElementById('redoButtonID')
-	var undoButton = document.getElementById('undoButtonID')
-	redoButton.disabled = !gRedoMap.has(gCurrentKey)
-	undoButton.disabled = !gUndoMap.has(gCurrentKey)
+	var querySelect = document.getElementById('querySelectID')
 	var isEditHidden = !getSessionBoolean('isEditHidden@')
-	redoButton.hidden = isEditHidden
-	undoButton.hidden = isEditHidden
-	document.getElementById('querySelectID').hidden = isEditHidden
+	querySelect.hidden = isEditHidden
+	var editMenuSelect = document.getElementById('editMenuSelectID')
+	var editMenuKeys = ['']
+	if (querySelect.selectedIndex < 3) {
+		editMenuKeys.push('')
+	}
+	else {
+		editMenuKeys.push('Undo')
+	}
+
+	if (Math.max(querySelect.selectedIndex, 2) > querySelect.options.length - 2) {
+		editMenuKeys.push('')
+	}
+	else {
+		editMenuKeys.push('Redo')
+	}
+
+	setSelectToKeysIndexTitle(editMenuSelect, editMenuKeys, 0, 'Edit')
+	setOthersMenuLine(isEditHidden, editMenuSelect)
 	document.getElementById('queryLinkID').hidden = isEditHidden
 }
 
 function updateFile() {
-	var loadLastSessionButton = document.getElementById('loadLastSessionButtonID')
-	var loadASessionSelect = document.getElementById('loadASessionID')
-	loadLastSessionButton.disabled = (localStorage.getItem('old_' + gTitle) == null)
-	loadASessionSelect.disabled = localStorage.length == 0
-	var options = loadASessionSelect.options
-	if (options.length == 0) {
-		var option = document.createElement('option')
-		option.text = 'Load A Session'
-		loadASessionSelect.add(option)
-		option = document.createElement('option')
-		option.text = ' '
-		loadASessionSelect.add(option)
-	}
-	if (localStorage.length > 0) {
-		var optionSet = new Set()
-		for (var optionIndex = 0; optionIndex < options.length; optionIndex++) {
-			optionSet.add(options[optionIndex].text)
-		}
-		var localStorageKeys = Object.keys(localStorage)
-		localStorageKeys.sort()
-		for (var key of localStorageKeys) {
-			if (!optionSet.has(key)) {
-				var option = document.createElement('option')
-				option.text = key
-				loadASessionSelect.add(option)
-			}
-		}
-	}
 	var isFileHidden = !getSessionBoolean('isFileHidden@')
-	document.getElementById('newWindowButtonID').hidden = isFileHidden
+	var fileMenuSelect = document.getElementById('fileMenuSelectID')
+	var fileMenuKeys = ['', 'New Window', 'Save To Archive', 'Save To Download Folder']
+	setSelectToKeysIndexTitle(fileMenuSelect, fileMenuKeys, 0, 'File')
+	setOthersMenuLine(isFileHidden, fileMenuSelect)
+	var loadSessionSelect = document.getElementById('loadSessionID')
+	loadSessionSelect.disabled = localStorage.length == 0
+	setSelectToKeysTitle(loadSessionSelect, Object.keys(localStorage).sort(), 'Load Session')
+	loadSessionSelect.hidden = isFileHidden
 	document.getElementById('browseID').hidden = isFileHidden
-	loadASessionSelect.hidden = isFileHidden
-	document.getElementById('saveButtonID').hidden = isFileHidden
-	loadLastSessionButton.hidden = isFileHidden
+	var deleteSessionSelect = document.getElementById('deleteSessionID')
+	deleteSessionSelect.disabled = localStorage.length == 0
+	setSelectToKeysTitle(deleteSessionSelect, new Array(6).fill('').concat(Object.keys(localStorage).sort()), 'Delete Session')
+	deleteSessionSelect.hidden = isFileHidden
 }
 
 function updateLink(wordString) {
 	var queryLink = document.getElementById('queryLinkID')
 	queryLink.innerHTML = gCurrentKey
-	if (wordString == null) {
+	if (wordString == undefined) {
 		queryLink.href = ''
 		queryLink.innerHTML = 'n/a'
 		return
 	}
+
 	var encodedURI = getCompressToEncodedURI(wordString)
 	if (encodedURI.length > 0) {
 		queryLink.href = '?' + encodedURI
@@ -397,8 +534,17 @@ function updateSelect(select) {
 }
 
 function updateStorageTextLink() {
-	var wordString = getWordStringUpdateStorage()
+	var wordString = sessionStorage.getItem(gCurrentKey)
+	if (getIsEmpty(wordString)) {
+		wordString = ''
+	}
+
+	document.getElementById('wordAreaID').value = wordString
 	updateWordArea(wordString)
+	if (getIsWordStringNew(wordString)) {
+		localStorage.setItem(getDraftTitle(gTitle), wordString)
+	}
+
 	updateFile()
 	updateEdit()
 	updateLink(wordString)
