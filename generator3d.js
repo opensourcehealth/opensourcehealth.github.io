@@ -230,12 +230,12 @@ function addPolygonsToLayer(arrowGridFacets, id, layer, mesh, oldArrowGridFacets
 	var isClockwise = getIsClockwise(polygons[0])
 
 	if (statement != undefined) {
-		connectionAngle = getValueByDefault(connectionAngle, getFloatByStatement('connectionAngle', registry, statement))
+		connectionAngle = getValueDefault(getFloatByStatement('connectionAngle', registry, statement), connectionAngle)
 		connectionIDs = getStrings('connectionIDs', statement)
-		vertical = getValueByDefault(vertical, getBooleanByStatement('vertical', registry, statement))
+		vertical = getValueDefault(getBooleanByStatement('vertical', registry, statement), vertical)
 
 		if (polygons[0].length < 3) {
-			isClockwise = getValueByDefault(false, getBooleanByStatement('clockwise', registry, statement))
+			isClockwise = getValueFalse(getBooleanByStatement('clockwise', registry, statement))
 		}
 	}
 	var connectionProduct = undefined
@@ -408,7 +408,7 @@ oldArrowGridFacets, pointLayerMap, polygon, previousLayer, sculpture, vertical) 
 			addOrJoinFacet(arrowHigh, arrowLow, arrowGridFacets.arrowMap, mesh.facets, points)
 		}
 	}
-	addElementToMapArray(topFacet, id, sculpture.facetsMap)
+	addElementToMapArray(sculpture.facetsMap, id, topFacet)
 	arrowGridFacets.topFacetsDirections[1 * isClockwise].push(topFacet)
 }
 
@@ -462,11 +462,12 @@ function addToPillarMesh(heights, mesh, polygon3DGroup) {
 }
 
 function addToSlopedConnection(connectionProduct, connectionFacet, oldTopFacets, point, points, polygon3D, vertexIndex) {
-	var bisector = null
+	var leftVector = null
 	if (connectionProduct != undefined) {
 		var beginPoint = polygon3D[(vertexIndex - 1 + polygon3D.length) % polygon3D.length]
-		bisector = getNormalizedBisectorByBeginCenterEnd(beginPoint, point, polygon3D[(vertexIndex + 1) % polygon3D.length])
+		leftVector = getLeftVector(beginPoint, point, polygon3D[(vertexIndex + 1) % polygon3D.length])
 	}
+
 	var closestIndex = null
 	var closestTopFacetIndex = null
 	var closestVertexIndex = null
@@ -481,8 +482,8 @@ function addToSlopedConnection(connectionProduct, connectionFacet, oldTopFacets,
 			if (shouldSetClosest && connectionProduct != undefined) {
 				var beginPoint = points[topFacet[(vertexIndex - 1 + topFacet.length) % topFacet.length]]
 				var endPoint = points[topFacet[(vertexIndex + 1) % topFacet.length]]
-				var otherBisector = getNormalizedBisectorByBeginCenterEnd(beginPoint, centerPoint, endPoint)
-				shouldSetClosest = dotProduct2D(bisector, otherBisector) > connectionProduct
+				var otherLeftVector = getLeftVector(beginPoint, centerPoint, endPoint)
+				shouldSetClosest = dotProduct2D(leftVector, otherLeftVector) > connectionProduct
 			}
 			if (shouldSetClosest) {
 				leastDistanceSquared = distanceSquared
@@ -492,9 +493,11 @@ function addToSlopedConnection(connectionProduct, connectionFacet, oldTopFacets,
 			}
 		}
 	}
+
 	if (closestTopFacetIndex == null) {
 		return
 	}
+
 	connectionFacet.push({low:closestIndex, high:points.length, topFacetIndex:closestTopFacetIndex, vertexIndex:closestVertexIndex})
 }
 
@@ -659,7 +662,7 @@ function convertPlankToFence(betweens, bottoms, curve, matrix3D, mesh, registry,
 		point[0] = oneMinusAlong * inset[0] + along * nextInset[0]
 		point[1] = oneMinusAlong * inset[1] + along * nextInset[1]
 	}
-	mesh.points = get3DsBy3Dmatrix3D(matrix3D, mesh.points)
+	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 }
 
 function getBottoms(registry, statement, tops) {
@@ -906,7 +909,7 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 				statement = sculpture.statementMap.get(id)
 
 				if (statement != undefined && polygon.length < 3) {
-					isClockwise = getValueByDefault(false, getBooleanByStatement('clockwise', registry, statement))
+					isClockwise = getValueFalse(getBooleanByStatement('clockwise', registry, statement))
 				}
 			}
 			var polygon3D = getPolygon3D(polygon, 0.0)
@@ -922,7 +925,7 @@ function getSculptureMesh(layers, matrix3D, registry, sculpture) {
 			}
 			oldArrowGridFacets.topFacetsDirections[1 * isClockwise].push(topFacet)
 		}
-		addElementToMapArray(topFacet, id, sculpture.facetsMap)
+		addElementToMapArray(sculpture.facetsMap, id, topFacet)
 	}
 
 	for (var layerIndex = 1; layerIndex < layers.length; layerIndex++) {
@@ -1033,7 +1036,7 @@ function removeTooThinFacets(mesh) {
 				var beginPointIndex = facet[checkIndex % facet.length]
 				var endPointIndex = facet[(checkIndex + 1) % facet.length]
 				if (getIsXYZSegmentClose(points[beginPointIndex], points[endPointIndex], point)) {
-					addElementToMapArray(pointIndex, getEdgeKey(beginPointIndex, endPointIndex), segmentMap)
+					addElementToMapArray(segmentMap, getEdgeKey(beginPointIndex, endPointIndex), pointIndex)
 				}
 			}
 		}
@@ -1067,6 +1070,7 @@ function removeTooThinFacets(mesh) {
 
 function removeTriangulateTransform(matrix3D, mesh) {
 	removeTooThinFacets(mesh)
+	removeUnfacetedPoints(mesh)
 	triangulateBentFacets(mesh)
 	mesh.points = get3DsBy3DMatrix(matrix3D, mesh.points)
 	return mesh
@@ -1227,10 +1231,10 @@ var gSculpture = {
 		var layers = []
 		for (var child of statement.children) {
 			if (child.tag == 'layer') {
-				connectionAngle = getValueByDefault(connectionAngle, getFloatByStatement('connectionAngle', registry, child))
+				connectionAngle = getValueDefault(getFloatByStatement('connectionAngle', registry, child), connectionAngle)
 				var childMatrices = getMatrices3D(registry, child, null)
 				var polygonStatements = getPolygonStatementsRecursively(registry, child, 1)
-				vertical = getValueByDefault(vertical, getBooleanByStatement('vertical', registry, child))
+				vertical = getValueDefault(getBooleanByStatement('vertical', registry, child), vertical)
 				var id = child.attributeMap.get('id')
 				var workIDs = getStrings('work', child)
 				for (var count = 0; count < childMatrices.length; count++) {
@@ -1275,7 +1279,7 @@ var gSculpture = {
 }
 
 function getVerticalHingeMesh
-(chamferAngle, fromAngle, gap, height, innerRadius, matrix3D, numberOfSides, outerRadius, outset, stopperThickness, toAngle) {
+(chamferAngle, chamferOutset, fromAngle, gap, height, innerRadius, matrix3D, numberOfSides, outerRadius, stopperThickness, toAngle) {
 	var center = [outerRadius, outerRadius + gap]
 	var hingeRight = outerRadius * 2.0
 	var polygon = spiralCenterRadius(center, outerRadius, fromAngle, toAngle, numberOfSides)
@@ -1300,11 +1304,11 @@ function getVerticalHingeMesh
 	else {
 		return getPillarMesh(heights, matrix3D, [polygon])
 	}
-	var chamferDepth = outset / Math.tan(0.5 * chamferAngle * gRadiansPerDegree)
+	var chamferDepth = chamferOutset / Math.tan(0.5 * chamferAngle * gRadiansPerDegree)
 	var layers = []
-	var outsets = [outset, outset]
+	var outsets = [chamferOutset, chamferOutset]
 	var outsetPolygon = getOutsetPolygon(outsets, innerPolygon)
-	stopperThickness = getValueByDefault(0.0, stopperThickness)
+	stopperThickness = getValueZero(stopperThickness)
 
 	if (stopperThickness <= 0.0) {
 		layers.push({matrix3D:getMatrix3DByTranslateZ([0]), polygons:[polygon, outsetPolygon], vertical:true})
@@ -1326,6 +1330,7 @@ var gVerticalHinge = {
 	name: 'verticalHinge',
 	processStatement:function(registry, statement) {
 		var chamferAngle = getFloatByDefault(90.0, 'chamferAngle', registry, statement, this.name)
+		var chamferOutset = getFloatByDefault(1.0, 'chamferOutset', registry, statement, this.name)
 		var fromAngle = getFloatByDefault(0.0, 'fromAngle', registry, statement, this.name)
 		var gap = getFloatByDefault(0.0, 'gap', registry, statement, this.name)
 		var height = getFloatByDefault(10.0, 'height', registry, statement, this.name)
@@ -1333,11 +1338,10 @@ var gVerticalHinge = {
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var numberOfSides = getFloatByDefault(48.0, 'sides', registry, statement, this.name)
 		var outerRadius = getFloatByDefault(10.0, 'outerRadius', registry, statement, this.name)
-		var outset = getFloatByDefault(1.0, 'outset', registry, statement, this.name)
 		var stopperThickness = getFloatByDefault(0.0, 'stopperThickness', registry, statement, this.name)
 		var toAngle = getFloatByDefault(180.0, 'toAngle', registry, statement, this.name)
 		var verticalHingeMesh = getVerticalHingeMesh(
-		chamferAngle, fromAngle, gap, height, innerRadius, matrix3D, numberOfSides, outerRadius, outset, stopperThickness, toAngle)
+		chamferAngle, chamferOutset, fromAngle, gap, height, innerRadius, matrix3D, numberOfSides, outerRadius, stopperThickness, toAngle)
 		analyzeOutputMesh(verticalHingeMesh, registry, statement)
 	}
 }
