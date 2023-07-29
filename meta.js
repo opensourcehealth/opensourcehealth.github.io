@@ -54,23 +54,20 @@ function addEntriesToStatementLine(entries, registry, statement) {
 	registry.lineUpdated = true
 }
 
-function addFunctionsToVariableEntries(functionsToAdd, optionSet) {
-	for (var functionToAdd of functionsToAdd) {
-		addFunctionToVariableEntries(functionToAdd, optionSet)
-	}
-}
-
-function addFunctionToVariableEntries(functionToAdd, optionSet) {
+function addFunctionToMap(functionToAdd, optionSet, map) {
 	var functionName = functionToAdd.name
 	if (functionName.endsWith('_Check')) {
 		functionName = functionName.slice(0, -6)
 	}
-	addFunctionToEntriesByName(functionToAdd, gVariableMapEntries, functionName, optionSet)
+
+	functionToAdd.optionSet = optionSet
+	getValueDefault(map, gFunctionMap).set(functionName, functionToAdd)
 }
 
-function addFunctionToEntriesByName(functionToAdd, mapEntries, name, optionSet) {
-	functionToAdd.optionSet = optionSet
-	mapEntries.push([name, functionToAdd])
+function addFunctionsToMap(functionsToAdd, optionSet, map) {
+	for (var functionToAdd of functionsToAdd) {
+		addFunctionToMap(functionToAdd, optionSet, map)
+	}
 }
 
 function addLineToParent(registry, statement) {
@@ -109,11 +106,11 @@ function addMeshesRecursively(depth, meshes, registry, statement) {
 function addMeshesToGroupStatement(idStart, meshes, registry, statement) {
 	for (var mesh of meshes) {
 		var meshStatement = getStatementByParentTag(new Map(), 0, statement, 'mesh')
-		copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, meshStatement.attributeMap)
+		copyKeysExcept(meshStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 		getUniqueID(idStart, registry, meshStatement)
 		analyzeOutputMesh(getMeshCopy(mesh), registry, statement)
 	}
-	deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+	deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 }
 
 function addMeshToStatement(inputArea, mesh, registry, statement) {
@@ -161,11 +158,11 @@ function addOutputArea(text, title) {
 function addPointsToGroupStatement(idStart, pointsStatements, registry, statement) {
 	for (var pointsStatement of pointsStatements) {
 		var tagStatement = getStatementByParentTag(new Map(), 0, statement, pointsStatement.statement.tag)
-		copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, tagStatement.attributeMap)
+		copyKeysExcept(tagStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 		getUniqueID(idStart, registry, tagStatement)
 		setPointsExcept(getArraysCopy(pointsStatement.points), registry, tagStatement)
 	}
-	deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+	deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 }
 
 function addStatementRecursively(depth, parent, registry, workStatement) {
@@ -181,7 +178,7 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	var statement = getStatementByParentTag(new Map(), workStatement.nestingIncrement, parent, workStatement.tag)
 	var workID = workStatement.attributeMap.get('id')
 	gWorkIDMap.set(workID, getUniqueID(parent.attributeMap.get('id') + '_' + workID, registry, statement))
-	copyMissingKeysExcept(gIDSet, workStatement.attributeMap, statement.attributeMap)
+	copyMissingKeysExcept(statement.attributeMap, workStatement.attributeMap, gIDSet)
 	if (workStatement.attributeMap.has('work')) {
 		var workWorkID = workStatement.attributeMap.get('work')
 		if (gWorkIDMap.has(workWorkID)) {
@@ -202,20 +199,6 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	}
 }
 
-function addVariableObjectToEntries(map, variableObject) {
-	var propertyNames = Object.getOwnPropertyNames(variableObject)
-	for (var propertyName of propertyNames) {
-		if (gLowerCharacterSet.has(propertyName[0])) {
-			map.set(propertyName, variableObject[propertyName])
-			variableObject[propertyName].optionSet = null
-		}
-		else {
-			map.set(propertyName, variableObject[propertyName].toString())
-		}
-	}
-	return map
-}
-
 function alterStatementPoints(registry, statement) {
 	var mesh = getMeshByID(statement.attributeMap.get('id'), registry)
 	if (mesh != undefined) {
@@ -233,7 +216,7 @@ function copyStatementRecursively(registry, statement, workStatement) {
 		noticeByList(['Will not copy a copy type statement in copyStatementRecursively in meta.', statement, workStatement])
 		return
 	}
-	copyMissingKeysExcept(gAlterationDisplayIDTransformWorkSet, workStatement.attributeMap, statement.attributeMap)
+	copyMissingKeysExcept(statement.attributeMap, workStatement.attributeMap, gAlterationDisplayIDTransformWorkSet)
 	var work2DMatrix = getChainSkipMatrix2D(registry, workStatement)
 	if (work2DMatrix != null) {
 		var statement2DMatrix = getMatrix2D(registry, statement)
@@ -253,6 +236,20 @@ function copyStatementRecursively(registry, statement, workStatement) {
 	for (var child of workStatement.children) {
 		addStatementRecursively(0, statement, registry, child)
 	}
+}
+
+function getAttributeString(registry) {
+	var attributeValues = []
+	for (var line of registry.lines) {
+		var statement = getStatement(line)
+		if (statement.attributeMap != undefined) {
+			for (var value of statement.attributeMap.values()) {
+				attributeValues.push(value)
+			}
+		}
+	}
+
+	return attributeValues.join(' ')
 }
 
 function getDistanceSquaredToStatement(location, registry, statement) {
@@ -315,6 +312,21 @@ function getInputArea(title) {
 		document.body.appendChild(textArea)	
 	}
 	return textArea
+}
+
+function getMapByVariableObject(variableObject) {
+	var map = new Map()
+	var propertyNames = Object.getOwnPropertyNames(variableObject)
+	for (var propertyName of propertyNames) {
+		if (gLowerCharacterSet.has(propertyName[0])) {
+			map.set(propertyName, variableObject[propertyName])
+			variableObject[propertyName].optionSet = null
+		}
+		else {
+			map.set(propertyName, variableObject[propertyName].toString())
+		}
+	}
+	return map
 }
 
 function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
@@ -582,65 +594,6 @@ function setClosestStatementRecursively(closestDistanceStatement, depth, locatio
 	}
 }
 
-function ViewImage() {
-	this.draw = function() {
-		if (this.image == undefined) {
-			this.image = new Image()
-			this.image.src = this.filename
-		}
-		clearBoundingBox(this.controlBoundingBox, viewBroker.context)
-		if (this.image.complete) {
-			if (this.height == null) {
-				var greatestDimension = Math.max(this.image.naturalHeight, this.image.naturalWidth)
-				var zoomRatio = 1.0 * viewBroker.canvas.height / greatestDimension
-				this.height = zoomRatio * this.image.naturalHeight
-				this.width = zoomRatio * this.image.naturalWidth
-				this.halfCanvasMinus = viewBroker.halfWidth - this.width / 2
-				this.canvasHeightMinus = viewBroker.canvas.height - this.height
-			}
-			viewBroker.context.drawImage(this.image, this.halfCanvasMinus, this.canvasHeightMinus, this.width, this.height)
-		}
-		else {
-			this.image.onload = wordscapeViewerDraw
-		}
-	}
-	this.height = null
-	this.isDownloadHidden = true
-	this.mouseDown = function(event) {
-		this.polyline.push(viewBroker.mouseDown2D)
-		var boundingBox = getBoundingBox(this.polyline)
-		var minimumPoint = boundingBox[0]
-		var size = getSubtraction2D(boundingBox[1], minimumPoint)
-		var maximumDimension = Math.max(Math.max(size[0], size[1]), 1.0)
-		var fittedString = ''
-		var multiplier = 100.0 / maximumDimension
-		for (var fittedIndex = 0; fittedIndex < this.polyline.length; fittedIndex++) {
-			var point = this.polyline[fittedIndex]
-			var x = multiplier * (point[0] - minimumPoint[0])
-			var y = multiplier * (boundingBox[1][1] - point[1])
-			fittedString += x.toFixed(1) + ',' + y.toFixed(1) + ' '
-		}
-		console.log(fittedString)
-	}
-	this.mouseMove = function(event) {
-		var characterBegin = viewBroker.analysisCharacterStart
-		var context = viewBroker.context
-		context.clearRect(characterBegin, 0, viewBroker.canvas.width, viewBroker.doubleTextSpace + 1)
-		setTextContext(context)
-		context.textAlign = 'left'
-		context.fillText('x :  ' + event.offsetX, characterBegin, viewBroker.textSpace)
-		context.fillText('y :  ' + event.offsetY, characterBegin, viewBroker.doubleTextSpace)
-	}
-	this.mouseOut = function(event) {
-	}
-	this.mouseUp = function(event) {
-	}
-	this.polyline = []
-	this.start = function() {
-		this.controlBoundingBox = [[0, 0], [viewBroker.canvas.height, viewBroker.canvas.height]]
-	}
-}
-
 function workMesh(registry, statement, propertyName) {
 	var attributeMap = statement.attributeMap
 	if (!attributeMap.has('work')) {
@@ -682,31 +635,28 @@ var gAbstract = {
 			attributeMap.set('transform', scaleString)
 		}
 		titleStrings = []
-		gProject = null
+		var project = undefined
 		if (attributeMap.has('project')) {
-			gProject = attributeMap.get('project')
-			if (gProject != 'untitled') {
-				titleStrings.push(gProject)
-				registry.dataMap.set('project', gProject)
+			project = attributeMap.get('project')
+			if (project != 'untitled') {
+				titleStrings.push(project)
+				registry.dataMap.set('project', project)
 			}
 		}
-		gAbstractID = null
 		if (attributeMap.has('id')) {
-			gAbstractID = attributeMap.get('id')
-			if (gAbstractID != 'untitled' && gAbstractID != 'abstract' && gAbstractID != gProject) {
-				titleStrings.push(gAbstractID)
-				registry.dataMap.set('abstractID', gAbstractID)
+			var abstractID = attributeMap.get('id')
+			if (abstractID != 'untitled' && abstractID != 'abstract' && abstractID != project) {
+				titleStrings.push(abstractID)
+				registry.dataMap.set('abstractID', abstractID)
 			}
 		}
-		gDate = null
 		if (attributeMap.has('date')) {
-			gDate = attributeMap.get('date')
-			titleStrings.push(gDate)
-			registry.dataMap.set('date', gDate)
+			var date = attributeMap.get('date')
+			titleStrings.push(date)
+			registry.dataMap.set('date', date)
 		}
-		gTitle = titleStrings.join('_')
-		titleStrings.push('Wordscape')
-		document.title = titleStrings.join(' - ')
+		gTitle = titleStrings.join(' - ')
+		document.title = gTitle + ' - Wordscape'
 	}
 }
 
@@ -732,7 +682,7 @@ var gCopy = {
 			var closestDistanceStatement = {distance:Number.MAX_VALUE, statement:null}
 			setClosestStatementRecursively(closestDistanceStatement, 0, location, registry, workStatement)
 			workStatement = closestDistanceStatement.statement
-			if (workStatement == null) {
+			if (workStatement == undefined) {
 				noticeByList(['No objects to find closest to location in copy in meta.', workStatement, statement])
 				return
 			}
@@ -806,7 +756,7 @@ var gCopyMesh = {
 		}
 		for (var matrix3D of matrix3Ds) {
 			var matrixAttributeMap = new Map([['transform3D', 'matrix(' + matrix3D.toString() + ')']])
-			copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, matrixAttributeMap)
+			copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, 'mesh')
 			getUniqueID(idStart, registry, matrixStatement)
 			if (meshes.length == 1) {
@@ -817,7 +767,7 @@ var gCopyMesh = {
 				addMeshesToGroupStatement(matrixAttributeMap.get('id'), meshes, registry, matrixStatement)
 			}
 		}
-		deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+		deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 	}
 }
 
@@ -858,7 +808,7 @@ var gCopyPoints = {
 		}
 		for (var matrix2D of matrix2Ds) {
 			var matrixAttributeMap = new Map([['transform', 'matrix(' + matrix2D.toString() + ')']])
-			copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, matrixAttributeMap)
+			copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, pointsStatements[0].statement.tag)
 			getUniqueID(idStart, registry, matrixStatement)
 			if (pointsStatements.length == 1) {
@@ -869,7 +819,7 @@ var gCopyPoints = {
 				addPointsToGroupStatement(matrixAttributeMap.get('id'), pointsStatements, registry, matrixStatement)
 			}
 		}
-		deleteKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap)
+		deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 	}
 }
 
@@ -994,7 +944,7 @@ var gPolygonAnalysis = {
 			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
 			return
 		}
-		copyMissingKeys(getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)), statement.attributeMap)
+		copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
 	}
 }
 
@@ -1005,17 +955,14 @@ var gProcess = {
 	name: 'process',
 	processStatement: function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
-
 		if (workStatements.length > 0) {
 			for (var workStatement of workStatements) {
-				copyKeysExcept(gIDPointsTransformWorkSet, statement.attributeMap, workStatement.attributeMap)
-				var descendants = []
-				addToDescendantsInsideFirst(descendants, workStatement)
-				descendants.push(workStatement)
-				processStatementsByTagMap(new Set(), registry, descendants, gTagCenterMap)
+				copyKeysExcept(workStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+				processStatementsByTagMap(new Set(), registry, getDescendantsInsideFirst(workStatement), gTagCenterMap)
 			}
 			return
 		}
+
 		noticeByList(['No work attribute in process in meta.', statement])
 	}
 }
@@ -1184,15 +1131,15 @@ var gTriangleAnalysis = {
 			return
 		}
 		workMesh = getTriangleMesh(workMesh)
-		copyMissingKeys(getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)), statement.attributeMap)
+		copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
 	}
 }
 
 var gTSV = {
 	alterMesh: function(mesh, registry, statement) {
 		var id = getOutputOrWorkOrID(statement.attributeMap)
-		var date = getNullOrValue('date', registry.dataMap)
-		addOutputArea(getTSVMeshString(date, id, mesh, getNullOrValue('project', registry.dataMap)), 'TSV - ' + id)
+		var date = getNullOrValue(registry.dataMap, 'date')
+		addOutputArea(getTSVMeshString(date, id, mesh, getNullOrValue(registry.dataMap, 'project')), 'TSV - ' + id)
 	},
 	initialize: function() {
 		gAlterMeshMap.set(this.name, this)
@@ -1240,86 +1187,90 @@ var gURL = {
 var gVar = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
-		addFunctionsToVariableEntries([add2D_Check, add3D_Check, addArray_Check], null)
-		addFunctionsToVariableEntries([additionInterpolation, additionInterpolation2D, additionInterpolation3D], null)
-		addFunctionToVariableEntries(alongsFromToDistance, null)
-		addFunctionToVariableEntries(arcBeforeFromTo, gSetR)
-		addFunctionToVariableEntries(arcCenterRadius, null)
-		addFunctionToVariableEntries(arcFromToAngle, gSetR)
-		addFunctionToVariableEntries(arcFromToRadius, gSetR)
-		addFunctionToVariableEntries(arcTo, gSetR)
-		addFunctionToVariableEntries(arcToAngle, gSetR)
-		addFunctionToVariableEntries(arcToRadius, gSetR)
-		addFunctionToVariableEntries(arcWaveXFromToHeight, null)
-		addFunctionToVariableEntries(arcYXFromToHeight, null)
-		addFunctionToVariableEntries(arrayAtIndex_Check, null)
-		addFunctionToVariableEntries(attributeByIDKey, gSetRS)
-		addFunctionToVariableEntries(border, gSetRS)
-		addFunctionToVariableEntries(bracket, null)
-		addFunctionsToVariableEntries([crossProduct_Check, crossProduct2D_Check], null)
-		addFunctionsToVariableEntries([distance2D_Check, distanceSquared2D_Check, distance3D_Check, distanceSquared3D_Check], null)
-		addFunctionsToVariableEntries([distanceArray_Check, distanceSquaredArray_Check], null)
-		addFunctionsToVariableEntries([divide2D_Check, divide2DScalar_Check, divide3D_Check, divide3DScalar_Check], null)
-		addFunctionsToVariableEntries([divideArray_Check, divideArrayScalar_Check], null)
-		addFunctionToVariableEntries(ellipseFromToRadius, gSetR)
-		addFunctionToVariableEntries(ellipseToRadius, gSetR)
-		addFunctionToVariableEntries(floatByIDKey, gSetRS)
-		addFunctionToVariableEntries(floatByKeyID, gSetRS)
-		addFunctionsToVariableEntries([getAddition2D_Check, getAddition3D_Check, getAdditionArray_Check], null)
-		addFunctionsToVariableEntries([getDivision2D_Check, getDivision2DScalar_Check], null)
-		addFunctionsToVariableEntries([getDivision3D_Check, getDivision3DScalar_Check], null)
-		addFunctionsToVariableEntries([getDivisionArray_Check, getDivisionArrayScalar_Check], null)
-		addFunctionsToVariableEntries([getMultiplication2D_Check, getMultiplication2DScalar_Check], null)
-		addFunctionsToVariableEntries([getMultiplication3D_Check, getMultiplication3DScalar_Check], null)
-		addFunctionsToVariableEntries([getMultiplicationArray_Check, getMultiplicationArrayScalar_Check], null)
-		addFunctionsToVariableEntries([getSubtraction2D_Check, getSubtraction3D_Check, getSubtractionArray_Check], null)
-		addFunctionToVariableEntries(insetsHeightAngle, null)
-		addFunctionsToVariableEntries([intervalFromToBetween, intervalsFromQuantityIncrement, intervalsFromToAlong], null)
-		addFunctionsToVariableEntries([intervalsFromToBetween, intervalsFromToIncrement, intervalsFromToQuantity], null)
-		addFunctionToVariableEntries(joinPoints, gSetR)
-		addFunctionsToVariableEntries([length2D_Check, lengthSquared2D_Check, length3D_Check], null)
-		addFunctionsToVariableEntries([lengthSquared3D_Check, lengthArray_Check, lengthSquaredArray_Check], null)
-		addFunctionToVariableEntries(mirror, gSetR)
-		addFunctionToVariableEntries(mirrorJoin, gSetR)
-		addFunctionsToVariableEntries([multiply2D_Check, multiply2DScalar_Check, multiply3D_Check, multiply3DScalar_Check], null)
-		addFunctionsToVariableEntries([multiplyArray_Check, multiplyArrayScalar_Check], null)
-		addFunctionsToVariableEntries([parabolaFromToQuantity, parabolaToQuantity], gSetR)
-		addFunctionToVariableEntries(point, gSetRS)
-		addFunctionToVariableEntries(pointsByID, gSetRS)
-		addFunctionToVariableEntries(polar_Check, null)
-		addFunctionToVariableEntries(rightByID, gSetRS)
-		addFunctionsToVariableEntries([reverseSigns_Check, rotate2DAngle_Check, rotate2DVector_Check, getRotation2DVector_Check], null)
-		addFunctionsToVariableEntries([setAttributesArrays, setAttributeByID, setAttributesRowTable, setAttributesTable], gSetRS)
-		addFunctionsToVariableEntries([sideHypoteneuse_Check, sideHypoteneuseSquared_Check], null)
-		addFunctionToVariableEntries(sineWaveXFromToCycles, null)
-		addFunctionToVariableEntries(sineYXFromToCycles, null)
-		addFunctionToVariableEntries(spiralBeforeFromTo, gSetR)
-		addFunctionToVariableEntries(spiralCenterRadius, null)
-		addFunctionToVariableEntries(spiralFromToAngle, gSetR)
-		addFunctionToVariableEntries(spiralFromToRadius, gSetR)
-		addFunctionToVariableEntries(spiralTo, gSetR)
-		addFunctionToVariableEntries(spiralToAngle, gSetR)
-		addFunctionToVariableEntries(spiralToRadius, gSetR)
-		addFunctionsToVariableEntries([stepsFromQuantityIncrement, stepsQuantityIncrement], gSetR)
-		addFunctionsToVariableEntries([stepFromToBetween, stepsFromToAlong, stepsFromToBetween, stepsFromToQuantity], gSetR)
-		addFunctionsToVariableEntries([stepsToAlong, stepsToBetween, stepsToQuantity, stepToBetween], gSetR)
-		addFunctionToVariableEntries(stringLength, gSetRS)
-		addFunctionsToVariableEntries([subtract2D_Check, subtract3D_Check, subtractArray_Check], null)
-		addFunctionToVariableEntries(topByID, gSetRS)
-		addFunctionToVariableEntries(toward, null)
-		addFunctionToVariableEntries(zigzag, null)
-		addFunctionsToVariableEntries([zoomInterpolation, zoomInterpolation2D, zoomInterpolation3D], null)
-		gVariableMapEntries.push(['Array', addVariableObjectToEntries(new Map(), Array)])
-		gVariableMapEntries.push(['Date', addVariableObjectToEntries(new Map(), Date)])
-		var mathMap = new Map()
-		gVariableMapEntries.push(['Math', addVariableObjectToEntries(mathMap, Math)])
+		addFunctionToMap(alongsFromToDistance, null)
+		addFunctionToMap(arcBeforeFromTo, gSetR)
+		addFunctionToMap(arcCenterRadius, null)
+		addFunctionToMap(arcFromToAngle, gSetR)
+		addFunctionToMap(arcFromToRadius, gSetR)
+		addFunctionToMap(arcTo, gSetR)
+		addFunctionToMap(arcToAngle, gSetR)
+		addFunctionToMap(arcToRadius, gSetR)
+		addFunctionToMap(arcWaveXFromToHeight, null)
+		addFunctionToMap(arcYXFromToHeight, null)
+		addFunctionToMap(attributeByIDKey, gSetRS)
+		addFunctionToMap(border, gSetRS)
+		addFunctionToMap(bracket, null)
+		addFunctionToMap(ellipseFromToRadius, gSetR)
+		addFunctionToMap(ellipseToRadius, gSetR)
+		addFunctionToMap(floatByIDKey, gSetRS)
+		addFunctionToMap(floatByKeyID, gSetRS)
+		addFunctionToMap(insetsHeightAngle, null)
+		addFunctionsToMap([intervalFromToBetween, intervalsFromQuantityIncrement, intervalsFromToAlong], null)
+		addFunctionsToMap([intervalsFromToBetween, intervalsFromToIncrement, intervalsFromToQuantity], null)
+		addFunctionToMap(joinPoints, gSetR)
+		addFunctionToMap(mirror, gSetR)
+		addFunctionToMap(mirrorJoin, gSetR)
+		addFunctionsToMap([parabolaFromToQuantity, parabolaToQuantity], gSetR)
+		addFunctionToMap(point, gSetRS)
+		addFunctionToMap(pointsByID, gSetRS)
+		addFunctionToMap(rightByID, gSetRS)
+		addFunctionsToMap([setAttributesArrays, setAttributeByID, setAttributesRowTable, setAttributesTable], gSetRS)
+		addFunctionToMap(sineWaveXFromToCycles, null)
+		addFunctionToMap(sineYXFromToCycles, null)
+		addFunctionToMap(spiralBeforeFromTo, gSetR)
+		addFunctionToMap(spiralCenterRadius, null)
+		addFunctionToMap(spiralFromToAngle, gSetR)
+		addFunctionToMap(spiralFromToRadius, gSetR)
+		addFunctionToMap(spiralTo, gSetR)
+		addFunctionToMap(spiralToAngle, gSetR)
+		addFunctionToMap(spiralToRadius, gSetR)
+		addFunctionsToMap([stepsFromQuantityIncrement, stepsQuantityIncrement], gSetR)
+		addFunctionsToMap([stepFromToBetween, stepsFromToAlong, stepsFromToBetween, stepsFromToQuantity], gSetR)
+		addFunctionsToMap([stepsToAlong, stepsToBetween, stepsToQuantity, stepToBetween], gSetR)
+		addFunctionToMap(stringLength, gSetRS)
+		addFunctionToMap(topByID, gSetRS)
+		addFunctionToMap(toward, null)
+		addFunctionToMap(zigzag, null)
+		addFunctionsToMap([zoomInterpolation, zoomInterpolation2D, zoomInterpolation3D], null)
+		gFunctionMap.set('Array', getMapByVariableObject(Array))
+		gFunctionMap.set('Date', getMapByVariableObject(Date))
+		var mathMap = getMapByVariableObject(Math)
+		gFunctionMap.set('Math', mathMap)
 		mathMap.set('DegreesPerRadian', gDegreesPerRadian.toString())
 		mathMap.set('DR', gDegreesPerRadian.toString())
 		mathMap.set('RadiansPerDegree', gRadiansPerDegree.toString())
 		mathMap.set('RD', gRadiansPerDegree.toString())
 		mathMap.set('PI2', gDoublePi.toString())
-		gVariableMapEntries.push(['Number', addVariableObjectToEntries(new Map(), Number)])
-		gVariableMapEntries.push(['String', addVariableObjectToEntries(new Map(), String)])
+		gFunctionMap.set('Number', getMapByVariableObject(Number))
+		gFunctionMap.set('String', getMapByVariableObject(String))
+		var vectorMap = getMapByVariableObject(Math)
+		gFunctionMap.set('Vector', vectorMap)
+		addFunctionsToMap([add2D_Check, add3D_Check, addArray_Check], null, vectorMap)
+		addFunctionsToMap([additionInterpolation, additionInterpolation2D, additionInterpolation3D], null, vectorMap)
+		addFunctionToMap(arrayAtIndex_Check, null, vectorMap)
+		addFunctionsToMap([crossProduct_Check, crossProduct2D_Check], null, vectorMap)
+		addFunctionsToMap([distance2D_Check, distanceSquared2D_Check, distance3D_Check, distanceSquared3D_Check], null, vectorMap)
+		addFunctionsToMap([distanceArray_Check, distanceSquaredArray_Check], null, vectorMap)
+		addFunctionsToMap([divide2D_Check, divide2DScalar_Check, divide3D_Check, divide3DScalar_Check], null, vectorMap)
+		addFunctionsToMap([divideArray_Check, divideArrayScalar_Check], null, vectorMap)
+		addFunctionsToMap([equal2D_Check, equal3D_Check, equalArray_Check], null, vectorMap)
+		addFunctionsToMap([getAddition2D_Check, getAddition2Ds_Check, getAddition3D_Check, getAdditionArray_Check], null, vectorMap)
+		addFunctionsToMap([getDivision2D_Check, getDivision2DScalar_Check], null, vectorMap)
+		addFunctionsToMap([getDivision3D_Check, getDivision3DScalar_Check], null, vectorMap)
+		addFunctionsToMap([getDivisionArray_Check, getDivisionArrayScalar_Check], null, vectorMap)
+		addFunctionsToMap([getMultiplication2D_Check, getMultiplication2DScalar_Check], null, vectorMap)
+		addFunctionsToMap([getMultiplication3D_Check, getMultiplication3DScalar_Check], null, vectorMap)
+		addFunctionsToMap([getMultiplicationArray_Check, getMultiplicationArrayScalar_Check], null, vectorMap)
+		addFunctionsToMap([getSubtraction2D_Check, getSubtraction3D_Check, getSubtractionArray_Check], null, vectorMap)
+		addFunctionsToMap([length2D_Check, lengthSquared2D_Check, length3D_Check], null, vectorMap)
+		addFunctionsToMap([lengthSquared3D_Check, lengthArray_Check, lengthSquaredArray_Check], null, vectorMap)
+		addFunctionsToMap([multiply2D_Check, multiply2DScalar_Check, multiply3D_Check, multiply3DScalar_Check], null, vectorMap)
+		addFunctionsToMap([multiplyArray_Check, multiplyArrayScalar_Check], null, vectorMap)
+		addFunctionsToMap([oppositeHypoteneuseAdjacent_Check, oppositeHypoteneuseAdjacentSquared_Check], null, vectorMap)
+		addFunctionToMap(polar_Check, null, vectorMap)
+		addFunctionsToMap([reverseSigns_Check, rotate2DAngle_Check, rotate2DVector_Check, getRotation2DVector_Check], null, vectorMap)
+		addFunctionsToMap([getRotation2DX_Check, getRotation2DY_Check], null, vectorMap)
+		addFunctionsToMap([subtract2D_Check, subtract3D_Check, subtractArray_Check], null, vectorMap)
 	},
 	name: 'var',
 	processStatement: function(registry, statement) {
@@ -1338,30 +1289,116 @@ var gVar = {
 	}
 }
 
+var gVarAnalysis = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'varAnalysis',
+	processStatement: function(registry, statement) {
+		var workStatements = getWorkStatements(registry, statement)
+		if (workStatements.length == 0) {
+			var parent = statement
+			for (var whileCount = 0; whileCount < gLengthLimit; whileCount++) {
+				if (parent.parent == undefined) {
+					break
+				}
+				else {
+					parent = parent.parent
+				}
+			}
+			workStatements = [parent]
+		}
+
+		var descendantSet = new Set()
+		for (var workStatement of workStatements) {
+			addElementsToSet(descendantSet, getDescendantsInsideFirst(workStatement))
+		}
+
+		var variableMap = new Map()
+		for (var descendant of descendantSet) {
+			if (descendant.variableMap != undefined) {
+				for (var key of descendant.variableMap.keys()) {
+					if (!key.startsWith('_')) {
+						variableMap.set(key, descendant.variableMap.get(key))
+					}
+				}
+			}
+		}
+
+		if (getBooleanByDefault(false, 'all', registry, statement, this.name)) {
+			var allVariables = []
+			for (var entry of variableMap.entries()) {
+				allVariables.push(entry)
+			}
+			allVariables.sort(compareStringZeroAscending)
+			statement.attributeMap.set('allVariables', allVariables.join(' ').toString())
+		}
+
+		if (getBooleanByDefault(true, 'unused', registry, statement, this.name)) {
+			var attributeString = getAttributeString(registry)
+			var unusedVariables = []
+			for (var key of variableMap.keys()) {
+				if (attributeString.indexOf(key) == -1) {
+					unusedVariables.push(key)
+				}
+			}
+			statement.attributeMap.set('unusedVariables', unusedVariables.toString().replace(/,/g, ' '))
+		}
+	}
+}
+
 var gView = {
 	alterMesh: function(mesh, registry, statement) {
 		if (mesh == null) {
 			return
 		}
+
 		var view = new ViewMesh()
 		view.id = statement.attributeMap.get('id')
-		viewBroker.minimumHeight = Math.max(viewBroker.minimumHeight, 96)
 		registry.views.push(view)
 	},
 	getPoints: function(points, registry, statement) {
-		if (statement.tag != 'image') {
+		var id = statement.attributeMap.get('id')
+		if (statement.tag == 'image') {
+			if (statement.attributeMap.has('href')) {
+				var view = new ViewPoints()
+				view.filename = statement.attributeMap.get('href')
+				view.id = id
+				registry.views.push(view)
+			}
+			else {
+				noticeByList(['No href for image in meta.', statement])
+			}
 			return points
 		}
-		if (statement.attributeMap.has('href')) {
-			var view = new ViewImage()
-			view.filename = statement.attributeMap.get('href')
-			view.id = statement.attributeMap.get('id')
-			viewBroker.minimumHeight = Math.max(viewBroker.minimumHeight, 256)
-			registry.views.push(view)
+
+		if (getIsEmpty(points)) {
+			noticeByList(['No points for view in meta.', statement])
+			return points
 		}
-		else {
-			noticeByList(['No href for image in meta.', statement])
+
+		var view = new ViewPoints()
+		view.id = id
+		view.lineStatement = getStatement(registry.lines[statement.lineIndex])
+		var parent = statement
+		var parents = []
+		for (var whileCount = 0; whileCount < gRecursionLimit; whileCount++) {
+			parents.push(parent)
+			parent = parent.parent
+			if (parent == undefined) {
+				break
+			}
 		}
+
+		view.lineStatement.variableMap = new Map()
+		parents.reverse()
+		for (var parent of parents) {
+			if (parent.variableMap != undefined) {
+				addMapToMap(view.lineStatement.variableMap, parent.variableMap)
+			}
+		}
+
+		registry.views.push(view)
 		return points
 	},
 	initialize: function() {
@@ -1379,8 +1416,8 @@ var gView = {
 			}
 			return
 		}
-		var workStatements = getWorkStatements(registry, statement)
 
+		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length == 0) {
 			noticeByList(['No workStatements could be found for view in alteration.', statement])
 		}
@@ -1405,5 +1442,5 @@ var gWindow = {
 
 var gMetaProcessors = [
 	gAbstract, gCopy, gCopyMesh, gCopyPoints, gDelete, gGroup, gHelp, gMatrix2D, gMatrix3D, gPolygonAnalysis,
-	gProcess, gRow, gSpreadsheet, gSTLInput, gSTL, gString, gTriangleAnalysis, gTSV, gTSVInput, gVar, gView, gWindow
+	gProcess, gRow, gSpreadsheet, gSTLInput, gSTL, gString, gTriangleAnalysis, gTSV, gTSVInput, gVar, gVarAnalysis, gView, gWindow
 ]
