@@ -1,6 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gVariableMapEntries = []
+var gFunctionMap = new Map()
 
 function addValueToArrayByKeys(array, keys, value) {
 	for (var key of keys) {
@@ -682,7 +682,13 @@ function VariableMonad() {
 	this.getRawValue = function(statement) {
 		this.valueString = this.valueString.trim()
 		if (this.previousMap == null) {
-			return getVariableValue(this.valueString, statement)
+			var variableValue = getVariableValue(this.valueString, statement)
+			if (variableValue == undefined) {
+				if (gFunctionMap.has(this.valueString)) {
+					variableValue = gFunctionMap.get(this.valueString)
+				}
+			}
+			return variableValue
 		}
 		return this.previousMap.get(this.valueString)
 	}
