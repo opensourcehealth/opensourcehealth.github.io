@@ -115,7 +115,7 @@ function addSpacel(key, signedIntersectionsMap) {
 	var parameters = key.split(',');
 	var intersectionKey = parameters.slice(1).join(',')
 	var x = parseInt(parameters[0])
-	addElementToMapArray(x, intersectionKey, signedIntersectionsMap)
+	addElementToMapArray(signedIntersectionsMap, intersectionKey, x)
 }
 
 function addTestPixels(pixelMap) {
@@ -216,10 +216,10 @@ function getIntersectionPairsMapBoolean(existenceCondition, signB, intersectionP
 	var intersectionPairsMapBoolean = new Map()
 	var keySet = new Set()
 	if (intersectionPairsMapA != null) {
-		addElementsToSet(intersectionPairsMapA.keys(), keySet)
+		addElementsToSet(keySet, intersectionPairsMapA.keys())
 	}
 	if (intersectionPairsMapB != null) {
-		addElementsToSet(intersectionPairsMapB.keys(), keySet)
+		addElementsToSet(keySet, intersectionPairsMapB.keys())
 	}
 	for (var key of keySet) {
 		var intersectionPairsA = null
