@@ -13,7 +13,7 @@ function addPolygonsToGroup(polygons, registry, statement, copyKeys = true) {
 		var polygonStatement = getStatementByParentTag(new Map(), 0, statement, 'polygon')
 		getUniqueID(idStart + polygonIndex.toString(), registry, polygonStatement)
 		if (copyKeys) {
-			copyMissingKeysExcept(exceptionSet, statement.attributeMap, polygonStatement.attributeMap)
+			copyMissingKeysExcept(polygonStatement.attributeMap, statement.attributeMap, exceptionSet)
 		}
 		setPointsHD(polygons[polygonIndex], polygonStatement)
 		gPolygon.processStatement(registry, polygonStatement)
@@ -146,7 +146,7 @@ function closeByDYMultiplier(dyMultiplier, monad, registry, statement) {
 }
 
 function createCharacterPolylineMap() {
-	gLetteringSet = new Set('.3568BKRX'.split(''))
+	gLetteringSet = new Set('3568ABKMNRVWX'.split(''))
 	gLetteringMap = new Map()
 	var bottomDiagonal = [[0, 1], [1, 0]]
 	var bottomHorizontalSemicircle = arcFromTo(1, 0.5, 0, 0.5, 0.5)
@@ -184,7 +184,7 @@ function createCharacterPolylineMap() {
 	var eight = center.concat(arcCenterRadius(0.5, 1.5, 0.5, 240, -60)).concat(center)
 	gLetteringMap.set('8', [eight.concat(arcCenterRadius(0.5, 0.5, 0.5, 60, -240)).concat(center)])
 	gLetteringMap.set('9', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
-	gLetteringMap.set('A', [[[,], [0.15, 0.4], [0.75, 2], [1.35, 0.4], [1.5, 0]], [[0.15, 0.4], [1.35,]]])
+	gLetteringMap.set('A', [[[,], [0.14, 0.4], [0.7, 2], [0.8,], [1.36, 0.4], [1.5, 0]], [[0.14, 0.4], [1.36,]]])
 	gLetteringMap.set('B', [bottomSemicircle, leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('C', [bottomLeftArc, leftTallSemicircle, topRightArc])
 	gLetteringMap.set('D', [arcFromTo(0, 2, 0, 0, 1), leftLine])
@@ -196,8 +196,8 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('J', [[[0.5, 2], [1,]], lowRightLine, bottomHorizontalSemicircle])
 	gLetteringMap.set('K', [leftBisectedPolyline, bottomDiagonal, topDiagonal])
 	gLetteringMap.set('L', [bottomLine, leftLine])
-	gLetteringMap.set('M', [[[,], [, 2], [0.75, 0.2], [1.5, 2], [, 0]]])
-	gLetteringMap.set('N', [leftLine, diagonalDown, rightLine])
+	gLetteringMap.set('M', [[[,], [, 2], [0.04,], [0.73, 0.8], [0.77,], [1.46, 2], [1.5,], [, 0]]])
+	gLetteringMap.set('N', [leftLine.concat([[0.04, 2], [0.96, 0]]).concat(rightLine)])
 	gLetteringMap.set('O', [leftTallSemicircle, rightTallSemicircle])
 	gLetteringMap.set('P', [leftBisectedPolyline, topSemicircle])
 	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5,], [0.9, -0.15]]])
@@ -207,8 +207,8 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('S', s)
 	gLetteringMap.set('T', [middleVerticalLine, [[, 2], [0.5, 2], [1,]]])
 	gLetteringMap.set('U', [lowRightLine, bottomHorizontalSemicircle, lowLeftLine])
-	gLetteringMap.set('V', [[[, 2], [0.5, 0], [1, 2]]])
-	gLetteringMap.set('W', [[[, 2], [0.375, 0], [0.75, 1.8], [1.125, 0], [1.5, 2]]])
+	gLetteringMap.set('V', [[[, 2], [0.48, 0], [0.52,], [1, 2]]])
+	gLetteringMap.set('W', [[[, 2], [0.35, 0], [0.4,], [0.73, 1.4], [0.77,], [1.15, 0], [1.2, 0], [1.5, 2]]])
 	gLetteringMap.set('X', [diagonalDown, diagonalUp])
 	gLetteringMap.set('Y', [[[0.5,], [, 1]], [[0, 2], [0.5, 1], [1, 2]]])
 	gLetteringMap.set('Z', [bottomLine, diagonalUp, topLine])
@@ -239,32 +239,20 @@ function getAnchorFontParent(registry, statement) {
 }
 
 function getBox(registry, statement) {
-	var points = getPointsHD(registry, statement)
-	if (getIsEmpty(points)) {
-		return null
-	}
-	for (var point of points) {
-		if (point.length == 1) {
-			point.push(point[0])
-		}
-	}
+	var points = getRectangularPoints([10], registry, statement)
 	var pointZero = points[0]
-	if (points.length == 1) {
-		points.push([0.0, 0.0])
-	}
-	if (points.length == 2) {
-		var minimumX = Math.min(points[0][0], points[1][0])
-		var minimumY = Math.min(points[0][1], points[1][1])
-		var maximumX = Math.max(points[0][0], points[1][0])
-		var maximumY = Math.max(points[0][1], points[1][1])
-		points = [[minimumX, minimumY], [minimumX, maximumY], [maximumX, maximumY], [maximumX, minimumY]]
-	}
+	var minimumX = Math.min(points[0][0], points[1][0])
+	var minimumY = Math.min(points[0][1], points[1][1])
+	var maximumX = Math.max(points[0][0], points[1][0])
+	var maximumY = Math.max(points[0][1], points[1][1])
+	points = [[minimumX, minimumY], [maximumX, minimumY], [maximumX, maximumY], [minimumX, maximumY]]
 	if (pointZero.length > 2) {
-		var z = points[0][2]
+		var z = pointZero[2]
 		for (var point of points) {
 			point.push(z)
 		}
 	}
+
 	return points
 }
 
@@ -285,12 +273,13 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 	var averageAdvance = halfHeight + betweenCharacter
 	var letteringOutlines = []
 	var maximumX = 0
-	var radius = strokeWidth / fontSize
-	var outsets = [[radius, radius]]
+	var outset = strokeWidth / fontSize
+	var outsets = [[outset, outset]]
 	var x = 0
 	if (gLetteringMap == null) {
 		createCharacterPolylineMap()
 	}
+
 	for (var character of text) {
 		var polylines = gLetteringMap.get(character)
 		if (polylines == null) {
@@ -299,7 +288,7 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 		else {
 			var outlines = getOutlines(null, null, gLetteringSet.has(character), true, outsets, polylines, null)
 			if (!isIsland) {
-				outlines = outlines.filter(getIsClockwise)
+				outlines = outlines.filter(getIsCounterclockwise)
 			}
 			var polygon = getConnectedPolygon(outlines)
 			polygon = getArraysCopy(polygon)
@@ -359,7 +348,32 @@ function getNextYString(fontSize, monad, yString) {
 	if (lineHeightString != undefined) {
 		fontSize = parseFloat(lineHeightString)
 	}
+
 	return (parseFloat(yString) + fontSize).toString()
+}
+
+function getRectangularPoints(defaultValue, registry, statement) {
+	var points = getPointsHD(registry, statement)
+	if (getIsEmpty(points)) {
+		points=[defaultValue]
+	}
+
+	for (var point of points) {
+		if (point.length == 1) {
+			point.push(point[0])
+		}
+	}
+
+	var pointZero = points[0]
+	if (points.length == 1) {
+		var point = [0.0, 0.0]
+		if (pointZero.length > 2) {
+			point.push(pointZero[2])
+		}
+		points.splice(0, 0, point)
+	}
+
+	return points
 }
 
 function getRegularPolygon(center, isClockwise, outsideness, radius, sideOffset, sides, startAngle) {
@@ -426,6 +440,26 @@ function getTextLength(text) {
 		}
 	}
 	return textLength
+}
+
+function getTrapezoid(beginX, endX, points, widening) {
+	var begin = points[0]
+	var end = points[1]
+	var trapezoid = []
+	var beginEnd = getSubtraction2D(end, begin)
+	var beginEndLength = length2D(beginEnd)
+	if (beginEndLength == 0.0) {
+		noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
+		return []
+	}
+
+	divide2DScalar(beginEnd, beginEndLength)
+	var beginEndX = [beginEnd[1], -beginEnd[0]]
+	trapezoid = [getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[1] + widening))]
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[1] + widening)))
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[0] - widening)))
+	trapezoid.push(getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[0] - widening)))
+	return trapezoid
 }
 
 function ItalicMonad() {
@@ -559,9 +593,9 @@ function TableMonad() {
 		var fontSize = getAttributeFloat('font-size', this)
 		var sourceStatement = registry.idMap.get(src)
 		var sourceChildren = sourceStatement.children
-		var numberOfColumns = parseInt(getValueByDefault('1', getAttributeValue('columns', this)))
+		var numberOfColumns = parseInt(getValueDefault(getAttributeValue('columns', this), '1'))
 		var x = getAttributeFloat('padding', this)
-		var numberOfRows = parseInt(getValueByDefault('1', getAttributeValue('rows', this)))
+		var numberOfRows = parseInt(getValueDefault(getAttributeValue('rows', this), '1'))
 		var numberOfCells = Math.min(numberOfColumns * numberOfRows, sourceChildren.length)
 		var width = getAttributeFloat('width', this)
 		var remainingLength = sourceChildren.length - numberOfCells
@@ -746,8 +780,8 @@ var gGrid = {
 	initialize: function() {
 		gParentFirstSet.add(this.name)
 		gTagCenterMap.set(this.name, this)
-		addFunctionToVariableEntries(cellX, gSetR)
-		addFunctionToVariableEntries(cellY, gSetR)
+		addFunctionToMap(cellX, gSetR)
+		addFunctionToMap(cellY, gSetR)
 	},
 	name: 'grid',
 	processStatement: function(registry, statement) {
@@ -933,7 +967,7 @@ var gList = {
 			var name = formatMonad.attributeMap.get('name')
 			if (attributeMap.has(name)) {
 				var value = attributeMap.get(name)
-				value = getValueByDefault(value, getVariableValue(value, statement))
+				value = getValueDefault(getVariableValue(value, statement), value)
 				var key = getAttributeValue('key', formatMonad)
 				if (key != undefined) {
 					value = value.trim()
@@ -1100,9 +1134,8 @@ var gPolygon = {
 	name: 'polygon',
 	processStatement: function(registry, statement) {
 		var points = getPointsHD(registry, statement)
-		if (points == null) {
-			noticeByList(['No points could be found for polygon in generator2d.', statement])
-			return
+		if (getIsEmpty(points)) {
+			points = [[0, 0], [10, 0], [0, 10]]
 		}
 		setPointsExcept(points, registry, statement)
 	}
@@ -1115,9 +1148,8 @@ var gPolyline = {
 	name: 'polyline',
 	processStatement: function(registry, statement) {
 		var points = getPointsHD(registry, statement)
-		if (points == null) {
-			noticeByList(['No points could be found for polyline in generator2d.', statement])
-			return
+		if (getIsEmpty(points)) {
+			points = [[0, 0], [10, 0]]
 		}
 		setPointsExcept(points, registry, statement)
 	}
@@ -1131,10 +1163,6 @@ var gRectangle = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'polygon'
 		var points = getBox(registry, statement)
-		if (getIsEmpty(points)) {
-			noticeByList(['No points could be found for rectangle in generator2d.', statement])
-			return
-		}
 		setPointsExcept(points, registry, statement)
 	}
 }
@@ -1297,7 +1325,7 @@ var gTable = {
 	name: 'table',
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
-		var spreadsheetID = getValueByDefault(attributeMap.get('id'), attributeMap.get('spreadsheetID'))
+		var spreadsheetID = getValueDefault(attributeMap.get('spreadsheetID'), attributeMap.get('id'))
 		var tableID = getValueByKeyDefault('table_0', 'tableID', registry, statement, this.name)
 		var table = getSpreadsheetTable(registry, spreadsheetID, tableID)
 		if (table == undefined) {
@@ -1329,6 +1357,86 @@ var gText = {
 	processStatement: function(registry, statement) {
 		statement.attributeMap.set('x', getFloatByDefault(0.0, 'x', registry, statement, this.name).toString())
 		statement.attributeMap.set('y', getFloatByDefault(0.0, 'y', registry, statement, this.name).toString())
+	}
+}
+
+var gTrapezoid = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'trapezoid',
+	processStatement: function(registry, statement) {
+		statement.tag = 'polygon'
+		var beginX = getFloatsIncludingZero('beginX', registry, statement, this.name)
+		var points = getRectangularPoints([0.0, 10.0], registry, statement)
+		var endX = getFloatsByDefault(beginX, 'endX', registry, statement, this.name)
+		addZeroToFloats(endX)
+		setUndefinedElementsToArray(endX, beginX)
+		statement.attributeMap.set('endX', endX.toString())
+		var widening = getFloatByDefault(0.0, 'widening', registry, statement, this.name)
+		var points = getTrapezoid(beginX, endX, points, widening)
+		setPointsExcept(points, registry, statement)
+	}
+}
+
+function getTrapezoidSocket(beginX, endX, points, selfGap, stopperGap, stopperThickness, widening) {
+	var begin = points[0]
+	var end = points[1]
+	var extraUHeight = stopperGap + stopperThickness
+	var trapezoid = []
+	var beginEnd = getSubtraction2D(end, begin)
+	var beginEndLength = length2D(beginEnd)
+	if (beginEndLength == 0.0) {
+		noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
+		return []
+	}
+
+	divide2DScalar(beginEnd, beginEndLength)
+	var beginEndX = [beginEnd[1], -beginEnd[0]]
+	var extraURatio = extraUHeight / beginEndLength
+	var extraPoint = getMultiplication2DScalar(beginEnd, extraUHeight)
+	endX[0] += (endX[0] - beginX[0]) * extraURatio
+	endX[1] += (endX[1] - beginX[1]) * extraURatio
+	add2D(end, extraPoint)
+	trapezoid = [getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[0] - widening))]
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[0] - widening)))
+	if (stopperThickness > 0.0) {
+		var endXPlusGapMinusWidening = endX[0] + selfGap - widening
+		var endXMinusGapPlusWidening = endX[1] - selfGap + widening
+		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXPlusGapMinusWidening)))
+		var stopperEnd = getSubtraction2D(end, getMultiplication2DScalar(beginEnd, stopperThickness))
+		var extraStopperRatio = stopperThickness / (beginEndLength + extraUHeight)
+		var topMultiplier = endXPlusGapMinusWidening + (beginX[0] - endX[0]) * extraStopperRatio
+		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, topMultiplier)))
+		var bottomMultiplier = endXMinusGapPlusWidening + (beginX[1] - endX[1]) * extraStopperRatio
+		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, bottomMultiplier)))
+		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXMinusGapPlusWidening)))
+	}
+
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[1] + widening)))
+	trapezoid.push(getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[1] + widening)))
+	return trapezoid
+}
+
+var gTrapezoidSocket = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'trapezoidSocket',
+	processStatement: function(registry, statement) {
+		statement.tag = 'polyline'
+		var beginX = getFloatsIncludingZero('beginX', registry, statement, this.name)
+		var points = getRectangularPoints([0.0, 10.0], registry, statement)
+		var endX = getFloatsByDefault(beginX, 'endX', registry, statement, this.name)
+		addZeroToFloats(endX)
+		setUndefinedElementsToArray(endX, beginX)
+		statement.attributeMap.set('endX', endX.toString())
+		var selfGap = getFloatByDefault(1.4, 'selfGap', registry, statement, this.name)
+		var stopperGap = getFloatByDefault(0.0, 'stopperGap', registry, statement, this.name)
+		var stopperThickness = getFloatByDefault(0.0, 'stopperThickness', registry, statement, this.name)
+		var widening = getFloatByDefault(0.0, 'widening', registry, statement, this.name)
+		var points = getTrapezoidSocket(beginX, endX, points, selfGap, stopperGap, stopperThickness, widening)
+		setPointsExcept(points, registry, statement)
 	}
 }
 
@@ -1387,4 +1495,4 @@ var gTruncatedTeardrop = {
 
 var gGenerator2DProcessors = [
 gCircle, gFormattedText, gFractal2D, gGrid, gImage, gLettering, gList, gMap, gOutline,
-gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gTable, gText, gTruncatedTeardrop]
+gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gTable, gText, gTrapezoid, gTrapezoidSocket, gTruncatedTeardrop]
