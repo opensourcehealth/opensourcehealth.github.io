@@ -1,22 +1,22 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function addElementListsToSet(elementLists, setTo) {
+function addElementListsToSet(destinationSet, elementLists) {
 	for (var elements of elementLists) {
-		addElementsToSet(elements, setTo)
+		addElementsToSet(destinationSet, elements)
 	}
 }
 
-function addElementsToMapArray(elements, key, mapTo) {
-	if (mapTo.has(key)) {
-		pushArray(mapTo.get(key), elements)
+function addElementsToMapArray(destinationMap, key, elements) {
+	if (destinationMap.has(key)) {
+		pushArray(destinationMap.get(key), elements)
 		return
 	}
-	mapTo.set(key, elements)
+	destinationMap.set(key, elements)
 }
 
-function addElementsToSet(elements, setTo) {
+function addElementsToSet(destinationSet, elements) {
 	for (var element of elements) {
-		setTo.add(element)
+		destinationSet.add(element)
 	}
 }
 
@@ -29,23 +29,29 @@ function addElementToArrays(arrays, index, value) {
 	}
 }
 
-function addElementToMapArray(element, key, mapTo) {
-	if (mapTo.has(key)) {
-		mapTo.get(key).push(element)
+function addElementToMapArray(destinationMap, key, element) {
+	if (destinationMap.has(key)) {
+		destinationMap.get(key).push(element)
 		return
 	}
-	mapTo.set(key, [element])
+	destinationMap.set(key, [element])
 }
 
-function addMapToMapArray(mapFrom, mapTo) {
-	for (var entry of mapFrom.entries()) {
-		addElementsToMapArray(entry[1], entry[0], mapTo)
+function addMapToMap(destinationMap, sourceMap) {
+	for (var entry of sourceMap.entries()) {
+		destinationMap.set(entry[0], entry[1])
 	}
 }
 
-function addRangeToSet(aSet, from, to) {
+function addMapToMapArray(destinationMap, sourceMap) {
+	for (var entry of sourceMap.entries()) {
+		addElementsToMapArray(destinationMap, entry[0], entry[1])
+	}
+}
+
+function addRangeToSet(destinationSet, from, to) {
 	for (var rangeIndex = from; rangeIndex < to; rangeIndex++) {
-		aSet.add(rangeIndex)
+		destinationSet.add(rangeIndex)
 	}
 }
 
@@ -120,50 +126,43 @@ function compareSignedIntersectionAscending(a, b) {
 	return a[0] - b[0]
 }
 
-function copyKeysExcept(exceptionSet, mapFrom, mapTo) {
-	for (var key of mapFrom.keys()) {
+function compareStringZeroAscending(a, b) {
+	return a[0] > b[0]
+}
+
+function copyKeysExcept(destinationMap, sourceMap, exceptionSet) {
+	for (var key of sourceMap.keys()) {
 		if (!exceptionSet.has(key)) {
-			mapTo.set(key, mapFrom.get(key))
+			destinationMap.set(key, sourceMap.get(key))
 		}
 	}
 }
 
-/*
-deprecated23
-function copySetKeys(copySet, mapFrom, mapTo) {
-	for (var key of mapFrom.keys()) {
-		if (copySet.has(key)) {
-			mapTo.set(key, mapFrom.get(key))
-		}
-	}
-}
-*/
-
-function copyMissingKeys(mapFrom, mapTo) {
-	for (var key of mapFrom.keys()) {
-		if (!mapTo.has(key)) {
-			mapTo.set(key, mapFrom.get(key))
+function copyMissingKeys(destinationMap, sourceMap) {
+	for (var key of sourceMap.keys()) {
+		if (!destinationMap.has(key)) {
+			destinationMap.set(key, sourceMap.get(key))
 		}
 	}
 }
 
-function copyMissingKeysExcept(exceptionSet, mapFrom, mapTo) {
-	for (var key of mapFrom.keys()) {
+function copyMissingKeysExcept(destinationMap, sourceMap, exceptionSet) {
+	for (var key of sourceMap.keys()) {
 		if (!exceptionSet.has(key)) {
-			if (!mapTo.has(key)) {
-				mapTo.set(key, mapFrom.get(key))
+			if (!destinationMap.has(key)) {
+				destinationMap.set(key, sourceMap.get(key))
 			}
 		}
 	}
 }
 
-function deleteElementsFromSet(elements, setFrom) {
+function deleteElementsFromSet(setSource, elements) {
 	for (var element of elements) {
-		setFrom.delete(element)
+		setSource.delete(element)
 	}
 }
 
-function deleteKeysExcept(exceptionSet, map) {
+function deleteKeysExcept(map, exceptionSet) {
 	for (var key of map.keys()) {
 		if (!exceptionSet.has(key)) {
 			map.delete(key)
@@ -180,14 +179,14 @@ function getArrayArraysCopy(arrayArrays) {
 }
 
 function getArrayByElements(elements, until, value) {
-	value = getValueByDefault(0.0, value)
+	value = getValueZero(value)
 	elements = getArrayByValue(elements)
-	until = getValueByDefault(elements.length, until)
+	until = getValueDefault(until, elements.length)
 	if (elements.length < until) {
 		elements.length = until
 	}
 	for (var elementIndex = 0; elementIndex < until; elementIndex++) {
-		elements[elementIndex] = getValueByDefault(value, elements[elementIndex])
+		elements[elementIndex] = getValueDefault(elements[elementIndex], value)
 	}
 	return elements
 }
@@ -246,9 +245,9 @@ function getIsLong(array, minimumLength) {
 	return array.length >= minimumLength
 }
 
-function getMapArraysCopy(mapFrom) {
+function getMapArraysCopy(sourceMap) {
 	var mapCopy = new Map()
-	for (var entry of mapFrom.entries()) {
+	for (var entry of sourceMap.entries()) {
 		mapCopy.set(entry[0], entry[1].slice(0))
 	}
 	return mapCopy
@@ -276,7 +275,7 @@ function getNumberOfDifferences(arraysA, arraysB) {
 	return numberOfDifferences
 }
 
-function getNullOrValue(key, map) {
+function getNullOrValue(map, key) {
 	if (map.has(key)) {
 		return map.get(key)
 	}
@@ -306,10 +305,10 @@ function getSequence(length) {
 	return sequence
 }
 
-function getShortArrays(length, points) {
-	var shortArrays = new Array(points.length)
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		shortArrays[pointIndex] = points[pointIndex].slice(0, length)
+function getShortArrays(arrays, length) {
+	var shortArrays = new Array(arrays.length)
+	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
+		shortArrays[arrayIndex] = arrays[arrayIndex].slice(0, length)
 	}
 	return shortArrays
 }
@@ -332,10 +331,59 @@ function getStringByArrays(arrays) {
 	return joinedArrays.join(' ')
 }
 
-function getValueByDefault(defaultValue, value) {
+function getValueDefault(value, defaultValue) {
 	if (value == undefined) {
 		return defaultValue
 	}
+
+	return value
+}
+
+function getValueFalse(value) {
+	if (value == undefined) {
+		return false
+	}
+
+	return value
+}
+
+function getValueOne(value) {
+	if (value == undefined) {
+		return 1.0
+	}
+
+	return value
+}
+
+function getValueFour(value) {
+	if (value == undefined) {
+		return 4.0
+	}
+
+	return value
+}
+
+function getValueTen(value) {
+	if (value == undefined) {
+		return 10.0
+	}
+
+	return value
+}
+
+function getValueTrue(value) {
+	if (value == undefined) {
+		return true
+	}
+
+	return value
+}
+
+function getValueZero(value) {
+	if (value == undefined) {
+		return 0.0
+	}
+
 	return value
 }
 
@@ -386,7 +434,7 @@ function removeNulls(elements) {
 	}
 	elements.length = withoutNullLength
 }
-
+/* deprecated 24
 function removeNullsBySet(elements, nullIndexSet) {
 	var withoutNullLength = 0
 	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
@@ -397,7 +445,7 @@ function removeNullsBySet(elements, nullIndexSet) {
 	}
 	elements.length = withoutNullLength
 }
-
+*/
 function removeRepeats(elements) {
 	for (var elementIndex = elements.length - 1; elementIndex > -1; elementIndex--) {
 		if (elements[elementIndex] == elements[(elementIndex + 1) % elements.length]) {
@@ -443,25 +491,29 @@ function setMapIfMissing(key, map, value) {
 	}
 }
 
-//deprecated24
-function setObjectAttribute(key, map, object, value) {
-	if (map.has(key)) {
-		value = map.get(key)(value)
+function setUndefinedElementsToArray(elements, sources) {
+	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
+		elements[parameterIndex] = getValueDefault(elements[parameterIndex], sources[parameterIndex])
 	}
-	return object[key] = value
 }
 
-function setUndefinedElementsToArray(elements, sources) {
-	var minimumLength = Math.min(elements.length, sources.length)
+function setUndefinedElementsToArrayZero(elements, sources) {
 	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
-		elements[parameterIndex] = getValueByDefault(sources[parameterIndex], elements[parameterIndex])
+		if (elements[parameterIndex] == undefined) {
+			if (sources.length > parameterIndex) {
+				elements[parameterIndex] = sources[parameterIndex]
+			}
+			else {
+				elements[parameterIndex] = 0.0
+			}
+		}
 	}
 }
 
 function setUndefinedElementsToValue(elements, value) {
-	value = getValueByDefault(0.0, value)
+	value = getValueZero(value)
 	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
-		elements[parameterIndex] = getValueByDefault(value, elements[parameterIndex])
+		elements[parameterIndex] = getValueDefault(elements[parameterIndex], value)
 	}
 }
 
