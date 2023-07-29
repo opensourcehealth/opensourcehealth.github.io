@@ -348,12 +348,64 @@ function analyzeOutputMesh(mesh, registry, statement) {
 	alterMeshExcept(mesh, registry, statement)
 }
 
-function bevelPoints(bevels, mesh, pointIndexSet, points) {
-	var facets = mesh.facets
-//	bevels = getPushArray(bevels, splits)
-	if (bevels == null) {
+function bevelPointIndex(bevelMap, bevels, horizontalDirectionMap, pointIndex, points) {
+	var point = points[pointIndex]
+	if (point == undefined) {
+		noticeByList(['point is undefined in bevelPointIndex in alteration.', points, pointIndex])
 		return
 	}
+
+	var interpolationAlong = getFlatInterpolationAlongBeginEnd(point[2], bevels)
+	var along = interpolationAlong[0]
+	var lower = interpolationAlong[1]
+	var upper = interpolationAlong[2]
+	var oneMinus = 1.0 - along
+	var inset = [oneMinus * lower[0] + along * upper[0], oneMinus * lower[1] + along * upper[1]]
+	var normals = horizontalDirectionMap.get(pointIndex)
+	if (normals == undefined) {
+		noticeByList(['Unfaceted point in bevelPointIndex in alteration.', point, pointIndex, points])
+		return
+	}
+
+	var horizontalNormalIndex = null
+	var smallestZ = Number.MAX_VALUE
+	for (var normalIndex = 0; normalIndex < normals.length; normalIndex++) {
+		var z = Math.abs(normals[normalIndex][2])
+		if (z < smallestZ) {
+			smallestZ = z
+			horizontalNormalIndex = normalIndex
+		}
+	}
+
+	var horizontalNormal = normals[horizontalNormalIndex]
+	var highestCrossProductZ = -Number.MAX_VALUE
+	var highestCrossNormal = horizontalNormal
+	var maximumZ = smallestZ + 0.5
+	var highestNormalZ = 0.0
+	for (var normalIndex = 0; normalIndex < normals.length; normalIndex++) {
+		var otherNormal = normals[normalIndex]
+		highestNormalZ = Math.max(highestNormalZ, Math.abs(otherNormal[2]))
+		if (normalIndex != horizontalNormalIndex) {
+			var crossProductZ = Math.abs(crossProduct2D(horizontalNormal, otherNormal))
+			crossProductZ += gClose * Math.abs(dotProduct2D(horizontalNormal, otherNormal))
+			if (crossProductZ > highestCrossProductZ && Math.abs(otherNormal[2]) < maximumZ) {
+				highestCrossProductZ = crossProductZ
+				highestCrossNormal = otherNormal
+			}
+		}
+	}
+
+	var addition = getAddition2D(normalize2D(horizontalNormal.slice(0, 2)), normalize2D(highestCrossNormal.slice(0, 2)))
+	var multiplier = -2.0 * highestNormalZ / lengthSquared2D(addition)
+	bevelMap.set(pointIndex, getMultiplication2D(multiply2DScalar(addition, multiplier), inset))
+}
+
+function bevelPoints(bevels, mesh, pointIndexSet, points) {
+	var facets = mesh.facets
+	if (getIsEmpty(bevels)) {
+		return
+	}
+
 	bevels.sort(compareFirstElementAscending)
 	for (var bevel of bevels) {
 		if (bevel.length == 1) {
@@ -363,63 +415,29 @@ function bevelPoints(bevels, mesh, pointIndexSet, points) {
 			bevel.push(0.0)
 		}
 	}
+
 	var horizontalDirectionMap = new Map()
 	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
-		var normal = getNormalByFacet(facets[facetIndex], points)
-		if (normal != null) {
-			var facet = facets[facetIndex]
+		var facet = facets[facetIndex]
+		var normal = getNormalByFacet(facet, points)
+		if (normal != undefined) {
 			for (var pointIndex of facet) {
 				if (pointIndexSet.has(pointIndex)) {
 					normal.push(facetIndex)
 					for (var pointIndex of facet) {
-						addElementToMapArray(normal, pointIndex, horizontalDirectionMap)
+						addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
 					}
 					break
 				}
 			}
 		}
 	}
+
 	var bevelMap = new Map()
 	for (var pointIndex of pointIndexSet) {
-		var point = points[pointIndex]
-		if (point == undefined) {
-			noticeByList(['point is undefined in pointIndexSet in alteration.', points, pointIndex, pointIndexSet])
-			return
-		}
-		var interpolationAlong = getFlatInterpolationAlongBeginEnd(point[2], bevels)
-		var along = interpolationAlong[0]
-		var lower = interpolationAlong[1]
-		var upper = interpolationAlong[2]
-		var oneMinus = 1.0 - along
-		var inset = [oneMinus * lower[0] + along * upper[0], oneMinus * lower[1] + along * upper[1]]
-		var unitVectors = horizontalDirectionMap.get(pointIndex)
-		var horizontalVectorIndex = null
-		var smallestZ = Number.MAX_VALUE
-		for (var unitVectorIndex = 0; unitVectorIndex < unitVectors.length; unitVectorIndex++) {
-			var z = Math.abs(unitVectors[unitVectorIndex][2])
-			if (z < smallestZ) {
-				smallestZ = z
-				horizontalVectorIndex = unitVectorIndex
-			}
-		}
-		var horizontalVector = unitVectors[horizontalVectorIndex]
-		var highestCrossProductZ = -Number.MAX_VALUE
-		var highestCrossVector = horizontalVector
-		var maximumZ = smallestZ + 0.5
-		for (var unitVectorIndex = 0; unitVectorIndex < unitVectors.length; unitVectorIndex++) {
-			if (unitVectorIndex != horizontalVectorIndex) {
-				var otherVector = unitVectors[unitVectorIndex]
-				var crossProductZ = Math.abs(crossProduct2D(horizontalVector, otherVector))
-				crossProductZ += gClose * Math.abs(dotProduct2D(horizontalVector, otherVector))
-				if (crossProductZ > highestCrossProductZ && Math.abs(otherVector[2]) < maximumZ) {
-					highestCrossProductZ = crossProductZ
-					highestCrossVector = otherVector
-				}
-			}
-		}
-		var addition = getAddition2D(normalize2D(horizontalVector.slice(0, 2)), normalize2D(highestCrossVector.slice(0, 2)))
-		bevelMap.set(pointIndex, getMultiplication2D(multiply2DScalar(addition, -2.0 / lengthSquared2D(addition)), inset))
+		bevelPointIndex(bevelMap, bevels, horizontalDirectionMap, pointIndex, points)
 	}
+
 	for (var pointIndex of bevelMap.keys()) {
 		add2D(points[pointIndex], bevelMap.get(pointIndex))
 	}
@@ -481,19 +499,19 @@ function getCenterDirectionByCenterDirection(center, direction) {
 	if (center.length == 1) {
 		center.push(0.0)
 	}
-	center[0] = getValueByDefault(0.0, center[0])
-	center[1] = getValueByDefault(0.0, center[1])
+	center[0] = getValueZero(center[0])
+	center[1] = getValueZero(center[1])
 	if (getIsEmpty(direction)) {
 		if (center[0] == 0.0 && center[1] == 0.0) {
 			return {center:center, direction:[1.0, 0.0]}
 		}
 		return {center:center, direction:normalize2D([-center[1], center[0]])}
 	}
-	direction[0] = getValueByDefault(0.0, direction[0])
+	direction[0] = getValueZero(direction[0])
 	if (direction.length == 1) {
 		return {center:center, direction:polarCounterclockwise(direction[0] * gRadiansPerDegree)}
 	}
-	direction[1] = getValueByDefault(0.0, direction[1])
+	direction[1] = getValueZero(direction[1])
 	var directionLength = length2D(direction)
 	if (directionLength == 0.0) {
 		return {center:center, direction:[1.0, 0.0]}
@@ -524,10 +542,10 @@ function getDirectionMapZ(facets, points) {
 	var horizontalDirectionMap = new Map()
 	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
 		var normal = getNormalByFacet(facets[facetIndex], points)
-		if (normal != null) {
+		if (normal != undefined) {
 			var facet = facets[facetIndex]
 			for (var pointIndex of facet) {
-				addElementToMapArray(normal, pointIndex, horizontalDirectionMap)
+				addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
 			}
 		}
 	}
@@ -537,9 +555,9 @@ function getDirectionMapZ(facets, points) {
 		var z = points[key][2]
 		minimumZ = Math.min(minimumZ, z)
 		maximumZ = Math.max(maximumZ, z)
-		var unitVectors = horizontalDirectionMap.get(key)
-		unitVectors.sort(compareAbsoluteElementTwoAscending)
-		var addition = getAddition2D(normalize2D(unitVectors[0]), normalize2D(unitVectors[1]))
+		var normals = horizontalDirectionMap.get(key)
+		normals.sort(compareAbsoluteElementTwoAscending)
+		var addition = getAddition2D(normalize2D(normals[0]), normalize2D(normals[1]))
 		horizontalDirectionMap.set(key, multiply2DScalar(addition, 2.0 / lengthSquared2D(addition)))
 	}
 	return {deltaZ:maximumZ - minimumZ, horizontalDirectionMap:horizontalDirectionMap , minimumZ:minimumZ, maximumZ:maximumZ}
@@ -574,7 +592,7 @@ function getDotProduct3DRange(points, vector) {
 }
 
 function getFilletedPolygon(numberOfSides, polygon, radius, checkLength) {
-	checkLength = getValueByDefault(true, checkLength)
+	checkLength = getValueTrue(checkLength)
 	var filletedPolygon = []
 	var minimumAngle = gDoublePi / numberOfSides
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
@@ -625,7 +643,7 @@ function getInsideInterpolationAlongBeginEnd(x, points) {
 
 function getOutsetPolygons(points, registry, statement, tag) {
 	var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
-	var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, tag)
+	var checkIntersection = getBooleanByDefault(true, 'checkIntersection', registry, statement, tag)
 	var clockwise = getBooleanByStatement('clockwise', registry, statement)
 	if (clockwise == undefined) {
 		clockwise = getIsClockwise(points)
@@ -684,7 +702,7 @@ function getPointIndexSet(antiregion, intersectionIDs, points, mesh, region, reg
 	if (mesh.intersectionIndexesMap != undefined) {
 		for (var id of intersectionIDs) {
 			if (mesh.intersectionIndexesMap.has(id)) {
-				addElementsToSet(mesh.intersectionIndexesMap.get(id), pointIndexSet)
+				addElementsToSet(pointIndexSet, mesh.intersectionIndexesMap.get(id))
 			}
 		}
 	}
@@ -692,7 +710,7 @@ function getPointIndexSet(antiregion, intersectionIDs, points, mesh, region, reg
 	if (mesh.splitIndexesMap != undefined) {
 		for (var id of splitIDs) {
 			if (mesh.splitIndexesMap.has(id)) {
-				addElementsToSet(mesh.splitIndexesMap.get(id), pointIndexSet)
+				addElementsToSet(pointIndexSet, mesh.splitIndexesMap.get(id))
 			}
 		}
 	}
@@ -1195,7 +1213,7 @@ var gBend = {
 			return
 		}
 		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
-		var translations = getPointsByKey('translation', registry, statement)
+		var translations = getFloatListsByStatement('translation', registry, statement)
 		var center = getFloatsByDefault([0.0, 0.0, 0.0], 'center', registry, statement, statement.tag)
 		var translationEquations = getEquations('translationEquation', statement)
 		var vector = getVector3DByStatement(registry, statement)
@@ -1683,11 +1701,7 @@ var gMultiplyJoin = {
 
 var gOutset = {
 	getPoints: function(points, registry, statement) {
-		var outsetPolygons = getOutsetPolygons(points, registry, statement, this.name)
-		if (outsetPolygons.length == 0) {
-			return []
-		}
-		return outsetPolygons[0]
+		return getLargestPolygon(getOutsetPolygons(points, registry, statement, this.name))
 	},
 	initialize: function() {
 		gGetPointsMap.set(this.name, this)
