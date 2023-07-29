@@ -104,6 +104,20 @@ function getEndOfLine(text) {
 	return '\n'
 }
 
+function getIndexOfBracketed(text, searchCharacter, searchBracketDepth) {
+	var bracketDepth = 0
+	searchBracketDepth = getValueZero(searchBracketDepth)
+	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
+		var character = text[characterIndex]
+		bracketDepth += 1 * (character == '(' || character == '[') - 1 * (character == ')' || character == ']')
+		if (bracketDepth == searchBracketDepth && character == searchCharacter) {
+			return characterIndex
+		}
+	}
+
+	return -1
+}
+
 function getJoinWord() {
 	if (navigator.appVersion.indexOf("Win") > -1) {
 		return '\r\n'
