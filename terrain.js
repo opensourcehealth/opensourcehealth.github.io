@@ -38,7 +38,7 @@ function getIsOccupied(childrenMaps, location, terrain) {
 		if (childrenMap.has(xyKey)) {
 			var children = childrenMap.get(xyKey)
 			for (var child of children) {
-				if (child.location[0] == location[0] && child.location[1] == location[1]) {
+				if (equal2D(child.location[0], location[1])) {
 					return true
 				}
 			}
