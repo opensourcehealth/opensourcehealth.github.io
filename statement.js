@@ -1,7 +1,5 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-var gIDCountMap = new Map()
-
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in addPassthroughLines reached, no further statements will be added.'
@@ -36,7 +34,7 @@ function addToDescendantsInsideFirst(descendants, statement) {
 		warning(warningText, warningVariables)
 		return
 	}
-	if (statement.children != null) {
+	if (statement.children != undefined) {
 		for (var child of statement.children) {
 			if (gParentFirstSet.has(child.tag)) {
 				descendants.push(child)
@@ -57,7 +55,7 @@ function addToDescendantsOutsideFirst(descendants, statement) {
 		warning(warningText, warningVariables)
 		return
 	}
-	if (statement.children != null) {
+	if (statement.children != undefined) {
 		for (var child of statement.children) {
 			descendants.push(child)
 			addToDescendantsOutsideFirst(descendants, child)
@@ -77,7 +75,7 @@ function convertToGroupIfParent(statement) {
 }
 
 function createDefault(registry, rootStatement) {
-	rootStatement.variableMap = new Map(gVariableMapEntries)
+	rootStatement.variableMap = new Map()
 	if (registry.idMap.has('_default')) {
 		return
 	}
@@ -129,17 +127,24 @@ function deleteStatementsByTagDepth(depth, registry, statement, tag) {
 
 function getConcatenatedUniqueID(id, registry, statement) {
 	var whileCount = 2
-	if (gIDCountMap.has(id)) {
-		whileCount = gIDCountMap.get(id) + 1
+	if (registry.idCountMap.has(id)) {
+		whileCount = registry.idCountMap.get(id) + 1
 	}
 	for (; whileCount < gLengthLimit; whileCount++) {
 		var check = id + '_' + whileCount.toString()
 		if (getIsIDUnique(check, registry, statement)) {
-			gIDCountMap.set(id, whileCount)
+			registry.idCountMap.set(id, whileCount)
 			return check
 		}
 	}
 	return id
+}
+
+function getDescendantsInsideFirst(statement) {
+	var descendants = []
+	addToDescendantsInsideFirst(descendants, statement)
+	descendants.push(statement)
+	return descendants
 }
 
 function getDocumentRoot(lines, tag) {
@@ -383,15 +388,15 @@ function getStatement(line) {
 }
 
 function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
-	var children = null
+	var statement =	{attributeMap:attributeMap, nestingIncrement:nestingIncrement, parent:parent, tag:tag}
 	if (tag != null) {
-		children = []
+		statement.children = []
 	}
-	var statement =
-	{attributeMap:attributeMap, children:children, nestingIncrement:nestingIncrement, parent:parent, tag:tag, variableMap:null}
+
 	if (parent != null) {
 		parent.children.push(statement)
 	}
+
 	return statement
 }
 
@@ -540,10 +545,8 @@ function initializeProcessors(processors) {
 }
 
 function processRootStatementByTagMap(registry, rootStatement, tagMap) {
-	var descendants = [rootStatement]
-	addToDescendantsInsideFirst(descendants, rootStatement)
 	var missingProcessorSet = new Set()
-	processStatementsByTagMap(missingProcessorSet, registry, descendants, gTagCenterMap)
+	processStatementsByTagMap(missingProcessorSet, registry, getDescendantsInsideFirst(rootStatement), gTagCenterMap)
 	missingProcessorSet.delete('default')
 	missingProcessorSet.delete('layer')
 	missingProcessorSet.delete('license')
