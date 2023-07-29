@@ -485,8 +485,8 @@ function getXYZLatticeBoolean(existenceCondition, signB, xyzLatticeA, xyzLattice
 		var intersectionPairsMapMapB = xyzLatticeB[mapIndex]
 		var intersectionPairsMapMapC = new Map()
 		var keySet = new Set()
-		addElementsToSet(intersectionPairsMapMapA.keys(), keySet)
-		addElementsToSet(intersectionPairsMapMapB.keys(), keySet)
+		addElementsToSet(keySet, intersectionPairsMapMapA.keys())
+		addElementsToSet(keySet, intersectionPairsMapMapB.keys())
 		for (var key of keySet) {
 			var intersectionPairsMapA = null
 			if (intersectionPairsMapMapA.has(key)) {
@@ -512,8 +512,8 @@ function getXYZLatticeBoolean(existenceCondition, signB, xyzLatticeA, xyzLattice
 		var intersectionPairsMapC = new Map()
 		xyzLatticeC[intersectionPairsMapIndex] = intersectionPairsMapC
 		var keySet = new Set()
-		addElementsToSet(intersectionPairsMapA.keys(), keySet)
-		addElementsToSet(intersectionPairsMapB.keys(), keySet)
+		addElementsToSet(keySet, intersectionPairsMapA.keys())
+		addElementsToSet(keySet, intersectionPairsMapB.keys())
 		for (var key of keySet) {
 			var intersectionPairsA = null
 			if (intersectionPairsMapA.has(key)) {
