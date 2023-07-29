@@ -1,5 +1,7 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+const gGridSpacingMultiplier = 0.2
+
 function boundDrawControlSlider(control, viewer) {
 	control.value = Math.max(control.value, control.lower)
 	control.value = Math.min(control.value, control.upper)
@@ -92,8 +94,7 @@ function drawCheckbox(control, viewer) {
 	var left = boundingBox[0][0] + 0.6 * outset
 	var width = control.size[1] - 2 * outset
 	var checkboxTop = boundingBox[0][1] + outset
-	setTextContext(context)
-	context.textAlign = 'center'
+	setTextContext(context, 'center')
 	context.fillText(control.text, 0.5 * (left + width + boundingBox[1][0]), boundingBox[1][1] - viewBroker.textControlLift)
 	context.lineWidth = 1.0
 	if (control.selectedState) {
@@ -118,16 +119,22 @@ function drawCheckbox(control, viewer) {
 function drawChoice(control, viewer) {
 	var boundingBox = control.boundingBox
 	var context = viewBroker.context
+	var parent = control.parent
+	var left = boundingBox[0][0] + parent.selectedIndex * control.choiceWidth
 	clearFillBoundingBox(boundingBox, context)
-	setTextContext(context)
-	context.textAlign = 'center'
+	if (parent.control == control) {
+		context.fillStyle = '#ffff99' // canary
+		fillRoundRect(left + 2, boundingBox[0][1] + 2, context, left + control.choiceWidth - 2, boundingBox[1][1] - 2)
+		context.lineWidth = 1.0
+		context.strokeStyle = 'green'
+		strokeRoundRect(left + 2, boundingBox[0][1] + 2, context, left + control.choiceWidth - 2, boundingBox[1][1] - 2)
+	}
+	setTextContext(context, 'center')
+	var textOffsetX = boundingBox[0][0] + control.choiceWidth * 0.5
 	for (var textIndex = 0; textIndex < control.texts.length; textIndex++) {
 		var text = control.texts[textIndex]
-		context.fillText(text, control.choiceWidth * (textIndex + 0.5), boundingBox[1][1] - viewBroker.textControlLift)
+		context.fillText(text, control.choiceWidth * textIndex + textOffsetX, boundingBox[1][1] - viewBroker.textControlLift)
 	}
-	context.lineWidth = 1.0
-	var left = boundingBox[0][0] + control.selectedIndex * control.choiceWidth
-	strokeRoundRect(left + 2, boundingBox[0][1] + 2, context, left + control.choiceWidth - 2, boundingBox[1][1] - 2)
 }
 
 function drawControl(control, viewer) {
@@ -155,16 +162,29 @@ function drawControlSlider(control, viewer) {
 function drawControlSliderReset(control, viewer) {
 	drawControlSlider(control, viewer)
 	viewBroker.mouseDownCenterOffset = null
-	viewBroker.mouseDown2D = null
-	viewBroker.mouseMoveManipulator = null
+	viewBroker.mouseDown2D = undefined
+	viewBroker.mouseMoveManipulator = undefined
 }
 
 function drawControlText(boundingBox, text) {
 	var context = viewBroker.context
 	clearFillBoundingBox(boundingBox, context)
-	setTextContext(context)
-	context.textAlign = 'center'
+	setTextContext(context, 'center')
 	context.fillText(text, 0.5 * (boundingBox[0][0] + boundingBox[1][0]), boundingBox[1][1] - viewBroker.textControlLift)
+}
+
+function drawGridSpacing(context, gridSpacing, selectedState) {
+	var height = viewBroker.canvas.height
+	var gridSpacingBox = [[height, height - viewBroker.doubleTextSpace], [viewBroker.canvas.width, height]]
+	clearBoundingBox(gridSpacingBox, context)
+	if (selectedState) {
+		setTextContext(context)
+		var x = viewBroker.analysisCharacterBegin
+		var y = height - viewBroker.textControlLift
+		var text = 'Grid Spacing:'
+		context.fillText(text, x, y)
+		drawNumericArray(context, getIntegerStep(gridSpacing), x + getTextLength(text + ' ') * viewBroker.textHeight, y)
+	}
 }
 
 function drawHorizontalSlider(control, viewer) {
@@ -174,7 +194,6 @@ function drawHorizontalSlider(control, viewer) {
 	var thumbX = thumbLeft + control.thumbRadius
 	clearFillBoundingBox(boundingBox, context)
 	setTextContext(context)
-	context.textAlign = 'left'
 	context.fillText(control.horizontalText, boundingBox[0][0] + 0.5 * viewBroker.textSpace, boundingBox[1][1] - viewBroker.textControlLift)
 
 	context.beginPath()
@@ -206,12 +225,11 @@ function drawHorizontalSliderWide(control, viewer) {
 	var thumbLeft = control.barRight + control.rangeOverValue * (control.value - control.lower)
 	var thumbX = thumbLeft + control.thumbRadius
 	clearFillBoundingBox(boundingBox, context)
-	setTextContext(context)
-	context.textAlign = 'right'
+	setTextContext(context, 'right')
 	var textY = 0.5 * (boundingBox[0][1] + boundingBox[1][1]) + viewBroker.textHeight - viewBroker.textSpace
 	context.fillText(control.horizontalText, control.titleEndX, textY)
 
-	var decimalPlaces = getValueByDefault(0, control.decimalPlaces)
+	var decimalPlaces = getValueDefault(control.decimalPlaces, 0)
 	var value = control.value
 	if (control.valueFunction != undefined) {
 		value = control.valueFunction(value)
@@ -242,8 +260,16 @@ function drawHorizontalSliderWide(control, viewer) {
 	context.fill()
 }
 
+function drawLine(context, begin, end) {
+	context.beginPath()
+	moveToPoint(context, begin)
+	lineToPoint(context, end)
+	context.stroke()
+	context.closePath()
+}
+
 function drawNumericArray(context, element, x, y, decimalPlaces) {
-	decimalPlaces = getValueByDefault(0, decimalPlaces)
+	decimalPlaces = getValueDefault(decimalPlaces, 0)
 	if (Array.isArray(element)) {
 		if (element.length > 0) {
 			var text = getSignificant(decimalPlaces, element[0])
@@ -262,27 +288,6 @@ function drawNumericArrays(context, elements, textSpace, x, y, decimalPlaces) {
 		drawNumericArray(context, element, x, y, decimalPlaces)
 		y += textSpace
 	}
-}
-
-function drawOutsetLine(begin, context, end, outset) {
-	var beginEnd = getSubtraction2D(end, begin)
-	var beginEndLength = length2D(beginEnd)
-	if (beginEndLength == 0.0) {
-		return
-	}
-	multiply2DScalar(beginEnd, outset / beginEndLength)
-	var right = [beginEnd[1], -beginEnd[0]]
-	var left = [-right[0], -right[1]]
-	var endBegin = [-beginEnd[0], -beginEnd[1]]
-	var beginOutset = getAddition2D(begin, endBegin)
-	var endOutset = getAddition2D(end, beginEnd)
-	context.beginPath()
-	moveToPoint(context, getAddition2D(beginOutset, left))
-	lineToPoint(context, getAddition2D(beginOutset, right))
-	lineToPoint(context, getAddition2D(endOutset, right))
-	lineToPoint(context, getAddition2D(endOutset, left))
-	context.closePath()
-	context.fill()
 }
 
 function drawVerticalSlider(control, viewer) {
@@ -319,22 +324,29 @@ function fillRoundRect(beginX, beginY, context, endX, endY, outset) {
 }
 
 function getCheckbox(boundingBox, text, selectedState) {
-	selectedState = getValueByDefault(true, selectedState)
+	selectedState = getValueTrue(selectedState)
 	var control = {boundingBox:boundingBox, draw:drawCheckbox, mouseDown:mouseDownCheckbox, selectedState:selectedState, text:text}
 	control.size = getSubtraction2D(boundingBox[1], boundingBox[0])
 	return control
 }
 
-function getChoice(boundingBox, texts, selectedIndex) {
-	selectedIndex = getValueByDefault(0, selectedIndex)
-	var control = {boundingBox:boundingBox, draw:drawChoice, mouseDown:mouseDownChoice, selectedIndex:selectedIndex, texts:texts}
+function getChoice(boundingBox, texts, parent) {
+	var control = {boundingBox:boundingBox, draw:drawChoice, mouseDown:mouseDownChoice, parent:parent, texts:texts}
 	control.size = getSubtraction2D(boundingBox[1], boundingBox[0])
 	control.choiceWidth = control.size[0] / texts.length
 	return control
 }
 
+function getExponentialZoom() {
+	return Math.pow(10.0, viewBroker.view.zoomControl.value)
+}
+
+function getHeightMinusOverZoom() {
+	return 1.8 * viewBroker.halfHeightMinus / getExponentialZoom()
+}
+
 function getHorizontalSlider(boundingBox, lower, text, upper, value) {
-	value = getValueByDefault(lower, value)
+	value = getValueDefault(value, lower)
 	var control = 	{boundingBox:boundingBox,
 	draw:drawHorizontalSlider, horizontalText:text, mouseDown:mouseDownHorizontalSlider, lower:lower, upper:upper, value:value}
 	var boundingBox = control.boundingBox
@@ -352,7 +364,7 @@ function getHorizontalSlider(boundingBox, lower, text, upper, value) {
 }
 
 function getHorizontalSliderWide(boundingBox, lower, text, upper, value) {
-	value = getValueByDefault(lower, value)
+	value = getValueDefault(value, lower)
 	var control = {boundingBox:boundingBox,
 	draw:drawHorizontalSliderWide, horizontalText:text, mouseDown:mouseDownHorizontalSlider, lower:lower, upper:upper, value:value}
 	var boundingBox = control.boundingBox
@@ -383,6 +395,44 @@ function getIntegerStep(step) {
 	return 5.0 * powerTen
 }
 
+function getMouseMovement(event) {
+	if (viewBroker.mouseDown2D == undefined) {
+		return undefined
+	}
+
+	var mouseMovement = [event.offsetX - viewBroker.mouseDown2D[0], event.offsetY - viewBroker.mouseDown2D[1]]
+	if (mouseMovement[0] == 0.0 && mouseMovement[1] == 0.0) {
+		return undefined
+	}
+
+	return getMouseMovementShifted(event, mouseMovement)
+}
+
+function getMouseMovementFlipped(event) {
+	if (viewBroker.mouseDown2D == undefined) {
+		return undefined
+	}
+
+	var mouseMovementFlipped = [event.offsetX - viewBroker.mouseDown2D[0], viewBroker.mouseDown2D[1] - event.offsetY]
+	if (mouseMovementFlipped[0] == 0.0 && mouseMovementFlipped[1] == 0.0) {
+		return undefined
+	}
+
+	return getMouseMovementShifted(event, mouseMovementFlipped)
+}
+
+function getMouseMovementShifted(event, mouseMovement) {
+	if (event.shiftKey) {
+		if (Math.abs(mouseMovement[0]) > Math.abs(mouseMovement[1])) {
+			mouseMovement[1] = 0.0 
+		}
+		else {
+			mouseMovement[0] = 0.0 
+		}
+	}
+	return mouseMovement
+}
+
 function getRangeZ(points) {
 	var rangeZ = {upperZ:points[0][2]}
 	rangeZ.lowerZ = rangeZ.upperZ
@@ -395,8 +445,12 @@ function getRangeZ(points) {
 	return rangeZ
 }
 
+function getSelectedName(parent) {
+	return parent.control.texts[parent.selectedIndex]
+}
+
 function getVerticalSlider(boundingBox, lower, text, upper, value) {
-	value = getValueByDefault(lower, value)
+	value = getValueDefault(value, lower)
 	var control = {boundingBox:boundingBox,
 	draw:drawVerticalSlider, mouseDown:mouseDownVerticalSlider, lower:lower, text:text, upper:upper, value:value}
 	var boundingBox = control.boundingBox
@@ -428,10 +482,12 @@ function mouseDownCheckbox(control, event, viewer) {
 }
 
 function mouseDownChoice(control, event, viewer) {
-	control.selectedIndex = Math.floor((event.offsetX - control.boundingBox[0][0]) / control.choiceWidth)
-	control.selectedIndex = Math.max(control.selectedIndex, 0)
-	control.selectedIndex = Math.min(control.selectedIndex, control.texts.length - 1)
-	drawChoice(control, viewer)
+	var parent = control.parent
+	parent.control = control
+	parent.selectedIndex = Math.floor((event.offsetX - control.boundingBox[0][0]) / control.choiceWidth)
+	parent.selectedIndex = Math.max(parent.selectedIndex, 0)
+	parent.selectedIndex = Math.min(parent.selectedIndex, control.texts.length - 1)
+	drawControls(parent.controls, viewer)
 	waitCallControlChanged(control, viewer)
 }
 
@@ -488,7 +544,7 @@ function mouseMoveControls(controls, event, viewer) {
 }
 
 function roundRectPath(beginX, beginY, context, endX, endY, outset) {
-	outset = getValueByDefault(8, outset)
+	outset = getValueDefault(outset, 8)
 	context.beginPath()
 	context.arc(endX - outset, beginY + outset, outset, -0.5 * Math.PI, 0.0)
 	context.lineTo(endX, endY - outset)
@@ -500,45 +556,11 @@ function roundRectPath(beginX, beginY, context, endX, endY, outset) {
 	context.closePath()
 }
 
-function setTextContext(context) {
+function setTextContext(context, textAlign) {
+	textAlign = getValueDefault(textAlign, 'left')
 	context.font = viewBroker.textHeight.toString() + 'px freeserif,Palatino'
 	context.fillStyle = 'black'
-}
-
-function setTypeSelect(selectedIndex, types) {
-	var typeSelect = document.getElementById('typeSelectID')
-	var options = typeSelect.options
-	if (options.length > 0) {
-		return
-	}
-	for (var type of types) {
-		option = document.createElement('option')
-		option.text = type
-		typeSelect.add(option)
-	}
-	typeSelect.selectedIndex = selectedIndex
-}
-
-function setViewSelect(selectedIndex, views) {
-	var viewSelect = document.getElementById('viewSelectID')
-	var options = viewSelect.options
-	for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
-		var view = views[viewIndex]
-		var option = null
-		if (viewIndex >= options.length) {
-			option = document.createElement('option')
-			viewSelect.add(option)
-		}
-		else {
-			option = options[viewIndex]
-		}
-		option.text = view.id
-	}
-	var optionLength = options.length
-	for (var optionIndex = optionLength - 1; optionIndex >= views.length; optionIndex--) {
-		options.remove(optionIndex)
-	}
-	viewSelect.selectedIndex = selectedIndex
+	context.textAlign = textAlign
 }
 
 function strokeRoundRect(beginX, beginY, context, endX, endY, outset) {
@@ -551,22 +573,16 @@ function toggleView() {
 	updateView()
 }
 
-function typeSelectChanged() {
-	viewBroker.setType(document.getElementById('typeSelectID').selectedIndex)
-	wordscapeViewerDraw()
-}
-
 function updateView() {
 	var isViewHidden = !getSessionBoolean('isViewHidden@')
-	var isDownloadHidden = isViewHidden
 	if (viewBroker.view != null) {
-		if (viewBroker.view.isDownloadHidden != undefined) {
-			isDownloadHidden = viewBroker.view.isDownloadHidden
+		if (viewBroker.view.updateViewer != undefined) {
+			viewBroker.view.updateViewer(isViewHidden)
 		}
 	}
-	document.getElementById('downloadCanvasButtonID').hidden = isDownloadHidden
-	document.getElementById('typeSelectID').hidden = isViewHidden
+
 	document.getElementById('viewSelectID').hidden = isViewHidden
+	setOthersMenuLine(isViewHidden, document.getElementById('viewMenuSelectID'))
 }
 
 function viewerMouseDown(event) {
@@ -594,10 +610,27 @@ function viewerMouseUp(event) {
 	}
 }
 
+function viewMenuSelectChanged() {
+	var viewMenuSelect = document.getElementById('viewMenuSelectID')
+	var viewMenuText = viewMenuSelect.options[viewMenuSelect.selectedIndex].text
+	if (viewMenuText.endsWith(' Others')) {
+		toggleSessionBoolean('isViewHidden@')
+	}
+	else {
+		if (viewMenuText == 'Download Canvas') {
+			downloadCanvas()
+		}
+	}
+
+	viewMenuSelect.selectedIndex = 0
+	updateView()
+}
+
 function viewSelectChanged() {
 	var viewSelect = document.getElementById('viewSelectID')
 	viewBroker.setView(viewSelect.selectedIndex)
 	updateView()
+	clearBoundingBox(viewBroker.boundingBox, viewBroker.context)
 	wordscapeViewerDraw()
 }
 
@@ -669,15 +702,16 @@ var viewBroker = {
 		this.textControlLift = this.controlWidth / 2 - 0.4 * this.textHeight
 		this.doubleTextSpace = this.textSpace + this.textSpace
 		this.titleVariableGap = 0.5 * this.textSpace
-		this.typeSelectedIndex = 0
 		this.viewID = null
 		this.wideHeight = this.controlWidth + this.textSpace
 	},
-	setType: function(typeSelectedIndex) {
-		this.typeSelectedIndex = typeSelectedIndex
-		this.type = this.types[typeSelectedIndex]
-	},
 	setView: function(viewIndex) {
+		if (this.view != null) {
+			if (this.view.clearViewer != undefined) {
+				this.view.clearViewer()
+			}
+		}
+
 		this.view = this.registry.views[viewIndex]
 		this.viewID = this.view.id
 	},
@@ -687,14 +721,11 @@ var viewBroker = {
 		this.canvas = document.getElementById(id)
 		this.canvas.height = height
 		this.canvas.width = height + 17.0 * this.textHeight
-		this.mouseDown2D = null
-		this.mouseMoveManipulator = null
-		this.types = ['Solid Polyhedral', 'Solid Triangular', 'Wireframe Polyhedral', 'Wireframe Triangular']
-		this.type = this.types[this.typeSelectedIndex]
 		this.view = null
 		if (views.length == 0) {
 			return
 		}
+
 		this.context = this.canvas.getContext('2d')
 		this.context.lineJoin = 'round'
 		this.halfHeight = height / 2
@@ -704,30 +735,27 @@ var viewBroker = {
 		this.modelDiameter = height - 2.0 * this.controlWidth
 		this.canvasCenterMatrix = getMatrix3DByTranslate(this.canvasCenter)
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
-		var selectedIndex = views.length
-		setTypeSelect(this.typeSelectedIndex, this.types)
+		setSelectToKeysIndexTitle(document.getElementById('viewMenuSelectID'), ['', 'Download Canvas'], 0, 'View')
 		views.sort(compareIDAscending)
-		for (; selectedIndex > 0;) {
-			selectedIndex--
-			if (views[selectedIndex].id == this.viewID) {
-				this.view = views[selectedIndex]
-				break
-			}
-			
+		var ids = new Array(views.length)
+		for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
+			ids[viewIndex] = views[viewIndex].id
 		}
-		setViewSelect(selectedIndex, views)
-		this.setView(selectedIndex)
-		this.setType(this.typeSelectedIndex)
+
+		var viewSelectedIndex = Math.max(ids.indexOf(this.viewID), 0)
+		this.view = views[viewSelectedIndex]
+		setSelectToKeysIndexTitle(document.getElementById('viewSelectID'), ids, viewSelectedIndex)
+		this.setView(viewSelectedIndex)
 		this.heightMinus = height - this.controlWidth
-		this.analysisBottom = 5 * this.textSpace
-		this.analysisBoundingBox = [[height, 0], [this.canvas.width, this.analysisBottom]]
-		this.analysisCharacterBegin = this.analysisBoundingBox[0][0] + 0.5 * this.textHeight
-		this.analysisSizeBegin = this.analysisBoundingBox[0][0] + 2 * this.textHeight
-		this.analysisLowerBegin = this.analysisBoundingBox[0][0] + 7 * this.textHeight
-		this.analysisUpperBegin = this.analysisBoundingBox[0][0] + 12 * this.textHeight
+		this.analysisCharacterBegin = height + 0.5 * this.textHeight
+		this.analysisSizeBegin = height + 2 * this.textHeight
+		this.analysisLowerBegin = height + 7 * this.textHeight
+		this.analysisUpperBegin = height + 12 * this.textHeight
+		this.boundingBox = [[0, 0], [viewBroker.canvas.width, height]]
 		for (var view of views) {
 			view.start()
 		}
+
 		updateView()
 		wordscapeViewerDraw()
 		if (id != this.canvasID) {
