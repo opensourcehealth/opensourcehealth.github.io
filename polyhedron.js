@@ -1936,12 +1936,12 @@ function getSTLMeshString(id, mesh) {
 		var normal = getNormalByFacet(facet, points)
 		var normalString = 'facet'
 		if (normal != undefined) {
-			normalString += ' normal ' + roundFloats(normal, 3).join(' ')
+			normalString += ' normal ' + getFixedStrings(normal, 3).join(' ')
 		}
 		meshStrings.push(normalString)
 		meshStrings.push('  outer loop')
 		for (var pointIndex of facet) {
-			meshStrings.push('    vertex ' + roundFloats(points[pointIndex], 8).join(' '))
+			meshStrings.push('    vertex ' + getFixedStrings(points[pointIndex], 8).join(' '))
 		}
 		meshStrings.push('  endloop')
 		meshStrings.push('endfacet')
@@ -2123,7 +2123,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 	}
 	var joinedMesh = meshes[0]
 	if (!getIsEmpty(matrices)) {
-		joinedMesh.points = get3DsBy3DMatrix(matrix3D, joinedMesh.points)
+		joinedMesh.points = get3DsByMatrix3D(joinedMesh.points, matrix3D)
 	}
 	for (var meshesIndex = 1; meshesIndex < meshes.length; meshesIndex++) {
 		var otherMesh = meshes[meshesIndex]
@@ -2134,7 +2134,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 			for (var matrix of matrices) {
 				if (!isUnitMatrix(matrix)) {
 					var otherMeshCopy = getMeshCopy(otherMesh)
-					otherMeshCopy.points = get3DsBy3DMatrix(matrix3D, otherMeshCopy.points)
+					otherMeshCopy.points = get3DsByMatrix3D(otherMeshCopy.points, matrix3D)
 					transform2DOr3DPoints(matrix, otherMeshCopy.points)
 					addMeshToJoinedMesh(joinedMesh, otherMeshCopy)
 				}
@@ -2142,7 +2142,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 		}
 	}
 	if (!getIsEmpty(matrices)) {
-		joinedMesh.points = get3DsBy3DMatrix(getInverseRotationTranslation3D(matrix3D), joinedMesh.points)
+		joinedMesh.points = get3DsByMatrix3D(joinedMesh.points, getInverseRotationTranslation3D(matrix3D))
 	}
 }
 
