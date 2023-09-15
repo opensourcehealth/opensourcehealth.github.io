@@ -23,20 +23,22 @@ const gXYZMap = new Map([['x', '1,0,0'], ['y', '0,1,0'], ['z', '0,0,1']])
 
 function addMatrices3DByWord(matrices3D, registry, statement, word) {
 	var entry = getBracketedEntry(word)
-	if (entry == null) {
+	if (entry == undefined) {
 		return
 	}
+
 	var transformType = entry[0]
-	if (g2DTransformMap.has(transformType)) {
-		var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-		matrices3D.push(getMatrix3DBy2D(g2DTransformMap.get(transformType)(floats)))
+	if (transformType == 'transform3D') {
+		matrices3D.push(getMatrix3DByWords(registry, statement, getBracketSeparatedWords(entry[1])))
 		return
 	}
+
 	if (g3DTransformMap.has(transformType)) {
 		var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
 		matrices3D.push(g3DTransformMap.get(transformType)(floats))
 		return
 	}
+
 	if (g3DMatricesMap.has(transformType)) {
 		var points = getPointsByValue(registry, statement, entry[1])
 		pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
@@ -155,33 +157,44 @@ function getBaseAlphabet(number) {
 }
 
 function getBooleanByDefault(defaultValue, key, registry, statement, tag) {
-	var boolean = getValueByKeyDefault(defaultValue, key, registry, statement, tag)
-	return getValueDefault(getBooleanByStatementValue(key, registry, statement, boolean), defaultValue)
+	return getBooleanByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
 }
 
 function getBooleanByStatement(key, registry, statement) {
 	if (statement.attributeMap.has(key)) {
 		return getBooleanByStatementValue(key, registry, statement, statement.attributeMap.get(key))
 	}
+
 	return undefined
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
+	if (getIsEmpty(value)) {
+		return undefined
+	}
+
 	value = value.trim()
 	if (gFalseSet.has(value)) {
 		return false
 	}
+
 	if (gTrueSet.has(value)) {
 		return true
 	}
+
 	if (value.length == 0) {
 		return undefined
 	}
+
 	var boolean = getValueByEquation(registry, statement, value)
 	if (boolean == undefined) {
 		return undefined
 	}
-	statement.attributeMap.set(key, boolean.toString())
+
+	if (key != undefined) {
+		statement.attributeMap.set(key, boolean.toString())
+	}
+
 	return boolean
 }
 
@@ -190,14 +203,16 @@ function getBooleanByString(value) {
 	if (gFalseSet.has(value)) {
 		return false
 	}
+
 	if (gTrueSet.has(value)) {
 		return true
 	}
+
 	return undefined
 }
 
-function getChainMatrix3D(registry, statement) {
-	var transformedMatrix = getMatrix3D(registry, statement)
+function getChainMatrix3D(registry, statement, key) {
+	var transformedMatrix = getMatrix3D(registry, statement, key)
 	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
 		var statement = statement.parent
 		if (statement == undefined) {
@@ -208,7 +223,7 @@ function getChainMatrix3D(registry, statement) {
 				return transformedMatrix
 			}
 		}
-		var statementMatrix = getMatrix3D(registry, statement)
+		var statementMatrix = getMatrix3D(registry, statement, key)
 		if (statementMatrix != null) {
 			if (transformedMatrix == null) {
 				transformedMatrix = statementMatrix
@@ -285,37 +300,6 @@ function getChainSkipMatrix2DUntil(caller, registry, statement) {
 	return matrix2DUntil
 }
 
-function getChainSkipMatrix3D(registry, statement) {
-	var transformedMatrix = getMatrix3D(registry, statement)
-	for (var downIndex = 0; downIndex < gLengthLimit; downIndex++) {
-		var statement = statement.parent
-		if (statement == undefined) {
-			if (transformedMatrix == null) {
-				return getUnitMatrix3D()
-			}
-			else {
-				return transformedMatrix
-			}
-		}
-		var skip3D = false
-		if (statement.attributeMap.has('skip3D')) {
-			skip3D = getBooleanByStatementValue('skip3D', registry, statement, statement.attributeMap.get('skip3D'))
-		}
-		if (skip3D != true) {
-			var statementMatrix = getMatrix3D(registry, statement)
-			if (statementMatrix != null) {
-				if (transformedMatrix == null) {
-					transformedMatrix = statementMatrix
-				}
-				else {
-					transformedMatrix = getMultiplied3DMatrix(statementMatrix, transformedMatrix)
-				}
-			}
-		}
-	}
-	return transformedMatrix
-}
-
 function getCloseString(floatValue) {
 	return (Math.round(floatValue * gOneOverClose) * gClose).toString()
 }
@@ -358,6 +342,16 @@ function getEquations(key, statement) {
 	return equations
 }
 
+function getFixedStrings(floats, numberOfDecimals) {
+	var fixedStrings = new Array(floats.length)
+	numberOfDecimals = getValueDefault(numberOfDecimals, 1)
+	for (var floatIndex = 0; floatIndex < floats.length; floatIndex++) {
+		fixedStrings[floatIndex] = floats[floatIndex].toFixed(numberOfDecimals)
+	}
+
+	return fixedStrings
+}
+
 function getFloatByDefault(defaultValue, key, registry, statement, tag) {
 	return getFloatByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
 }
@@ -366,18 +360,26 @@ function getFloatByStatement(key, registry, statement) {
 	if (statement.attributeMap.has(key)) {
 		return getFloatByStatementValue(key, registry, statement, statement.attributeMap.get(key))
 	}
-	return null
+
+	return undefined
 }
 
 function getFloatByStatementValue(key, registry, statement, value) {
 	if (value.length == 0) {
 		return undefined
 	}
+
 	if (isNaN(value)) {
 		var float = getValueByEquation(registry, statement, value)
-		statement.attributeMap.set(key, float.toString())
+		if (float == undefined) {
+			return undefined
+		}
+		if (key != undefined) {
+			statement.attributeMap.set(key, float.toString())
+		}
 		return float
 	}
+
 	return parseFloat(value)
 }
 
@@ -421,27 +423,29 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 		}
 		oldPoint = points[points.length - 1]
 	}
+
 	return [points, update]
 }
 
 function getFloatsByDefault(defaultValue, key, registry, statement, tag) {
-	var value = getValueByKeyDefault(defaultValue, key, registry, statement, tag)
-	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
-	if (floatsUpdate[1]) {
-		statement.attributeMap.set(key, floatsUpdate[0].toString())
-	}
-	return floatsUpdate[0]
+	return getFloatsByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
 }
 
 function getFloatsByStatement(key, registry, statement) {
 	if (statement.attributeMap.has(key)) {
-		var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, statement.attributeMap.get(key))
-		if (floatsUpdate[1]) {
-			statement.attributeMap.set(key, floatsUpdate[0].toString())
-		}
-		return floatsUpdate[0]
+		return getFloatsByStatementValue(key, registry, statement, statement.attributeMap.get(key))
 	}
+
 	return undefined
+}
+
+function getFloatsByStatementValue(key, registry, statement, value) {
+	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
+	if (floatsUpdate[1] && key != undefined) {
+		statement.attributeMap.set(key, floatsUpdate[0].toString())
+	}
+
+	return floatsUpdate[0]
 }
 
 function getFloatsIncludingZero(key, registry, statement, tag) {
@@ -456,13 +460,15 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 	if (getIsEmpty(value)) {
 		return [undefined, false]
 	}
-	if (value.indexOf('(') != -1) {
+
+	if (value.indexOf('(') != -1 || value.indexOf('[') != -1) {
 		var value = getValueByEquation(registry, statement, value)
 		if (Array.isArray(value)) {
 			return [value, true]
 		}
 		return [[value], true]
 	}
+
 	var floats = []
 	var floatWords = value.split(',')
 	var update = false
@@ -493,6 +499,7 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 			}
 		}
 	}
+
 	return [floats, update]
 }
 
@@ -523,13 +530,14 @@ function getHeights(registry, statement, tag) {
 }
 
 function getIntByDefault(defaultValue, key, registry, statement, tag) {
-	return getIntByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
+	return getIntSetByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
 }
 
-function getIntByStatementValue(key, registry, statement, value) {
+function getIntSetByStatementValue(key, registry, statement, value) {
 	if (value.length == 0) {
 		return null
 	}
+
 	if (isNaN(value)) {
 		var int = getValueByEquation(registry, statement, value)
 		statement.attributeMap.set(key, int.toString())
@@ -544,6 +552,7 @@ function getIntsByDefault(defaultValue, key, registry, statement, tag) {
 	if (intsUpdate[1]) {
 		statement.attributeMap.set(key, intsUpdate[0].toString())
 	}
+
 	return intsUpdate[0]
 }
 
@@ -555,6 +564,7 @@ function getIntsByStatement(key, registry, statement) {
 		}
 		return intsUpdate[0]
 	}
+
 	return null
 }
 
@@ -587,28 +597,34 @@ function getIntsUpdateByStatementValue(registry, statement, value) {
 }
 
 function getMatrices3D(registry, statement, tag) {
+	var heights = []
 	if (statement.attributeMap.has('height')) {
-		var heights = getFloatsUpdateByStatementValue(registry, statement, statement.attributeMap.get('height'))[0]
-		if (!getIsEmpty(heights)) {
-			return getMatrices3DByHeights(heights, registry, statement)
-		}
+		heights = getFloatsByDefault([1.0], 'height', registry, statement, tag)
 	}
-	return getMatrices3DByHeights([], registry, statement)
+
+	return getMatrices3DByHeights(heights, registry, statement)
 }
 
 function getMatrices3DAndZeroHeight(registry, statement, tag) {
-	//deprecated24
-	var key = 'height'
-	if (statement.attributeMap.has('heights') && !statement.attributeMap.has('height')) {
-		key = 'heights'
+	var matrices3D = getMatrices3D(registry, statement, tag)
+	if (matrices3D.length == 0) {
+		matrices3D.push(1.0)
 	}
-	if (statement.attributeMap.has(key)) {
-		var heights = getHeights(registry, statement, tag)
-		if (!getIsEmpty(heights)) {
-			return getMatrices3DByHeights(heights, registry, statement)
+
+	if (matrices3D.length == 1) {
+		var heightZero = matrices3D[0]
+		if (Array.isArray(heightZero)) {
+			heightZero = heightZero[14]
+		}
+		if (heightZero > 0.0) {
+			matrices3D.splice(0, 0, 0.0)
+		}
+		else {
+			matrices3D.push(0.0)
 		}
 	}
-	return getMatrices3DByHeights([], registry, statement)
+
+	return matrices3D
 }
 
 function getMatrices3DByHeights(heights, registry, statement) {
@@ -617,27 +633,27 @@ function getMatrices3DByHeights(heights, registry, statement) {
 //	2 6 10 14
 //	3 7 11 15
 	var attributeMap = statement.attributeMap
-	var matrices3D = new Array(heights.length)
-	for (var heightIndex = 0; heightIndex < heights.length; heightIndex++) {
-		matrices3D[heightIndex] = getUnitMatrix3D()
-		matrices3D[heightIndex][14] = heights[heightIndex]
-	}
-	statement.attributeMap.set('height', heights.toString())
 	if (!attributeMap.has('transforms')) {
-		return matrices3D
+		return heights
 	}
+
 	var transformMatrices3D = getMatrices3DByValue(registry, statement, attributeMap.get('transforms'))
-	matrices3D.length = Math.max(matrices3D.length, transformMatrices3D.length)
-	for (var matrix3DIndex = 0; matrix3DIndex < matrices3D.length; matrix3DIndex++) {
-		if (matrices3D[matrix3DIndex] == undefined) {
-			matrices3D[matrix3DIndex] = transformMatrices3D[matrix3DIndex]
+	heights.length = Math.max(heights.length, transformMatrices3D.length)
+	for (var matrix3DIndex = 0; matrix3DIndex < heights.length; matrix3DIndex++) {
+		if (heights[matrix3DIndex] == undefined) {
+			heights[matrix3DIndex] = transformMatrices3D[matrix3DIndex]
 		}
 		else {
-			matrices3D[matrix3DIndex] = getMultiplied3DMatrix(matrices3D[matrix3DIndex], transformMatrices3D[matrix3DIndex])
+			if (transformMatrices3D[matrix3DIndex] != undefined) {
+				var z = heights[matrix3DIndex]
+				heights[matrix3DIndex] = transformMatrices3D[matrix3DIndex]
+				heights[matrix3DIndex][14] += z
+			}
 		}
 	}
-	attributeMap.set('transforms', matrices3D.join(' '))
-	return matrices3D
+
+	attributeMap.set('transforms', heights.join(' '))
+	return heights
 }
 
 function getMatrices3DByValue(registry, statement, value) {
@@ -646,6 +662,7 @@ function getMatrices3DByValue(registry, statement, value) {
 	for (var separatedWord of separatedWords) {
 		addMatrices3DByWord(matrices3D, registry, statement, separatedWord)
 	}
+
 	return matrices3D
 }
 
@@ -658,7 +675,7 @@ function getMatrix2D(registry, statement) {
 	var separatedWords = getBracketSeparatedWords(attributeMap.get('transform'))
 	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
 		var entry = getBracketedEntry(separatedWords[wordIndex])
-		if (entry != null) {
+		if (entry != undefined) {
 			var transformType = entry[0]
 			if (g2DTransformMap.has(transformType)) {
 				var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
@@ -706,43 +723,50 @@ function getMatrix2DUntil(caller, registry, statement) {
 	return matrix2DUntil
 }
 
-function getMatrix3D(registry, statement) {
+function getMatrix3D(registry, statement, key) {
+	key = getValueDefault(key, 'transform3D')
 	var attributeMap = statement.attributeMap
-	if (!statement.attributeMap.has('transform3D')) {
-		return null
+	if (!statement.attributeMap.has(key)) {
+		return undefined
 	}
-	var matrix = null
-	var separatedWords = getBracketSeparatedWords(attributeMap.get('transform3D'))
-	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
-		var entry = getBracketedEntry(separatedWords[wordIndex])
-		if (entry != null) {
+
+	var words = getBracketSeparatedWords(attributeMap.get(key))
+	attributeMap.set(key, words.join(' '))
+	return getMatrix3DByWords(registry, statement, words)
+}
+
+function getMatrix3DByWords(registry, statement, words) {
+	var matrix3D = undefined
+	for (var wordIndex = words.length - 1; wordIndex > -1; wordIndex--) {
+		var entry = getBracketedEntry(words[wordIndex])
+		if (entry != undefined) {
 			var transformType = entry[0]
 			if (g3DTransformMap.has(transformType)) {
 				var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
-				var bracketMatrix = g3DTransformMap.get(transformType)(floats)
-				if (matrix == null) {
-					matrix = bracketMatrix
+				words[wordIndex] = transformType + '(' + floats.toString() + ')'
+				var bracketMatrix3D = g3DTransformMap.get(transformType)(floats)
+				if (matrix3D == undefined) {
+					matrix3D = bracketMatrix3D
 				}
 				else {
-					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
+					matrix3D = getMultiplied3DMatrix(bracketMatrix3D, matrix3D)
 				}
 			}
 			if (g3DPointTransformMap.has(transformType)) {
 				var points = getPoints3D(registry, statement, entry[1])
-				separatedWords[wordIndex] = transformType + '(' + points.join(' ') + ')'
-				var bracketMatrix = g3DPointTransformMap.get(transformType)(points)
-				if (matrix == null) {
-					matrix = bracketMatrix
+				words[wordIndex] = transformType + '(' + points.join(' ') + ')'
+				var bracketMatrix3D = g3DPointTransformMap.get(transformType)(points)
+				if (matrix3D == undefined) {
+					matrix3D = bracketMatrix3D
 				}
 				else {
-					matrix = getMultiplied3DMatrix(bracketMatrix, matrix)
+					matrix3D = getMultiplied3DMatrix(bracketMatrix3D, matrix3D)
 				}
 			}
 		}
 	}
-	attributeMap.set('transform3D', separatedWords.join(' '))
-	return matrix
+
+	return matrix3D
 }
 
 function getMatrix3DsByChildren(children, registry) {
@@ -763,6 +787,29 @@ function getPath2DByStatement(registry, statement) {
 		return []
 	}
 	return removeIdentical2DPoints(getPointsHDByStatementOnly(registry, workStatement))
+}
+
+function getPoint2DByDefault(defaultValue, key, registry, statement, tag) {
+	return getPoint2DByStatementValue(key, registry, statement, getValueByKeyDefault(defaultValue, key, registry, statement, tag))
+}
+
+function getPoint2DByStatementValue(key, registry, statement, value) {
+	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
+	var point = floatsUpdate[0]
+	if (getIsEmpty(point)) {
+		point = [0.0]
+	}
+
+	if (point.length == 1) {
+		point.push(point[0])
+	}
+
+	setUndefinedElementsToValue(point, 0.0)
+	if (floatsUpdate[1] && key != undefined) {
+		statement.attributeMap.set(key, point.toString())
+	}
+
+	return point
 }
 
 function getPoint3DByStatement(key, registry, statement) {
@@ -790,14 +837,6 @@ function getPoint3DByStatement(key, registry, statement) {
 		statement.attributeMap.set(key, floats.toString())
 	}
 	return floats
-}
-
-function getPointByDefault(defaultValue, key, registry, statement, tag) {
-	var point = getFloatsByDefault(defaultValue, key, registry, statement, tag)
-	if (point.length == 1) {
-		point.push(point[0])
-	}
-	return point
 }
 
 function getPoints3D(registry, statement, value) {
@@ -851,7 +890,14 @@ function getPointsByTag(key, registry, statement, tag) {
 }
 
 function getPointsByValue(registry, statement, value) {
-	return getFloatListsUpdateByStatementValue(registry, true, statement, value)[0]
+	var points = getFloatListsUpdateByStatementValue(registry, true, statement, value)[0]
+	for (var point of points) {
+		if (point.length == 1) {
+			point.push(point[0])
+		}
+	}
+
+	return points
 }
 
 function getPointsHD(registry, statement) {
@@ -948,6 +994,10 @@ function getStringByArray(depth, elements) {
 
 function getValues(value) {
 	var values = []
+	if (value == undefined) {
+		return values
+	}
+
 	if (value.indexOf('(') == -1) {
 		values = value.split(' ').filter(lengthCheck)
 	}
@@ -970,6 +1020,7 @@ function getValues(value) {
 			values.push(token)
 		}
 	}
+
 	return values
 }
 
@@ -1055,11 +1106,10 @@ function getVector3DByStatement(registry, statement) {
 	return divide3DScalar(vector, vectorLength)
 }
 
-function roundFloats(floats, places) {
-	for (var floatIndex = 0; floatIndex < floats; floatIndex++) {
-		floats[floatIndex] = parseFloat(parameter.toFixed(places))
+function pointsToFixed(points, numberOfDecimals) {
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		points[pointIndex] = getFixedStrings(points[pointIndex], numberOfDecimals)
 	}
-	return floats
 }
 
 function setAttributeValue(key, monad, value) {
