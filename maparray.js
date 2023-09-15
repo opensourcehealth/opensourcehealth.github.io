@@ -11,6 +11,7 @@ function addElementsToMapArray(destinationMap, key, elements) {
 		pushArray(destinationMap.get(key), elements)
 		return
 	}
+
 	destinationMap.set(key, elements)
 }
 
@@ -34,6 +35,7 @@ function addElementToMapArray(destinationMap, key, element) {
 		destinationMap.get(key).push(element)
 		return
 	}
+
 	destinationMap.set(key, [element])
 }
 
@@ -64,6 +66,7 @@ function arrayIsClose(elements, others) {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -78,6 +81,7 @@ function compareArrayAscending(a, b) {
 			return a[0][elementIndex] - b[0][elementIndex]
 		}
 	}
+
 	return 0
 }
 
@@ -88,6 +92,7 @@ function compareArrayDescending(a, b) {
 			return b[0][elementIndex] - a[0][elementIndex]
 		}
 	}
+
 	return 0
 }
 
@@ -104,6 +109,7 @@ function compareFirstThirdElementAscending(a, b) {
 	if (Math.abs(a[0] - b[0]) < gClose) {
 		return a[2] - b[2]
 	}
+
 	return a[0] - b[0]
 }
 
@@ -123,6 +129,7 @@ function compareSignedIntersectionAscending(a, b) {
 	if (a[0] == b[0]) {
 		return a[1] - b[1]
 	}
+
 	return a[0] - b[0]
 }
 
@@ -175,11 +182,12 @@ function getArrayArraysCopy(arrayArrays) {
 	for (var arraysIndex = 0; arraysIndex < arrayArrays.length; arraysIndex++) {
 		arrayArraysCopy[arraysIndex] = getArraysCopy(arrayArrays[arraysIndex])
 	}
+
 	return arrayArraysCopy
 }
 
 function getArrayByElements(elements, until, value) {
-	value = getValueZero(value)
+	value = getValueDefault(value, 0.0)
 	elements = getArrayByValue(elements)
 	until = getValueDefault(until, elements.length)
 	if (elements.length < until) {
@@ -188,6 +196,7 @@ function getArrayByElements(elements, until, value) {
 	for (var elementIndex = 0; elementIndex < until; elementIndex++) {
 		elements[elementIndex] = getValueDefault(elements[elementIndex], value)
 	}
+
 	return elements
 }
 
@@ -198,6 +207,7 @@ function getArrayBySet(setForArray) {
 		array[index] = element
 		index += 1
 	}
+
 	return array
 }
 
@@ -205,6 +215,7 @@ function getArrayByValue(value) {
 	if (Array.isArray(value)) {
 		return value
 	}
+
 	return [value]
 }
 
@@ -212,6 +223,7 @@ function getArrayOrNullBySet(setForArray) {
 	if (setForArray.size == 0) {
 		return null
 	}
+
 	return getArrayBySet(setForArray)
 }
 
@@ -220,6 +232,7 @@ function getArraysBySplittingStrings(strings, stringSeparator) {
 	for (var stringIndex = 0; stringIndex < strings.length; stringIndex++) {
 		arrays[stringIndex] = strings[stringIndex].split(stringSeparator)
 	}
+
 	return arrays
 }
 
@@ -228,13 +241,19 @@ function getArraysCopy(arrays) {
 	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
 		arraysCopy[arrayIndex] = arrays[arrayIndex].slice(0)
 	}
+
 	return arraysCopy
+}
+
+function getBoundedValue(value, lower, upper) {
+	return Math.min(Math.max(value, lower), upper)
 }
 
 function getIsEmpty(array) {
 	if (array == null || array == undefined) {
 		return true
 	}
+
 	return array.length == 0
 }
 
@@ -242,7 +261,13 @@ function getIsLong(array, minimumLength) {
 	if (array == null || array == undefined) {
 		return false
 	}
+
 	return array.length >= minimumLength
+}
+
+function getKeyMapDefault(key, map, value) {
+	setMapDefault(key, map, value)
+	return [key, viewBroker.valueMap]
 }
 
 function getMapArraysCopy(sourceMap) {
@@ -250,6 +275,7 @@ function getMapArraysCopy(sourceMap) {
 	for (var entry of sourceMap.entries()) {
 		mapCopy.set(entry[0], entry[1].slice(0))
 	}
+
 	return mapCopy
 }
 
@@ -340,51 +366,11 @@ function getValueDefault(value, defaultValue) {
 }
 
 function getValueFalse(value) {
-	if (value == undefined) {
-		return false
-	}
-
-	return value
-}
-
-function getValueOne(value) {
-	if (value == undefined) {
-		return 1.0
-	}
-
-	return value
-}
-
-function getValueFour(value) {
-	if (value == undefined) {
-		return 4.0
-	}
-
-	return value
-}
-
-function getValueTen(value) {
-	if (value == undefined) {
-		return 10.0
-	}
-
-	return value
+	return getValueDefault(value, false)
 }
 
 function getValueTrue(value) {
-	if (value == undefined) {
-		return true
-	}
-
-	return value
-}
-
-function getValueZero(value) {
-	if (value == undefined) {
-		return 0.0
-	}
-
-	return value
+	return getValueDefault(value, true)
 }
 
 function notNullCheck(element) {
@@ -424,6 +410,24 @@ function pushArray(elements, others) {
 	return elements
 }
 
+function removeCollectionElementsByIterable(collection, iterable) {
+	for (var element of iterable) {
+		collection.delete(element)
+	}
+}
+
+function removeLastEmpties(elements) {
+	var lastIndex = elements.length - 1
+	for (; lastIndex > -1; lastIndex--) {
+		if (elements[lastIndex] != undefined && elements[lastIndex] != '') {
+			elements.length = lastIndex + 1
+			return
+		}
+	}
+
+	elements.length = 0
+}
+
 function removeNulls(elements) {
 	var withoutNullLength = 0
 	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
@@ -454,12 +458,6 @@ function removeRepeats(elements) {
 	}
 }
 
-function removeCollectionElementsByIterable(collection, iterable) {
-	for (var element of iterable) {
-		collection.delete(element)
-	}
-}
-
 function removeShortArrays(arrays, length) {
 	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
 		if (arrays[arrayIndex] != null) {
@@ -485,7 +483,7 @@ function reverseArrays(elements) {
 	}
 }
 
-function setMapIfMissing(key, map, value) {
+function setMapDefault(key, map, value) {
 	if (!map.has(key)) {
 		map.set(key, value)
 	}
@@ -511,7 +509,7 @@ function setUndefinedElementsToArrayZero(elements, sources) {
 }
 
 function setUndefinedElementsToValue(elements, value) {
-	value = getValueZero(value)
+	value = getValueDefault(value, 0.0)
 	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
 		elements[parameterIndex] = getValueDefault(elements[parameterIndex], value)
 	}
