@@ -1,5 +1,7 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
+gValidTagSet = new Set('default defs layer license radialGradient stop svg xml'.split(' '))
+
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in addPassthroughLines reached, no further statements will be added.'
@@ -478,36 +480,26 @@ function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
 	if (value != undefined) {
 		return value
 	}
-	var defaultMap = registry.idMap.get('_default').attributeMap
-	var value = getValueByKeyTag(defaultMap, key, tag)
-	if (value != undefined) {
-		return value
-	}
+
 	if (defaultValue == undefined) {
 		return undefined
 	}
+
+	var defaultMap = registry.idMap.get('_default').attributeMap
 	var defaultString = defaultValue.toString()
 	var keyValueString = key + ':' + defaultString
 	if (defaultMap.has(tag)) {
-		defaultMap.set(tag, defaultMap.get(tag) + ';' + keyValueString)
+		var keyValueStrings = defaultMap.get(tag).split(';')
+		if (keyValueStrings.indexOf(keyValueString) == -1) {
+			keyValueStrings.push(keyValueString)
+			defaultMap.set(tag, keyValueStrings.join(';'))
+		}
 	}
 	else {
 		defaultMap.set(tag, keyValueString)
 	}
-	return defaultString
-}
 
-function getValueByKeyTag(attributeMap, key, tag) {
-	if (attributeMap.has(tag)) {
-		var keyValueStrings = attributeMap.get(tag).split(';')
-		for (var keyValueString of keyValueStrings) {
-			var keyValue = keyValueString.split(':')
-			if (keyValue[0].trim() == key) {
-				return keyValue[1].trim()
-			}
-		}
-	}
-	return undefined
+	return defaultString
 }
 
 function getWorkStatement(registry, statement) {
@@ -547,24 +539,14 @@ function initializeProcessors(processors) {
 function processRootStatementByTagMap(registry, rootStatement, tagMap) {
 	var missingProcessorSet = new Set()
 	processStatementsByTagMap(missingProcessorSet, registry, getDescendantsInsideFirst(rootStatement), gTagCenterMap)
-	missingProcessorSet.delete('default')
-	missingProcessorSet.delete('layer')
-	missingProcessorSet.delete('license')
-	missingProcessorSet.delete('svg')
-	missingProcessorSet.delete('xml')
-	var missingProcessors = []
-	for (var element of missingProcessorSet) {
-		if (!element.startsWith('_')) {
-			missingProcessors.push(element)
+	if (missingProcessorSet.size > 0) {
+		if (missingProcessorSet.size > 1) {
+			console.log('Could not find processors for the tags:')
 		}
-	}
-	if (missingProcessors.length > 0) {
-		var processorString = 'Could not find a processor for the tag:'
-		if (missingProcessors.length > 1) {
-			processorString = 'Could not find processors for the tags:'
+		else {
+			console.log('Could not find a processor for the tag:')
 		}
-		console.log(processorString)
-		console.log(missingProcessors)
+		console.log(missingProcessorSet)
 		console.log('The following processors are available:')
 		console.log(getTagKeys())
 	}
@@ -572,11 +554,14 @@ function processRootStatementByTagMap(registry, rootStatement, tagMap) {
 
 function processStatementsByTagMap(missingProcessorSet, registry, statements, tagMap) {
 	for (var statement of statements) {
-		if (tagMap.has(statement.tag)) {
-			tagMap.get(statement.tag).processStatement(registry, statement)
+		var tag = statement.tag
+		if (tagMap.has(tag)) {
+			tagMap.get(tag).processStatement(registry, statement)
 		}
 		else {
-			missingProcessorSet.add(statement.tag)
+			if (!gValidTagSet.has(tag) && !tag.startsWith('_')) {
+				missingProcessorSet.add(tag)
+			}
 		}
 	}
 }
@@ -592,18 +577,16 @@ function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
 	if (points == null) {
 		return boundingBox
 	}
+
 	var matrix2DUntil = getMatrix2DUntil(caller, registry, statement)
 	if (matrix2DUntil != null) {
 		transform2DPoints(matrix2DUntil, points)
 	}
+
 	for (var point of points) {
-		if (boundingBox == null) {
-			boundingBox = [point.slice(0, 2), point.slice(0, 2)]
-		}
-		else {
-			widenBoundingBox(boundingBox, point)
-		}
+		widenBoundingBox(boundingBox, point)
 	}
+
 	return boundingBox
 }
 
@@ -611,6 +594,7 @@ function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
 	if (statement.tag == 'group' || statement.tag == 'g') {
 		getMatrix2D(registry, statement)
 	}
+
 	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
 		if (statement.attributeMap.has('display')) {
 			if (statement.attributeMap.get('display') == 'none') {
@@ -619,5 +603,6 @@ function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
 		}
 		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
 	}
+
 	return boundingBox
 }
