@@ -27,12 +27,19 @@
 </table>
 <table>
 <tr>
-<td><canvas id="viewerCanvas" width="0" height="0" style="border:1px solid black"></canvas></td><td id="paragraphText"></td>
+<td><canvas hidden="true" id="viewCanvas" width="0" height="0" style="border:1px solid black"></canvas></td><td id="paragraphText"></td>
 </tr>
 </table>
 <table>
 <tr>
-<td><text hidden="true" id="pointsID">Points</text></td><td><textarea hidden="true" id="pointsInputID" rows="3" cols="80"></textarea></td>
+<td><text hidden="true" id="pointsID">Points</text></td>
+<td><textarea hidden="true" id="pointsInputID" rows="3" cols="80"></textarea></td>
+<td></td>
+</tr>
+<tr>
+<td><text hidden="true" id="tagID">Tag</text></td>
+<td><textarea hidden="true" id="tagInputID" rows="3" cols="80"></textarea></td>
+<td><button hidden="true" id="pointsUpdateStatementID" onclick="updateStatement()">Update Statement</button></td>
 </tr>
 <tr>
 <td><button onclick="update()">Update</button></td>
@@ -75,7 +82,7 @@
 //change exterior to voxel and pixel
 //hidden lines
 //sculpture mosaics=[{transform,[surfacets]}], closed surfacet={indegons, bottom, top} indegon can be indexed x,y,z;index,id,polygonIndex
-//slice svg=id layerThickness=0.6 viewer=none/basic layerHeights=none/[]
+//slice svg=id layerThickness=0.6 view=none/basic layerHeights=none/[]
 //combination id=a+b-c#d!#e*f/g ** h on vertex
 //add circles and rect to bounding box
 //check backslash quote in quoteSeparated
@@ -114,7 +121,8 @@ wordArea.oninput = areaInput
 function updateWordArea(wordString) {
 	var lines = getBracketReplacedLinesByText(wordString)
 	var paragraphTextElement = document.getElementById('paragraphText')
-	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idCountMap:new Map(), idMap:new Map(), lines, meshMap:new Map(), views:[]}
+	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idCountMap:new Map(), idMap:new Map(), lines:lines, meshMap:new Map()}
+	registry.views = []
 	var svgStatement = getDocumentRoot(lines, 'svg')
 	if (svgStatement == undefined) {
 		document.getElementById('svgArea').value = ''
@@ -141,6 +149,11 @@ function updateWordArea(wordString) {
 	var width = null
 	var heightSuffix = ''
 	var widthSuffix = ''
+	if (registry.display == 'none') {
+		boundingBox = null
+		height = viewBroker.minimumHeight * 1.5
+	}
+
 	if (svgStatement.attributeMap.has('height')) {
 		var heightString = svgStatement.attributeMap.get('height')
 		heightSuffix = getAlphabeticSuffix(heightString)
@@ -168,11 +181,11 @@ function updateWordArea(wordString) {
 	}
 
 	if (height != null) {
-		svgStatement.attributeMap.set('height', height.toFixed() + heightSuffix)
+		svgStatement.attributeMap.set('height', height.toFixed(1) + heightSuffix)
 	}
 
 	if (width != null) {
-		svgStatement.attributeMap.set('width', width.toFixed() + widthSuffix)
+		svgStatement.attributeMap.set('width', width.toFixed(1) + widthSuffix)
 	}
 
 	if (!svgStatement.attributeMap.has('style')) {
@@ -196,7 +209,15 @@ function updateWordArea(wordString) {
 	}
 
 	document.getElementById('svgArea').value = svgString
-	paragraphTextElement.innerHTML = svgString
+	if (registry.display == 'none') {
+		paragraphTextElement.display = 'none'
+		paragraphTextElement.innerHTML = ''
+	}
+	else {
+		paragraphTextElement.display = 'inline'
+		paragraphTextElement.innerHTML = svgString
+	}
+
 	if (heightSuffix.trim() == 'mm') {
 		height *= 3.7795275591
 	}
@@ -208,9 +229,9 @@ function updateWordArea(wordString) {
 		height += doublePadding
 	}
 
-	document.getElementById('viewerCanvas').hidden = registry.views.length == 0
+	document.getElementById('viewCanvas').hidden = registry.views.length == 0
 	if (registry.views.length > 0) {
-		viewBroker.start(Math.max(height, viewBroker.minimumHeight), 'viewerCanvas', registry)
+		viewBroker.start(Math.max(height, viewBroker.minimumHeight), 'viewCanvas', registry)
 	}
 
 	if (registry.indexStatements != undefined) {
@@ -227,10 +248,11 @@ function updateWordArea(wordString) {
 
 var gParentFirstSet = new Set()
 var gTagCenterMap = new Map()
-gProcessors = gAlterationProcessors.concat(gConstructionProcessors).concat(gGenerator2DProcessors)
-gProcessors = gProcessors.concat(gGenerator3DProcessors).concat(gMetaProcessors)
-initializeProcessors(gProcessors)
-
+initializeProcessors(gAlterationProcessors)
+initializeProcessors(gConstructionProcessors)
+initializeProcessors(gGenerator2DProcessors)
+initializeProcessors(gGenerator3DProcessors)
+initializeProcessors(gMetaProcessors)
 setTextArea('wordAreaID')
 update()
 </script>
