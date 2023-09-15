@@ -72,7 +72,7 @@ function divide2D_Check(elements, divisor2D) {
 }
 
 function divide2DScalar_Check(elements, divisorScalar) {
-	return divide2DScalar(getArrayByElements(elements, 2), getValueOne(divisorScalar))
+	return divide2DScalar(getArrayByElements(elements, 2), getValueDefault(divisorScalar, 1.0))
 }
 
 function divide3D_Check(elements, divisor3D) {
@@ -80,7 +80,7 @@ function divide3D_Check(elements, divisor3D) {
 }
 
 function divide3DScalar_Check(elements, divisorScalar) {
-	return divide3DScalar(getArrayByElements(elements, 3), getValueOne(divisorScalar))
+	return divide3DScalar(getArrayByElements(elements, 3), getValueDefault(divisorScalar, 1.0))
 }
 
 function divideArray_Check(elements, divisors, until) {
@@ -88,7 +88,7 @@ function divideArray_Check(elements, divisors, until) {
 }
 
 function divideArrayScalar_Check(elements, divisorScalar) {
-	return divideArrayScalar(getArrayByElements(elements), getValueOne(divisorScalar))
+	return divideArrayScalar(getArrayByElements(elements), getValueDefault(divisorScalar, 1.0))
 }
 
 function dotProduct2D_Check(elements, others) {
@@ -137,7 +137,7 @@ function getDivision2D_Check(elements, divisor2D) {
 }
 
 function getDivision2DScalar_Check(elements, divisorScalar) {
-	return getDivision2DScalar(getArrayByElements(elements, 2), getValueOne(divisorScalar))
+	return getDivision2DScalar(getArrayByElements(elements, 2), getValueDefault(divisorScalar, 1.0))
 }
 
 function getDivision3D_Check(elements, divisor3D) {
@@ -145,7 +145,7 @@ function getDivision3D_Check(elements, divisor3D) {
 }
 
 function getDivision3DScalar_Check(elements, divisorScalar) {
-	return getDivision3DScalar(getArrayByElements(elements, 3), getValueOne(divisorScalar))
+	return getDivision3DScalar(getArrayByElements(elements, 3), getValueDefault(divisorScalar, 1.0))
 }
 
 function getDivisionArray_Check(elements, divisors) {
@@ -153,7 +153,7 @@ function getDivisionArray_Check(elements, divisors) {
 }
 
 function getDivisionArrayScalar_Check(elements, divisorScalar) {
-	return divideArrayScalar(getArrayByElements(elements), getValueOne(divisorScalar))
+	return divideArrayScalar(getArrayByElements(elements), getValueDefault(divisorScalar, 1.0))
 }
 
 function getMultiplication2D_Check(elements, multiplier2D) {
@@ -161,7 +161,7 @@ function getMultiplication2D_Check(elements, multiplier2D) {
 }
 
 function getMultiplication2DScalar_Check(elements, multiplierScalar) {
-	return getMultiplication2DScalar(getArrayByElements(elements, 2), getValueZero(multiplierScalar))
+	return getMultiplication2DScalar(getArrayByElements(elements, 2), getValueDefault(multiplierScalar, 0.0))
 }
 
 function getMultiplication3D_Check(elements, multiplier3D) {
@@ -169,7 +169,7 @@ function getMultiplication3D_Check(elements, multiplier3D) {
 }
 
 function getMultiplication3DScalar_Check(elements, multiplierScalar) {
-	return getMultiplication3DScalar(getArrayByElements(elements, 3), getValueZero(multiplierScalar))
+	return getMultiplication3DScalar(getArrayByElements(elements, 3), getValueDefault(multiplierScalar, 0.0))
 }
 
 function getMultiplicationArray_Check(elements, multipliers) {
@@ -177,7 +177,7 @@ function getMultiplicationArray_Check(elements, multipliers) {
 }
 
 function getMultiplicationArrayScalar_Check(elements, multiplierScalar) {
-	return multiplyArrayScalar(getArrayByElements(elements), getValueZero(multiplierScalar))
+	return multiplyArrayScalar(getArrayByElements(elements), getValueDefault(multiplierScalar, 0.0))
 }
 
 function getRotation2DAngle_Check(point, angle) {
@@ -237,7 +237,7 @@ function multiply2D_Check(elements, multiplier2D) {
 }
 
 function multiply2DScalar_Check(elements, multiplierScalar) {
-	return multiply2DScalar(getArrayByElements(elements, 2), getValueZero(multiplierScalar))
+	return multiply2DScalar(getArrayByElements(elements, 2), getValueDefault(multiplierScalar, 0.0))
 }
 
 function multiply3D_Check(elements, multiplier3D) {
@@ -245,7 +245,7 @@ function multiply3D_Check(elements, multiplier3D) {
 }
 
 function multiply3DScalar_Check(elements, multiplierScalar) {
-	return multiply3DScalar(getArrayByElements(elements, 3), getValueZero(multiplierScalar))
+	return multiply3DScalar(getArrayByElements(elements, 3), getValueDefault(multiplierScalar, 0.0))
 }
 
 function multiplyArray_Check(elements, multipliers, until) {
@@ -253,7 +253,7 @@ function multiplyArray_Check(elements, multipliers, until) {
 }
 
 function multiplyArrayScalar_Check(elements, multiplierScalar) {
-	return multiplyArrayScalar(getArrayByElements(elements), getValueZero(multiplierScalar))
+	return multiplyArrayScalar(getArrayByElements(elements), getValueDefault(multiplierScalar, 0.0))
 }
 
 function oppositeHypoteneuseAdjacent_Check(hypoteneuse, otherSide) {
@@ -265,11 +265,11 @@ function oppositeHypoteneuseAdjacent_Check(hypoteneuse, otherSide) {
 }
 
 function oppositeHypoteneuseAdjacentSquared_Check(hypoteneuse, otherSide) {
-	return oppositeHypoteneuseAdjacentSquared(getValueOne(otherSide), getValueZero(otherSide))
+	return oppositeHypoteneuseAdjacentSquared(getValueOne(otherSide), getValueDefault(otherSide, 1.0))
 }
 
 function polar_Check(angle, radius) {
-	return polarRadius(getValueZero(angle) * gRadiansPerDegree, getValueOne(radius))
+	return polarRadius(getValueDefault(angle, 0.0) * gRadiansPerDegree, getValueDefault(radius, 1.0))
 }
 
 function reverseSigns_Check(elements) {
@@ -277,7 +277,7 @@ function reverseSigns_Check(elements) {
 }
 
 function rotate2DAngle_Check(point, angle) {
-	return rotate2DVector(getArrayByElements(point, 2), polar_Check(getValueZero(angle)))
+	return rotate2DVector(getArrayByElements(point, 2), polar_Check(getValueDefault(angle, 0.0)))
 }
 
 function rotate2DVector_Check(point, vector) {
