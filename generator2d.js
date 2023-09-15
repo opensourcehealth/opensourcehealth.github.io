@@ -28,6 +28,100 @@ function addPolylinesToGroup(polylines, registry, statement) {
 	}
 }
 
+function addRectangle(boundingBox, color, registry, statement, strokeWidthString) {
+	var lowerPoint = boundingBox[0]
+	var size = getSubtraction2D(boundingBox[1], lowerPoint)
+	var xString = lowerPoint[0].toString()
+	var yString = lowerPoint[1].toString()
+	var rectangleAttributeMap = new Map([['x', xString], ['y', yString], ['width', size[0].toString()], ['height', size[1].toString()]])
+	if (color != undefined) {
+		rectangleAttributeMap.set('style', 'fill:' + color)
+ 	}
+	rectangleAttributeMap.set('stroke-width', strokeWidthString)
+	var rectangleStatement = getStatementByParentTag(rectangleAttributeMap, 0, statement, 'rect')
+	getUniqueID(statement.attributeMap.get('id') + '_rect_x_' + xString + '_y_' + yString, registry, rectangleStatement)
+}
+
+function addTable(caption, colorPeriod, fontSize, headerColor,
+registry, rowColor, statement, strokeWidth, table, tableAlign, tableStrokeWidth, textAnchor, x, y) {
+	var columnRight = tableStrokeWidth
+	var extraY = fontSize * 0.4
+	var halfStrokeWidth = strokeWidth * 0.5
+	var halfTableStrokeWidth = tableStrokeWidth * 0.5
+	var extraYHalfStroke = extraY + halfTableStrokeWidth + halfStrokeWidth
+	var maximumLength = table.headers.length
+	var polylines = []
+	var spaceFontLength = gSpaceLength * fontSize
+	var doubleSpaceLength = spaceFontLength * 2.0
+	var polylineTop = y + halfTableStrokeWidth
+	var polylineY = polylineTop
+	var strokeWidthString = tableStrokeWidth.toString()
+	var textAdvance = 0.5 * (textAnchor == 'middle') + 1.0 * (textAnchor == 'end')
+	var totalStrokeWidth = strokeWidth + tableStrokeWidth
+	var yAddition = fontSize + totalStrokeWidth + extraY
+	for (var row of table.rows) {
+		maximumLength = Math.max(maximumLength, row.length)
+	}
+	var columnXs = new Array(maximumLength)
+	var polylineXs = new Array(maximumLength)
+	for (var columnIndex = 0; columnIndex < maximumLength; columnIndex++) {
+		var columnTextLength = getColumnTextLength(columnIndex, table) * fontSize
+		columnXs[columnIndex] = columnRight + textAdvance * columnTextLength + spaceFontLength + halfStrokeWidth
+		columnRight += columnTextLength + totalStrokeWidth + doubleSpaceLength
+		polylineXs[columnIndex] = columnRight
+	}
+	var offset = x - tableAlign * columnRight
+	var polylineLeft = offset + halfTableStrokeWidth
+	addArrayScalar(columnXs, offset)
+	addArrayScalar(polylineXs, offset - halfTableStrokeWidth)
+	var polylineRight = polylineXs[columnXs.length - 1]
+	if (caption != undefined) {
+		polylineY += yAddition
+		var id = statement.attributeMap.get('id')
+		var polylineMiddleString = ((polylineLeft + polylineRight) * 0.5).toString()
+		addTextStatement(id, registry, statement, caption, 'middle', polylineMiddleString, (polylineY - extraYHalfStroke).toString())
+	}
+	if (table.headers.length > 0) {
+		polylineY += yAddition
+		addRectangle([[polylineLeft, polylineTop], [polylineRight, polylineY]], headerColor, registry, statement, strokeWidthString)
+		addTextRow(columnXs, registry, table.headers, statement, textAnchor, polylineY - extraYHalfStroke)
+		if (tableStrokeWidth > 0.0) {
+			polylines.push([[polylineLeft, polylineY], [polylineRight, polylineY]])
+		}
+	}
+	for (var rowIndex = 0; rowIndex < table.rows.length; rowIndex++) {
+		var oldY = polylineY
+		polylineY += yAddition
+		if ((rowIndex - 1 + colorPeriod) % colorPeriod == 0) {
+			addRectangle([[polylineLeft, oldY], [polylineRight, polylineY]], rowColor, registry, statement, strokeWidthString)
+		}
+		addTextRow(columnXs, registry, table.rows[rowIndex], statement, textAnchor, polylineY - extraYHalfStroke)
+		if (tableStrokeWidth > 0.0) {
+			polylines.push([[polylineLeft, polylineY], [polylineRight, polylineY]])
+		}
+	}
+	if (polylines.length == 0) {
+		return
+	}
+	polylines.push([[polylineLeft, polylineTop], [polylineRight, polylineTop]])
+	polylines.push([[polylineLeft, polylineTop], [polylineLeft, polylineY]])
+	for (var polylineX of polylineXs) {
+		polylines.push([[polylineX, polylineTop], [polylineX, polylineY]])
+	}
+	var idStart = statement.attributeMap.get('id') + '_group_'
+	var groupStatement = getStatementByParentTag(new Map([['stroke-width', tableStrokeWidth.toString()]]), 1, statement, 'g')
+	getUniqueID(idStart, registry, groupStatement)
+	addPolylinesToGroup(polylines, registry, groupStatement)
+}
+
+function addTextRow(columnXs, registry, row, statement, textAnchor, y) {
+	var idStart = statement.attributeMap.get('id')
+	var yString = y.toString()
+	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
+		addTextStatement(idStart, registry, statement, row[columnIndex], textAnchor, columnXs[columnIndex].toString(), yString)
+	}
+}
+
 function addTextStatement(idStart, registry, statement, text, textAnchor, xString, yString) {
 	var textAttributeMap = new Map([['innerHTML', text], ['text-anchor', textAnchor], ['x', xString], ['y', yString]])
 	var textStatement = getStatementByParentTag(textAttributeMap, 0, statement, 'text')
@@ -116,22 +210,25 @@ function BoldMonad() {
 	}
 }
 
+//deprecated24
 function cellX(registry, statement) {
 	var parent = statement.parent
 	var variableMap = getVariableMapByStatement(parent)
 	var cellColumn = getVariableInt('grid_cellColumn', parent)
-	if (cellColumn >= getVariableFloat('grid_columns', parent)) {
+	if (cellColumn >= getIntByDefault(1, 'gridColumns', registry, statement, statement.tag)) {
 		cellColumn = 0
 		variableMap.set('grid_cellColumn', '0')
 		variableMap.set('grid_cellRow', (getVariableInt('grid_cellRow', parent) + 1).toString())
 	}
-	var x = cellColumn * getVariableFloat('grid_cellWidth', parent)
+
+	var x = cellColumn * getAttributeFloat('gridCellWidth', statement)
 	variableMap.set('grid_cellColumn', (getVariableInt('grid_cellColumn', parent) + 1).toString())
 	return x
 }
 
+//deprecated24
 function cellY(registry, statement) {
-	return getVariableInt('grid_cellRow', statement.parent) * getVariableFloat('grid_cellHeight', statement.parent)
+	return getVariableInt('grid_cellRow', statement.parent) * getAttributeFloat('gridCellHeight', statement)
 }
 
 function closeByDYMultiplier(dyMultiplier, monad, registry, statement) {
@@ -140,7 +237,7 @@ function closeByDYMultiplier(dyMultiplier, monad, registry, statement) {
 	var joinedWord = getJoinedWordByWordLengths(monad.wordLengths)
 	var joinedLength = getTextLength(joinedWord) * fontSize
 	var word = '<tspan dx = "-' + (0.2 * fontSize).toString() + '"  dy = "' + dy.toString() + '" font-size = "'
-	word += (0.6 * fontSize).toString() + '">' + joinedWord + '</tspan><tspan display="none" dy = "' + (-dy).toString() + '">.</tspan>'
+	word += (0.6 * fontSize).toString() + '">' + joinedWord + '</tspan><tspan dy = "' + (-dy).toString() + '">&#8203;</tspan>'
 	monad.parent.wordLengths.push({word:word, length:joinedLength})
 	monad.wordLengths.length = 0
 }
@@ -239,7 +336,7 @@ function getAnchorFontParent(registry, statement) {
 }
 
 function getBox(registry, statement) {
-	var points = getRectangularPoints([10], registry, statement)
+	var points = getRectangularPoints([10.0, 10.0], registry, statement)
 	var pointZero = points[0]
 	var minimumX = Math.min(points[0][0], points[1][0])
 	var minimumY = Math.min(points[0][1], points[1][1])
@@ -254,6 +351,19 @@ function getBox(registry, statement) {
 	}
 
 	return points
+}
+
+function getColumnTextLength(columnIndex, table) {
+	var textLength = 0.0
+	if (columnIndex < table.headers.length) {
+		textLength = getTextLength(table.headers[columnIndex])
+	}
+	for (var row of table.rows) {
+		if (columnIndex < row.length) {
+			textLength = Math.max(textLength, getTextLength(row[columnIndex]))
+		}
+	}
+	return textLength
 }
 
 function getJoinedWordByWordLengths(wordLengths) {
@@ -292,7 +402,7 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 			}
 			var polygon = getConnectedPolygon(outlines)
 			polygon = getArraysCopy(polygon)
-			multiply2DsByScalar(polygon, halfHeight)
+			multiply2DsScalar(polygon, halfHeight)
 			var boundingX = getBoundingXByPolygons([polygon])
 			x -= boundingX[0]
 			addArraysByIndex(polygon, x, 0)
@@ -304,6 +414,19 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 	}
 	addArrayArraysByIndex(letteringOutlines, -textAlign * maximumX, 0)
 	return letteringOutlines
+}
+
+function getMarker(key, outsets, registry, statement) {
+	var marker = getPointsByKey(key, registry, statement)
+	if (!getIsEmpty(marker)) {
+		return marker
+	}
+
+	if (getBooleanByStatement(key + 'Semicircle', registry, statement) != true) {
+		return undefined
+	}
+
+	return arcCenterRadius(undefined, undefined, outsets[0][0], 0.0, 180.0, getSides(key, registry, statement), false, false)
 }
 
 function getNextMonad(monad, monadMap, registry, statement, word) {
@@ -358,12 +481,6 @@ function getRectangularPoints(defaultValue, registry, statement) {
 		points=[defaultValue]
 	}
 
-	for (var point of points) {
-		if (point.length == 1) {
-			point.push(point[0])
-		}
-	}
-
 	var pointZero = points[0]
 	if (points.length == 1) {
 		var point = [0.0, 0.0]
@@ -385,6 +502,7 @@ function getRegularPolygon(center, isClockwise, outsideness, radius, sideOffset,
 		angleIncrement = -angleIncrement
 		startAngle = -startAngle
 	}
+
 	var point = polarRadius(startAngle, radius)
 	var rotation = polarCounterclockwise(angleIncrement)
 	for (var vertexIndex = 0; vertexIndex < sides; vertexIndex++) {
@@ -392,6 +510,10 @@ function getRegularPolygon(center, isClockwise, outsideness, radius, sideOffset,
 		rotate2DVector(point, rotation)
 	}
 	return points
+}
+
+function getSides(key, registry, statement) {
+	return getValueDefault(getFloatByStatement(key + 'Sides', registry, statement), 24)
 }
 
 function getTextFormatMonad(registry, statement) {
@@ -460,6 +582,64 @@ function getTrapezoid(beginX, endX, points, widening) {
 	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[0] - widening)))
 	trapezoid.push(getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[0] - widening)))
 	return trapezoid
+}
+
+function getTrapezoidSocket(beginX, endX, points, selfGap, stopperGap, stopperThickness, widening) {
+	var begin = points[0]
+	var end = points[1]
+	var extraUHeight = stopperGap + stopperThickness
+	var trapezoid = []
+	var beginEnd = getSubtraction2D(end, begin)
+	var beginEndLength = length2D(beginEnd)
+	if (beginEndLength == 0.0) {
+		noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
+		return []
+	}
+
+	divide2DScalar(beginEnd, beginEndLength)
+	var beginEndX = [beginEnd[1], -beginEnd[0]]
+	var extraURatio = extraUHeight / beginEndLength
+	var extraPoint = getMultiplication2DScalar(beginEnd, extraUHeight)
+	endX[0] += (endX[0] - beginX[0]) * extraURatio
+	endX[1] += (endX[1] - beginX[1]) * extraURatio
+	add2D(end, extraPoint)
+	trapezoid = [getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[0] - widening))]
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[0] - widening)))
+	if (stopperThickness > 0.0) {
+		var endXPlusGapMinusWidening = endX[0] + selfGap - widening
+		var endXMinusGapPlusWidening = endX[1] - selfGap + widening
+		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXPlusGapMinusWidening)))
+		var stopperEnd = getSubtraction2D(end, getMultiplication2DScalar(beginEnd, stopperThickness))
+		var extraStopperRatio = stopperThickness / (beginEndLength + extraUHeight)
+		var topMultiplier = endXPlusGapMinusWidening + (beginX[0] - endX[0]) * extraStopperRatio
+		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, topMultiplier)))
+		var bottomMultiplier = endXMinusGapPlusWidening + (beginX[1] - endX[1]) * extraStopperRatio
+		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, bottomMultiplier)))
+		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXMinusGapPlusWidening)))
+	}
+
+	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[1] + widening)))
+	trapezoid.push(getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[1] + widening)))
+	return trapezoid
+}
+
+function gridCellX(registry, statement) {
+	var parent = statement.parent
+	var variableMap = getVariableMapByStatement(parent)
+	var cellColumn = getVariableInt('grid_cellColumn', parent)
+	if (cellColumn >= getIntByDefault(1, 'gridColumns', registry, statement, statement.tag)) {
+		cellColumn = 0
+		variableMap.set('grid_cellColumn', '0')
+		variableMap.set('grid_cellRow', (getVariableInt('grid_cellRow', parent) + 1).toString())
+	}
+
+	var x = cellColumn * getAttributeFloat('gridCellWidth', statement)
+	variableMap.set('grid_cellColumn', (getVariableInt('grid_cellColumn', parent) + 1).toString())
+	return x
+}
+
+function gridCellY(registry, statement) {
+	return getVariableInt('grid_cellRow', statement.parent) * getAttributeFloat('gridCellHeight', statement)
 }
 
 function ItalicMonad() {
@@ -654,6 +834,7 @@ var gCircle = {
 		var cx = getFloatByDefault(0.0, 'cx', registry, statement, this.name)
 		var cy = getFloatByDefault(0.0, 'cy', registry, statement, this.name)
 		var r = getFloatByDefault(1.0, 'r', registry, statement, this.name)
+		statement.attributeMap.set('r', r.toString())
 	}
 }
 
@@ -780,19 +961,23 @@ var gGrid = {
 	initialize: function() {
 		gParentFirstSet.add(this.name)
 		gTagCenterMap.set(this.name, this)
+
+//deprecated24
 		addFunctionToMap(cellX, gSetR)
 		addFunctionToMap(cellY, gSetR)
+
+		addFunctionToMap(gridCellX, gSetR)
+		addFunctionToMap(gridCellY, gSetR)
 	},
 	name: 'grid',
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
 		var parent = statement.parent
-
-		var cellHeight = getVariableFloatByDefault(100.0, 'grid_cellHeight', parent)
-		var cellWidth = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
-		var columns = getVariableIntByDefault(1, 'grid_columns', parent)
+		var cellHeight = getFloatByDefault(100.0, 'gridCellHeight', registry, statement, this.name)
+		var cellWidth = getFloatByDefault(100.0, 'gridCellWidth', registry, statement, this.name)
+		var columns = getIntByDefault(1, 'gridColumns', registry, statement, this.name)
 		var cornerMultiplier = getFloatByDefault(1.0, 'corner', registry, statement, this.name)
-		var rows = getVariableIntByDefault(1, 'grid_rows', parent)
+		var rows = getIntByDefault(1, 'gridRows', registry, statement, this.name)
 		var lineLength = getFloatByDefault(2.0, 'lineLength', registry, statement, this.name)
 		var cornerLength = getFloatByDefault(lineLength, 'cornerLength', registry, statement, this.name)
 		var edgeLength = getFloatByDefault(lineLength, 'edgeLength', registry, statement, this.name)
@@ -800,7 +985,6 @@ var gGrid = {
 		var outsideLength = getFloatByDefault(0.0, 'outsideLength', registry, statement, this.name)
 		var gridHeight = cellHeight * rows
 		var gridWidth = cellWidth * columns
-
 		var variableMap = getVariableMapByStatement(parent)
 		variableMap.set('grid_cellColumn', '0')
 		variableMap.set('grid_cellRow', '0')
@@ -809,6 +993,7 @@ var gGrid = {
 		if (cornerLength * edgeLength * insideLength == 0.0) {
 			return
 		}
+
 		var gridHeightPlus = gridHeight + outsideLength
 		var gridWidthPlus = gridWidth + outsideLength
 		var groupStatement = getStatementByParentTag(groupMap, 1, statement, 'g')
@@ -825,6 +1010,7 @@ var gGrid = {
 			polylines.push([[0, gridHeight - cornerLength], [0, gridHeightPlus]])
 			polylines.push([[gridWidth, gridHeight - cornerLength], [gridWidth, gridHeightPlus]])
 		}
+
 		if (edgeLength != 0.0) {
 			var x = 0.0
 			for (var xIndex = 1; xIndex < columns; xIndex++) {
@@ -843,6 +1029,7 @@ var gGrid = {
 				polylines.push([[gridWidth, y - edgeLength], [gridWidth, y + edgeLength]])
 			}
 		}
+
 		if (insideLength != 0.0) {
 			var y = 0.0
 			for (var yIndex = 1; yIndex < rows; yIndex++) {
@@ -855,6 +1042,7 @@ var gGrid = {
 				}
 			}
 		}
+
 		addPolylinesToGroup(polylines, registry, groupStatement)
 	}
 }
@@ -904,17 +1092,16 @@ var gList = {
 		if (!getIsEmpty(variableValue)) {
 			children = variableValue.split(' ')
 		}
-		var padding = getVariableFloatByDefault(2.0, 'list_padding', parent)
-		padding = getVariableFloatByDefault(padding, 'list_margin', parent)
-		var transform = getVariableValue('list_transform', parent)
-		if (attributeMap.has('transform')) {
-			transform = attributeMap.get('transform')
-		}
-		var width = getVariableFloatByDefault(100.0, 'grid_cellWidth', parent)
+
+		var padding = getFloatByDefault(2.0, 'listPadding', registry, statement, this.name)
+		padding = getFloatByDefault(padding, 'listMargin', registry, statement, this.name)
+		var transform = getValueDefault(getAttributeValue('listTransform', statement), attributeMap.get('transform'))
+		var width = getAttributeFloat('gridCellWidth', statement)
 		var x = 0.5 * width
 		if (!getIsEmpty(transform)) {
 			attributeMap.set('transform', transform)
 		}
+
 		if (attributeMap.has('function')) {
 			functionString = attributeMap.get('function') + '('
 			if (attributeMap.has('arguments')) {
@@ -932,41 +1119,21 @@ var gList = {
 		setFloatByKeyStatement(parentAttributeMap, width, 'width', registry, statement)
 		setFloatByKeyStatement(parentAttributeMap, 0.5 * width, 'x', registry, statement)
 		setFloatByKeyStatement(parentAttributeMap, 0.0, 'y', registry, statement)
-
-		var formatMonads = []
-		var variableValue = getVariableValue('list_formats', parent)
-		if (variableValue != undefined) {
-			var formatWords = variableValue.split(' ').filter(lengthCheck)
-			for (var formatWord of formatWords) {
-				if (formatWord.length > 0) {
-					var formatAttributes = formatWord.split(';')
-					var formatAttributeMap = new Map()
-					var formatMonad = {attributeMap:formatAttributeMap, parent:anchorFontParent}
-					for (var formatAttribute of formatAttributes) {
-						var formatEntry = formatAttribute.split(':')
-						var key = formatEntry[0]
-						if (key.length > 0) {
-							formatAttributeMap.set(key, formatEntry[1])
-							if (key == 'image') {
-								formatMonad.isImage = true
-							}
-						}
-					}
-					if (formatAttributeMap.has('name')) {
-						formatMonads.push(formatMonad)
-					}
-				}
-			}
-		}
-		if (formatMonads.length == 0) {
-			noticeByList(['No formats could be found for list in generator2d.', statement])
+		if (registry.textFormatMapMap == undefined) {
+			noticeByList(['No text formats could be found for list in generator2d.', statement])
 			return
 		}
 
-		for (var formatMonad of formatMonads) {
-			var name = formatMonad.attributeMap.get('name')
-			if (attributeMap.has(name)) {
-				var value = attributeMap.get(name)
+		if (registry.textFormatMapMap.size == 0) {
+			noticeByList(['No text formats could be found for list in generator2d.', statement])
+			return
+		}
+
+		for (var formatMapValue of registry.textFormatMapMap.values()) {
+			var formatMonad = {attributeMap:new Map(formatMapValue), parent:anchorFontParent}
+			var id = formatMonad.attributeMap.get('id')
+			if (attributeMap.has(id)) {
+				var value = attributeMap.get(id)
 				value = getValueDefault(getVariableValue(value, statement), value)
 				var key = getAttributeValue('key', formatMonad)
 				if (key != undefined) {
@@ -1002,8 +1169,8 @@ var gList = {
 						value += suffix
 					}
 				}
-				attributeMap.set(name, value)
-				if (formatMonad.isImage) {
+				attributeMap.set(id, value)
+				if (formatMonad.attributeMap.has('image')) {
 					var x = getAttributeFloat('x', formatMonad) + getAttributeFloat('dx', formatMonad)
 					var yString = getAttributeValue('y', formatMonad)
 					var imageMap = new Map([['href', value], ['x', x.toString()], ['y', yString]])
@@ -1027,7 +1194,7 @@ var gList = {
 							words.splice(wordIndex, 1)
 						}
 					}
-					attributeMap.set(name, words.join(' '))
+					attributeMap.set(id, words.join(' '))
 				}
 			}
 		}
@@ -1103,27 +1270,48 @@ var gOutline = {
 				polylines.push(polygon)
 			}
 		}
+
 		var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
 		var checkIntersection = getBooleanByDefault(false, 'checkIntersection', registry, statement, this.name)
+		var hole = getPointsByKey('hole', registry, statement)
 		var markerAbsolute = getBooleanByDefault(true, 'markerAbsolute', registry, statement, this.name)
-		var marker = getPointsByKey('marker', registry, statement)
-		var baseMarker = getPointsByKey('baseMarker', registry, statement)
-		var tipMarker = getPointsByKey('tipMarker', registry, statement)
-		if (getIsEmpty(baseMarker)) {
+		var outsets = getOutsets(registry, statement, this.name)
+		var marker = getMarker('marker', outsets, registry, statement)
+		var baseMarker = getMarker('baseMarker', outsets, registry, statement)
+		var tipMarker = getMarker('tipMarker', outsets, registry, statement)
+		if (baseMarker == undefined) {
 			baseMarker = marker
 		}
-		if (getIsEmpty(tipMarker)) {
+
+		if (tipMarker == undefined) {
 			tipMarker = marker
 		}
-		var outsets = getOutsets(registry, statement, this.name)
+
 		var outlines = getOutlines(baseLocation, baseMarker, checkIntersection, markerAbsolute, outsets, polylines, tipMarker)
 		if (getIsEmpty(outlines)) {
 			noticeByList(['No outlines could be found for outline in generator2d.', statement])
+			return
 		}
-		else{
-			convertToGroup(statement)
-			addPolygonsToGroup(outlines, registry, statement)
+
+		convertToGroup(statement)
+		if (getIsEmpty(hole)) {
+			if (getBooleanByStatement('holeCircle', registry, statement) == true) {
+				hole = getRegularPolygon([0.0, 0.0], true, 0.0, outsets[0][0] * 0.5, 0.0, getSides('hole', registry, statement), 0.0)
+			}
 		}
+
+		if (!getIsEmpty(hole)) {
+			var hole = getDirectedPolygon(!getIsCounterclockwise(outlines[0]), hole)
+			var holes = []
+			for (var polyline of polylines) {
+				for (var point of polyline) {
+					holes.push(getAddition2Ds(hole, point))
+				}
+			}
+			outlines = getDifferencePolygonsByPolygons(holes, outlines)
+		}
+
+		addPolygonsToGroup(outlines, registry, statement)
 	}
 }
 
@@ -1133,11 +1321,7 @@ var gPolygon = {
 	},
 	name: 'polygon',
 	processStatement: function(registry, statement) {
-		var points = getPointsHD(registry, statement)
-		if (getIsEmpty(points)) {
-			points = [[0, 0], [10, 0], [0, 10]]
-		}
-		setPointsExcept(points, registry, statement)
+		setPointsExcept(getPointsHD(registry, statement), registry, statement)
 	}
 }
 
@@ -1147,11 +1331,7 @@ var gPolyline = {
 	},
 	name: 'polyline',
 	processStatement: function(registry, statement) {
-		var points = getPointsHD(registry, statement)
-		if (getIsEmpty(points)) {
-			points = [[0, 0], [10, 0]]
-		}
-		setPointsExcept(points, registry, statement)
+		setPointsExcept(getPointsHD(registry, statement), registry, statement)
 	}
 }
 
@@ -1211,113 +1391,6 @@ var gScreen = {
 	}
 }
 
-function getColumnTextLength(columnIndex, table) {
-	var textLength = 0.0
-	if (columnIndex < table.headers.length) {
-		textLength = getTextLength(table.headers[columnIndex])
-	}
-	for (var row of table.rows) {
-		if (columnIndex < row.length) {
-			textLength = Math.max(textLength, getTextLength(row[columnIndex]))
-		}
-	}
-	return textLength
-}
-
-function addRectangle(boundingBox, color, registry, statement, strokeWidthString) {
-	var lowerPoint = boundingBox[0]
-	var size = getSubtraction2D(boundingBox[1], lowerPoint)
-	var xString = lowerPoint[0].toString()
-	var yString = lowerPoint[1].toString()
-	var rectangleAttributeMap = new Map([['x', xString], ['y', yString], ['width', size[0].toString()], ['height', size[1].toString()]])
-	if (color != undefined) {
-		rectangleAttributeMap.set('style', 'fill:' + color)
- 	}
-	rectangleAttributeMap.set('stroke-width', strokeWidthString)
-	var rectangleStatement = getStatementByParentTag(rectangleAttributeMap, 0, statement, 'rect')
-	getUniqueID(statement.attributeMap.get('id') + '_rect_x_' + xString + '_y_' + yString, registry, rectangleStatement)
-}
-
-function addTextRow(columnXs, registry, row, statement, textAnchor, y) {
-	var idStart = statement.attributeMap.get('id')
-	var yString = y.toString()
-	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
-		addTextStatement(idStart, registry, statement, row[columnIndex], textAnchor, columnXs[columnIndex].toString(), yString)
-	}
-}
-
-function addTable(caption, colorPeriod, fontSize, headerColor,
-registry, rowColor, statement, strokeWidth, table, tableAlign, tableStrokeWidth, textAnchor, x, y) {
-	var columnRight = tableStrokeWidth
-	var extraY = fontSize * 0.4
-	var halfStrokeWidth = strokeWidth * 0.5
-	var halfTableStrokeWidth = tableStrokeWidth * 0.5
-	var extraYHalfStroke = extraY + halfTableStrokeWidth + halfStrokeWidth
-	var maximumLength = table.headers.length
-	var polylines = []
-	var spaceFontLength = gSpaceLength * fontSize
-	var doubleSpaceLength = spaceFontLength * 2.0
-	var polylineTop = y + halfTableStrokeWidth
-	var polylineY = polylineTop
-	var strokeWidthString = tableStrokeWidth.toString()
-	var textAdvance = 0.5 * (textAnchor == 'middle') + 1.0 * (textAnchor == 'end')
-	var totalStrokeWidth = strokeWidth + tableStrokeWidth
-	var yAddition = fontSize + totalStrokeWidth + extraY
-	for (var row of table.rows) {
-		maximumLength = Math.max(maximumLength, row.length)
-	}
-	var columnXs = new Array(maximumLength)
-	var polylineXs = new Array(maximumLength)
-	for (var columnIndex = 0; columnIndex < maximumLength; columnIndex++) {
-		var columnTextLength = getColumnTextLength(columnIndex, table) * fontSize
-		columnXs[columnIndex] = columnRight + textAdvance * columnTextLength + spaceFontLength + halfStrokeWidth
-		columnRight += columnTextLength + totalStrokeWidth + doubleSpaceLength
-		polylineXs[columnIndex] = columnRight
-	}
-	var offset = x - tableAlign * columnRight
-	var polylineLeft = offset + halfTableStrokeWidth
-	addArrayScalar(columnXs, offset)
-	addArrayScalar(polylineXs, offset - halfTableStrokeWidth)
-	var polylineRight = polylineXs[columnXs.length - 1]
-	if (caption != undefined) {
-		polylineY += yAddition
-		var id = statement.attributeMap.get('id')
-		var polylineMiddleString = ((polylineLeft + polylineRight) * 0.5).toString()
-		addTextStatement(id, registry, statement, caption, 'middle', polylineMiddleString, (polylineY - extraYHalfStroke).toString())
-	}
-	if (table.headers.length > 0) {
-		polylineY += yAddition
-		addRectangle([[polylineLeft, polylineTop], [polylineRight, polylineY]], headerColor, registry, statement, strokeWidthString)
-		addTextRow(columnXs, registry, table.headers, statement, textAnchor, polylineY - extraYHalfStroke)
-		if (tableStrokeWidth > 0.0) {
-			polylines.push([[polylineLeft, polylineY], [polylineRight, polylineY]])
-		}
-	}
-	for (var rowIndex = 0; rowIndex < table.rows.length; rowIndex++) {
-		var oldY = polylineY
-		polylineY += yAddition
-		if ((rowIndex - 1 + colorPeriod) % colorPeriod == 0) {
-			addRectangle([[polylineLeft, oldY], [polylineRight, polylineY]], rowColor, registry, statement, strokeWidthString)
-		}
-		addTextRow(columnXs, registry, table.rows[rowIndex], statement, textAnchor, polylineY - extraYHalfStroke)
-		if (tableStrokeWidth > 0.0) {
-			polylines.push([[polylineLeft, polylineY], [polylineRight, polylineY]])
-		}
-	}
-	if (polylines.length == 0) {
-		return
-	}
-	polylines.push([[polylineLeft, polylineTop], [polylineRight, polylineTop]])
-	polylines.push([[polylineLeft, polylineTop], [polylineLeft, polylineY]])
-	for (var polylineX of polylineXs) {
-		polylines.push([[polylineX, polylineTop], [polylineX, polylineY]])
-	}
-	var idStart = statement.attributeMap.get('id') + '_group_'
-	var groupStatement = getStatementByParentTag(new Map([['stroke-width', tableStrokeWidth.toString()]]), 1, statement, 'g')
-	getUniqueID(idStart, registry, groupStatement)
-	addPolylinesToGroup(polylines, registry, groupStatement)
-}
-
 var gTable = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
@@ -1360,6 +1433,32 @@ var gText = {
 	}
 }
 
+var gTextFormat = {
+	initialize: function() {
+		gTagCenterMap.set(this.name, this)
+	},
+	name: 'textFormat',
+	processStatement: function(registry, statement) {
+		var attributeMap = statement.attributeMap
+		var id = attributeMap.get('id')
+		var textFormatMapMap = registry.textFormatMapMap
+		if (textFormatMapMap == undefined) {
+			textFormatMapMap = new Map()
+			registry.textFormatMapMap = textFormatMapMap
+		}
+
+		var textFormatMap = textFormatMapMap.get(id)
+		if (textFormatMap == undefined) {
+			textFormatMap = new Map()
+			textFormatMapMap.set(id, textFormatMap)
+		}
+
+		for (var entry of attributeMap.entries()) {
+			textFormatMap.set(entry[0], entry[1])
+		}
+	}
+}
+
 var gTrapezoid = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
@@ -1377,45 +1476,6 @@ var gTrapezoid = {
 		var points = getTrapezoid(beginX, endX, points, widening)
 		setPointsExcept(points, registry, statement)
 	}
-}
-
-function getTrapezoidSocket(beginX, endX, points, selfGap, stopperGap, stopperThickness, widening) {
-	var begin = points[0]
-	var end = points[1]
-	var extraUHeight = stopperGap + stopperThickness
-	var trapezoid = []
-	var beginEnd = getSubtraction2D(end, begin)
-	var beginEndLength = length2D(beginEnd)
-	if (beginEndLength == 0.0) {
-		noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
-		return []
-	}
-
-	divide2DScalar(beginEnd, beginEndLength)
-	var beginEndX = [beginEnd[1], -beginEnd[0]]
-	var extraURatio = extraUHeight / beginEndLength
-	var extraPoint = getMultiplication2DScalar(beginEnd, extraUHeight)
-	endX[0] += (endX[0] - beginX[0]) * extraURatio
-	endX[1] += (endX[1] - beginX[1]) * extraURatio
-	add2D(end, extraPoint)
-	trapezoid = [getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[0] - widening))]
-	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[0] - widening)))
-	if (stopperThickness > 0.0) {
-		var endXPlusGapMinusWidening = endX[0] + selfGap - widening
-		var endXMinusGapPlusWidening = endX[1] - selfGap + widening
-		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXPlusGapMinusWidening)))
-		var stopperEnd = getSubtraction2D(end, getMultiplication2DScalar(beginEnd, stopperThickness))
-		var extraStopperRatio = stopperThickness / (beginEndLength + extraUHeight)
-		var topMultiplier = endXPlusGapMinusWidening + (beginX[0] - endX[0]) * extraStopperRatio
-		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, topMultiplier)))
-		var bottomMultiplier = endXMinusGapPlusWidening + (beginX[1] - endX[1]) * extraStopperRatio
-		trapezoid.push(getAddition2D(stopperEnd, getMultiplication2DScalar(beginEndX, bottomMultiplier)))
-		trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endXMinusGapPlusWidening)))
-	}
-
-	trapezoid.push(getAddition2D(end, getMultiplication2DScalar(beginEndX, endX[1] + widening)))
-	trapezoid.push(getAddition2D(begin, getMultiplication2DScalar(beginEndX, beginX[1] + widening)))
-	return trapezoid
 }
 
 var gTrapezoidSocket = {
@@ -1494,5 +1554,5 @@ var gTruncatedTeardrop = {
 }
 
 var gGenerator2DProcessors = [
-gCircle, gFormattedText, gFractal2D, gGrid, gImage, gLettering, gList, gMap, gOutline,
-gPolygon, gPolyline, gRectangle, gRegularPolygon, gScreen, gTable, gText, gTrapezoid, gTrapezoidSocket, gTruncatedTeardrop]
+gCircle, gFormattedText, gFractal2D, gGrid, gImage, gLettering, gList, gMap, gOutline, gPolygon, gPolyline,
+gRectangle, gRegularPolygon, gScreen, gTable, gText, gTextFormat, gTrapezoid, gTrapezoidSocket, gTruncatedTeardrop]
