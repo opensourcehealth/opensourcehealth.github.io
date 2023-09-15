@@ -25,7 +25,7 @@
 </table>
 <table>
 <tr>
-<th><canvas id="viewerCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
+<th><canvas id="viewCanvas" width="400" height="300" style="border:1px solid black"></canvas></th>
 </tr>
 </table>
 <button type="button" onclick="update()">Update</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -50,8 +50,8 @@
 <script src="polygon.js"></script>
 <script src="statement.js"></script>
 <script src="terrain.js"></script>
-<script src="terrainviewer.js"></script>
 <script src="vector.js"></script>
+<script src="viewterrain.js"></script>
 <script>
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 //
@@ -69,7 +69,7 @@ function updateWordArea(wordString) {
 	dataMap.set('selectedEntity', null)
 	dataMap.set('selectedRegion', null)
 	var registry = {dataMap:dataMap, generatedIDSet:new Set(), idMap:new Map(), objectMap:new Map()}
-	terrainViewer.setID('viewerCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
+	terrainView.setID('viewCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
 	var xmlStatement = getDocumentRoot(lines, 'xml')
 	console.log(xmlStatement)
 	var descendants = [xmlStatement]
@@ -91,8 +91,8 @@ function updateWordArea(wordString) {
 	if (!tagSet.has('creature')) {
 		getStatementByParentTag(new Map(), 0, xmlStatement, 'creature')
 	}
-	if (!tagSet.has('terrainViewer')) {
-		getStatementByParentTag(new Map(), 0, xmlStatement, 'terrainViewer')
+	if (!tagSet.has('terrainView')) {
+		getStatementByParentTag(new Map(), 0, xmlStatement, 'terrainView')
 	}
 	createDefault(registry, xmlStatement)
 	processRootStatementByTagMap(registry, xmlStatement, gTagCenterMap)
@@ -102,15 +102,13 @@ function updateWordArea(wordString) {
 	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('xmlArea', xmlLines)
 	document.getElementById('xmlArea').value = xmlString
-	terrainViewer.start(registry.dataMap.get('terrainViewer.maximumHeight'))
+	terrainView.start(registry.dataMap.get('terrainView.maximumHeight'))
 	return xmlString
 }
 
 var gParentFirstSet = new Set()
 var gTagCenterMap = new Map()
-gProcessors = gTerrainProcessors
-initializeProcessors(gProcessors)
-
+initializeProcessors(gTerrainProcessors)
 setTextArea('wordAreaID')
 update()
 </script>
