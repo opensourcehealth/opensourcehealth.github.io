@@ -280,13 +280,13 @@ function getPolygonsBoolean(existenceCondition, layerThickness, offsetMultiplier
 	var polygonsBTransformed = getArrayArraysCopy(polygonsB)
 	addArrayArraysByY(polygonsATransformed, -offsetY)
 	addArrayArraysByY(polygonsBTransformed, -offsetY)
-	multiply2DArraysByScalar(polygonsATransformed, oneOverLayerThickness)
-	multiply2DArraysByScalar(polygonsBTransformed, oneOverLayerThickness)
+	multiply2DArraysScalar(polygonsATransformed, oneOverLayerThickness)
+	multiply2DArraysScalar(polygonsBTransformed, oneOverLayerThickness)
 	var xyLatticeA = getXYLattice(polygonsATransformed)
 	var xyLatticeB = getXYLattice(polygonsBTransformed)
 	var xyLatticeBoolean = getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB)
 	var polygonsBoolean = getXYPolygonsByLattice(xyLatticeBoolean)
-	return addArrayArraysByY(multiply2DArraysByScalar(polygonsBoolean, layerThickness), offsetY)
+	return addArrayArraysByY(multiply2DArraysScalar(polygonsBoolean, layerThickness), offsetY)
 }
 
 function getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
