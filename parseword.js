@@ -34,7 +34,7 @@ function getBracketedEntry(bracketString) {
 	indexOfBeginBracket = bracketString.indexOf('(')
 	indexOfEndBracket = bracketString.lastIndexOf(')')
 	if (indexOfBeginBracket == -1 || indexOfEndBracket == -1 || indexOfBeginBracket > indexOfEndBracket) {
-		return null
+		return undefined
 	}
 	return [bracketString.slice(0, indexOfBeginBracket).replace(/ /g, ''), bracketString.slice(indexOfBeginBracket + 1, indexOfEndBracket)]
 }
@@ -106,7 +106,7 @@ function getEndOfLine(text) {
 
 function getIndexOfBracketed(text, searchCharacter, searchBracketDepth) {
 	var bracketDepth = 0
-	searchBracketDepth = getValueZero(searchBracketDepth)
+	searchBracketDepth = getValueDefault(searchBracketDepth, 0)
 	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
 		var character = text[characterIndex]
 		bracketDepth += 1 * (character == '(' || character == '[') - 1 * (character == ')' || character == ']')
@@ -118,6 +118,24 @@ function getIndexOfBracketed(text, searchCharacter, searchBracketDepth) {
 	return -1
 }
 
+function getSplitsAroundBracketed(text, searchCharacter) {
+	var bracketDepth = 0
+	var characterIndex = 0
+	var splits = []
+	var splitStart = 0
+	for (; characterIndex < text.length; characterIndex++) {
+		var character = text[characterIndex]
+		bracketDepth += 1 * (character == '(' || character == '[') - 1 * (character == ')' || character == ']')
+		if (bracketDepth == 0 && character == searchCharacter) {
+			splits.push(text.slice(splitStart, characterIndex))
+			splitStart = characterIndex + 1
+		}
+	}
+
+	splits.push(text.slice(splitStart, characterIndex))
+	return splits
+}
+
 function getJoinWord() {
 	if (navigator.appVersion.indexOf("Win") > -1) {
 		return '\r\n'
@@ -125,8 +143,53 @@ function getJoinWord() {
 	return '\n'
 }
 
+function getLineByKeySearchReplace(line, key, valueSearch, valueReplace) {
+	var lastWord = undefined
+	var value = undefined
+	var word = ''
+	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
+		var character = line[characterIndex]
+		if (value != undefined) {
+			value += character
+		}
+		if (value != undefined) {
+			if (value.endsWith(valueSearch)) {
+				return line.slice(0, characterIndex + 1 - valueSearch.length) + valueReplace + line.slice(characterIndex + 1)
+			}
+		}
+		if (character == ' ') {
+			word = ''
+		}
+		else {
+			if (character == '=') {
+				if (lastWord == key) {
+					value = ''
+				}
+				else {
+					value = undefined
+				}
+				word = ''
+			}
+			else {
+				word += character
+				lastWord = word
+			}
+		}
+	}
+
+	return line
+}
+
 function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceReplacement) {
 	return originalString.slice(0, spliceIndex) + spliceReplacement + originalString.slice(spliceIndex + spliceRemoved)
+}
+
+function getValueStringIfDifferent(value, other) {
+	if (value == other) {
+		return undefined
+	}
+
+	return value.toString()
 }
 
 function getUnquotedText(text) {
