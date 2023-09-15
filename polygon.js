@@ -4,113 +4,6 @@ var gDifferenceExclusion = {toolExclusion:-1, workExclusion:1, workExclusionSet:
 var gIntersectionExclusion = {toolExclusion:-1, workExclusion:-1, workExclusionSet:new Set([-1])}
 var gUnionExclusion = {toolExclusion:1, workExclusion:1, workExclusionSet:new Set([1])}
 
-/*
-//deprecated
-function addExtantPolygons(extantPolygons, nodeMaps, originalNodeMapIndex, startException, turnRight) {
-	var defaultProximity = -9
-	if (turnRight) {
-		defaultProximity = -defaultProximity
-	}
-	var originalMap = nodeMaps[originalNodeMapIndex]
-	for (var nodeKey of originalMap.keys()) {
-		var nodeStrings = nodeKey.split(' ')
-		var operatingNode = originalMap.get(nodeKey)
-		if (nodeStrings[0] != startException && operatingNode != null) {
-			var extantPolygon = []
-			var firstKey = nodeKey
-			var nodeMapIndex = originalNodeMapIndex
-			var operatingMap = originalMap
-			for (var whileIndex = 0; whileIndex < gLengthLimit; whileIndex++) {
-				extantPolygon.push(nodeKey)
-				var oldNode = operatingNode
-				operatingNode = operatingMap.get(nodeKey)
-				var nodeStrings = nodeKey.split(' ')
-				if (nodeStrings[0] == 'm') {
-					var alternateProximity = defaultProximity
-					var centerBegin = null
-					var operatingProximity = defaultProximity
-					centerBegin = getSubtraction2D(oldNode.point, oldNode.nextPoint)
-					centerBeginLength = length2D(centerBegin)
-					if (centerBeginLength == 0.0) {
-						centerBegin = null
-					}
-					else {
-						divide2DScalar(centerBegin, centerBeginLength)
-					}
-					var alternateNodeIndex = 1 - nodeMapIndex
-					var alternateMap = nodeMaps[alternateNodeIndex]
-					var alternateNode = alternateMap.get(nodeKey)
-					if (centerBegin != null) {
-						if (alternateNode != null) {
-							var centerAlternate = getSubtraction2D(alternateNode.nextPoint, alternateNode.point)
-							var centerAlternateLength = length2D(centerAlternate)
-							if (centerAlternateLength == 0.0) {
-								console.log(alternateNode)
-								console.log(extantPolygons)
-								console.log(nodeMaps)
-							}
-							else {
-								divide2DScalar(centerAlternate, centerAlternateLength)
-								alternateProximity = getDirectionalProximity(centerBegin, centerAlternate)
-							}
-						}
-						if (operatingNode != null) {
-							var centerOperating = getSubtraction2D(operatingNode.nextPoint, operatingNode.point)
-							var centerOperatingLength = length2D(centerOperating)
-							if (centerOperatingLength == 0.0) {
-//								console.log(operatingNode)
-//								console.log(extantPolygons)
-//								console.log(nodeMaps)
-							}
-							else {
-								divide2DScalar(centerOperating, centerOperatingLength)
-								operatingProximity = getDirectionalProximity(centerBegin, centerOperating)
-							}
-						}
-					}
-					if (alternateProximity != operatingProximity) {
-						var switchToAlternate = alternateProximity > operatingProximity
-						if (turnRight) {
-							switchToAlternate = alternateProximity < operatingProximity
-						}
-						if (switchToAlternate) {
-							operatingMap = alternateMap
-							operatingNode = alternateNode
-							nodeMapIndex = alternateNodeIndex
-						}
-					}
-					else {
-						var alternateExtant = -1
-						if (alternateNode != null) {
-							alternateExtant = alternateNode.nextExtant
-						}
-						var operatingExtant = -1
-						if (operatingNode != null) {
-							operatingExtant = operatingNode.nextExtant
-						}
-						if (alternateExtant > operatingExtant) {
-							operatingMap = alternateMap
-							operatingNode = alternateNode
-							nodeMapIndex = alternateNodeIndex
-						}
-					}
-				}
-				operatingMap.set(nodeKey, null)
-				if (operatingNode == null) {
-					extantPolygons.push(extantPolygon)
-					break
-				}
-				nodeKey = operatingNode.nextKey
-				if (nodeKey == firstKey) {
-					extantPolygons.push(extantPolygon)
-					break
-				}
-			}
-		}
-	}
-}
-*/
-
 function addIntersectionsToSets(beginSet, endSet, intersections) {
 	for (intersectionIndex = 0; intersectionIndex < intersections.length; intersectionIndex += 2) {
 		endIntersectionIndex = intersectionIndex + 1
@@ -381,14 +274,16 @@ function getAxesByNormal(normal) {
 	return axes
 }
 
-function getBoundingBox(polygon) {
-	if (getIsEmpty(polygon)) {
-		return null
+function getBoundingBox(points) {
+	if (getIsEmpty(points)) {
+		return undefined
 	}
-	var boundingBox = [polygon[0].slice(0, 2), polygon[0].slice(0, 2)]
-	for (var pointIndex = 1; pointIndex < polygon.length; pointIndex++) {
-		widenBoundingBox(boundingBox, polygon[pointIndex])
+
+	var boundingBox = [points[0].slice(0, 2), points[0].slice(0, 2)]
+	for (var pointIndex = 1; pointIndex < points.length; pointIndex++) {
+		widenBoundingBox(boundingBox, points[pointIndex])
 	}
+
 	return boundingBox
 }
 
@@ -639,6 +534,7 @@ function getDifferencePolygonsByPolygons(toolPolygons, workPolygons) {
 		}
 		workPolygons = differencePolygons
 	}
+
 	return workPolygons
 }
 
@@ -655,8 +551,31 @@ function getDistanceToLine(begin, end, point) {
 	if (deltaLength == 0.0) {
 		return distance2D(begin, point)
 	}
+
 	divide2DScalar(delta, deltaLength)
 	return Math.abs(point[1] * delta[0] - point[0] * delta[1] - begin[1] * delta[0] + begin[0] * delta[1])
+}
+
+function getDistanceToLineSegment(begin, end, point) {
+	var delta = getSubtraction2D(end, begin)
+	var deltaLength = length2D(delta)
+	if (deltaLength == 0.0) {
+		return distance2D(begin, point)
+	}
+
+	divide2DScalar(delta, deltaLength)
+	delta[1] = -delta[1]
+	var rotatedBegin = getRotation2DVector(begin, delta)
+	var rotatedPoint = getRotation2DVector(point, delta)
+	if (rotatedPoint[0] < rotatedBegin[0]) {
+		return distance2D(begin, point)
+	}
+
+	if (rotatedPoint[0] > end[0] * delta[0] - end[1] * delta[1]) {
+		return distance2D(end, point)
+	}
+
+	return Math.abs(rotatedPoint[1] - rotatedBegin[1])
 }
 
 function getDouble3DPolygonArea(polygon) {
@@ -1690,6 +1609,34 @@ function getOperatedPolygonsByExclusion(exclusion, toolPolygon, workPolygon) {
 	var alongIndexesMap = new Map()
 	var meetingMap = new Map()
 	addMeetingsByPolygon(alongIndexesMap, meetingMap, toolPolygon, workPolygon)
+	if (meetingMap.size == 0) {
+		if (toolPolygon.length < 3) {
+			if (exclusion.workExclusion != 1) {
+				workPolygon = [[]]
+			}
+			return [workPolygon]
+		}
+		if (getIsPointInsidePolygon(toolPolygon[0], workPolygon)) {
+			return getPolygonsByExclusion(exclusion, toolPolygon, workPolygon)
+		}
+		if (workPolygon.length < 3) {
+			if (exclusion.workExclusion != 1) {
+				toolPolygon = [[]]
+			}
+			return [toolPolygon]
+		}
+		if (getIsPointInsidePolygon(workPolygon[0], toolPolygon)) {
+			return getPolygonsByExclusion(exclusion, workPolygon, toolPolygon)
+		}
+		if (exclusion.toolExclusion == 1) {
+			return [getConnectedPolygon([workPolygon, toolPolygon])]
+		}
+		if (exclusion.workExclusion != 1) {
+			workPolygon = [[]]
+		}
+		return [workPolygon]
+	}
+
 	sortAlongIndexesMap(alongIndexesMap, meetingMap)
 	var extantPolygons = getExtantPolygons(alongIndexesMap, exclusion, false, meetingMap, toolPolygon, workPolygon)
 	for (var extantPolygon of extantPolygons) {
@@ -1710,6 +1657,7 @@ function getOperatedPolygonsByExclusion(exclusion, toolPolygon, workPolygon) {
 			}
 		}
 	}
+
 	return extantPolygons
 }
 
@@ -1720,10 +1668,21 @@ function getOperatorDirectedPolygon(isWorkClockwise, operator, toolPolygon) {
 	return getDirectedPolygon(isWorkClockwise, toolPolygon)
 }
 
+function getPolygonsByExclusion(exclusion, insidePolygon, outsidePolygon) {
+	if (exclusion.toolExclusion == 1) {
+		return [outsidePolygon]
+	}
+	if (exclusion.workExclusion == 1) {
+		return [getConnectedPolygon([outsidePolygon, insidePolygon])]
+	}
+	return [insidePolygon]
+}
+
 function getOutlines(baseLocation, baseMarker, checkIntersection, markerAbsolute, outsets, polylines, tipMarker) {
 	if (checkIntersection) {
 		return getOutlinesCheckIntersection(baseLocation, baseMarker, markerAbsolute, outsets, polylines, tipMarker)
 	}
+
 	return getOutlinesQuickly(baseLocation, baseMarker, markerAbsolute, outsets, polylines, tipMarker)
 }
 
@@ -2028,7 +1987,7 @@ function getPolygon3D(polygon, z) {
 		return polygon
 	}
 	var polygon3D = new Array(polygon.length)
-	z = getValueZero(z)
+	z = getValueDefault(z, 0.0)
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
 		var vertex = polygon[vertexIndex]
 		polygon3D[vertexIndex] = [vertex[0], vertex[1], z]
@@ -2436,6 +2395,20 @@ function getUnionPolygonsByPolygons(polygons) {
 		joinedPolygons = operatedPolygons
 	}
 	return joinedPolygons
+}
+
+function getVerticalBound(points) {
+	if (getIsEmpty(points)) {
+		return undefined
+	}
+
+	var verticalBound = [Number.MAX_VALUE, -Number.MAX_VALUE]
+	for (var point of points) {
+		verticalBound[0] = Math.min(verticalBound[0], point[1])
+		verticalBound[1] = Math.max(verticalBound[1], point[1])
+	}
+
+	return verticalBound
 }
 
 function getZByPointPolygon(point, polygon) {
