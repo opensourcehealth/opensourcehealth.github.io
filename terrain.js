@@ -197,21 +197,21 @@ var gRegion = {
 			selectedRegion.add(region)
 		}
 		dataMap.set('selectedRegion', region)
-		terrainViewer.region = region
+		terrainView.region = region
 	}
 }
 
-var gTerrainViewer = {
+var gTerrainView = {
 	initialize: function() {
 		gTagCenterMap.set(this.name, this)
 	},
-	name: 'terrainViewer',
+	name: 'terrainView',
 	processStatement:function(registry, statement) {
 	//	var maximumWidth = getFloatByDefault(740.0, 'maximumWidth', registry, statement, this.name)
 		var maximumWidth = getFloatByDefault(390.0, 'maximumWidth', registry, statement, this.name)
-		registry.dataMap.set('terrainViewer.maximumHeight', maximumWidth)
-		registry.dataMap.set('terrainViewer.maximumWidth', maximumWidth)
+		registry.dataMap.set('terrainView.maximumHeight', maximumWidth)
+		registry.dataMap.set('terrainView.maximumWidth', maximumWidth)
 	}
 }
 
-var gTerrainProcessors = [gCreature, gLaunch, gRegion, gTerrainViewer]
+var gTerrainProcessors = [gCreature, gLaunch, gRegion, gTerrainView]
