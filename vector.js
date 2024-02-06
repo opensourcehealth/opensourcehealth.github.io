@@ -153,7 +153,7 @@ function equalArray(elements, others, until) {
 }
 
 function getAddition2D(elements, adder2D) {
-	return add2D(elements.slice(0), adder2D)
+	return add2D(elements.slice(0, 2), adder2D)
 }
 
 function getAddition2Ds(elements, adder2D) {
@@ -166,27 +166,47 @@ function getAddition2Ds(elements, adder2D) {
 }
 
 function getAddition3D(elements, adder3D) {
-	return add3D(elements.slice(0), adder3D)
+	return add3D(elements.slice(0, 3), adder3D)
 }
 
 function getAdditionArray(elements, adders, until) {
 	return addArray(elements.slice(0), adders, until)
 }
 
+// unfinished, do 3D and array, and check
+function getAlongFromTo2D(along, from, to) {
+	return add2D(getMultiplication2DScalar(to, along), getMultiplication2DScalar(from, (1.0 - along)))
+}
+
+// unfinished, do check
+function getDistanceFromTo2D(distance, from2D, to2D) {
+	return add2D(multiply2DScalar(getSubtraction2D(to2D, from2D), distance), from2D)
+}
+
+// unfinished, do check
+function getDistanceFromTo3D(distance, from3D, to3D) {
+	return add3D(multiply3DScalar(getSubtraction3D(to3D, from3D), distance), from3D)
+}
+
+// unfinished, do check
+function getDistanceFromToArray(distance, froms, tos, until) {
+	return addArray(multiplyArrayScalar(getSubtractionArray(tos, froms, until), distance, until), froms, until)
+}
+
 function getDivision2D(elements, divisor2D) {
-	return divide2D(elements.slice(0), divisor2D)
+	return divide2D(elements.slice(0, 2), divisor2D)
 }
 
 function getDivision2DScalar(elements, divisorScalar) {
-	return divide2DScalar(elements.slice(0), divisorScalar)
+	return divide2DScalar(elements.slice(0, 2), divisorScalar)
 }
 
 function getDivision3D(elements, divisor3D) {
-	return divide3D(elements.slice(0), divisor3D)
+	return divide3D(elements.slice(0, 3), divisor3D)
 }
 
 function getDivision3DScalar(elements, divisorScalar) {
-	return divide3DScalar(elements.slice(0), divisorScalar)
+	return divide3DScalar(elements.slice(0, 3), divisorScalar)
 }
 
 function getDivisionArray(elements, divisors) {
@@ -207,19 +227,23 @@ function getMinimumLength(elements, others, until) {
 }
 
 function getMultiplication2D(elements, multiplier2D) {
-	return multiply2D(elements.slice(0), multiplier2D)
+	return multiply2D(elements.slice(0, 2), multiplier2D)
 }
 
 function getMultiplication2DScalar(elements, multiplierScalar) {
-	return multiply2DScalar(elements.slice(0), multiplierScalar)
+	return multiply2DScalar(elements.slice(0, 2), multiplierScalar)
+}
+
+function getMultiplication2DsScalar(elements, multiplierScalar) {
+	return multiply2DsScalar(getArraysCopy(elements), multiplierScalar)
 }
 
 function getMultiplication3D(elements, multiplier3D) {
-	return multiply3D(elements.slice(0), multiplier3D)
+	return multiply3D(elements.slice(0, 3), multiplier3D)
 }
 
 function getMultiplication3DScalar(elements, multiplierScalar) {
-	return multiply3DScalar(elements.slice(0), multiplierScalar)
+	return multiply3DScalar(elements.slice(0, 3), multiplierScalar)
 }
 
 function getMultiplicationArray(elements, multipliers) {
@@ -235,7 +259,7 @@ function getRotation2DAngle(point, angle) {
 }
 
 function getRotation2DVector(point, vector) {
-	return rotate2DVector(point.slice(0), vector)
+	return rotate2DVector(point.slice(0, 2), vector)
 }
 
 function getRotation2DX(point, vector) {
@@ -247,11 +271,11 @@ function getRotation2DY(point, vector) {
 }
 
 function getSubtraction2D(elements, subtractor2D) {
-	return subtract2D(elements.slice(0), subtractor2D)
+	return subtract2D(elements.slice(0, 2), subtractor2D)
 }
 
 function getSubtraction3D(elements, subtractor3D) {
-	return subtract3D(elements.slice(0), subtractor3D)
+	return subtract3D(elements.slice(0, 3), subtractor3D)
 }
 
 function getSubtractionArray(elements, subtractors) {
