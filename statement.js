@@ -1,21 +1,24 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-gValidTagSet = new Set('default defs layer license radialGradient stop svg xml'.split(' '))
+gValidTagSet = new Set('comment default defs layer license radialGradient stop svg xml'.split(' '))
 
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 1,000 in addPassthroughLines reached, no further statements will be added.'
-		warningByList([warningText, statement, gRecursionLimit])
+		warningByList([warningText, gRecursionLimit, statement])
 		return
 	}
+
 	depth += 1
 	passthroughNesting.lines.push('  '.repeat(Math.max(0, passthroughNesting.nesting - 1)) + getLineByStatement(statement))
 	if (statement.nestingIncrement == 1) {
 		passthroughNesting.nesting += 1
 	}
+
 	for (var child of statement.children) {
 		addPassthroughLines(depth, passthrough, passthroughNesting, child)
 	}
+
 	if (statement.nestingIncrement == 1) {
 		passthroughNesting.nesting -= 1
 		var passthroughLine = '  '.repeat(Math.max(0, passthroughNesting.nesting - 1))
@@ -29,38 +32,44 @@ function addPassthroughLines(depth, passthrough, passthroughNesting, statement) 
 	}
 }
 
-function addToDescendantsInsideFirst(descendants, statement) {
-	if (descendants.length >= gLengthLimit) {
-		var warningText = 'Recursion limit of 9876543 of\naddToDescendantsInsideFirst reached, no further descendants will be added.'
-		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
-		return
-	}
-	if (statement.children != undefined) {
-		for (var child of statement.children) {
-			if (gParentFirstSet.has(child.tag)) {
-				descendants.push(child)
-				addToDescendantsInsideFirst(descendants, child)
-			}
-			else {
-				addToDescendantsInsideFirst(descendants, child)
-				descendants.push(child)
-			}
-		}
-	}
-}
-
 function addToDescendantsOutsideFirst(descendants, statement) {
 	if (descendants.length >= gLengthLimit) {
-		var warningText = 'Recursion limit of 9876543 of\naddToDescendants reached, no further descendants will be added.'
-		var warningVariables = [gLengthLimit, statement].concat(descendants.slice(0, 10))
-		warning(warningText, warningVariables)
+		var warningText = 'Recursion limit in addToDescendantsOutsideFirst in statement reached, no further descendants will be added.'
+		warningByList([warningText, gLengthLimit, statement, descendants.slice(0, 10)])
 		return
 	}
+
 	if (statement.children != undefined) {
 		for (var child of statement.children) {
 			descendants.push(child)
 			addToDescendantsOutsideFirst(descendants, child)
+		}
+	}
+}
+
+function addToProcessableDescendantsInsideFirst(descendants, statement) {
+	if (descendants.length >= gLengthLimit) {
+		var warningText = 'Recursion limit in addToDescendantsInsideFirst in statement reached, no further descendants will be added.'
+		warningByList([warningText, gLengthLimit, statement, descendants.slice(0, 10)])
+		return
+	}
+
+	if (statement.children == undefined) {
+		return
+	}
+
+	for (var child of statement.children) {
+		if (child.attributeMap != undefined) {
+			if (child.attributeMap.get('process') != 'false') {
+				if (gParentFirstSet.has(child.tag)) {
+					descendants.push(child)
+					addToProcessableDescendantsInsideFirst(descendants, child)
+				}
+				else {
+					addToProcessableDescendantsInsideFirst(descendants, child)
+					descendants.push(child)
+				}
+			}
 		}
 	}
 }
@@ -81,6 +90,7 @@ function createDefault(registry, rootStatement) {
 	if (registry.idMap.has('_default')) {
 		return
 	}
+
 	var defaultStatement = getStatementByParentTag(new Map([['id', '_default']]), 0, undefined, 'default')
 	defaultStatement.parent = rootStatement
 	rootStatement.children.splice(0, 0, defaultStatement)
@@ -103,15 +113,17 @@ function deleteStatement(statement) {
 
 function deleteStatementsByTagDepth(depth, registry, statement, tag) {
 	var children = statement.children
-	if (children == null) {
+	if (children == undefined) {
 		return
 	}
+
 	if (depth > gRecursionLimit) {
 		var warningText = 'Recursion limit of 100 in deleteStatementsByTagDepth reached, no further statements will be deleted.'
 		var warningVariables = [gRecursionLimit, statement]
 		warning(warningText, warningVariables)
 		return
 	}
+
 	depth += 1
 	for (var childIndex = children.length - 1; childIndex > -1; childIndex--) {
 		var child = children[childIndex]
@@ -120,9 +132,18 @@ function deleteStatementsByTagDepth(depth, registry, statement, tag) {
 			children.splice(childIndex, 1)
 		}
 	}
+
 	if (children.length == 1 && depth > 1) {
 		if (children[0].nestingIncrement == -1) {
 			deleteStatement(statement)
+		}
+	}
+}
+
+function generateStatementIDs(registry, statements) {
+	for (var statement of statements) {
+		if (statement.tag != undefined) {
+			getStatementID(registry, statement)
 		}
 	}
 }
@@ -132,6 +153,7 @@ function getConcatenatedUniqueID(id, registry, statement) {
 	if (registry.idCountMap.has(id)) {
 		whileCount = registry.idCountMap.get(id) + 1
 	}
+
 	for (; whileCount < gLengthLimit; whileCount++) {
 		var check = id + '_' + whileCount.toString()
 		if (getIsIDUnique(check, registry, statement)) {
@@ -139,14 +161,8 @@ function getConcatenatedUniqueID(id, registry, statement) {
 			return check
 		}
 	}
-	return id
-}
 
-function getDescendantsInsideFirst(statement) {
-	var descendants = []
-	addToDescendantsInsideFirst(descendants, statement)
-	descendants.push(statement)
-	return descendants
+	return id
 }
 
 function getDocumentRoot(lines, tag) {
@@ -158,7 +174,7 @@ function getDocumentRoot(lines, tag) {
 			statement.lineIndex = lineIndex
 		}
 		if (lastParent == undefined) {
-			if (statement.tag != null) {
+			if (statement.tag != undefined) {
 				if (statement.tag == tag) {
 					statement.nestingIncrement = 1
 				}
@@ -186,20 +202,23 @@ function getDocumentRoot(lines, tag) {
 					}
 				}
 			}
-			if (statement.tag != null) {
+			if (statement.tag != undefined) {
 				statement.parent.children.push(statement)
 			}
 		}
 	}
-	if (lastParent == null) {
+
+	if (lastParent == undefined) {
 		return undefined
 	}
+
 	for (var remainingIndex = 0; remainingIndex < gLengthLimit; remainingIndex++) {
 		if (lastParent.parent == undefined) {
 			return lastParent
 		}
 		lastParent = lastParent.parent
 	}
+
 	return undefined
 }
 
@@ -229,14 +248,6 @@ function getIDReplacedBySuffix(bracketString, increment, replacementMap, searchS
 	return replacedTokens.join('')
 }
 
-function getStrings(key, statement) {
-	var attributeMap = statement.attributeMap
-	if (!attributeMap.has(key)) {
-		return []
-	}
-	return attributeMap.get(key).replace(/,/g, ' ').split(' ').filter(lengthCheck)
-}
-
 function getIsIDUnique(id, registry, statement) {
 	if (registry.idMap.has(id)) {
 		return false
@@ -247,9 +258,10 @@ function getIsIDUnique(id, registry, statement) {
 
 function getLineByStatement(statement) {
 	var firstWord = statement.tag
-	if (firstWord == null) {
+	if (firstWord == undefined) {
 		return ''
 	}
+
 	var attributeWords = ['<' + firstWord]
 	for (var entry of statement.attributeMap) {
 		var value = entry[1]
@@ -267,17 +279,21 @@ function getLineByStatement(statement) {
 			attributeWords.push(attributeLine)
 		}
 	}
+
 	var attributeLine = attributeWords.join(' ')
 	var lineClosing = '>'
 	if (statement.nestingIncrement == 0) {
 		lineClosing = '/>'
 	}
+
 	if (firstWord == 'text' && statement.attributeMap.has('innerHTML')) {
 		return attributeLine +  '>' + statement.attributeMap.get('innerHTML') + '</text>'
 	}
+
 	if (attributeLine.endsWith('"') || attributeLine.endsWith('\'')) {
 		return attributeLine + lineClosing
 	}
+
 	return attributeLine + ' ' + lineClosing
 }
 
@@ -288,12 +304,12 @@ function getPassthroughLinesByStatement(passthrough, statement) {
 }
 
 function getQuoteSeparatedSnippets(line) {
-	var quoteCharacter = null
+	var quoteCharacter = undefined
 	var quoteSeparatedSnippets = []
 	var start = 0
 	for (var characterIndex = 0; characterIndex < line.length; characterIndex++) {
 		var character = line[characterIndex]
-		if (quoteCharacter == null) {
+		if (quoteCharacter == undefined) {
 			if (gSpaceEqualSet.has(character)) {
 				var quoteSeparatedWord = line.slice(start, characterIndex)
 				if (quoteSeparatedWord.length > 0) {
@@ -312,7 +328,7 @@ function getQuoteSeparatedSnippets(line) {
 		}
 		else {
 			if (character == quoteCharacter) {
-				quoteCharacter = null
+				quoteCharacter = undefined
 			}
 		}
 	}
@@ -320,14 +336,23 @@ function getQuoteSeparatedSnippets(line) {
 	return quoteSeparatedSnippets
 }
 
+function getProcessableDescendantsInsideFirst(statement) {
+	var descendants = []
+	addToProcessableDescendantsInsideFirst(descendants, statement)
+	descendants.push(statement)
+	return descendants
+}
+
 function getStatement(line) {
 	line = line.trim()
 	if (line.startsWith('</') || line.startsWith('}')) {
-		return getStatementByParentTag(undefined, -1, undefined, null)
+		return getStatementByParentTag(undefined, -1, undefined, undefined)
 	}
+
 	if (line.length < 2) {
-		return getStatementByParentTag(undefined, 0, undefined, null)
+		return getStatementByParentTag(undefined, 0, undefined, undefined)
 	}
+
 	var lastCharacter = line[line.length - 1]
 	var nestingIncrement = 0
 	var sliceBegin = line[0] == '<'
@@ -341,17 +366,20 @@ function getStatement(line) {
 			nestingIncrement = 1
 		}
 	}
+
 	line = line.slice(sliceBegin, sliceEnd).trim()
 	var tag = line
 	var indexOfSpace = line.indexOf(' ')
 	if (indexOfSpace != -1) {
 		tag = tag.slice(0, indexOfSpace)
 	}
+
 	if (tag.length == 0) {
-		return getStatementByParentTag(undefined, 0, undefined, null)
+		return getStatementByParentTag(undefined, 0, undefined, undefined)
 	}
+
 	line = line.slice(indexOfSpace + 1).trim()
-	var innerHTML = null
+	var innerHTML = undefined
 	if (tag == 'text') {
 		var lastIndexOfGreaterThan = line.lastIndexOf('>')
 		if (lastIndexOfGreaterThan != -1) {
@@ -364,15 +392,18 @@ function getStatement(line) {
 			line = line.slice(0, lastIndexOfGreaterThan).trim()
 		}
 	}
+
 	var quoteSeparatedSnippets = getQuoteSeparatedSnippets(line)
 	var tag = getCapitalizedKey(tag)
 	if (quoteSeparatedSnippets.length == 0) {
 		return getStatementByParentTag(new Map(), nestingIncrement, undefined, tag)
 	}
+
 	var attributes = getAttributes(quoteSeparatedSnippets)
-	if (innerHTML != null) {
+	if (innerHTML != undefined) {
 		attributes.push(['innerHTML', innerHTML])
 	}
+
 	for (var attribute of attributes) {
 		keyStrings = attribute[0].split('.')
 		if (keyStrings.length == 1) {
@@ -386,16 +417,17 @@ function getStatement(line) {
 			}
 		}
 	}
+
 	return getStatementByParentTag(new Map(attributes), nestingIncrement, undefined, tag)
 }
 
 function getStatementByParentTag(attributeMap, nestingIncrement, parent, tag) {
 	var statement =	{attributeMap:attributeMap, nestingIncrement:nestingIncrement, parent:parent, tag:tag}
-	if (tag != null) {
+	if (tag != undefined) {
 		statement.children = []
 	}
 
-	if (parent != null) {
+	if (parent != undefined) {
 		parent.children.push(statement)
 	}
 
@@ -423,29 +455,48 @@ function getStatementID(registry, statement) {
 			return id
 		}
 	}
+
 	if (attributeMap.has('output')) {
 		var output = attributeMap.get('output')
 		if (getIsIDUnique(output, registry, statement)) {
 			return output
 		}
 	}
+
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
+
 	if (attributeMap.has('work')) {
 		id += '_' + attributeMap.get('work')
 	}
+
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
+
 	var parentMap = statement.parent.attributeMap
 	if (parentMap.has('id')) {
 		id += '_' + parentMap.get('id')
 	}
+
 	if (getIsIDUnique(id, registry, statement)) {
 		return id
 	}
+
 	return getConcatenatedUniqueID(id, registry, statement)
+}
+
+function getStrings(key, statement) {
+	return getStringsByValue(statement.attributeMap.get(key))
+}
+
+function getStringsByValue(value) {
+	if (value == undefined) {
+		return []
+	}
+
+	return value.replaceAll(',', ' ').split(' ').filter(lengthCheck)
 }
 
 function getTagKeys() {
@@ -475,18 +526,18 @@ function getUniqueID(id, registry, statement) {
 	return getConcatenatedUniqueID(id, registry, statement)
 }
 
-function getValueByKeyDefault(defaultValue, key, registry, statement, tag) {
+function getValueByKeyDefault(key, registry, statement, tag, valueDefault) {
 	var value = getAttributeValue(key, statement)
 	if (value != undefined) {
 		return value
 	}
 
-	if (defaultValue == undefined) {
+	if (valueDefault == undefined) {
 		return undefined
 	}
 
 	var defaultMap = registry.idMap.get('_default').attributeMap
-	var defaultString = defaultValue.toString()
+	var defaultString = valueDefault.toString()
 	var keyValueString = key + ':' + defaultString
 	if (defaultMap.has(tag)) {
 		var keyValueStrings = defaultMap.get(tag).split(';')
@@ -531,14 +582,25 @@ function getWorkStatements(registry, statement) {
 
 function initializeProcessors(processors) {
 	for (var processor of processors) {
-		processor.initialize()
-		addToCapitalizationMap(processor.name)
+		if (processor.initialize == undefined) {
+			gTagCenterMap.set(processor.tag, processor)
+			if (processor.alterMesh != undefined) {
+				gAlterMeshMap.set(processor.tag, processor)
+			}
+			if (processor.getPoints != undefined) {
+				gGetPointsMap.set(processor.tag, processor)
+			}
+		}
+		else {
+			processor.initialize()
+		}
+		addToCapitalizationMap(processor.tag)
 	}
 }
 
 function processRootStatementByTagMap(registry, rootStatement, tagMap) {
 	var missingProcessorSet = new Set()
-	processStatementsByTagMap(missingProcessorSet, registry, getDescendantsInsideFirst(rootStatement), gTagCenterMap)
+	processStatementsByTagMap(missingProcessorSet, registry, getProcessableDescendantsInsideFirst(rootStatement), gTagCenterMap)
 	if (missingProcessorSet.size > 0) {
 		if (missingProcessorSet.size > 1) {
 			console.log('Could not find processors for the tags:')
@@ -574,12 +636,12 @@ function setIDMapSet(id, registry, statement) {
 
 function widenPolygonBoundingBox(boundingBox, caller, registry, statement) {
 	var points = getPointsHD(registry, statement)
-	if (points == null) {
+	if (points == undefined) {
 		return boundingBox
 	}
 
 	var matrix2DUntil = getMatrix2DUntil(caller, registry, statement)
-	if (matrix2DUntil != null) {
+	if (matrix2DUntil != undefined) {
 		transform2DPoints(matrix2DUntil, points)
 	}
 
@@ -596,10 +658,8 @@ function widenStatementBoundingBox(boundingBox, caller, registry, statement) {
 	}
 
 	if (statement.tag == 'polygon' || statement.tag == 'polyline') {
-		if (statement.attributeMap.has('display')) {
-			if (statement.attributeMap.get('display') == 'none') {
-				return boundingBox
-			}
+		if (statement.attributeMap.get('display') == 'none' || statement.attributeMap.get('process') == 'false' ) {
+			return boundingBox
 		}
 		return widenPolygonBoundingBox(boundingBox, caller, registry, statement)
 	}
