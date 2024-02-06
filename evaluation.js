@@ -28,9 +28,8 @@ function createCommaReturnUndefined(monad) {
 }
 
 function getAlphabeticSuffix(text) {
-	var alphabetSet = new Set(gAlphabetCharacters)
 	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
-		if (alphabetSet.has(text[characterIndex])) {
+		if (gAlphabetSet.has(text[characterIndex])) {
 			return text.slice(characterIndex)
 		}
 	}
@@ -784,5 +783,7 @@ gValueMonadMap.set(']', SquareCloseMonad)
 gValueMonadMap.set(',', UndefinedCommaMonad)
 
 // sets
+gAlphabetSet = new Set(gAlphabetCharacters)
 gEquationSet = new Set(gGreaterLessCharacters.concat(gNotCharacters).concat(gQuoteCharacters).concat('()[]'.split('')))
 gFloatSet = new Set(gFloatCharacters)
+gUpperCaseSet = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''))
