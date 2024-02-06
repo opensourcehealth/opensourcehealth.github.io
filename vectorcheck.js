@@ -268,8 +268,11 @@ function oppositeHypoteneuseAdjacentSquared_Check(hypoteneuse, otherSide) {
 	return oppositeHypoteneuseAdjacentSquared(getValueOne(otherSide), getValueDefault(otherSide, 1.0))
 }
 
-function polar_Check(angle, radius) {
-	return polarRadius(getValueDefault(angle, 0.0) * gRadiansPerDegree, getValueDefault(radius, 1.0))
+function polar_Check(angle, radius, x, y) {
+	var polar = polarRadius(getValueDefault(angle, 0.0) * gRadiansPerDegree, getValueDefault(radius, 1.0))
+	polar[0] += getValueDefault(x, 0.0)
+	polar[1] += getValueDefault(y, 0.0)
+	return polar
 }
 
 function reverseSigns_Check(elements) {
