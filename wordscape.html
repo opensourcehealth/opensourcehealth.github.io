@@ -60,6 +60,8 @@
 <script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
+<script src="generatorcenter.js"></script>
+<script src="generatorpoints.js"></script>
 <script src="lzstring.js"></script>
 <script src="matrix.js"></script>
 <script src="meta.js"></script>
@@ -72,7 +74,9 @@
 <script src="vector.js"></script>
 <script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
+<script src="viewcanvas.js"></script>
 <script src="viewfractal2d.js"></script>
+<script src="viewgroup.js"></script>
 <script src="viewmesh.js"></script>
 <script src="viewpoints.js"></script>
 <script src="voxel.js"></script>
@@ -133,24 +137,19 @@ function updateWordArea(wordString) {
 
 	var descendants = [svgStatement]
 	addToDescendantsOutsideFirst(descendants, svgStatement)
-	for (var statement of descendants) {
-		if (statement.tag != null) {
-			getStatementID(registry, statement)
-		}
-	}
-
+	generateStatementIDs(registry, descendants)
 	createDefault(registry, svgStatement)
 //	var before = new Date().getTime()
 	processRootStatementByTagMap(registry, svgStatement, gTagCenterMap)
 //	console.log('Execution time')
 //	console.log(new Date().getTime() - before)
 	var boundingBox = getGroupBoundingBox(null, registry, svgStatement)
-	var height = null
-	var width = null
+	var height = undefined
+	var width = undefined
 	var heightSuffix = ''
 	var widthSuffix = ''
 	if (registry.display == 'none') {
-		boundingBox = null
+		boundingBox.length = 0
 		height = viewBroker.minimumHeight * 1.5
 	}
 
@@ -168,23 +167,23 @@ function updateWordArea(wordString) {
 
 	var padding = 5
 	var doublePadding = 2 * padding
-	if (height == null) {
-		if (boundingBox != null) {
+	if (height == undefined) {
+		if (boundingBox.length != 0) {
 			height = boundingBox[1][1] + doublePadding
 		}
 	}
 
-	if (width == null) {
-		if (boundingBox != null) {
+	if (width == undefined) {
+		if (boundingBox.length != 0) {
 			width = boundingBox[1][0] + doublePadding
 		}
 	}
 
-	if (height != null) {
+	if (height != undefined) {
 		svgStatement.attributeMap.set('height', height.toFixed(1) + heightSuffix)
 	}
 
-	if (width != null) {
+	if (width != undefined) {
 		svgStatement.attributeMap.set('width', width.toFixed(1) + widthSuffix)
 	}
 
@@ -201,7 +200,7 @@ function updateWordArea(wordString) {
 	var svgString = svgLines.join(joinWord)
 	setNumberOfRows('wordAreaID', lines)
 	setNumberOfRows('svgArea', svgLines)
-	if (height == null || width == null) {
+	if (height == undefined || width == undefined) {
 		paragraphTextElement.hidden = true
 	}
 	else {
@@ -222,16 +221,15 @@ function updateWordArea(wordString) {
 		height *= 3.7795275591
 	}
 
-	if (height == null) {
-		height = 0
-	}
-	else {
-		height += doublePadding
+
+	var viewBrokerHeight = viewBroker.minimumHeight
+	if (height != undefined) {
+		viewBrokerHeight = height + doublePadding
 	}
 
 	document.getElementById('viewCanvas').hidden = registry.views.length == 0
 	if (registry.views.length > 0) {
-		viewBroker.start(Math.max(height, viewBroker.minimumHeight), 'viewCanvas', registry)
+		viewBroker.start(viewBrokerHeight, 'viewCanvas', registry)
 	}
 
 	if (registry.indexStatements != undefined) {
@@ -252,6 +250,8 @@ initializeProcessors(gAlterationProcessors)
 initializeProcessors(gConstructionProcessors)
 initializeProcessors(gGenerator2DProcessors)
 initializeProcessors(gGenerator3DProcessors)
+initializeProcessors(gGeneratorCenterProcessors)
+initializeProcessors(gGeneratorPointsProcessors)
 initializeProcessors(gMetaProcessors)
 setTextArea('wordAreaID')
 update()
