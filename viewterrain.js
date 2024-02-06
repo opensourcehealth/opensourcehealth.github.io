@@ -16,7 +16,7 @@ function checkCompleteness() {
 }
 
 function drawTerrain() {
-	terrainView.timeout = null
+	terrainView.timeout = undefined
 	if (terrainView.loadingImages.length > 0) {
 		terrainView.draw()
 	}
@@ -50,7 +50,7 @@ function setSelectOptions(select, selectStrings) {
 	var options = select.options
 	for (var optionIndex = 0; optionIndex < selectStrings.length; optionIndex++) {
 		var selectString = selectStrings[optionIndex]
-		var option = null
+		var option = undefined
 		if (optionIndex >= options.length) {
 			option = document.createElement('option')
 			select.add(option)
@@ -69,7 +69,7 @@ function viewMouseDown(event) {
 var terrainView = {
 	draw: function() {
 		console.log(this.location)
-		var childrenMap = null
+		var childrenMap = undefined
 		var childrenMaps = this.region.childrenMaps
 		if (this.region.childrenMaps.length > this.scaleSelectedIndex) {
 			childrenMap = this.region.childrenMaps[this.scaleSelectedIndex]
@@ -88,7 +88,7 @@ var terrainView = {
 						this.drawImageByScreenXY(pixelSlide, screenXY)
 					}
 				}
-				var boundingBox = null
+				var boundingBox = []
 				var scaleLocation = screenLocation.slice(0)
 				for (var scaleIndex = this.scaleSelectedIndex; scaleIndex < childrenMaps.length; scaleIndex++) {
 					var childrenMap = childrenMaps[scaleIndex]
@@ -97,7 +97,7 @@ var terrainView = {
 						var children = childrenMap.get(xyKey)
 						for (var child of children) {
 							var childLocation = child.location
-							if (boundingBox == null) {
+							if (boundingBox.length == 0) {
 								var scaleMultiplier = this.terrain.scaleMultipliers[this.scaleSelectedIndex]
 								var topLeft = getMultiplication2DScalar(screenLocation, scaleMultiplier)
 								var bottomRight = getAddition2D(topLeft, [scaleMultiplier, scaleMultiplier])
@@ -124,7 +124,7 @@ var terrainView = {
 		}
 	},
 	drawImage: function(source, x, y) {
-		var image = null
+		var image = undefined
 		if (this.imageMap.has(source)) {
 			image = this.imageMap.get(source)
 		}
@@ -137,7 +137,7 @@ var terrainView = {
 			this.context.drawImage(image, x, y)
 		}
 		else {
-			if (this.timeout == null) {
+			if (this.timeout == undefined) {
 				this.timeout = true
 				this.loadingImages.push(image)
 				setTimeout(drawTerrain, 1000)
@@ -162,7 +162,6 @@ var terrainView = {
 		this.context.fillRect(x, y, this.terrainHeight, this.terrainHeight)
 	},
 	initialize: function() {
-		this.canvasID = null
 		this.imageHeight = 64
 		this.halfImageHeight = this.imageHeight / 2
 		this.imageMap = new Map()
@@ -175,7 +174,7 @@ var terrainView = {
 		this.scales = new Array(this.numberOfScales)
 		this.scaleSelectedIndex = 0
 		this.scaleStrings = new Array(this.numberOfScales)
-		this.selectedRegion = null
+		this.selectedRegion = undefined
 		var scale = 1
 		for (var scaleIndex = 0; scaleIndex < this.numberOfScales; scaleIndex++) {
 			this.scales[scaleIndex] = scale
@@ -185,14 +184,14 @@ var terrainView = {
 		this.textHeight = 12
 		this.textSpace = this.textHeight * 3 / 2
 		this.textSpaceMinus = this.textSpace - 2
-		this.timeout = null
+		this.timeout = undefined
 		this.doubleTextSpace = this.textSpace + this.textSpace
 	},
 	lineToXY: function(xy) {
 		this.context.lineTo(xy[0], xy[1])
 	},
 	mouseDown: function(event) {
-		if (this.region == null) {
+		if (this.region == undefined) {
 			return
 		}
 		for (var sideArrowIndex = 0; sideArrowIndex < 4; sideArrowIndex++) {
@@ -246,9 +245,9 @@ var terrainView = {
 		this.loadingImages.length = 0
 		this.objectMap = objectMap
 		this.pixelSelectID = pixelSelectID
-		this.region = null
+		this.region = undefined
 		this.scaleSelectID = scaleSelectID
-		this.view = null
+		this.view = undefined
 	},
 	setPixel: function(pixelSelectedIndex) {
 		var pixelMultiplierString = this.pixelMultiplierStrings[pixelSelectedIndex]
@@ -270,7 +269,7 @@ var terrainView = {
 		height = this.pixelHeight * this.imageHeight
 		this.canvas.height = height + this.doubleTextSpace
 		this.canvas.width = this.canvas.height
-		if (this.region == null) {
+		if (this.region == undefined) {
 			return
 		}
 		this.location = this.region.entry.slice(0)
@@ -297,7 +296,7 @@ var terrainView = {
 		this.sideArrows = new Array(4)
 		for (var polygonIndex = 0; polygonIndex < 4; polygonIndex++) {
 			var rotation = gRotations[polygonIndex]
-			this.sideArrows[polygonIndex] = add2Ds(getRotations2DVector(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
+			this.sideArrows[polygonIndex] = add2Ds(getRotation2DsVector(sideArrow, [rotation[0], -rotation[1]]), this.canvasCenter)
 		}
 		setPixelSelect(this.pixelMultiplierStrings, this.pixelSelectedIndex, this.pixelSelectID)
 		setScaleSelect(this.scaleStrings, this.scaleSelectedIndex, this.scaleSelectID)
@@ -314,7 +313,7 @@ function Terrain(terrainString) {
 	this.extraWater = 3500.0
 	this.numberOfTerrainScales = 13
 	this.objectTypeMap = new Map([['d', ['#ebaf4c', 'beehive.png']], ['h', ['#ffa500', 'red_dragon_welsh.png']]])
-	this.selectedRegion = null
+	this.selectedRegion = undefined
 	this.altitudeMultipliers = new Array(this.numberOfTerrainScales)
 	this.circumferences = new Array(this.numberOfTerrainScales)
 	this.scaleMultipliers = new Array(this.numberOfTerrainScales)
@@ -367,7 +366,7 @@ function Terrain(terrainString) {
 	}
 	this.getTerrainParameters = function(screenLocation, terrainScaleIndex) {
 		if (terrainScaleIndex == this.numberOfTerrainScales) {
-			return null
+			return undefined
 		}
 		var terrainMap = this.terrainMaps[terrainScaleIndex]
 		var depthCircumference = this.circumferences[terrainScaleIndex]
