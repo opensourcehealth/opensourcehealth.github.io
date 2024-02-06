@@ -185,8 +185,8 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	var oneOverLayerThickness = 1.0 / layerThickness
 	var pointsATransformed = getArraysCopy(meshA.points)
 	var pointsBTransformed = getArraysCopy(meshB.points)
-	addArraysByZ(pointsATransformed, -offsetZ)
-	addArraysByZ(pointsBTransformed, -offsetZ)
+	addArraysByIndex(pointsATransformed, -offsetZ, 2)
+	addArraysByIndex(pointsBTransformed, -offsetZ, 2)
 	multiply3DsScalar(pointsATransformed, oneOverLayerThickness)
 	multiply3DsScalar(pointsBTransformed, oneOverLayerThickness)
 	var latticeA = getXYZLatticeByMesh({facets:meshA.facets, points:pointsATransformed})
@@ -194,7 +194,7 @@ function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, me
 	var latticeBoolean = getXYZLatticeBoolean(existenceCondition, signB, latticeA, latticeB)
 	var mesh = getMeshByXYZLattice(latticeBoolean)
 	mesh.points = getArraysCopy(mesh.points)
-	addArraysByZ(multiply3DsScalar(mesh.points, layerThickness), offsetZ)
+	addArraysByIndex(multiply3DsScalar(mesh.points, layerThickness, 2), offsetZ)
 	return mesh
 }
 
@@ -355,11 +355,11 @@ function getMeshByTipMap(pointMap, tipMap) {
 				facet.pop()
 			}
 			if (facet.length > 2) {
-				var polygonRotatedToBottom = getPolygonRotatedToBottom(facet)
+				var polygonRotatedToBottom = getPolygonRotatedToLower(facet)
 //				var facetString = polygonRotatedToBottom.join(' ')
 				facetStringMap.set(polygonRotatedToBottom.join(' '), polygonRotatedToBottom)
 /*
-				var facetStringReverse = getPolygonRotatedToBottom(facet.slice(0).reverse()).join(' ')
+				var facetStringReverse = getPolygonRotatedToLower(facet.slice(0).reverse()).join(' ')
 				if (facetStringMap.has(facetStringReverse)) {
 					var numberOfFacets = facetStringMap.get(facetStringReverse) - 1
 					if (numberOfFacets == 0) {
