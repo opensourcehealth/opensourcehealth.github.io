@@ -66,19 +66,15 @@
 function updateWordArea(wordString) {
 	var lines = getBracketReplacedLinesByText(document.getElementById('wordAreaID').value)
 	var dataMap = new Map()
-	dataMap.set('selectedEntity', null)
-	dataMap.set('selectedRegion', null)
+	dataMap.set('selectedEntity', undefined)
+	dataMap.set('selectedRegion', undefined)
 	var registry = {dataMap:dataMap, generatedIDSet:new Set(), idMap:new Map(), objectMap:new Map()}
 	terrainView.setID('viewCanvas', registry.objectMap, 'pixelSelect', 'scaleSelect')
 	var xmlStatement = getDocumentRoot(lines, 'xml')
 	console.log(xmlStatement)
 	var descendants = [xmlStatement]
 	addToDescendantsOutsideFirst(descendants, xmlStatement)
-	for (var statement of descendants) {
-		if (statement.tag != null) {
-			getStatementID(registry, statement)
-		}
-	}
+	generateStatementIDs(registry, descendants)
 	var tagSet = new Set()
 	for (var statement of descendants) {
 		if (gTagCenterMap.has(statement.tag)) {
