@@ -6,10 +6,17 @@ function noticeByList(notices) {
 	if (notices.length == 0) {
 		return
 	}
+
 	for (var notice of notices) {
 		console.log(notice)
 	}
+
+	if (noticeByList.caller == null) {
+		return
+	}
+
 	console.log('Caller:\n' + noticeByList.caller.toString().split('\n').slice(0,10).join('\n'))
+	console.log((new Error()).stack)
 }
 
 function warning(text, variables) {
@@ -44,13 +51,16 @@ function warningByList(warnings) {
 	if (warnings.length == 0) {
 		return
 	}
+
 	var firstString = warnings[0]
 	for (var warning of warnings) {
 		console.log(warning)
 	}
+
 	if (gAlertSet.has(firstString)) {
 		return
 	}
+
 	gAlertSet.add(firstString)
 	warnings.push('Further warnings about this will be sent to the debugging console only.')
 	alert(warnings.join('\n'))
