@@ -12,6 +12,8 @@
 <script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
+<script src="generatorcenter.js"></script>
+<script src="generatorpoints.js"></script>
 <script src="lzstring.js"></script>
 <script src="matrix.js"></script>
 <script src="meta.js"></script>
@@ -24,7 +26,9 @@
 <script src="vector.js"></script>
 <script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
+<script src="viewcanvas.js"></script>
 <script src="viewfractal2d.js"></script>
+<script src="viewgroup.js"></script>
 <script src="viewmesh.js"></script>
 <script src="viewpoints.js"></script>
 <script src="voxel.js"></script>
@@ -32,19 +36,21 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [255,0,0]]
 
+// use removeUnincluded and pointIndex in ellipseFromToRadius
+// transform points in viewpoints
+// drawMarker, change transform, shift statements with indexes
+// group view to start, more definitions
 // t email
 // lever - Torque = Force x Distance, unequal arm lever - 1 N x 2 m = 2 N x 1 m, fulcrum on side - 0 = 1 N x 2 M - 2 N * 1 m
-// maybe mean, percentage or leaf on remaining joker
 // buttons on slider
 // control for alongs
-// buckle points, bottom fillet, top fillet, catch angle, catch length, catch width, spring fillet, peg width, peg length, peg angle
+// around should have default radius and holes like outline
+// outset polyline when close points intersect
 // thread
-// format text
-// platonic, svg
+// make x y z sliders for point in Polyline in viewpoints
 // fix nodeOrder in getOutlinesQuickly for figure 8
 // cell outline
 // polygonJoin, brickwork
-// outset point before fillet, outsetField
 // fillet mesh
 // console.log(oldWordLengths[0].word+=String.fromCharCode(9618))
 //
@@ -80,7 +86,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // arcTo using more dotProducts instead of atan2
 // rename bottomLeft to lowerLeft and topLeft to upperLeft
 // use getSwapped2DPolygon instead of swapPolygon in pixel and voxel if there is a possibility of a loop overlap
-// outset check for intersections
 // more matrix functions _Check..
 // delete getPolygonateMesh
 // analyze volume
@@ -91,7 +96,6 @@ const gPlanarColors = [[0,255,0], [0,255,0], [0,0,255], [0,0,255], [255,0,0], [2
 // later when getting points, transform 2D if any then transform 3D if any
 // bug gridWidth=215.9 - 25.4 * (0.26 * 2) is different from 215.9 - 25.4 * 0.26 * 2
 // check expand when there are horizontal facets
-// delete a session
 // memories, add text change to line number to optionSelect key in codec > var key = query.slice(0, 10)
 // connect facets on point line in difference and union
 // make circle, similar to arcFromTo, then make new O and Q
@@ -173,7 +177,7 @@ function drawPixelMap(pixelMap) {
 		document.writeln('<circle cx="' + cx + '" cy="' + cy + '" r="0.15" />')
 		for (directionIndex = 0; directionIndex < gXYDirections.length; directionIndex++) {
 			var xy = value[directionIndex]
-			if (xy != null) {
+			if (xy != undefined) {
 				var direction = gXYDirections[directionIndex]
 				document.writeln('<circle cx="' + xy[0] + '" cy="' + xy[1] + '" r="0.04" />')
 				var cxTip = cx + 0.15 * direction[0]
@@ -193,7 +197,7 @@ function drawVoxelMap(voxelMap) {
 		document.writeln('<circle cx="' + center[0] + '" cy="' + center[1] + '" r="0.3' + rgbString)
 		for (directionIndex = 0; directionIndex < gDirections.length; directionIndex++) {
 			xyz = value[directionIndex]
-			if (xyz != null) {
+			if (xyz != undefined) {
 				direction = gDirections[directionIndex]
 				var cTip = getXYPointStringByXYZ(xyz).split(',')
 				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.08' + rgbString)
@@ -356,7 +360,7 @@ function testBevel() {
 	var mesh = getExtrusionMesh([0.0, 6.0], undefined, [[[0,-1,0], [0,4,0], [2,5,0], [3,4,0], [4,-1,0], [2,-3,0]]])
 //	drawMesh(mesh)
 	var region = {equations:[], pointStringSet:new Set(), polygons:[[[-1,1], [-1,-5], [9,-5], [9,1]]]}
-	var pointIndexSet = getPointIndexSet(undefined, [], mesh.points, mesh, region, null, [], null, [[-1,1]])
+	var pointIndexSet = getPointIndexSetByIDs(undefined, [], mesh.points, mesh, region, null, [], null, [[-1,1]])
 	console.log(pointIndexSet)
 	console.log(mesh)
 	bevelPoints(bevels, mesh, pointIndexSet, mesh.points)
@@ -407,8 +411,8 @@ function testDrillByMesh() {
 	var centerMesh = getExtrusionMesh([0.0, 1.0], undefined, [centerPolygon])
 //	drawMesh(centerMesh)
 //	drawXYPolygon(centerPolygon, getRGB())
-	drillByMesh(centerMesh, null, getUnitMatrix3D(), {facets:facets, points:points})
-	drawXYZPolygons(getPolygonsByFacets(facets, points))
+//	differenceByMesh(centerMesh, null, getUnitMatrix3D(), {facets:facets, points:points})
+//	drawXYZPolygons(getPolygonsByFacets(facets, points))
 }
 
 function testEquation() {
@@ -447,7 +451,7 @@ function testEquation() {
 	var mathMap = new Map([['min', Math.min], ['sin', Math.sin]])
 	var testMap = new Map([['value', '3']])
 	stringLength.optionSet = gSetS
-	zigzag.optionSet = null
+	zigzag.optionSet = undefined
 	var variableMap = new Map([
 		['intervalsFromToIncrement', intervalsFromToIncrement],
 		['max', Math.max],
@@ -554,9 +558,10 @@ function testFacetSubtraction() {
 //	workMesh.facets = [workMesh.facets[0]]
 	console.log('workMesh.facets')
 	console.log(workMesh.facets.slice(0))
-	differenceByPolygon('lowerToolPolygon', [], [], null, lowerToolPolygon, workMesh)
+	console.log(workMesh.points.length)
+	differenceByPolygon('lowerToolPolygon', [], [], undefined, lowerToolPolygon, workMesh)
 	console.log('workMesh.facets')
-	console.log(workMesh.facets)
+	console.log(workMesh.facets.slice(0))
 	console.log('workMesh.points')
 	console.log(workMesh.points)
 	drawMesh(workMesh)
@@ -593,8 +598,7 @@ function testFillet() {
 //	var polygon = getPointsByString('0,0 0,20 20,0 5,0')
 	var radius = 5.0
 	drawXYPolygon(polygon, getRGB())
-//	var filletedPolygon = getFilletedPolygon(9, polygon, radius)
-	var filletedPolygon = getFilletedPolygon(36, polygon, radius)
+	var filletedPolygon = getFilletedPolygonByIndexes(polygon, radius, 18, [0, 3])
 	console.log('filletedPolygon')
 	console.log(filletedPolygon)
 	drawXYPolygon(filletedPolygon, getRGB())
@@ -602,19 +606,22 @@ function testFillet() {
 
 function testFormattedText() {
 	console.log('testFormattedText')
-	var attributeMap = new Map()
-	var format = {fontSize:12, name:'yo', xOffset:0}
 	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idMap:new Map(), meshMap:new Map(), views:[]}
-	var text = 'hello dave #p wide light bigbigbigword what is a matter with the clothes I am wearing can #/'
-	var parent = getStatementByParentTag(new Map(), 1, undefined, 'g')
-	var statement = getStatementByParentTag(attributeMap, 1, parent, 'formattedText')
-	var attributeMap = new Map([['font-size', '3'], ['left', '5'], ['right', '20'], ['text-anchor', 'start'], ['x', '0'], ['y', '10']])
-	var root = {attributeMap:attributeMap}
-	var format = {attributeMap:new Map([['name', 'DaveTest']]), parent:root}
-	addTextStatements(format, registry, statement, text)
-	console.log('root')
-	console.log(root)
+//	var text = '12 <tspan d="5">3</tspan> 9'
+	var text = '12 56 ya <sup>3</sup> 9'
+//	var text = 'y <tspan dx = "-0.9"  dy = "-1.8" font-size = "2.6999999999999997"> 2 </tspan><tspan dy = "1.8">&#8203;</tspan>	'
+//	var text = 'y <tspan dx = "-0.9"  dy = "-1.8" font-size = "2.6999999999999997" > 2 </tspan> <tspan dy = "1.8" > &#8203; </tspan>'
+//	var text = 'y <tspan dx = "-0.9" > 2 </tspan>'
+//	var text = '12 <tspan> 8 </tspan> <sup> 2 </sup> hello dave #p wide light bigbigbigword what is a matter with the clothes I am wearing can #/'
+	var parent = getStatementByParentTag(new Map([['id', 'parent']]), 1, undefined, 'g')
+	createDefault(registry, parent)
+	var statement = getStatementByParentTag(new Map(), 1, parent, 'formattedText')
+	statement.texts = []
+	addTextStatements(getTextFormatMonad(registry, statement), registry, statement, text)
+	console.log('parent')
+	console.log(parent)
 	console.log(statement)
+	console.log(statement.texts)
 }
 
 function testIntercircle() {
@@ -634,7 +641,7 @@ function testIntercircle() {
 		console.log(intercircleLoop)
 //		drawXYPolygon(intercircleLoop, getRGB())
 		var insetPolygon =
-		getOutsetPolygonByMarker(null, null, true, [0.2, 0.2], intercircleLoop, [[-1.2, 0], [0, 1.2], [1.2, 0]], [0.2, 0.2])
+		getOutsetPolygonByMarker(undefined, undefined, true, [0.2, 0.2], intercircleLoop, [[-1.2, 0], [0, 1.2], [1.2, 0]], [0.2, 0.2])
 		console.log(insetPolygon)
 		drawXYPolygon(insetPolygon, getRGB())
 	}
@@ -690,17 +697,6 @@ function testLettering() {
 	console.log(letteringStringA)
 	console.log(letteringStringB)
 	console.log(letteringStringC)
-//	console.log('arcFromToCenter()')
-//	var arc = arcFromToCenter(0, 1, 0, -2, 5)
-//	console.log(arc)
-//	drawXYPolygon(arc, getRGB())
-//	var branchA = getPointsByString('0,0 0.2,0.8 0.5,2 0.8,0.8 1,0')
-//	var branchB = getPointsByString('0.2,0.8 0.8,0.8')
-//	var branches = [branchA, branchB]
-//	var polylines = getCharacterPolylines('A')
-//	if (polylines != null) {
-//		drawXYPolylines(polylines)
-//	}
 	var letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringA, 0.2)
 	drawXYPolygons(letteringOutlines)
 	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringB, 0.2)
@@ -748,11 +744,13 @@ function testLoop() {
 function testMatrix() {
 	console.log('testMatrix')
 	var point = [1,2,3]
-	var matrix3D = getMatrix3DByTranslate([5,6,7])
+	var matrix3D = getMatrix3DByTranslate([5, 6, 7])
 	console.log(matrix3D.slice(0))
-	matrix3D = getMultiplied3DMatrix(getMatrix3DByRotateY([70]), matrix3D)
+	matrix3D = getMultiplied3DMatrix(getMatrix3DRotateY([60, 2, 4]), matrix3D)
 	console.log(matrix3D.slice(0))
-	matrix3D = getMultiplied3DMatrix(getMatrix3DByRotateX([40]), matrix3D)
+	matrix3D = getMultiplied3DMatrix(getMatrix3DRotateX([30, 3, 6]), matrix3D)
+	console.log(matrix3D.slice(0))
+	matrix3D = getMultiplied3DMatrix(getMatrix3DRotateZ([30, 5, 10, 15]), matrix3D)
 	console.log(matrix3D.slice(0))
 	point = get3DByMatrix3D(point, matrix3D)
 	var inverseMatrix3D = getInverseRotationTranslation3D(matrix3D)
@@ -767,21 +765,19 @@ function testMeshBoolean() {
 	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
 	var pointsA = getPointsByString(pointString)
 //	add2Ds(pointsA, [0.00001, 0.0])
-//	addArraysByZ(pointsA, -0.01777)
 	multiply2DsScalar(pointsA, 2.0)
 	var meshA = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsA}
 	var lattice = getXYZLatticeByMesh(meshA)
 	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
 	var pointsB = getPointsByString(pointStringB)
 	add2Ds(pointsB, [1, 0.0])
-//	addArraysByZ(pointsB, -0.000000000000001)
 	multiply2DsScalar(pointsB, 2.0)
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var offsetMultiplier = 0.0
 //	var offsetMultiplier = 0.49
 //	var layerThickness = 0.100000
 	var layerThickness = 0.49999999999999999
-	var meshBoolean = null
+	var meshBoolean = undefined
 //	meshBoolean = getMeshAddition(layerThickness, offsetMultiplier, meshA, meshB)
 	meshBoolean = getMeshExclusiveIntersection(layerThickness, offsetMultiplier, meshA, meshB)
 //	meshBoolean = getMeshIntersection(layerThickness, offsetMultiplier, meshA, meshB)
@@ -934,7 +930,7 @@ function testPolygonBoolean() {
 //	drawXYPolygons([xyPolygonB])
 	var layerThickness = 0.05
 	var offsetMultiplier = 0.45
-	var polygonsBoolean = null
+	var polygonsBoolean = undefined
 	polygonsBoolean = getPolygonsAddition(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
 //	polygonsBoolean = getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
 //	polygonsBoolean = getPolygonsIntersection(layerThickness, offsetMultiplier, [xyPolygonA], [xyPolygonB])
@@ -992,7 +988,7 @@ function testRemoveTooThinFacets() {
 	drawMesh(mesh)
 	removeTooThinFacets(mesh)
 	console.log(facets)
-	addArraysByY(mesh.points, -5)
+	addArraysByIndex(mesh.points, -5, 1)
 	drawMesh(mesh)
 }
 
@@ -1002,7 +998,7 @@ function testRoad() {
 //	var betweens = [0.25, 0.5, 0.75]
 	var centers = [[0,0,2], [2,0,4]]
 //	var centers = [[0,0,2,50], [2,0,4], [4,2,8]]
-	var curve = null
+	var curve = undefined
 //	var curve = 'y * y'
 	var heights = [0, 1]
 //	var heights = [0, 1, 2]
@@ -1017,39 +1013,44 @@ function testRoad() {
 	drawMesh(mesh)
 }
 
+function testSculptureSlope() {
+	console.log('testSculptureSlope')
+	var layers = []
+	var pointString = '0,0 6,0 0,6'
+	var points = getPointsByString(pointString)
+	layers.push({polygons:[points], vertical:true})
+	var triangle = [[1,1], [2,1], [1,2]]
+	var reverseTriangle = [[1,1], [1,2.9], [2.9,1]]
+	layers.push({matrix3D:2.0, polygons:[points, reverseTriangle], vertical:false})
+	var topID = 'top'
+	var topStatement = {attributeMap:new Map([['reverseBottom', 'true']])}
+	var sculpture = {polygonMap:new Map([[topID, triangle]]), statementMap:new Map([[topID, topStatement]])}
+	layers.push({matrix3D:4.0, ids:[topID], vertical:false})
+	var mesh = getSculptureMesh(layers, undefined, undefined, sculpture)
+	console.log(layers)
+	console.log(mesh)
+	drawMesh(mesh)
+}
+
 function testSculptureVertical() {
 	console.log('testSculptureVertical')
 	var pointString = '7,-1 12,-8 7,-5 7,-8'
-//	var pointString = '7,-1 12,-8 7,-5 7,-8'
 	var points = getPointsByString(pointString)
-	var gridMap = new Map()
-	var gridMultiplier = getGridMultiplier(gridMap, points)
-	var closestPoint = getClosestPoint(gridMap, gridMultiplier, [0.0, 0.0])
-//	console.log('gridMultiplier')
-//	console.log(gridMultiplier)
-//	console.log(gridMap)
-//	console.log(closestPoint)
 	var layers = []
-	var layersNew = []
 	var matrix3D = getUnitMatrix3D()
 	matrix3D[14] = 0.0
 	var polygons = [[[0,0], [0,4], [2,4], [2,0]], [[4,0], [4,4], [6,4], [6,0]]]
-//	var polygons = [[[0,0], [0,1], [0,3], [0,4], [2,4], [2,3], [2,1], [2,0]], [[4,0], [4,1], [4,3], [4,4], [6,4], [6,3], [6,1], [6,0]]]
-	layersNew.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
+	layers.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
 	matrix3D = getUnitMatrix3D()
 	matrix3D[14] = 2.0
-	layersNew.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
+	layers.push({matrix3D:matrix3D, polygons:polygons, vertical:true})
 	matrix3D = getUnitMatrix3D()
 	matrix3D[14] = 4.0
-//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [10,5], [10,0]]], vertical:true})
-//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [7,5], [10,5]]], vertical:false})
-//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [5,5], [10,4]]], vertical:false})
-	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [2,1], [4,1], [6,1], [6,0], [4,0], [2,0]]], vertical:true})
-//	layersNew.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [6,1], [6,0]]], vertical:true})
-	var meshNew = getSculptureMesh(layersNew, undefined)
-	console.log(layersNew)
-	console.log(meshNew)
-	drawMesh(meshNew)
+	layers.push({matrix3D:matrix3D, polygons:[[[0,0], [0,1], [2,1], [4,1], [6,1], [6,0], [4,0], [2,0]]], vertical:true})
+	var mesh = getSculptureMesh(layers, undefined)
+	console.log(layers)
+	console.log(mesh)
+	drawMesh(mesh)
 }
 
 function testSplitPoints() {
@@ -1128,7 +1129,7 @@ function testSubtraction() {
 //	polygons = ['8,-5 9,-5 9,-3', '7,-1 15,-8 12,-8 12,-7 8,-4 8,-6 12,-7 12,-8 7,-8']
 //	var workPoints = '0,0 0,5 10,5 10,0'
 //	var workPoints = '-2,4 2,4 2,0 -2,0'
-	var workPoints = '0,-2 20,5 20,-2 14,-1 20,-2'
+	var workPoints = '0,0 20,5 20,0 14,2 20,0'
 //	var workPoints = '0,-2 0,5 20,5 20,-2'
 //	var workPoints = '7,0 8,6 15,0'
 //	var workPoints = '7,0 8,7 15,0 7,0 9,3'
@@ -1137,9 +1138,11 @@ function testSubtraction() {
 //	var toolPoints = '5,-2 7,-2 7,-1'
 //	var toolPoints = '12,-1 14,-1 12,0'
 //	var toolPoints = '9,2 8,2 8,-5'
-//	var toolPoints = '9,2 8,2 8,1'
+//	var toolPoints = '15,2 14,2 14,1'
 //	var toolPoints = '2,0 2,2 -2,2 -2,0'
-	var toolPoints = '15,-6 18,-6 18,1'
+	var toolPoints = '15,-6 18,-6 18,2 17,-6 16,3'
+//	var toolPoints = '15,-6 18,-6 18,3 18,-5'
+//	var toolPoints = '15,-6 18,-6 18,3'
 	var workPolygon = getPointsByString(workPoints)
 	var toolPolygon = getPointsByString(toolPoints)
 //	toolPolygon.reverse()
@@ -1151,7 +1154,6 @@ function testSubtraction() {
 //	console.log(polygons)
 //	console.log(getPolygonInsideness([8,-7], polygons[0]))
 //	console.log(getPolygonInsideness([8.1,-7], polygons[0]))
-//	var operatedPolygons = getDifferencePolygons(toolPolygon, workPolygon)
 	var operatedPolygons = getDifferencePolygons(toolPolygon, workPolygon)
 //	var operatedPolygons = getDifferencePolygonsByPolygons([getPointsByString('15,-6 18,-6 18,1')], [workPolygon])
 	console.log('operatedPolygons')
@@ -1447,7 +1449,7 @@ function createSVGTest() {
 //	testLoop()
 //	testMatrix()
 //	testMeshBoolean()
-	testMirrorJoin()
+//	testMirrorJoin()
 //	testOutline()
 //	testOutset()
 //	testOverlap()
@@ -1458,10 +1460,11 @@ function createSVGTest() {
 //	testPolygonJoining()
 //	testRemoveTooThinFacets()
 //	testRoad()
+//	testSculptureSlope()
 //	testSculptureVertical()
 //	testSplitPoints()
 //	testSplitPolygon()
-//	testSubtraction()
+	testSubtraction()
 //	testTaper()
 //	testTransform()
 //	testTransforms()
