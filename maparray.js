@@ -219,9 +219,9 @@ function getArrayByValue(value) {
 	return [value]
 }
 
-function getArrayOrNullBySet(setForArray) {
+function getArrayOrUndefinedBySet(setForArray) {
 	if (setForArray.size == 0) {
-		return null
+		return undefined
 	}
 
 	return getArrayBySet(setForArray)
@@ -267,7 +267,7 @@ function getIsLong(array, minimumLength) {
 
 function getKeyMapDefault(key, map, value) {
 	setMapDefault(key, map, value)
-	return [key, viewBroker.valueMap]
+	return [key, map]
 }
 
 function getMapArraysCopy(sourceMap) {
@@ -301,24 +301,19 @@ function getNumberOfDifferences(arraysA, arraysB) {
 	return numberOfDifferences
 }
 
-function getNullOrValue(map, key) {
-	if (map.has(key)) {
-		return map.get(key)
-	}
-	return null
-}
-
 function getPushArray(elements, others) {
-	if (elements == null) {
+	if (elements == undefined) {
 		return others
 	}
+
 	return pushArray(elements, others)
 }
 
 function getPushElement(arrayToAddTo, element) {
-	if (arrayToAddTo == null) {
+	if (arrayToAddTo == undefined) {
 		return [element]
 	}
+
 	arrayToAddTo.push(element)
 	return arrayToAddTo
 }
@@ -346,7 +341,8 @@ function getStartIndex(elements) {
 			return nextIndex
 		}
 	}
-	return null
+
+	return undefined
 }
 
 function getStringByArrays(arrays) {
@@ -357,9 +353,25 @@ function getStringByArrays(arrays) {
 	return joinedArrays.join(' ')
 }
 
-function getValueDefault(value, defaultValue) {
+function getUndefinedOrValue(map, key) {
+	if (map.has(key)) {
+		return map.get(key)
+	}
+
+	return undefined
+}
+
+function getValueDefault(value, valueDefault) {
 	if (value == undefined) {
-		return defaultValue
+		return valueDefault
+	}
+
+	return value
+}
+
+function getValueRatio(value, valueNumerator, valueRatio) {
+	if (value < 0.0) {
+		return valueNumerator * valueRatio
 	}
 
 	return value
@@ -373,8 +385,8 @@ function getValueTrue(value) {
 	return getValueDefault(value, true)
 }
 
-function notNullCheck(element) {
-	return element != null
+function notUndefinedCheck(element) {
+	return element != undefined
 }
 
 function overwriteArray(elements, sources) {
@@ -397,16 +409,18 @@ function overwriteArrayUntil(elements, sources, until) {
 }
 
 function pushArray(elements, others) {
-	if (others == null || others == undefined) {
+	if (others == undefined) {
 		return elements
 	}
+
 	var elementsLength = elements.length
 	var othersLength = others.length
 	elements.length = elementsLength + othersLength
-	for (var otherIndex = 0; otherIndex < others.length; otherIndex++) {
+	for (var otherIndex = 0; otherIndex < othersLength; otherIndex++) {
 		elements[elementsLength] = others[otherIndex]
 		elementsLength++
 	}
+
 	return elements
 }
 
@@ -428,28 +442,6 @@ function removeLastEmpties(elements) {
 	elements.length = 0
 }
 
-function removeNulls(elements) {
-	var withoutNullLength = 0
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		if (elements[elementIndex] != null) {
-			elements[withoutNullLength] = elements[elementIndex]
-			withoutNullLength += 1
-		}
-	}
-	elements.length = withoutNullLength
-}
-/* deprecated 24
-function removeNullsBySet(elements, nullIndexSet) {
-	var withoutNullLength = 0
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		if (!nullIndexSet.has(elementIndex)) {
-			elements[withoutNullLength] = elements[elementIndex]
-			withoutNullLength += 1
-		}
-	}
-	elements.length = withoutNullLength
-}
-*/
 function removeRepeats(elements) {
 	for (var elementIndex = elements.length - 1; elementIndex > -1; elementIndex--) {
 		if (elements[elementIndex] == elements[(elementIndex + 1) % elements.length]) {
@@ -458,15 +450,41 @@ function removeRepeats(elements) {
 	}
 }
 
+function removeRepeatsAdd(elements, others, minimumLength) {
+	removeRepeats(others)
+	if (others.length >= minimumLength) {
+		elements.push(others)
+	}
+}
+
 function removeShortArrays(arrays, length) {
 	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
-		if (arrays[arrayIndex] != null) {
+		if (arrays[arrayIndex] != undefined) {
 			if (arrays[arrayIndex].length < length) {
-				arrays[arrayIndex] = null
+				arrays[arrayIndex] = undefined
 			}
 		}
 	}
-	removeNulls(arrays)
+
+	removeUndefineds(arrays)
+}
+
+function removeUndefineds(elements) {
+	var withoutNullLength = 0
+	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
+		if (elements[elementIndex] != undefined) {
+			elements[withoutNullLength] = elements[elementIndex]
+			withoutNullLength += 1
+		}
+	}
+
+	elements.length = withoutNullLength
+}
+
+function replaceAllKeys(map, find, replacement) {
+	for (var key of map.keys()) {
+		map.set(key, map.get(key).replaceAll(find, replacement))
+	}
 }
 
 function replaceElements(elements, find, replacement) {
@@ -483,9 +501,34 @@ function reverseArrays(elements) {
 	}
 }
 
+function setArraysLength(arrays, length) {
+	for (var array of arrays) {
+		array.length = length
+	}
+}
+
 function setMapDefault(key, map, value) {
 	if (!map.has(key)) {
 		map.set(key, value)
+	}
+}
+
+function setMapIfDefined(key, map, value) {
+	if (value != undefined) {
+		map.set(key, value)
+	}
+}
+
+function setUndefinedArraysToPrevious(arrays) {
+	if (arrays.length == 0) {
+		return
+	}
+
+	var oldElements = arrays[0]
+	for (var arrayIndex = 1; arrayIndex < arrays.length; arrayIndex++) {
+		var elements = arrays[arrayIndex]
+		setUndefinedElementsToArray(elements, oldElements)
+		oldElements = elements
 	}
 }
 
