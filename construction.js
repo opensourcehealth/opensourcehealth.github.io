@@ -70,9 +70,11 @@ function addSeparatedFacets(facet, mesh) {
 			arrowMap.set(reverseStrings.toString(), vertexIndex)
 		}
 	}
+
 	if (skipSet.size == 0) {
 		return
 	}
+
 	var polylines = getPolylinesByFacet(facet, skipSet)
 	var endMap = getEndMapByPolylines(polylines)
 	var separatedFacetIndex = 0
@@ -137,23 +139,23 @@ function addVerticalFacets(facetIntersections, isClockwiseTop, toolPolygon, work
 	var polylines = []
 	var toolPairMap = getToolPairMap(facetIntersections, isClockwiseTop, workMesh.points, toolPolygon)
 	for (var workFacet of workFacets) {
-		var startIndex = null
+		var startIndex = undefined
 		for (var vertexIndex = 0; vertexIndex < workFacet.length; vertexIndex++) {
 			if (toolPairMap.has(workFacet[vertexIndex])) {
 				startIndex = vertexIndex
 				break
 			}
 		}
-		if (startIndex == null) {
+		if (startIndex == undefined) {
 			facets.push(workFacet)
 		}
 		else {
-			var polyline = null
+			var polyline = undefined
 			for (var extraIndex = 0; extraIndex < workFacet.length; extraIndex++) {
 				var vertexIndex = (startIndex + extraIndex) % workFacet.length
 				var beginIndex = workFacet[vertexIndex]
 				var nextIndex = workFacet[(vertexIndex + 1) % workFacet.length]
-				if (polyline == null) {
+				if (polyline == undefined) {
 					polyline = [beginIndex, nextIndex]
 				}
 				else {
@@ -176,15 +178,15 @@ function addVerticalFacets(facetIntersections, isClockwiseTop, toolPolygon, work
 	for (var polylineIndex = 0; polylineIndex < polylines.length; polylineIndex++) {
 		var polyline = polylines[polylineIndex]
 		var beginKey = polyline[polyline.length - 1]
-		var endPolylineIndex = null
+		var endPolylineIndex = undefined
 		if (toolPairMap.has(beginKey)) {
 			var pairKey = toolPairMap.get(beginKey)
 			if (endMap.has(pairKey)) {
 				endPolylineIndex = endMap.get(pairKey)
 			}
 		}
-		if (endPolylineIndex != null) {
-			polylines[polylineIndex] = null
+		if (endPolylineIndex != undefined) {
+			polylines[polylineIndex] = undefined
 			if (endPolylineIndex == polylineIndex) {
 				if (polyline[0] == polyline[polyline.length - 1]) {
 					polyline.pop()
@@ -203,7 +205,7 @@ function addVerticalFacets(facetIntersections, isClockwiseTop, toolPolygon, work
 	}
 
 	for (var polyline of polylines) {
-		if (polyline != null) {
+		if (polyline != undefined) {
 			noticeByList(['polyline is not null in addVerticalFacets in construction.', polyline, polylines])
 			if (polyline[0] == polyline[polyline.length - 1]) {
 				polyline.pop()
@@ -451,10 +453,10 @@ function embossMeshByToolWorkMap(facetIntersections, toolMesh, toolWorkMap, tran
 	}
 
 	var isConnectionAboveXY = averageBorderHeight > 0.0
-	var outerZ = null
+	var outerZ = undefined
 	for (var pointIndex of toolWorkMap.values()) {
 		var inversePointZ = transformedPoints[pointIndex][2]
-		if (outerZ == null) {
+		if (outerZ == undefined) {
 			outerZ = inversePointZ
 		}
 		else {
@@ -572,6 +574,7 @@ function getFacetIntersections(strata, toolPolygon, workMesh) {
 			}
 		}
 	}
+
 	return facetIntersections
 }
 
@@ -727,8 +730,9 @@ function getStratas(registry, statement) {
 	}
 
 	if (getIsEmpty(stratas)) {
-		return [null]
+		return [undefined]
 	}
+
 	return stratas
 }
 
@@ -782,6 +786,7 @@ function getWorkMapByArrowSet(arrowSet) {
 		var splitKey = arrow.split(' ')
 		workMap.set(parseInt(splitKey[1]), parseInt(splitKey[0]))
 	}
+
 	return workMap
 }
 
@@ -910,10 +915,7 @@ function unionByPolygon(id, splitHeights, splitInsides, strata, toolPolygon, wor
 }
 
 var gAssembly = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'assembly',
+	tag: 'assembly',
 	processStatement:function(registry, statement) {
 		statement.tag = 'g'
 		var meshes = []
@@ -928,10 +930,7 @@ var gAssembly = {
 }
 
 var gDifference = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'difference',
+	tag: 'difference',
 	processStatement:function(registry, statement) {
 		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
@@ -947,8 +946,8 @@ var gDifference = {
 
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			var chamferAngle = getFloatByDefault(90.0, 'chamferAngle', registry, statement, this.name)
-			var chamferOutset = getFloatByDefault(0.0, 'chamferOutset', registry, statement, this.name)
+			var chamferAngle = getFloatByDefault('chamferAngle', registry, statement, this.tag, 90.0)
+			var chamferOutset = getFloatByDefault('chamferOutset', registry, statement, this.tag, 0.0)
 			var id = statement.attributeMap.get('id')
 			var matrix3D = getChainMatrix3D(registry, statement)
 			var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
@@ -984,9 +983,9 @@ var gEmboss = {
 		gCopyIDKeySet.add('bottomTool')
 		gCopyIDKeySet.add('topTool')
 		gCopyIDKeySet.add('tool')
-		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set(this.tag, this)
 	},
-	name: 'emboss',
+	tag: 'emboss',
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
 		var workMeshes = getWorkMeshes(registry, statement)
@@ -994,7 +993,7 @@ var gEmboss = {
 		if (workMeshes.length == 0) {
 			return
 		}
-		var isTop = getBooleanByDefault(true, 'top', registry, statement, this.name)
+		var isTop = getBooleanByDefault('top', registry, statement, this.tag, true)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var stratas = getStratas(registry, statement)
 		var bottomTools = getMeshesByKey('bottomTool', registry, statement)
@@ -1023,10 +1022,7 @@ var gEmboss = {
 }
 
 var gIntersection = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'intersection',
+	tag: 'intersection',
 	processStatement:function(registry, statement) {
 		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
@@ -1036,8 +1032,8 @@ var gIntersection = {
 				noticeByList(['No tool polygons could be found for intersection in construction.', statement])
 				return
 			}
-			var chamferAngle = getFloatByDefault(90.0, 'chamferAngle', registry, statement, this.name)
-			var chamferOutset = getFloatByDefault(0.0, 'chamferOutset', registry, statement, this.name)
+			var chamferAngle = getFloatByDefault('chamferAngle', registry, statement, this.tag, 90.0)
+			var chamferOutset = getFloatByDefault('chamferOutset', registry, statement, this.tag, 0.0)
 			var id = statement.attributeMap.get('id')
 			var matrix3D = getChainMatrix3D(registry, statement)
 			var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
@@ -1069,10 +1065,7 @@ var gIntersection = {
 }
 
 var gJoin = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'join',
+	tag: 'join',
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (getIsEmpty(workMeshes)) {
@@ -1087,10 +1080,7 @@ var gJoin = {
 }
 
 var gOverlap = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'overlap',
+	tag: 'overlap',
 	processStatement: function(registry, statement) {
 		convertToGroup(statement)
 		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
@@ -1099,7 +1089,7 @@ var gOverlap = {
 			noticeByList(['No work or tool polygon could be found for overlap in construction.', statement])
 			return
 		}
-		var outset = getPoint2DByDefault([1.0, 1.0], 'outset', registry, statement, this.name)
+		var outset = getPoint2DByDefault('outset', registry, statement, this.tag, [1.0, 1.0])
 		var overlappedPolygons = getOverlappedPolygons(outset, polygons)
 		if (overlappedPolygons.length == 0) {
 			noticeByList(['No polygons remained after overlap operation in construction.', polygons, statement])
@@ -1110,10 +1100,7 @@ var gOverlap = {
 }
 
 var gUnion = {
-	initialize: function() {
-		gTagCenterMap.set(this.name, this)
-	},
-	name: 'union',
+	tag: 'union',
 	processStatement:function(registry, statement) {
 		convertToGroup(statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
@@ -1123,8 +1110,8 @@ var gUnion = {
 				noticeByList(['No tool polygons could be found for union in construction.', statement])
 				return
 			}
-			var chamferAngle = getFloatByDefault(90.0, 'chamferAngle', registry, statement, this.name)
-			var chamferOutset = getFloatByDefault(0.0, 'chamferOutset', registry, statement, this.name)
+			var chamferAngle = getFloatByDefault('chamferAngle', registry, statement, this.tag, 90.0)
+			var chamferOutset = getFloatByDefault('chamferOutset', registry, statement, this.tag, 0.0)
 			var id = statement.attributeMap.get('id')
 			var matrix3D = getChainMatrix3D(registry, statement)
 			var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
