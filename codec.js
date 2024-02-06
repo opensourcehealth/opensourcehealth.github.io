@@ -133,7 +133,7 @@ function getBracketReplacedLinesByText(wordString) {
 
 function getCompressToEncodedURI(text) {
 //	if (text.length < gURLMaximumLength) {
-		return text.replace(/\n/g, '%0A').replace(/,/g, '%2C').replace(/\t/g, '%09')
+		return text.replaceAll('\n', '%0A').replaceAll(',', '%2C').replaceAll('\t', '%09')
 //	}
 /*
 	var compressedText = gLZStringHeader + LZString.compressToEncodedURIComponent(text)
@@ -181,10 +181,10 @@ function getIsWordStringNew(wordString) {
 
 function getSessionBoolean(booleanKey) {
 	if (sessionStorage.getItem(booleanKey) == undefined) {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 function getSessionKey() {
@@ -253,7 +253,7 @@ function saveToArchive() {
 
 function saveToDownloadFolder() {
 	var blob = new Blob([sessionStorage.getItem(gCurrentKey)], {type: "text/plain;charset=utf-8"});
-	saveAs(blob, gTitle.replace(/\./g, '_').replace(/\//g, '_').replace(/\-/g, '_').replace(/\ /g, '_') + '.txt');
+	saveAs(blob, gTitle.replaceAll('.', '_').replaceAll('/', '_').replaceAll('-', '_').replaceAll(' ', '_') + '.txt');
 	updateSession()
 }
 
@@ -326,7 +326,7 @@ function setTextArea(textAreaID) {
 
 	var indexOfNewline = query.indexOf('\n')
 	if (indexOfNewline < 0) {
-		query = query.replace(/></g, '>\n<')
+		query = query.replaceAll('><', '>\n<')
 	}
 
 	document.getElementById(textAreaID).value = query
