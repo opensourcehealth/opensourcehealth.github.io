@@ -118,9 +118,9 @@ function Region(terrain) {
 
 var gCreature = {
 	initialize: function() {
-		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set(this.tag, this)
 	},
-	name: 'creature',
+	tag: 'creature',
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		var creature = new Creature()
@@ -136,10 +136,10 @@ var gCreature = {
 		var dataMap = registry.dataMap
 		var selectedRegion = dataMap.get('selectedRegion')
 	//	var archetype = attributeMap.get('archetype')
-		creature.color = getValueByKeyDefault(creature.color, 'color', registry, statement, this.name)
-		creature.filename = getValueByKeyDefault(creature.filename, 'filename', registry, statement, this.name)
-		creature.location = getFloatsByDefault(creature.location, 'location', registry, statement, this.name)
-		creature.scaleIndex = getIntByDefault(creature.scaleIndex, 'scaleIndex', registry, statement, this.name)
+		creature.color = getValueByKeyDefault('color', registry, statement, this.tag, creature.color)
+		creature.filename = getValueByKeyDefault('filename', registry, statement, this.tag, creature.filename)
+		creature.location = getFloatsByDefault('location', registry, statement, this.tag, creature.location)
+		creature.scaleIndex = getIntByDefault('scaleIndex', registry, statement, this.tag, creature.scaleIndex)
 		setAttributeMap(gCreatureVariableSet, attributeMap, creature.attributeMap)
 		if (selectedRegion != null) {
 			selectedRegion.add(creature)
@@ -149,19 +149,19 @@ var gCreature = {
 
 var gLaunch = {
 	initialize: function() {
-		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set(this.tag, this)
 	},
-	name: 'launch',
+	tag: 'launch',
 	processStatement:function(registry, statement) {
 		var workStatement = getWorkStatement(registry, statement)
 		if (workStatement == undefined) {
 			return
 		}
 		var workAttributeMap = workStatement.attributeMap
-		var exhaustVelocity = getFloatByDefault(1000.0, 'exhaustVelocity', registry, workStatement, this.name)
-		var numberOfStages = getIntByDefault(1, 'stages', registry, workStatement, this.name)
-		var payloadRatio = getFloatByDefault(1.0, 'payloadRatio', registry, workStatement, this.name)
-		var propellantRatio = getFloatByDefault(10.0, 'propellantRatio', registry, workStatement, this.name)
+		var exhaustVelocity = getFloatByDefault('exhaustVelocity', registry, workStatement, this.tag, 1000.0)
+		var numberOfStages = getIntByDefault('stages', registry, workStatement, this.tag, 1)
+		var payloadRatio = getFloatByDefault('payloadRatio', registry, workStatement, this.tag, 1.0)
+		var propellantRatio = getFloatByDefault('propellantRatio', registry, workStatement, this.tag, 10.0)
 		var dryMass = 1.0 + payloadRatio
 		var wetMass = dryMass + propellantRatio
 		var massRatio = wetMass / dryMass
@@ -179,9 +179,9 @@ var gLaunch = {
 
 var gRegion = {
 	initialize: function() {
-		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set(this.tag, this)
 	},
-	name: 'region',
+	tag: 'region',
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		if (!attributeMap.has('terrain')) {
@@ -192,7 +192,7 @@ var gRegion = {
 		var terrainString = attributeMap.get('terrain')
 		var terrain = new Terrain(terrainString)
 		var region = new Region(terrain)
-		region.entry = getFloatsByDefault([6204,0], 'entry', registry, statement, this.name)
+		region.entry = getFloatsByDefault('entry', registry, statement, this.tag, [6204,0])
 		if (selectedRegion != null) {
 			selectedRegion.add(region)
 		}
@@ -203,12 +203,11 @@ var gRegion = {
 
 var gTerrainView = {
 	initialize: function() {
-		gTagCenterMap.set(this.name, this)
+		gTagCenterMap.set(this.tag, this)
 	},
-	name: 'terrainView',
+	tag: 'terrainView',
 	processStatement:function(registry, statement) {
-	//	var maximumWidth = getFloatByDefault(740.0, 'maximumWidth', registry, statement, this.name)
-		var maximumWidth = getFloatByDefault(390.0, 'maximumWidth', registry, statement, this.name)
+		var maximumWidth = getFloatByDefault('maximumWidth', registry, statement, this.tag, 390.0)
 		registry.dataMap.set('terrainView.maximumHeight', maximumWidth)
 		registry.dataMap.set('terrainView.maximumWidth', maximumWidth)
 	}
