@@ -4,6 +4,34 @@ var gDifferenceExclusion = {toolExclusion:-1, workExclusion:1, workExclusionSet:
 var gIntersectionExclusion = {toolExclusion:-1, workExclusion:-1, workExclusionSet:new Set([-1])}
 var gUnionExclusion = {toolExclusion:1, workExclusion:1, workExclusionSet:new Set([1])}
 
+function addEndRectangles(polygons, polyline, size) {
+	var halfLength = size[0] * 0.5
+	var halfWidth = size[1] * 0.5
+
+	if (polyline.length < 2 || halfLength <= 0.0 || halfWidth <= 0.0) {
+		return polyline
+	}
+
+	var rectangle = getRectangleCornerParameters(-halfLength, -halfWidth, halfLength, halfWidth)
+	var endPoint = polyline[polyline.length - 1]
+	var penultimateMinusEnd = getSubtraction2D(polyline[polyline.length - 2], endPoint)
+	var penultimateMinusEndLength = length2D(penultimateMinusEnd)
+	if (penultimateMinusEndLength > 0.0) {
+		divide2DScalar(penultimateMinusEnd, penultimateMinusEndLength)
+		polygons.push(getAddition2Ds(getRotation2DsVector(rectangle, penultimateMinusEnd), endPoint))
+	}
+
+	var zeroPoint = polyline[0]
+	var secondMinusZero = getSubtraction2D(polyline[1], zeroPoint)
+	var secondMinusZeroLength = length2D(secondMinusZero)
+	if (secondMinusZeroLength > 0.0) {
+		divide2DScalar(secondMinusZero, secondMinusZeroLength)
+		polygons.push(getAddition2Ds(getRotation2DsVector(rectangle, secondMinusZero), zeroPoint))
+	}
+
+	return polygons
+}
+
 function addIntersectionsToSets(beginSet, endSet, intersections) {
 	for (intersectionIndex = 0; intersectionIndex < intersections.length; intersectionIndex += 2) {
 		endIntersectionIndex = intersectionIndex + 1
@@ -258,7 +286,7 @@ function addXIntersectionsBySegment(begin, end, xIntersections, y) {
 }
 
 function convert2DPolygonsTo3D(xyPolygons, z) {
-	for (polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
+	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
 		xyPolygons[polygonIndex] = getPolygon3D(xyPolygons[polygonIndex], z)
 	}
 	return xyPolygons
@@ -305,23 +333,23 @@ function directPolygonGroup(polygonGroup) {
 	}
 }
 
-function getArcFromAngleToAngle(fromPoint, fromDegree, toPoint, toDegree, numberOfSides) {
+function getArcFromAngleToAngle(fromPoint, fromAngle, toPoint, toAngle, numberOfSides) {
 	var arc = [fromPoint]
-	var fromDifferenceVector = getCenterDifferenceVector(fromPoint, fromDegree, toPoint)
+	var fromDifferenceVector = getCenterDifferenceVector(fromPoint, fromAngle, toPoint)
 	if (fromDifferenceVector == undefined) {
 		return arc
 	}
 
-	var toDifferenceVector = getCenterDifferenceVector(toPoint, toDegree, fromPoint)
+	var toDifferenceVector = getCenterDifferenceVector(toPoint, toAngle, fromPoint)
 	var numberOfArcSides = Math.max(Math.abs(fromDifferenceVector.difference), Math.abs(toDifferenceVector.difference))
 	numberOfArcSides = Math.ceil(numberOfSides * numberOfArcSides / gPI2 - gClose)
-	var fromArc = getArcFromAngleToArcSides(fromPoint, fromDegree, toPoint, numberOfArcSides)
-	var toArc = getArcFromAngleToArcSides(toPoint, toDegree, fromPoint, numberOfArcSides).reverse()
+	var fromArc = getArcFromAngleToArcSides(fromPoint, fromAngle, toPoint, numberOfArcSides)
+	var toArc = getArcFromAngleToArcSides(toPoint, toAngle, fromPoint, numberOfArcSides).reverse()
 	return getMeldedArray(fromArc, toArc)
 }
 
-function getArcFromAngleToArcSides(fromPoint, fromDegree, toPoint, numberOfArcSides) {
-	var centerDifferenceVector = getCenterDifferenceVector(fromPoint, fromDegree, toPoint)
+function getArcFromAngleToArcSides(fromPoint, fromAngle, toPoint, numberOfArcSides) {
+	var centerDifferenceVector = getCenterDifferenceVector(fromPoint, fromAngle, toPoint)
 	var arc = [fromPoint]
 	if (centerDifferenceVector == undefined) {
 		return arc
@@ -350,7 +378,7 @@ function getAxesByNormal(normal) {
 		axes = [0, 1]
 	}
 	if (greatestProduct < 0.0) {
-		swapXYPoint(axes)
+		swap2DPoint(axes)
 	}
 	return axes
 }
@@ -388,7 +416,21 @@ function getBoundingXByPolygons(polygons) {
 	return boundingX
 }
 
-function getCenterDifferenceVector(fromPoint, fromDegree, toPoint) {
+function getBoundingSegment(points, dimension = 0) {
+	if (getIsEmpty(points)) {
+		return undefined
+	}
+
+	var boundingSegment = [points[0][dimension], points[0][dimension]]
+	for (var pointIndex = 1; pointIndex < points.length; pointIndex++) {
+		boundingSegment[0] = Math.min(boundingSegment[0], points[pointIndex][dimension])
+		boundingSegment[1] = Math.max(boundingSegment[1], points[pointIndex][dimension])
+	}
+
+	return boundingSegment
+}
+
+function getCenterDifferenceVector(fromPoint, fromAngle, toPoint) {
 	var fromTo = subtract2D(toPoint.slice(0), fromPoint)
 	var fromToLength = length2D(fromTo)
 	if (fromToLength == 0.0) {
@@ -396,7 +438,7 @@ function getCenterDifferenceVector(fromPoint, fromDegree, toPoint) {
 	}
 
 	divide2DScalar(fromTo, fromToLength)
-	var fromVector = polarCounterclockwise(fromDegree * gRadiansPerDegree)
+	var fromVector = polarCounterclockwise(fromAngle)
 	var crossTo = crossProduct2D(fromVector, fromTo)
 	var dotTo = dotProduct2D(fromVector, fromTo)
 	var fromToRight = multiply2DScalar([-fromTo[1], fromTo[0]], 0.5 * fromToLength * dotTo / crossTo)
@@ -606,13 +648,6 @@ function getConnectionSegments(endMap, nodeBeginKey, toolNodeMap, toolPolygonSeg
 }
 */
 
-function getCounterDirectedPolygon(counterClockwise, polygon) {
-	if (getIsCounterclockwise(polygon) == counterClockwise) {
-		return polygon
-	}
-	return polygon.slice(0).reverse()
-}
-
 function getCrossProductByPolygon(polygon) {
 	removeIdentical3DPoints(polygon)
 	var product = [0.0, 0.0, 0.0]
@@ -652,6 +687,7 @@ function getDirectedPolygon(clockwise, polygon) {
 	if (getIsClockwise(polygon) == clockwise) {
 		return polygon
 	}
+
 	return polygon.slice(0).reverse()
 }
 
@@ -696,6 +732,7 @@ function getDouble3DPolygonArea(polygon) {
 		var end = polygon[(pointIndex + 2) % polygon.length]
 		polygonArea += length3D(crossProduct(getSubtraction3D(begin, center), getSubtraction3D(end, center)))
 	}
+
 	return polygonArea
 }
 
@@ -705,7 +742,17 @@ function getDoublePolygonArea(polygon) {
 		var nextPoint = polygon[(pointIndex + 1) % polygon.length]
 		polygonArea += polygon[pointIndex][0] * nextPoint[1] - polygon[pointIndex][1] * nextPoint[0]
 	}
+
 	return polygonArea
+}
+
+function getDoublePolygonsArea(polygons) {
+	var polygonsArea = 0.0
+	for (var polygon of polygons) {
+		polygonsArea += getDoublePolygonArea(polygon)
+	}
+
+	return polygonsArea
 }
 
 function getDoubleTriangleArea(a, b, c) {
@@ -1254,11 +1301,12 @@ function getIsPointInsidePolygon(point, polygon) {
 	if (getNumberOfIntersectionsToLeft(point[0], xIntersections) % 2 == 1) {
 		return true
 	}
-	swapXYPoint(point)
+
+	swap2DPoint(point)
 	xIntersections = []
 	addXIntersectionsByPolygon(xIntersections, getSwapped2DPolygon(polygon), point[1])
 	var x = point[0]
-	swapXYPoint(point)
+	swap2DPoint(point)
 	return getNumberOfIntersectionsToLeft(x, xIntersections) % 2 == 1
 }
 
@@ -1274,11 +1322,11 @@ function getIsPointInsidePolygonOrClose(point, polygon) {
 			return true
 		}
 	}
-	swapXYPoint(point)
+	swap2DPoint(point)
 	xIntersections = []
 	addXIntersectionsByPolygon(xIntersections, getSwapped2DPolygon(polygon), point[1])
 	x = point[0]
-	swapXYPoint(point)
+	swap2DPoint(point)
 	for (var xIntersection of xIntersections) {
 		if (Math.abs(xIntersection - x) < gClose) {
 			return true
@@ -1427,13 +1475,15 @@ function getIsXYZCollinear(beginPoint, centerPoint, endPoint) {
 		warningByList(['In getIsCollinear both vectors have zero length:', vectorA, vectorB, beginPoint, centerPoint, endPoint])
 		return true
 	}
+
 	if (vectorALength == 0.0 || vectorBLength == 0.0) {
 		warningByList(['In getIsCollinear a vector has zero length:', vectorA, vectorB, beginPoint, centerPoint, endPoint])
 		return false
 	}
+
 	divide3DScalar(vectorA, vectorALength)
 	divide3DScalar(vectorB, vectorBLength)
-	return Math.abs(dotProduct3D(vectorA, vectorB)) > 0.9999
+	return Math.abs(dotProduct3D(vectorA, vectorB)) > gOneMinusClose
 }
 
 function getIsXYZSegmentClose(begin, end, point) {
@@ -1895,27 +1945,42 @@ function getOutlinesQuickly(baseLocation, baseMarker, markerAbsolute, outsets, p
 	return outlines
 }
 
+function getOutsetPoint(outset, polygon, vertexIndex) {
+	var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
+	var centerPoint = polygon[vertexIndex]
+	var centerBegin = normalize2D(getSubtraction2D(beginPoint, centerPoint))
+	var endPoint = polygon[(vertexIndex + 1) % polygon.length]
+	var centerEnd = normalize2D(getSubtraction2D(endPoint, centerPoint))
+	var outsetDelta = getAddition2D(centerBegin, centerEnd)
+	var centerEndLeft = [centerEnd[1], -centerEnd[0]]
+	var divisor = dotProduct2D(centerEndLeft, outsetDelta)
+	if (Math.abs(divisor) < gClose) {
+		outsetDelta = centerEndLeft
+	}
+	else {
+		divide2DScalar(outsetDelta, divisor)
+	}
+
+	return add2D(centerPoint.slice(0), multiply2D(outsetDelta, outset))
+}
+
 function getOutsetPolygon(outset, polygon) {
 	removeIdentical2DPoints(polygon)
 	var outsetPolygon = new Array(polygon.length)
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var beginPoint = polygon[(vertexIndex - 1 + polygon.length) % polygon.length]
-		var centerPoint = polygon[vertexIndex]
-		var centerBegin = normalize2D(getSubtraction2D(beginPoint, centerPoint))
-		var endPoint = polygon[(vertexIndex + 1) % polygon.length]
-		var centerEnd = normalize2D(getSubtraction2D(endPoint, centerPoint))
-		var outsetDelta = getAddition2D(centerBegin, centerEnd)
-		var centerEndLeft = [centerEnd[1], -centerEnd[0]]
-		var divisor = dotProduct2D(centerEndLeft, outsetDelta)
-		if (Math.abs(divisor) < gClose) {
-			outsetDelta = centerEndLeft
-		}
-		else {
-			divide2DScalar(outsetDelta, divisor)
-		}
-		outsetPolygon[vertexIndex] = add2D(centerPoint.slice(0), getMultiplication2D(outsetDelta, outset))
+		outsetPolygon[vertexIndex] = getOutsetPoint(outset, polygon, vertexIndex)
 	}
+
 	return outsetPolygon
+}
+
+function getOutsetPolygons(outset, polygons) {
+	var outsetPolygons = new Array(polygons.length)
+	for (var polygonIndex = 0; polygonIndex < polygons.length; polygonIndex++) {
+		outsetPolygons[polygonIndex] = getOutsetPolygon(outset, polygons[polygonIndex])
+	}
+
+	return outsetPolygons
 }
 
 function getOutsetPolygonByMarker(baseLocation, baseMarker, markerAbsolute, outsets, polygon, tipMarker) {
@@ -2258,12 +2323,8 @@ function getPolygonInsideness(point, polygon) {
 	return -1
 }
 
-function getPolygonRotated(polygon, rotation) {
-	var polygonRotated = new Array(polygon.length)
-	for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
-		polygonRotated[keyIndex] = polygon[(keyIndex + rotation) % polygon.length]
-	}
-	return polygonRotated
+function getPolygonRotatedToIndex(polygon, vertexIndex = 0) {
+	return pushArray(polygon.slice(vertexIndex), polygon.slice(0, vertexIndex))
 }
 
 function getPolygonRotatedToLower(polygon, parameterIndex = 0) {
@@ -2281,12 +2342,7 @@ function getPolygonRotatedToLower(polygon, parameterIndex = 0) {
 		}
 	}
 
-	var polygonRotatedToBottom = new Array(polygon.length)
-	for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
-		polygonRotatedToBottom[keyIndex] = polygon[(keyIndex + bottomIndex) % polygon.length]
-	}
-
-	return polygonRotatedToBottom
+	return getPolygonRotatedToIndex(polygon, bottomIndex)
 }
 
 function getPolygonsByArrowMap(arrowMap, pointMap) {
@@ -2674,8 +2730,8 @@ function getSwapped2DPolygon(polygon) {
 	return swapped2DPolygon
 }
 
-function getUFromAngleToAngle(fromPoint, fromDegree, toPoint, toDegree, length, numberOfSides) {
-	var arc = getArcFromAngleToAngle(fromPoint, fromDegree, toPoint, toDegree, numberOfSides)
+function getUFromAngleToAngle(fromPoint, fromAngle, toPoint, toAngle, length, numberOfSides) {
+	var arc = getArcFromAngleToAngle(fromPoint, fromAngle, toPoint, toAngle, numberOfSides)
 	if (arc.length < 2 || length <= 0.0) {
 		return arc
 	}
@@ -2820,6 +2876,7 @@ function isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon) {
 	if (!isPointInsideBoundingBoxOrClose(boundingBox, point)) {
 		return false
 	}
+
 	return getIsPointInsidePolygonOrClose(point, polygon)
 }
 
@@ -2917,6 +2974,7 @@ function removeCollinearPointsByMesh(mesh) {
 	for (var facet of facets) {
 		addFacetToCollinearities(collinearities, facet, points)
 	}
+
 	removeCollinearPointsByFacets(collinearities, facets)
 }
 
@@ -3107,21 +3165,31 @@ function subtractXExistences(xExistences, xNegativeExistences) {
 	unionXDensities(xDensities, xExistences)
 }
 
-function swapXYPoint(xyPoint) {
-	var x = xyPoint[0]
-	xyPoint[0] = xyPoint[1]
-	xyPoint[1] = x
+function swap2DPoint(point2D) {
+	swapPoint(point2D, 0, 1)
 }
 
-function swapXYPolygon(xyPolygon) {
-	for (var xyPoint of xyPolygon) {
-		swapXYPoint(xyPoint)
+function swap2DPolyline(polyline2D) {
+	for (var point2D of polyline2D) {
+		swap2DPoint(point2D)
 	}
 }
 
-function swapXYPolygons(xyPolygons) {
-	for (var xyPolygon of xyPolygons) {
-		swapXYPolygon(xyPolygon)
+function swap2DPolylines(polyline2Ds) {
+	for (var polyline2D of polyline2Ds) {
+		swap2DPolyline(polyline2D)
+	}
+}
+
+function swapPoint(point, indexA, indexB) {
+	var x = point[indexA]
+	point[indexA] = point[indexB]
+	point[indexB] = x
+}
+
+function swapPolyline(polyline, indexA, indexB) {
+	for (var point of polyline) {
+		swap2DPoint(point, indexA, indexB)
 	}
 }
 
