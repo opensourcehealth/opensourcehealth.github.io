@@ -709,9 +709,9 @@ function parabolaFromToQuantityOnly(fromPoint, toPoint, quantity, fromLevel, hor
 	horizontal = getValueTrue(horizontal)
 	fromPoint = fromPoint.slice(0)
 	if (!horizontal) {
-		swapXYPoint(fromPoint)
+		swap2DPoint(fromPoint)
 		toPoint = toPoint.slice(0)
-		swapXYPoint(toPoint)
+		swap2DPoint(toPoint)
 	}
 
 	var fromTo = getSubtractionArray(toPoint, fromPoint, 3)
@@ -763,7 +763,7 @@ function parabolaFromToQuantityOnly(fromPoint, toPoint, quantity, fromLevel, hor
 	}
 
 	if (!horizontal) {
-		swapXYPolygon(parabola)
+		swap2DPolyline(parabola)
 	}
 
 	return removeUnincluded(parabola, includeFrom, includeTo)
@@ -892,12 +892,13 @@ function sineWaveXFromToCycles(xs, from, to, numberOfCycles, phase, numberOfSegm
 	var numberOfCycles = getValueDefault(numberOfCycles, 1.0)
 	var xs = getValueDefault(xs, intervalsFromToIncrement(from, to, 0.5 / numberOfCycles))
 	var numberOfSegments = getValueDefault(numberOfSegments, 24)
-	var sinPoints = new Array(numberOfCycles * numberOfSegments + 1)
+	var sinPoints = new Array(xs.length)
 	var wavelength = Math.abs(to - from) / numberOfCycles
 	var oneOverWavelengthSegments = wavelength / numberOfSegments
 	for (var xIndex = 0; xIndex < xs.length; xIndex++) {
 		sinPoints[xIndex] = [xs[xIndex], sineYXFromToCycles(xs[xIndex], from, to, numberOfCycles, phase)]
 	}
+
 	return sinPoints
 }
 
