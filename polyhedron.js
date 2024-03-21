@@ -258,6 +258,7 @@ function addPointsToFacets(mesh, segmentMap) {
 		arrowMap.set(entry[0], pointIndexes)
 		arrowMap.set(pointIndexStrings[1] + ' ' + pointIndexStrings[0], pointIndexes.slice(0).reverse())
 	}
+
 	for (var facet of mesh.facets) {
 		for (var vertexIndex = facet.length - 1; vertexIndex > -1; vertexIndex--) {
 			var endIndex = (vertexIndex + 1) % facet.length
@@ -270,9 +271,6 @@ function addPointsToFacets(mesh, segmentMap) {
 }
 
 function addPointsToIndexSet(pointIndexSet, points, polygons) {
-	if (getIsEmpty(polygons)) {
-		return
-	}
 	for (var polygon of polygons) {
 		var boundingBox = getBoundingBox(polygon)
 		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
@@ -323,6 +321,7 @@ function addSplitIndexesByFacetSet(facetIndexSet, id, splitHeight, workMesh) {
 			}
 		}
 	}
+
 	for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
 		if (!facetIndexSet.has(facetIndex)) {
 			if (facetSharesArrow(facets[facetIndex], arrowSet)) {
@@ -330,6 +329,7 @@ function addSplitIndexesByFacetSet(facetIndexSet, id, splitHeight, workMesh) {
 			}
 		}
 	}
+
 	addSplitIndexesBySplits(facetSplits, id, outerFacetSplits, splitHeight, workMesh)
 }
 
@@ -373,6 +373,7 @@ function addSplitIndexesBySplits(facetSplits, id, outerFacetSplits, splitHeight,
 	if (getIsEmpty(workMesh.points)) {
 		return
 	}
+
 	var meetingMap = getMeetingMapByHeight(facetSplits, splitHeight, workMesh)
 	for (var facetSplit of facetSplits) {
 		var alongIndexesMap = facetSplit.alongIndexesMap
@@ -385,16 +386,20 @@ function addSplitIndexesBySplits(facetSplits, id, outerFacetSplits, splitHeight,
 			arrowAlongMap.set(facet[endIndex].toString() + ' ' + facet[beginIndex].toString(), alongIndexesMap.get('w ' + nodeSuffix))
 		}
 	}
+
 	for (var facetSplit of facetSplits) {
 		addFacetsByFacetSplit(workMesh.facets, facetSplit, meetingMap, workMesh.points, splitHeight)
 	}
+
 	for (var outerFacetSplit of outerFacetSplits) {
 		addMeetingsToFacet(arrowAlongMap, outerFacetSplit.facet, meetingMap)
 	}
+
 	var pointIndexSet = new Set()
 	for (var meeting of meetingMap.values()) {
 		pointIndexSet.add(meeting.pointIndex)
 	}
+
 	if (pointIndexSet.size > 0) {
 		if (workMesh.splitIndexesMap == undefined) {
 			workMesh.splitIndexesMap = new Map()
@@ -548,7 +553,7 @@ function getAllTriangleFacets(mesh) {
 			var original = getPolygonByFacet(originalFacet, points).join(' ')
 			var xyPolygon = getPolygonByFacet(originalFacet, xyPoints).join(' ')
 			var message = 'identical arrows in getAllTriangleFacets in polyhedron.'
-			noticeByList([message, multiples, xyMultiples, original, xyPolygon, triangleFacets])
+			noticeByList([message, multiples, xyMultiples, original, xyPolygon, triangleFacets.join(' ')])
 		}
 		pushArray(allTriangleFacets, triangleFacets)
 	}
@@ -696,18 +701,13 @@ function getConvexFacet(facet, isClockwise, xyPoints) {
 		var centerBeginLength = length2D(centerBegin)
 		var centerEnd = getSubtraction2D(endPoint, centerPoint)
 		var centerEndLength = length2D(centerEnd)
-
 		if (centerBeginLength > 0.0 && centerEndLength > 0.0) {
 			divide2DScalar(centerBegin, centerBeginLength)
 			divide2DScalar(centerEnd, centerEndLength)
 			var bisector = getAddition2D(centerBegin, centerEnd)
 			var bisectorLength = length2D(bisector)
-			if (bisectorLength > 0.0) {
-				var crossProductZ = crossProduct2D(centerBegin, centerEnd)
-				if (isClockwise) {
-					crossProductZ = -crossProductZ
-				}
-				if (crossProductZ > 0.0) {
+			if (bisectorLength > gClose) {
+				if (isClockwise == (crossProduct2D(centerBegin, centerEnd) < 0.0)) {
 					var splitFacet = getSplitFacet(divide2DScalar(bisector, bisectorLength), facet, vertexIndex, xyPoints)
 					if (splitFacet != undefined) {
 						return splitFacet
@@ -738,6 +738,7 @@ function getConvexFacet(facet, isClockwise, xyPoints) {
 //			}
 //		}
 	}
+
 	return undefined
 }
 
@@ -785,10 +786,6 @@ function getConnectedPolygon(polygons) {
 }
 
 function getConvex3DFacets(facet, points, xyPoints) {
-	if (facet.length < 4) {
-		return [facet]
-	}
-
 	var normal = getNormalByFacet(facet, points)
 	if (normal == undefined) {
 		return [facet]
@@ -807,6 +804,7 @@ function getDoubleMeshArea(mesh) {
 	for (var facet of mesh.facets) {
 		polygonArea += Math.abs(getDouble3DPolygonArea(getPolygonByFacet(facet, mesh.points)))
 	}
+
 	return polygonArea
 }
 
@@ -1021,21 +1019,25 @@ function getFacetGroups(facets, points) {
 function getFacetVertexIndexes(polygon) {
 	var facet = new Array(polygon.length)
 	var vertexIndexes = new Array(polygon.length)
+	var points = new Array(polygon.length)
 	var pointStringMap = new Map()
 	for (var vertexIndex = 0; vertexIndex < polygon.length; vertexIndex++) {
-		var pointString = polygon[vertexIndex].toString()
+		var point = polygon[vertexIndex]
+		var pointString = point.toString()
 		if (pointStringMap.has(pointString)) {
 			facet[vertexIndex] = pointStringMap.get(pointString)
 		}
 		else {
 			facet[vertexIndex] = pointStringMap.size
+			points[pointStringMap.size] = point
 			vertexIndexes[pointStringMap.size] = vertexIndex
 			pointStringMap.set(pointString, pointStringMap.size)
 		}
 	}
 
+	points.length = pointStringMap.size
 	vertexIndexes.length = pointStringMap.size
-	return {facet:facet, length:pointStringMap.size, vertexIndexes:vertexIndexes}
+	return {facet:facet, length:pointStringMap.size, points:points, vertexIndexes:vertexIndexes}
 }
 
 function getIdenticalVertexIndexes(facet, pointIndex) {
@@ -1150,6 +1152,7 @@ function getIsPolygonInStratas(polygon, stratas) {
 	if (getIsEmpty(stratas)) {
 		return true
 	}
+
 	for (var strata of stratas) {
 		for (var point of polygon) {
 			if (getIsInStrata(strata, point[2])) {
@@ -1157,6 +1160,7 @@ function getIsPolygonInStratas(polygon, stratas) {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -1495,23 +1499,36 @@ function getMeshAnalysis(mesh, normal) {
 		isFacetPointingOutside = 'Meaningless because mesh is incorrect.'
 	}
 
-	var numberOfErrors = numberOfIncorrectEdges + tooThinFacetsStrings.length
+	var numberOfErrors = numberOfIdenticalPoints + numberOfIncorrectEdges + tooThinFacetsStrings.length
 	attributeMap.set('greatestFacetVertexes', greatestFacetVertexes.toString())
 	attributeMap.set('isFacetPointingOutside', isFacetPointingOutside.toString())
-	if (loneEdges.length > 0) {
-		attributeMap.set('loneEdges', loneEdges.join(' '))
-	}
-
 	var meshBoundingBox = getMeshBoundingBox(mesh)
 	attributeMap.set('area', (0.5 * getDoubleMeshArea(mesh)).toString())
 	attributeMap.set('boundingBox', meshBoundingBox[0].toString() + ' ' + meshBoundingBox[1].toString())
 	attributeMap.set('numberOfEdges', numberOfEdges.toString())
-	attributeMap.set('numberOfErrors', numberOfErrors.toString())
 	attributeMap.set('numberOfFacets', mesh.facets.length.toString())
-	attributeMap.set('numberOfIdenticalPoints', numberOfIdenticalPoints.toString())
-	attributeMap.set('numberOfIncorrectEdges', numberOfIncorrectEdges.toString())
 	attributeMap.set('numberOfShapes', getJoinedMap(mesh.facets.length, linkMap).size.toString())
-	attributeMap.set('numberOfTooThinFacets', tooThinFacetsStrings.length.toString())
+	attributeMap.set('numberOfErrors', numberOfErrors.toString())
+	if (numberOfErrors > 0) {
+		attributeMap.set('numberOfIdenticalPoints', numberOfIdenticalPoints.toString())
+		attributeMap.set('numberOfIncorrectEdges', numberOfIncorrectEdges.toString())
+		attributeMap.set('numberOfTooThinFacets', tooThinFacetsStrings.length.toString())
+	}
+
+	if (loneEdges.length > 0) {
+		loneEdgesString = loneEdges.join(' ')
+		var loneIndexStringSet = new Set()
+		for (var loneEdge of loneEdges) {
+			addElementsToSet(loneIndexStringSet, loneEdge.split(','))
+		}
+		var loneIndexStrings = Array.from(loneIndexStringSet)
+		loneIndexStrings.sort()
+		for (var loneIndexString of loneIndexStrings) {
+			var loneIndex = parseInt(loneIndexString)
+			loneEdgesString += ' ' + loneIndex + ': ' + points[loneIndex]
+		}
+		attributeMap.set('loneEdges', loneEdgesString)
+	}
 
 	if (moreThanDoubleEdges.length > 0) {
 		attributeMap.set('moreThanDoubleEdges', moreThanDoubleEdges.join(';'))
@@ -1520,9 +1537,12 @@ function getMeshAnalysis(mesh, normal) {
 	if (unidirectionalEdges.length > 0) {
 		attributeMap.set('unidirectionalEdges', unidirectionalEdges.join(';'))
 	}
+
 	if (tooThinFacetsStrings.length > 0) {
 		attributeMap.set('tooThinFacets', tooThinFacetsStrings.join(';'))
 	}
+
+
 	if (!getIsEmpty(normal)) {
 		var dotPolygons = []
 		for (var facet of mesh.facets) {
@@ -1547,6 +1567,7 @@ function getMeshAnalysis(mesh, normal) {
 		}
 		attributeMap.set('normalFacetStrings', normalFacetStrings.join(';'))
 	}
+
 	return attributeMap
 }
 
@@ -1907,10 +1928,11 @@ function getSplitFacet(bisector, facet, vertexIndex, xyPoints) {
 		var checkIndex = (vertexIndex + extraIndex) % facet.length
 		var checkPoint = polygon[checkIndex]
 		var distanceSquared = distanceSquared2D(point, checkPoint)
-		if (dotProduct2D(bisector, getSubtraction2D(point, checkPoint)) > 0.0) {
+		if (dotProduct2D(bisector, getSubtraction2D(point, checkPoint)) > gClose) {
 			distanceExtras.push([distanceSquared, checkIndex])
 		}
 	}
+
 	distanceExtras.sort(compareFirstElementAscending)
 	for (var distanceExtra of distanceExtras) {
 		var checkIndex = distanceExtra[1]
@@ -1931,6 +1953,7 @@ function getSplitFacet(bisector, facet, vertexIndex, xyPoints) {
 			return splitFacet
 		}
 	}
+
 	return undefined
 }
 
@@ -2031,6 +2054,10 @@ function getToolMeshIndex(directedIndex, facetIntersection, toolPolygon, workMes
 }
 
 function getTriangle3DFacets(facet, points, xyPoints) {
+	if (facet.length < 4) {
+		return [facet]
+	}
+
 	var convexFacets = getConvex3DFacets(facet, points, xyPoints)
 	var convexFacetsLength = convexFacets.length
 	for (var convexFacetIndex = 0; convexFacetIndex < convexFacetsLength; convexFacetIndex++) {
@@ -2220,6 +2247,7 @@ function polygonateMesh(mesh) {
 			addFacetToCollinearities(collinearities, joinedFacet, points)
 		}
 	}
+
 	for (var joinedFacets of joinedFacetArrays) {
 		if (joinedFacets.length > 0) {
 			removeCollinearPointsByFacets(collinearities, joinedFacets)
@@ -2240,6 +2268,8 @@ function polygonateMesh(mesh) {
 			overwriteArray(joinedFacets, getConnectedFacet(joinedFacets, points2D))
 		}
 	}
+
+	removeShortArrays(joinedFacetArrays, 3)
 	overwriteArray(mesh.facets, joinedFacetArrays)
 	removeUnfacetedPoints(mesh)
 	return mesh
@@ -2252,49 +2282,6 @@ function removeArrowFromMap(arrows, arrowsMap, key) {
 	else {
 		arrows.shift()
 	}
-}
-
-function removePointsFromIndexSet(pointIndexSet, points, polygons) {
-	for (var polygon of polygons) {
-		var boundingBox = getBoundingBox(polygon)
-		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-			var point = points[pointIndex]
-			if (isPointInsideBoundingBoxPolygonOrClose(boundingBox, point, polygon)) {
-				pointIndexSet.delete(pointIndex)
-			}
-		}
-	}
-}
-
-function removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points) {
-	if (antiregion == undefined) {
-		return pointIndexSet
-	}
-
-	removePointsFromIndexSet(pointIndexSet, points, antiregion.polygons)
-	if (antiregion.pointStringSet.size > 0) {
-		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-			if (antiregion.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
-				pointIndexSet.delete(pointIndex)
-			}
-		}
-	}
-
-	if (antiregion.equations.length == 0) {
-		return pointIndexSet
-	}
-
-	var variableMap = getVariableMapByStatement(statement)
-	for (var equation of antiregion.equations) {
-		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-			variableMap.set('point', points[pointIndex].toString())
-			if (getValueByEquation(registry, statement, equation)) {
-				pointIndexSet.delete(pointIndex)
-			}
-		}
-	}
-
-	return pointIndexSet
 }
 
 function removeUnfacetedPoints(mesh) {
