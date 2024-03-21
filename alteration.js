@@ -1,13 +1,5 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-function addAllToPointIndexSet(pointIndexSet, points, stratas) {
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		if (getIsInStratas(stratas, points[pointIndex][2])) {
-			pointIndexSet.add(pointIndex)
-		}
-	}
-}
-
 function addConnectedSegmentsToPolygons(meetingMap, polygon, polygons, toolSegments, workSegments) {
 	var connectedSegmentArrays = getPolynodes(toolSegments, workSegments)
 	for (var extantPolygon of connectedSegmentArrays) {
@@ -28,6 +20,26 @@ function addConnectedSegmentsToPolygons(meetingMap, polygon, polygons, toolSegme
 	}
 }
 
+function addMeshRegionToPointIndexSet(mesh, pointIndexSet, points, region, registry, statement) {
+	if (mesh.intersectionIndexesMap != undefined && region.intersectionIDs != undefined) {
+		for (var id of region.intersectionIDs) {
+			if (mesh.intersectionIndexesMap.has(id)) {
+				addElementsToSet(pointIndexSet, mesh.intersectionIndexesMap.get(id))
+			}
+		}
+	}
+
+	if (mesh.splitIndexesMap != undefined && region.splitIDs != undefined) {
+		for (var id of region.splitIDs) {
+			if (mesh.splitIndexesMap.has(id)) {
+				addElementsToSet(pointIndexSet, mesh.splitIndexesMap.get(id))
+			}
+		}
+	}
+
+	addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement)
+}
+
 function addMirrorPoints(centerVector, mirrorStart, points) {
 	var mirrorPoints = getMirrorPoints(centerVector, mirrorStart, points)
 	trimBeginEnd(points, mirrorPoints)
@@ -35,8 +47,19 @@ function addMirrorPoints(centerVector, mirrorStart, points) {
 	pushArray(points, mirrorPoints)
 }
 
-function addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement, stratas) {
-	for (var polygon of region.polygons) {
+function addPolygons2DToPointIndexSet(pointIndexSet, points, polygons) {
+	for (var polygon of polygons) {
+		var boundingBox = getBoundingBox(polygon)
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			if (isPointInsideBoundingBoxPolygonOrClose(boundingBox, points[pointIndex], polygon)) {
+				pointIndexSet.add(pointIndex)
+			}
+		}
+	}
+}
+
+function addPolygonsToPointIndexSet(pointIndexSet, points, polygons, stratas) {
+	for (var polygon of polygons) {
 		var boundingBox = getBoundingBox(polygon)
 		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			var point = points[pointIndex]
@@ -47,7 +70,23 @@ function addRegionToPointIndexSet(pointIndexSet, points, region, registry, state
 			}
 		}
 	}
+}
 
+function addPolygonStratasToPointIndexSet(pointIndexSet, points, polygonStratas) {
+	for (var polygonStrata of polygonStratas) {
+		if (polygonStrata.polygons.length == 0) {
+			if (!getIsEmpty(polygonStrata.stratas[0])) {
+				addWithinStratasToIndexSet(pointIndexSet, points, polygonStrata.stratas)
+			}
+		}
+		else {
+			addPolygonsToPointIndexSet(pointIndexSet, points, polygonStrata.polygons, polygonStrata.stratas)
+		}
+	}
+}
+
+function addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement) {
+	addPolygonStratasToPointIndexSet(pointIndexSet, points, region.polygonStratas)
 	if (region.pointStringSet.size > 0) {
 		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			if (region.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
@@ -56,18 +95,38 @@ function addRegionToPointIndexSet(pointIndexSet, points, region, registry, state
 		}
 	}
 
-	if (region.equations.length > 0) {
-		var variableMap = getVariableMapByStatement(statement)
-		for (var equation of region.equations) {
-			for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-				var point = points[pointIndex]
-				if (getIsInStratas(stratas, point[2])) {
-					variableMap.set('point', point.toString())
-					if (getValueByEquation(registry, statement, equation)) {
-						pointIndexSet.add(pointIndex)
-					}
+	if (getIsEmpty(region.equations) || registry == undefined) {
+		return
+	}
+
+	var variableMap = getVariableMapByStatement(statement)
+	for (var equation of region.equations) {
+		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+			var point = points[pointIndex]
+			if (getIsInStratas(stratas, point[2])) {
+				variableMap.set('point', point.toString())
+				if (getValueByEquation(registry, statement, equation)) {
+					pointIndexSet.add(pointIndex)
 				}
 			}
+		}
+	}
+}
+
+function addSplitPointsToPolygon(polygon, splitHeight) {
+	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
+		var point = polygon[vertexIndex]
+		var nextPoint = polygon[(vertexIndex + 1) % polygon.length]
+		if (point[1] > splitHeight != nextPoint[1] > splitHeight) {
+			var along = (splitHeight - point[1]) / (nextPoint[1] - point[1])
+			var betweenPoint = new Array(point.length)
+			betweenPoint[1] = splitHeight
+			for (var parameterIndex = 0; parameterIndex < point.length; parameterIndex++) {
+				if (parameterIndex != 1) {
+					betweenPoint[parameterIndex] = (1.0 - along) * point[parameterIndex] + along * nextPoint[parameterIndex]
+				}
+			}
+			polygon.splice(vertexIndex + 1, 0, betweenPoint)
 		}
 	}
 }
@@ -166,40 +225,43 @@ function addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons) {
 	}
 }
 
-function addToRegion(region, regionID, registry, statement) {
-	if (regionID == 'this') {
-		var polygons = []
-		for (var child of statement.children) {
-			pushArray(polygons, getPolygonsHDRecursively(registry, child))
-		}
-		if (polygons.length > 0) {
-			pushArray(region.polygons, polygons)
-		}
-		else {
-			noticeByList(['No polygons could be found for addToRegion in alteration.', regionID, statement])
-		}
-		return
-	}
+function addStatementToMeshRegion(region, registry, statement) {
+	addStatementToRegion(region, registry, statement)
+	pushArray(region.intersectionIDs, getStrings('intersectionID', statement))
+	pushArray(region.splitIDs, getStrings('splitID', statement))
+}
 
-	if (regionID.startsWith('equation.')) {
-		var equation = getVariableValue(regionID.slice('equation.'.length), statement)
-		if (getIsEmpty(equation)) {
-			noticeByList(['No equation could be found for addToRegion in alteration.', regionID, statement])
-		}
-		else {
-			region.equations.push(equation)
-		}
-		return
-	}
-
-	if (regionID.startsWith('point.')) {
-		var point = getValueByEquation(registry, statement, regionID.slice('point.'.length))
-		if (getIsEmpty(point)) {
-			noticeByList(['No point could be found for addToRegion in alteration.', regionID, statement])
-		}
-		else {
+function addStatementToRegion(region, registry, statement) {
+	region.stratas = getStratas(registry, statement)
+	region.polygonStratas.push({polygons:getPolygonsHDRecursively(registry, statement), stratas:getStratas(registry, statement)})
+	pushArray(region.polygons, getPolygonsHDRecursively(registry, statement))
+	var polylines = getChainPointListsHDRecursively(statement, 1, registry, statement, 'polyline')
+	for (var polyline of polylines) {
+		for (var point of polyline) {
 			region.pointStringSet.add(point.slice(0,2).toString())
 		}
+	}
+
+	pushArray(region.equations, getEquations('regionEquation', statement))
+}
+
+function addToMeshRegion(region, regionID, registry, statement) {
+	if (regionID == 'this') {
+		addStatementToMeshRegion(region, registry, statement)
+		return
+	}
+
+	if (!registry.idMap.has(regionID)) {
+		noticeByList(['No statement could be found for addToMeshRegion in alteration.', regionID, statement])
+		return
+	}
+
+	addStatementToMeshRegion(region, registry, registry.idMap.get(regionID))
+}
+
+function addToRegion(region, regionID, registry, statement) {
+	if (regionID == 'this') {
+		addStatementToRegion(region, registry, statement)
 		return
 	}
 
@@ -208,22 +270,13 @@ function addToRegion(region, regionID, registry, statement) {
 		return
 	}
 
-	var regionStatement = registry.idMap.get(regionID)
-	var polygons = getPolygonsHDRecursively(registry, regionStatement)
-	if (polygons.length > 0) {
-		pushArray(region.polygons, polygons)
-		return
-	}
+	addStatementToRegion(region, registry, registry.idMap.get(regionID))
+}
 
-	var polylines = getChainPointListsHDRecursively(regionStatement, 1, registry, regionStatement, 'polyline')
-	if (polylines.length == 0) {
-		noticeByList(['No polygons or polylines could be found for addToRegion in alteration.', regionID, statement])
-		return
-	}
-
-	for (var polyline of polylines) {
-		for (var point of polyline) {
-			region.pointStringSet.add(point.slice(0,2).toString())
+function addWithinStratasToIndexSet(pointIndexSet, points, stratas) {
+	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		if (getIsInStratas(stratas, points[pointIndex][2])) {
+			pointIndexSet.add(pointIndex)
 		}
 	}
 }
@@ -377,20 +430,12 @@ function expandMesh(expansionBottom, expansionXY, expansionTop, matrix3D, mesh) 
 	mesh.points = get3DsByMatrix3D(mesh.points, getInverseRotationTranslation3D(matrix3D))
 }
 
-function getBoundedPoints2D(points, region, registry, statement) {
-	if (getIsEmpty(region)) {
-		return points
-	}
-	var pointIndexSet = new Set()
-	addPointsToIndexSet(pointIndexSet, points, region.polygons)
-	return getBoundedPointsBySet(pointIndexSet, points)
-}
-
 function getBoundedPointsBySet(pointIndexSet, points) {
 	var boundedPoints = []
 	for (var pointIndex of pointIndexSet) {
 		boundedPoints.push(points[pointIndex])
 	}
+
 	return boundedPoints
 }
 
@@ -553,6 +598,7 @@ function getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes
 	if (pointIndexes == undefined) {
 		pointIndexes = getSequence(points.length)
 	}
+
 	var tangentSidesMap = new Map()
 	for (var pointIndex of pointIndexes) {
 		var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
@@ -632,6 +678,23 @@ function getInsideInterpolationAlongBeginEnd(x, points) {
 	return undefined
 }
 
+function getMeshRegion(key, registry, statement) {
+	var value = getAttributeValue(key, statement)
+	if (value == undefined) {
+		return undefined
+	}
+
+	var regionIDs = value.split(' ').filter(lengthCheck)
+	var region = {equations:[], pointStringSet:new Set(), polygons:[], polygonStratas:[]}
+	region.intersectionIDs = []
+	region.splitIDs = []
+	for (var regionID of regionIDs) {
+		addToMeshRegion(region, regionID, registry, statement)
+	}
+
+	return region
+}
+
 function getMirrorPoints(centerVector, mirrorStart, points) {
 	var mirrorPoints = getArraysCopy(points.slice(0, mirrorStart))
 	mirrorPoints.reverse()
@@ -639,7 +702,7 @@ function getMirrorPoints(centerVector, mirrorStart, points) {
 	return mirrorPoints
 }
 
-function getOutsetPolygons(points, registry, statement, tag) {
+function getOutsetPolygonsByStatement(points, registry, statement, tag) {
 	var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
 	var checkIntersection = getBooleanByDefault('checkIntersection', registry, statement, tag, true)
 	var clockwise = getBooleanByStatement('clockwise', registry, statement)
@@ -679,49 +742,23 @@ function getOutsets(registry, statement, tag) {
 	return outsets
 }
 
-function getPointIndexSet(antiregion, points, region, registry, statement, stratas) {
+function getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement) {
 	var pointIndexSet = new Set()
 	if (region == undefined) {
-		addAllToPointIndexSet(pointIndexSet, points, stratas)
+		addRangeToSet(pointIndexSet, 0, points.length)
 	}
 	else {
-		addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement, stratas)
+		addMeshRegionToPointIndexSet(mesh, pointIndexSet, points, region, registry, statement)
 	}
 
-	return removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points)
-}
-
-function getPointIndexSetByIDs(antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas) {
-	var addAll = true
-	var pointIndexSet = new Set()
-	if (mesh.intersectionIndexesMap != undefined) {
-		for (var id of intersectionIDs) {
-			addAll = false
-			if (mesh.intersectionIndexesMap.has(id)) {
-				addElementsToSet(pointIndexSet, mesh.intersectionIndexesMap.get(id))
-			}
-		}
+	if (antiregion == undefined) {
+		return pointIndexSet
 	}
 
-	if (mesh.splitIndexesMap != undefined) {
-		for (var id of splitIDs) {
-			addAll = false
-			if (mesh.splitIndexesMap.has(id)) {
-				addElementsToSet(pointIndexSet, mesh.splitIndexesMap.get(id))
-			}
-		}
-	}
-
-	if (region != undefined) {
-		addAll = false
-		addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement, stratas)
-	}
-
-	if (addAll) {
-		addAllToPointIndexSet(pointIndexSet, points, stratas)
-	}
-
-	return removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points)
+	var removalIndexSet = new Set()
+	addMeshRegionToPointIndexSet(mesh, removalIndexSet, points, antiregion, registry, statement)
+	deleteElementsFromSet(pointIndexSet, removalIndexSet)
+	return pointIndexSet
 }
 
 function getPointIndexSetByOutside(center, isOutside, points, mesh) {
@@ -743,6 +780,25 @@ function getPointIndexSetByOutside(center, isOutside, points, mesh) {
 			}
 		}
 	}
+	return pointIndexSet
+}
+
+function getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement) {
+	var pointIndexSet = new Set()
+	if (region == undefined) {
+		addRangeToSet(pointIndexSet, 0, points.length)
+	}
+	else {
+		addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement)
+	}
+
+	if (antiregion == undefined) {
+		return pointIndexSet
+	}
+
+	var removalIndexSet = new Set()
+	addRegionToPointIndexSet(removalIndexSet, points, antiregion, registry, statement)
+	deleteElementsFromSet(pointIndexSet, removalIndexSet)
 	return pointIndexSet
 }
 
@@ -776,7 +832,7 @@ function getRegion(key, registry, statement) {
 	}
 
 	var regionIDs = value.split(' ').filter(lengthCheck)
-	var region = {equations:[], polygons:[], pointStringSet:new Set()}
+	var region = {equations:[], pointStringSet:new Set(), polygons:[], polygonStratas:[]}
 	for (var regionID of regionIDs) {
 		addToRegion(region, regionID, registry, statement)
 	}
@@ -873,11 +929,26 @@ var gPlacer = {
 	}
 }
 
+function removeDeadEnds(facets) {
+	for (var facet of facets) {
+		var originalLength = facet.length
+		for (var vertexIndex = 0; vertexIndex < originalLength; vertexIndex++) {
+			var nextNextIndex = (vertexIndex + 2) % originalLength
+			if (facet[vertexIndex] == facet[nextNextIndex]) {
+				facet[(vertexIndex + 1) % originalLength] = undefined
+				facet[nextNextIndex] = undefined
+			}
+		}
+
+		removeUndefineds(facet)
+	}
+}
+
 function setPointsExcept(points, registry, statement) {
 	setPointsHD(getPointsExcept(points, registry, statement), statement)
 }
 
-function splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement, stratas) {
+function splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement) {
 	if (mesh == undefined || getIsEmpty(splitHeights)) {
 		return
 	}
@@ -886,7 +957,7 @@ function splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeight
 	var facets = mesh.facets
 	var points = mesh.points
 	for (var splitHeight of splitHeights) {
-		var pointIndexSet = getPointIndexSet(antiregion, points, region, registry, statement, stratas)
+		var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
 		var facetIndexSet = new Set()
 		for (var facetIndex = 0; facetIndex < facets.length; facetIndex++) {
 			var facet = facets[facetIndex]
@@ -911,6 +982,8 @@ function splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeight
 	}
 
 	mesh.points = get3DsByMatrix3D(mesh.points, getInverseRotationTranslation3D(matrix3D))
+	removeTooThinFacets(mesh)
+	removeUnfacetedPoints(mesh)
 }
 
 function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
@@ -1133,6 +1206,65 @@ function threadPoints(axials, center, heights, numberOfThreads, points, taperAng
 
 }
 
+var transform3DProcessor = {
+	alterMesh: function(mesh, registry, statement) {
+		var antiregion = getMeshRegion('antiregion', registry, statement)
+		var matrix3D = getChainMatrix3D(registry, statement)
+		var points = get3DsByMatrix3D(mesh.points, matrix3D)
+		var region = getMeshRegion('region', registry, statement)
+		var regionTransform3D = getChainMatrix3D(registry, statement, 'regionTransform3D')
+		var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
+		transform3DPointsBySet(regionTransform3D, pointIndexSet, points)
+		mesh.points = get3DsByMatrix3D(points, getInverseRotationTranslation3D(matrix3D))
+		removeClosePoints(mesh)
+	},
+	getPoints: function(points, registry, statement) {
+		var antiregion = getRegion('antiregion', registry, statement)
+		var region = getRegion('region', registry, statement)
+		for (var point of points) {
+			if (point.length < 3) {
+				point.length = 3
+				setUndefinedElementsToValue(point)				
+			}
+		}
+
+		var pointIndexSet = getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement)
+		transform3DPointsBySet(getChainMatrix3D(registry, statement, 'regionTransform3D'), pointIndexSet, points)
+		return points
+	},
+	initialize: function() {
+		gAlterMeshMap.set(this.tag, this)
+		gGetPointsMap.set(this.tag, this)
+		gTagCenterMap.set(this.tag, this)
+	},
+	tag: 'transform3D',
+	processStatement:function(registry, statement) {
+		statement.tag = 'g'
+		var workMeshes = getWorkMeshes(registry, statement)
+		for (var workMesh of workMeshes) {
+			this.alterMesh(workMesh, registry, statement)
+			analyzeOutputMesh(workMesh, registry, statement)
+		}
+
+		var workStatements = getWorkStatements(registry, statement)
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var points = getPointsHD(registry, workStatement)
+				if (points == undefined) {
+					noticeByList(['No points could be found for a workStatement in bend in alteration.', workStatement, statement])
+				}
+				else {
+					points = this.getPoints(points, registry, statement)
+					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+				}
+			}
+			return
+		}
+
+		noticeByList(['No work mesh or points could be found for bend in alteration.', statement])
+	}
+}
+
 function transformPoints2DByEquation(center, points, registry, statement, translationEquations, translations, vector) {
 	if (!getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
@@ -1239,19 +1371,11 @@ function wedgeMesh(inset, matrix3D, mesh) {
 
 var gBend = {
 	alterMesh: function(mesh, registry, statement) {
-		var antiregion = getRegion('antiregion', registry, statement)
-		var intersectionIDs = getStrings('intersectionID', statement)
+		var antiregion = getMeshRegion('antiregion', registry, statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsByMatrix3D(mesh.points, matrix3D)
-		var region = getRegion('region', registry, statement)
-		var splitIDs = getStrings('splitID', statement)
-		var stratas = getStratas(registry, statement)
-		var pointIndexSet = getPointIndexSetByIDs(
-		antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas)
-		if (pointIndexSet.size == 0) {
-			return
-		}
-
+		var region = getMeshRegion('region', registry, statement)
+		var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
 		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
 		var translations = getFloatListsByStatement('translation', registry, statement)
 		var center = getFloatsByDefault('center', registry, statement, statement.tag, [0.0, 0.0, 0.0])
@@ -1263,12 +1387,13 @@ var gBend = {
 	},
 	getPoints: function(points, registry, statement) {
 		var antiregion = getRegion('antiregion', registry, statement)
-
 		var region = getRegion('region', registry, statement)
-		var boundedPoints = getBoundedPoints2D(points, region, registry, statement)
+		var pointIndexSet = getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement)
+		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
 		if (getIsEmpty(boundedPoints)) {
 			return points
 		}
+
 		var translations = getPointsByKey('translation', registry, statement)
 		var center = getFloatsByDefault('center', registry, statement, statement.tag, [0.0, 0.0])
 		var translationEquations = getEquations('translationEquation', statement)
@@ -1286,7 +1411,6 @@ var gBend = {
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
 		var workMeshes = getWorkMeshes(registry, statement)
-
 		if (workMeshes.length > 0) {
 			for (var workMesh of workMeshes) {
 				this.alterMesh(workMesh, registry, statement)
@@ -1294,8 +1418,8 @@ var gBend = {
 			}
 			return
 		}
-		var workStatements = getWorkStatements(registry, statement)
 
+		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
 			for (var workStatement of workStatements) {
 				var points = getPointsHD(registry, workStatement)
@@ -1309,31 +1433,19 @@ var gBend = {
 			}
 			return
 		}
+
 		noticeByList(['No work mesh or points could be found for bend in alteration.', statement])
 	}
 }
 
 var gBevel = {
 	alterMesh: function(mesh, registry, statement) {
-		var antiregion = getRegion('antiregion', registry, statement)
+		var antiregion = getMeshRegion('antiregion', registry, statement)
 		var bevels = getPointsByKey('bevel', registry, statement)
-		var intersectionIDs = getStrings('intersectionID', statement)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var points = get3DsByMatrix3D(mesh.points, matrix3D)
-
-		//deprecated24
-//		var polygons = getPolygonsHDRecursively(registry, statement)
-
-//		var splitBevels = getPointsByKey('splitBevel', registry, statement)
-//		if (getIsEmpty(splitBevels)) {
-//			splitBevels = getPointsByKey('splitBevels', registry, statement)
-//		}
-
-		var region = getRegion('region', registry, statement)
-		var splitIDs = getStrings('splitID', statement)
-		var stratas = getStratas(registry, statement)
-		var pointIndexSet = getPointIndexSetByIDs(
-		antiregion, intersectionIDs, points, mesh, region, registry, splitIDs, statement, stratas)
+		var region = getMeshRegion('region', registry, statement)
+		var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
 		if (pointIndexSet.size == 0) {
 			return
 		}
@@ -1400,37 +1512,7 @@ var gFillet = {
 		radius = getFloatByDefault('r', registry, statement, this.tag, radius)
 
 		var region = getRegion('region', registry, statement)
-		if (antiregion == undefined && region == undefined) {
-			return getFilletedPolygonByIndexes(points, radius, numberOfSides)
-		}
-
-		var pointIndexSet = new Set()
-		if (region == undefined) {
-			addRangeToSet(pointIndexSet, 0, points.length)
-		}
-		else {
-			addPointsToIndexSet(pointIndexSet, points, region.polygons)
-			if (region.pointStringSet.size > 0) {
-				for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-					if (region.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
-						pointIndexSet.add(pointIndex)
-					}
-				}
-			}
-			if (region.equations.length > 0) {
-				var variableMap = getVariableMapByStatement(statement)
-				for (var equation of region.equations) {
-					for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-						variableMap.set('point', points[pointIndex].toString())
-						if (getValueByEquation(registry, statement, equation)) {
-							pointIndexSet.add(pointIndex)
-						}
-					}
-				}
-			}
-		}
-
-		removePointsFromIndexSetByAntiregion(antiregion, pointIndexSet, points)
+		var pointIndexSet = getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement)
 		var pointIndexes = Array.from(pointIndexSet)
 		pointIndexes.sort(compareNumberAscending)
 		return getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes)
@@ -1719,7 +1801,7 @@ var gMultiplyJoin = {
 
 var gOutset = {
 	getPoints: function(points, registry, statement) {
-		return getLargestPolygon(getOutsetPolygons(points, registry, statement, this.tag))
+		return getLargestPolygon(getOutsetPolygonsByStatement(points, registry, statement, this.tag))
 	},
 	tag: 'outset',
 	processStatement:function(registry, statement) {
@@ -1745,7 +1827,7 @@ var gOutset = {
 		}
 
 		statement.tag = 'polygon'
-		var outsetPolygons = getOutsetPolygons(points, registry, statement, this.tag)
+		var outsetPolygons = getOutsetPolygonsByStatement(points, registry, statement, this.tag)
 		if (getIsEmpty(outsetPolygons)) {
 			setPointsExcept([], registry, statement)
 			return
@@ -2089,13 +2171,12 @@ var gReverse = {
 
 var gSplit = {
 	alterMesh: function(mesh, registry, statement) {
-		var antiregion = getRegion('antiregion', registry, statement)
+		var antiregion = getMeshRegion('antiregion', registry, statement)
 		var id = statement.attributeMap.get('id')
 		var matrix3D = getChainMatrix3D(registry, statement)
-		var region = getRegion('region', registry, statement)
+		var region = getMeshRegion('region', registry, statement)
 		var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
-		var stratas = getStratas(registry, statement)
-		splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement, stratas)
+		splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement)
 	},
 	tag: 'split',
 	processStatement:function(registry, statement) {
@@ -2279,6 +2360,7 @@ var gVerticalBound = {
 
 var gWedge = {
 	alterMesh: function(mesh, registry, statement) {
+		var matrix3D = getChainMatrix3D(registry, statement)
 		var inset = getPoint2DByDefault('inset', registry, statement, this.tag, [1.0, 1.0])
 		var matrix3D = getChainMatrix3D(registry, statement)
 		wedgeMesh(inset, matrix3D, mesh)
@@ -2301,7 +2383,7 @@ var gWedge = {
 		}
 		var heights = getHeights(registry, statement, this.tag)
 		var matrix3D = getChainMatrix3D(registry, statement)
-		var pillarMesh = getExtrusionMesh(heights, matrix3D, polygons)
+		var pillarMesh = extrusion.getMesh(heights, matrix3D, polygons)
 		this.alterMesh(pillarMesh, registry, statement)
 		analyzeOutputMesh(pillarMesh, registry, statement)
 	}
@@ -2309,6 +2391,7 @@ var gWedge = {
 
 var gAlterationProcessors = [
 gBend, gBevel, gExpand, gFillet, gMirror, gMirrorJoin, gMove, gMultiplyJoin,
-gOutset, gPlacer, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, gSplit, gTaper, gThread, gTriangulate, gVerticalBound, gWedge]
+gOutset, gPlacer, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, gSplit, gTaper, gThread, transform3DProcessor,
+gTriangulate, gVerticalBound, gWedge]
 var gAlterMeshMap = new Map()
 var gGetPointsMap = new Map()
