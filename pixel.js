@@ -363,9 +363,9 @@ function getSignedIntersectionsMapBySpacelMap(spacelMap) {
 function getXYLattice(xyPolygons) {
 	var xyLattice = new Array(2)
 	xyLattice[0] = getIntersectionPairsMap(xyPolygons)
-	swapXYPolygons(xyPolygons)
+	swap2DPolylines(xyPolygons)
 	xyLattice[1] = getIntersectionPairsMap(xyPolygons)
-	swapXYPolygons(xyPolygons)
+	swap2DPolylines(xyPolygons)
 	return xyLattice
 }
 
