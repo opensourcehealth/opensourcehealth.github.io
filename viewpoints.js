@@ -850,6 +850,8 @@ class InspectPoints extends CanvasControl {
 		context.fillText('Upper', viewBroker.analysisUpperBegin, titleTop)
 		drawNumericArrays(context, pointsBox[1], viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
 		y += viewCanvas.textSpace * (pointsBox[0].length + 1)
+		context.fillText('Number of Points: ' + analysis.points.length, viewBroker.analysisCharacterBegin, y)
+		y += viewCanvas.textSpace * 2
 		if (this.mousePoint == undefined || analysis.closestPointIndex == undefined) {
 			return
 		}
