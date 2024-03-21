@@ -365,20 +365,23 @@ function getEquations(key, statement) {
 	if (!statement.attributeMap.has(key)) {
 		return []
 	}
+
 	var equationString = statement.attributeMap.get(key)
 	for (var character of equationString) {
 		if (gEquationSet.has(character)) {
 			return [equationString]
 		}
 	}
+
 	var equations = []
-	var equationStrings = equationString.replaceAll(',', ' ').split(' ').filter(lengthCheck)
+	var equationStrings = equationString.split(' ').filter(lengthCheck)
 	for (var equationString of equationStrings) {
 		var equationValue = getVariableValue(equationString, statement)
 		if (!getIsEmpty(equationValue)) {
 			equations.push(equationValue)
 		}
 	}
+
 	return equations
 }
 
@@ -990,6 +993,11 @@ function getRotatedLow24Bit(a, rotation)
 	return (a << 8) >>> (8 + rotation) | (a << (-rotation & 31)) >>> 8 | (a >>> 24) << 24
 }
 
+function getRoundedFloat(float, decimalPlaces = 1) {
+	var powerTen = Math.round(Math.pow(10.0, decimalPlaces))
+	return Math.round(float * powerTen) / powerTen
+}
+
 function getSignificant(decimalPlaces, value) {
 	var absValue = Math.abs(value)
 	if (absValue >= 100.0) {
@@ -1168,6 +1176,24 @@ function pointsToFixed(points, numberOfDecimals) {
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 		points[pointIndex] = getFixedStrings(points[pointIndex], numberOfDecimals)
 	}
+
+	return points
+}
+
+function roundFloatArrays(floatArrays, decimalPlaces) {
+	for (var floats of floatArrays) {
+		roundFloats(floats, decimalPlaces)
+	}
+
+	return floatArrays
+}
+
+function roundFloats(floats, decimalPlaces) {
+	for (var parameterIndex = 0; parameterIndex < floats.length; parameterIndex++) {
+		floats[parameterIndex] = getRoundedFloat(floats[parameterIndex], decimalPlaces)
+	}
+
+	return floats
 }
 
 function setAttributeValue(key, monad, value) {
