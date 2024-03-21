@@ -294,12 +294,16 @@ class InspectMesh extends CanvasControl {
 		drawNumericArrays(context, meshBox[0], viewCanvas.textSpace, viewBroker.analysisLowerBegin, y)
 		context.fillText('Upper', viewBroker.analysisUpperBegin, titleTop)
 		drawNumericArrays(context, meshBox[1], viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
-		y += viewCanvas.textSpace * meshBox[0].length
+		y += viewCanvas.textSpace * (meshBox[0].length + 1)
+		context.fillText('Number of Points: ' + view.mesh.points.length, viewBroker.analysisCharacterBegin, y)
+		y += viewCanvas.textSpace
+		context.fillText('Number of Facets: ' + view.mesh.facets.length, viewBroker.analysisCharacterBegin, y)
+		y += viewCanvas.textSpace * 2
 		if (viewCanvas.mouseDown2D == undefined || getIsSlice(view) || this.mousePoint == undefined) {
 			return
 		}
 
-		var boundingBoxTopPlus = y + viewCanvas.textSpace
+		var boundingBoxTopPlus = y
 		y = boundingBoxTopPlus + viewCanvas.textSpace
 		drawArrays(context, 'X: Y: Z:'.split(' '), viewCanvas.textSpace, viewBroker.analysisCharacterBegin, y)
 		context.fillText('Mouse', viewBroker.analysisSizeBegin, boundingBoxTopPlus)
@@ -345,7 +349,9 @@ class MeshControl extends CanvasControl {
 		}
 
 		var boundingBox = this.boundingBox
+
 		var facets = mesh.facets
+
 		var zPolygons = []
 		var canvasRotationMatrix = getCanvasRotationMatrix(view)
 		clearBoundingBox(boundingBox, context)
