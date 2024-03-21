@@ -52,7 +52,7 @@ var gDowel = {
 			layers.push({matrix3D:z, polygons:[getWidenedPolygon(dowelPolygon, -this.tipBevel - slopeTop)], vertical:false})
 		}
 
-		return polygonateMesh(getSculptureMesh(layers, matrix3D))
+		return polygonateMesh(sculpture.getMesh(layers, matrix3D))
 	},
 	octagonalEdgeDivider: 1.0 + Math.sqrt(2.0),
 	processStatement: function(registry, statement) {
@@ -92,7 +92,11 @@ var gGear = {
 			return this.getRack(gearObject, pitchRadius, sectorDegree, startAngle, teeth)
 		}
 
-		return this.getInvoluteGear(gearObject, pitchRadius, sectorDegree, startAngle, teeth)
+		if (sectorDegree > 0.0) {
+			return this.getInvoluteGear(gearObject, pitchRadius, sectorDegree, startAngle, teeth)
+		}
+
+		return this.getRingGear(gearObject, pitchRadius, sectorDegree, startAngle, teeth)
 	},
 	getInvoluteGear: function(gearObject, pitchRadius, sectorDegree, startAngle, teeth) {
 		var baseRadius = Math.cos(gearObject.pressureAngle) * pitchRadius
@@ -161,6 +165,46 @@ var gGear = {
 		gear.push([gear[0][0], bottom])
 		return gear
 	},
+	getRingGear: function(gearObject, pitchRadius, sectorDegree, startAngle, teeth) {
+		var baseRadius = Math.cos(gearObject.pressureAngle) * pitchRadius
+		var basePitchDistance = Math.sin(gearObject.pressureAngle) * pitchRadius
+		var startOffset = startAngle * pitchRadius
+		var zeroAngleDistance = basePitchDistance - gearObject.pressureAngle * baseRadius
+		var involuteEndAngle = gearObject.pressureAngle * 1.3
+		var involuteBeginAngle = 0.0
+		if (gearObject.dedendum != undefined) {
+			var distance = pitchRadius - gearObject.dedendum
+			involuteBeginAngle = (Math.sqrt(distance * distance - baseRadius * baseRadius) - zeroAngleDistance) / baseRadius
+			distance = pitchRadius + gearObject.addendum
+			involuteEndAngle = (Math.sqrt(distance * distance - baseRadius * baseRadius) - zeroAngleDistance) / baseRadius
+		}
+
+		var profileSides = Math.ceil(gearObject.sides * 0.3)
+		var profileSidesPlus = profileSides + 1
+		var profilePlusDouble = profileSidesPlus * 2
+		var tooth = new Array(profileSidesPlus)
+		var angle = involuteBeginAngle
+		var angleIncrement = (involuteEndAngle - involuteBeginAngle) / profileSides
+		for (var vertexIndex = 0; vertexIndex < profileSidesPlus; vertexIndex++) {
+			var toothVector = polarCounterclockwise(angle)
+			var toothPoint = multiply2DScalar([toothVector[1], -toothVector[0]], zeroAngleDistance + angle * baseRadius)
+			add2D(toothPoint, multiply2DScalar(toothVector, baseRadius))
+			tooth[vertexIndex] = toothPoint
+			angle += angleIncrement
+		}
+
+		rotate2DsVector(tooth, polarCounterclockwise(-Math.PI * 0.5 / teeth))
+		addMirrorPoints({vector:[1.0, 0.0]}, tooth.length, tooth)
+		var gear = []
+		var rotationVector = polarCounterclockwise(gPI2 / teeth)
+		var toothVector = polarCounterclockwise(startAngle)
+		for (var toothIndex = 0; toothIndex < teeth; toothIndex++) {
+			pushArray(gear, getRotation2DsVector(tooth, toothVector))
+			rotate2DVector(toothVector, rotationVector)
+		}
+
+		return gear
+	},
 	minimizeAddendumDedendum: function(gearObject, pitchRadius, sectorDegree, teeth) {
 		if (sectorDegree == 0.0) {
 			return
@@ -181,7 +225,7 @@ var gGear = {
 		var cx = getFloatByDefault('cx', registry, statement, this.tag, 0.0)
 		var cy = getFloatByDefault('cy', registry, statement, this.tag, 0.0)
 		this.oldDedendum = getFloatByStatement('dedendum', registry, statement)
-		var gearDegree = getIntByDefault('gearAngle', registry, statement, this.tag, 360.0)
+		var gearSectorDegree = getIntByDefault('gearSectorAngle', registry, statement, this.tag, 360.0)
 		var gearTeeth = getIntByDefault('gearTeeth', registry, statement, this.tag, 11)
 		var pitchRadius = getFloatByDefault('pitchRadius', registry, statement, this.tag, 100.0)
 		this.pressureAngle = getFloatByDefault('pressureAngle', registry, statement, this.tag, 20.0) * gRadiansPerDegree
@@ -191,7 +235,7 @@ var gGear = {
 		statement.tag = 'polygon'
 		startAngle += gPI2 * sideOffset / gearTeeth
 		this.minimizeAddendumDedendum(this, pitchRadius, gearSectorDegree, gearTeeth)
-		var gear = this.getGear(this, pitchRadius, gearDegree, startAngle, gearTeeth)
+		var gear = this.getGear(this, pitchRadius, gearSectorDegree, startAngle, gearTeeth)
 		setPointsExcept(add2Ds(gear, [cx, cy]), registry, statement)
 	},
 	tag: 'gear'
@@ -362,7 +406,7 @@ var gSocket = {
 			layers.push({matrix3D:this.height + this.extraHeight, polygons:narrowedPolygons})
 		}
 
-		return polygonateMesh(getSculptureMesh(layers, matrix3D))
+		return polygonateMesh(sculpture.getMesh(layers, matrix3D))
 	},
 	processStatement: function(registry, statement) {
 		var backFrontBevel = getFloatByDefault('backFrontBevel', registry, statement, this.tag, 1.0)
