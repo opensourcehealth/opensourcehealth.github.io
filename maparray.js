@@ -200,17 +200,6 @@ function getArrayByElements(elements, until, value) {
 	return elements
 }
 
-function getArrayBySet(setForArray) {
-	var array = new Array(setForArray.size)
-	var index = 0
-	for (var element of setForArray) {
-		array[index] = element
-		index += 1
-	}
-
-	return array
-}
-
 function getArrayByValue(value) {
 	if (Array.isArray(value)) {
 		return value
@@ -224,7 +213,7 @@ function getArrayOrUndefinedBySet(setForArray) {
 		return undefined
 	}
 
-	return getArrayBySet(setForArray)
+	return Array.from(setForArray)
 }
 
 function getArraysBySplittingStrings(strings, stringSeparator) {
@@ -247,6 +236,15 @@ function getArraysCopy(arrays) {
 
 function getBoundedValue(value, lower, upper) {
 	return Math.min(Math.max(value, lower), upper)
+}
+
+function getFilledArray(value, length = 2) {
+	var array = new Array(length)
+	for (var arrayIndex = 0; arrayIndex < length; arrayIndex++) {
+		array[arrayIndex] = value
+	}
+
+	return array
 }
 
 function getIsEmpty(array) {
@@ -551,8 +549,7 @@ function setUndefinedElementsToArrayZero(elements, sources) {
 	}
 }
 
-function setUndefinedElementsToValue(elements, value) {
-	value = getValueDefault(value, 0.0)
+function setUndefinedElementsToValue(elements, value = 0.0) {
 	for (var parameterIndex = 0; parameterIndex < elements.length; parameterIndex++) {
 		elements[parameterIndex] = getValueDefault(elements[parameterIndex], value)
 	}
