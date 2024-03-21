@@ -1,6 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-gValidTagSet = new Set('comment default defs layer license radialGradient stop svg xml'.split(' '))
+gValidTagSet = new Set('comment default defs information layer license radialGradient stop svg xml'.split(' '))
 
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
