@@ -156,7 +156,7 @@ function getCompressToEncodedURI(text) {
 }
 
 function getDecompressFromEncodedURI(text) {
-	if (text.indexOf('=') == -1) {
+	if (text.indexOf('=') == -1 && text.length > 99) {
 		return LZString.decompressFromEncodedURIComponent(text.slice(text.lastIndexOf('_') + 1))
 	}
 
