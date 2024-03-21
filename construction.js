@@ -604,12 +604,14 @@ function getOverlappedPolygons(outset, polygons) {
 	if (polygons.length < 2) {
 		return polygons
 	}
+
 	var overlappedPolygons = [polygons[0]]
 	var outsetPolygons = [getOutsetPolygon(outset, polygons[0])]
 	for (var polygonIndex = 1; polygonIndex < polygons.length; polygonIndex++) {
 		pushArray(overlappedPolygons, getDifferencePolygonsByPolygons(outsetPolygons, [polygons[polygonIndex]]))
 		outsetPolygons.push(getOutsetPolygon(outset, polygons[polygonIndex]))
 	}
+
 	return overlappedPolygons
 }
 
