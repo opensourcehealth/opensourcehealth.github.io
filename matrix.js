@@ -7,10 +7,10 @@ const gXZRotationBasis = [0, 2]
 
 function add2DAlongAxis(point, addition) {
 	if (Math.abs(addition[0]) > Math.abs(addition[1])) {
-		point[0]  += addition[0]
+		point[0] += addition[0]
 	}
 	else {
-		point[1]  += addition[1]
+		point[1] += addition[1]
 	}
 }
 
@@ -264,28 +264,6 @@ function getInverseRotationTranslation3D(matrix3D) {
 	}
 
 	return inverseMatrix3D
-}
-
-function getLeftVector(beginPoint, centerPoint, endPoint) {
-	var endCenter = getSubtraction2D(centerPoint, endPoint)
-	var endCenterLength = length2D(endCenter)
-	if (endCenterLength != 0.0) {
-		divide2DScalar(endCenter, endCenterLength)
-	}
-
-	var centerBegin = getSubtraction2D(beginPoint, centerPoint)
-	var centerBeginLength = length2D(centerBegin)
-	if (centerBeginLength != 0.0) {
-		divide2DScalar(centerBegin, centerBeginLength)
-	}
-
-	var totalVector = getAddition2D(endCenter, centerBegin)
-	var totalVectorLength = length2D(totalVector)
-	if (totalVectorLength != 0.0) {
-		divide2DScalar(totalVector, totalVectorLength)
-	}
-
-	return [-totalVector[1], totalVector[0]]
 }
 
 function getMatrices3DByPath(points) {
@@ -1382,8 +1360,22 @@ function transform2DPointsByFacet(facet, matrix2D, points) {
 	return points
 }
 
+function transform2DPolylines(matrix2D, polylines) {
+	for (var polyline of polylines) {
+		transform2DPoints(matrix2D, polyline)
+	}
+
+	return polylines
+}
+
 function transform3DPoints(matrix3D, points) {
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
+		points[pointIndex] = get3DByMatrix3D(points[pointIndex], matrix3D)
+	}
+}
+
+function transform3DPointsBySet(matrix3D, pointIndexSet, points) {
+	for (var pointIndex of pointIndexSet) {
 		points[pointIndex] = get3DByMatrix3D(points[pointIndex], matrix3D)
 	}
 }
