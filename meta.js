@@ -858,7 +858,7 @@ var gHypertext = {
 			return this.getHTMLVerticalLineTable(endOfLine, lines, text)
 		}
 
-		if (getCharacterCount(text, '`') * 2 > lines.length) {
+		if (getCharacterCount(text, '`') > lines.length) {
 			return this.getHTMLApostropheTable(endOfLine, lines, text)
 		}
 
