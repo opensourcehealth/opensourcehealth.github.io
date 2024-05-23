@@ -3,7 +3,7 @@
 function addConnectedSegmentsToPolygons(meetingMap, polygon, polygons, toolSegments, workSegments) {
 	var connectedSegmentArrays = getPolynodes(toolSegments, workSegments)
 	for (var extantPolygon of connectedSegmentArrays) {
-		removeRepeats(extantPolygon)
+		arrayKit.removeRepeats(extantPolygon)
 		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
 			var nodeStrings = extantPolygon[nodeStringIndex].split(' ')
 			var meetingKey = nodeStrings[1]
@@ -24,7 +24,7 @@ function addMeshRegionToPointIndexSet(mesh, pointIndexSet, points, region, regis
 	if (mesh.intersectionIndexesMap != undefined && region.intersectionIDs != undefined) {
 		for (var id of region.intersectionIDs) {
 			if (mesh.intersectionIndexesMap.has(id)) {
-				addElementsToSet(pointIndexSet, mesh.intersectionIndexesMap.get(id))
+				setKit.addElementsToSet(pointIndexSet, mesh.intersectionIndexesMap.get(id))
 			}
 		}
 	}
@@ -32,7 +32,7 @@ function addMeshRegionToPointIndexSet(mesh, pointIndexSet, points, region, regis
 	if (mesh.splitIndexesMap != undefined && region.splitIDs != undefined) {
 		for (var id of region.splitIDs) {
 			if (mesh.splitIndexesMap.has(id)) {
-				addElementsToSet(pointIndexSet, mesh.splitIndexesMap.get(id))
+				setKit.addElementsToSet(pointIndexSet, mesh.splitIndexesMap.get(id))
 			}
 		}
 	}
@@ -44,7 +44,7 @@ function addMirrorPoints(centerVector, mirrorStart, points) {
 	var mirrorPoints = getMirrorPoints(centerVector, mirrorStart, points)
 	trimBeginEnd(points, mirrorPoints)
 	trimBeginEnd(mirrorPoints, points)
-	pushArray(points, mirrorPoints)
+	arrayKit.pushArray(points, mirrorPoints)
 }
 
 function addPolygons2DToPointIndexSet(pointIndexSet, points, polygons) {
@@ -73,9 +73,13 @@ function addPolygonsToPointIndexSet(pointIndexSet, points, polygons, stratas) {
 }
 
 function addPolygonStratasToPointIndexSet(pointIndexSet, points, polygonStratas) {
+	if (polygonStratas == undefined) {
+		return
+	}
+
 	for (var polygonStrata of polygonStratas) {
 		if (polygonStrata.polygons.length == 0) {
-			if (!getIsEmpty(polygonStrata.stratas[0])) {
+			if (!arrayKit.getIsEmpty(polygonStrata.stratas[0])) {
 				addWithinStratasToIndexSet(pointIndexSet, points, polygonStrata.stratas)
 			}
 		}
@@ -87,7 +91,7 @@ function addPolygonStratasToPointIndexSet(pointIndexSet, points, polygonStratas)
 
 function addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement) {
 	addPolygonStratasToPointIndexSet(pointIndexSet, points, region.polygonStratas)
-	if (region.pointStringSet.size > 0) {
+	if (region.pointStringSet != undefined) {
 		for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			if (region.pointStringSet.has(points[pointIndex].slice(0,2).toString())) {
 				pointIndexSet.add(pointIndex)
@@ -95,7 +99,7 @@ function addRegionToPointIndexSet(pointIndexSet, points, region, registry, state
 		}
 	}
 
-	if (getIsEmpty(region.equations) || registry == undefined) {
+	if (arrayKit.getIsEmpty(region.equations) || registry == undefined) {
 		return
 	}
 
@@ -187,7 +191,7 @@ function addSplitPolygonByHeight(polygon, splitHeight, splitPolygons) {
 			toolAlongIndexes.push([toolAlong, meetingKey])
 		}
 	}
-	toolAlongIndexes.sort(compareFirstElementAscending)
+	toolAlongIndexes.sort(arrayKit.compareElementZeroAscending)
 	addSplitPolygons(alongIndexesMap, meetingMap, polygon, splitHeight, splitPolygons, toolAlongIndexes)
 }
 
@@ -209,7 +213,7 @@ function addSplitPolygons(alongIndexesMap, meetingMap, polygon, splitHeight, spl
 	toolSegments.pop()
 	addConnectedSegmentsToPolygons(meetingMap, polygon, splitPolygons, toolSegments, bottomSegments)
 	toolSegments.reverse()
-	reverseArrays(toolSegments)
+	arrayKit.reverseArrays(toolSegments)
 	addConnectedSegmentsToPolygons(meetingMap, polygon, splitPolygons, toolSegments, topSegments)
 }
 
@@ -220,29 +224,49 @@ function addSplitPolygonsByHeight(polygons, splitHeight, splitPolygons) {
 }
 
 function addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons) {
-	for (var splitHeight of splitHeights) {
+	splitHeights.sort()
+	for (var splitHeightIndex = 0; splitHeightIndex < splitHeights.length - 1; splitHeightIndex++) {
+		var splitHeight = splitHeights[splitHeightIndex]
 		addSplitPolygonsByHeight(polygons, splitHeight, splitPolygons)
+		polygons = []
+		for (var splitPolygonIndex = splitPolygons.length - 1; splitPolygonIndex > -1; splitPolygonIndex--) {
+			var splitPolygon = splitPolygons[splitPolygonIndex]
+			if (getBoundingSegment(splitPolygon, 1)[1] > splitHeight) {
+				polygons.push(splitPolygon)
+				splitPolygons.splice(splitPolygonIndex, 1)
+			}
+		}		
+	}
+
+	for (var splitHeightIndex = splitHeights.length - 1; splitHeightIndex < splitHeights.length; splitHeightIndex++) {
+		addSplitPolygonsByHeight(polygons, splitHeights[splitHeightIndex], splitPolygons)
 	}
 }
 
 function addStatementToMeshRegion(region, registry, statement) {
 	addStatementToRegion(region, registry, statement)
-	pushArray(region.intersectionIDs, getStrings('intersectionID', statement))
-	pushArray(region.splitIDs, getStrings('splitID', statement))
+	arrayKit.pushArray(region.intersectionIDs, getStrings('intersectionID', statement))
+	arrayKit.pushArray(region.splitIDs, getStrings('splitID', statement))
 }
 
 function addStatementToRegion(region, registry, statement) {
-	region.stratas = getStratas(registry, statement)
+	if (region.polygonStratas == undefined) {
+		region.polygonStratas = []
+	}
+
+	var polygons = []
 	region.polygonStratas.push({polygons:getPolygonsHDRecursively(registry, statement), stratas:getStratas(registry, statement)})
-	pushArray(region.polygons, getPolygonsHDRecursively(registry, statement))
 	var polylines = getChainPointListsHDRecursively(statement, 1, registry, statement, 'polyline')
 	for (var polyline of polylines) {
 		for (var point of polyline) {
+			if (region.pointStringSet == undefined) {
+				region.pointStringSet = new Set()
+			}
 			region.pointStringSet.add(point.slice(0,2).toString())
 		}
 	}
 
-	pushArray(region.equations, getEquations('regionEquation', statement))
+	region.equations = arrayKit.getPushArray(region.equations, getEquations('regionEquation', statement))
 }
 
 function addToMeshRegion(region, regionID, registry, statement) {
@@ -304,10 +328,29 @@ function alterMeshExcept(mesh, registry, statement) {
 	}
 }
 
-//deprecated
+function alterProcessorMesh(processor, registry, statement, workMeshes) {
+	for (var workMesh of workMeshes) {
+		processor.alterMesh(workMesh, registry, statement)
+		analyzeOutputMesh(workMesh, registry, statement)
+	}
+}
+
+function alterProcessorPoints(processor, registry, statement, workStatements) {
+	for (var workStatement of workStatements) {
+		var points = getPointsHD(registry, workStatement)
+		if (points == undefined) {
+			noticeByList(['No points could be found for a workStatement in ' + processor.tag + '.', workStatement, statement])
+		}
+		else {
+			points = processor.getPoints(points, registry, statement)
+			setPointsHD(getPointsExcept(points, registry, statement), workStatement)
+		}
+	}
+}
+
 function analyzeOutputMesh(mesh, registry, statement) {
-	var id = statement.attributeMap.get('id')
-	registry.meshMap.set(id, mesh)
+	var id = 
+	registry.meshMap.set(statement.attributeMap.get('id'), mesh)
 	alterMeshExcept(mesh, registry, statement)
 }
 
@@ -349,8 +392,8 @@ function bevelPointIndex(bevelMap, bevels, horizontalDirectionMap, pointIndex, p
 		var otherNormal = normals[normalIndex]
 		highestNormalZ = Math.max(highestNormalZ, Math.abs(otherNormal[2]))
 		if (normalIndex != horizontalNormalIndex) {
-			var crossProductZ = Math.abs(crossProduct2D(horizontalNormal, otherNormal))
-			crossProductZ += gClose * Math.abs(dotProduct2D(horizontalNormal, otherNormal))
+			var crossProductZ = Math.abs(Vector.crossProduct2D(horizontalNormal, otherNormal))
+			crossProductZ += gClose * Math.abs(Vector.dotProduct2D(horizontalNormal, otherNormal))
 			if (crossProductZ > highestCrossProductZ && Math.abs(otherNormal[2]) < maximumZ) {
 				highestCrossProductZ = crossProductZ
 				highestCrossNormal = otherNormal
@@ -358,18 +401,18 @@ function bevelPointIndex(bevelMap, bevels, horizontalDirectionMap, pointIndex, p
 		}
 	}
 
-	var addition = getAddition2D(normalize2D(horizontalNormal.slice(0, 2)), normalize2D(highestCrossNormal.slice(0, 2)))
-	var multiplier = -2.0 * highestNormalZ / lengthSquared2D(addition)
-	bevelMap.set(pointIndex, getMultiplication2D(multiply2DScalar(addition, multiplier), inset))
+	var addition = Vector.getAddition2D(normalize2D(horizontalNormal.slice(0, 2)), normalize2D(highestCrossNormal.slice(0, 2)))
+	var multiplier = -2.0 * highestNormalZ / Vector.lengthSquared2D(addition)
+	bevelMap.set(pointIndex, Vector.getMultiplication2D(Vector.multiply2DScalar(addition, multiplier), inset))
 }
 
 function bevelPoints(bevels, mesh, pointIndexSet, points) {
 	var facets = mesh.facets
-	if (getIsEmpty(bevels)) {
+	if (arrayKit.getIsEmpty(bevels)) {
 		return
 	}
 
-	bevels.sort(compareFirstElementAscending)
+	bevels.sort(arrayKit.compareElementZeroAscending)
 	for (var bevel of bevels) {
 		if (bevel.length == 1) {
 			bevel.push(bevel[0])
@@ -388,7 +431,7 @@ function bevelPoints(bevels, mesh, pointIndexSet, points) {
 				if (pointIndexSet.has(pointIndex)) {
 					normal.push(facetIndex)
 					for (var pointIndex of facet) {
-						addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
+						mapKit.addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
 					}
 					break
 				}
@@ -402,7 +445,7 @@ function bevelPoints(bevels, mesh, pointIndexSet, points) {
 	}
 
 	for (var pointIndex of bevelMap.keys()) {
-		add2D(points[pointIndex], bevelMap.get(pointIndex))
+		Vector.add2D(points[pointIndex], bevelMap.get(pointIndex))
 	}
 }
 
@@ -418,7 +461,7 @@ function expandMesh(expansionBottom, expansionXY, expansionTop, matrix3D, mesh) 
 	var directionMapZ = getDirectionMapZ(facets, mesh.points)
 	var horizontalDirectionMap = directionMapZ.horizontalDirectionMap
 	for (var key of horizontalDirectionMap.keys()) {
-		add2D(mesh.points[key], getMultiplication2D(horizontalDirectionMap.get(key), expansionXY))
+		Vector.add2D(mesh.points[key], Vector.getMultiplication2D(horizontalDirectionMap.get(key), expansionXY))
 	}
 	var bottomOverDeltaZ = expansionBottom / directionMapZ.deltaZ
 	var topOverDeltaZ = expansionTop / directionMapZ.deltaZ
@@ -454,15 +497,15 @@ function getCenterVectorMirrorStart(mirrorStart, points) {
 
 	var penultimatePoint = points[points.length - 2]
 	var ultimatePoint = points[points.length - 1]
-	var vector = getSubtraction2D(ultimatePoint, penultimatePoint)
+	var vector = Vector.getSubtraction2D(ultimatePoint, penultimatePoint)
 	vector = [vector[1], -vector[0]]
-	perpendicular = multiply2DScalar(getAddition2D(penultimatePoint, ultimatePoint), 0.5)
-	var vectorLength = length2D(vector)
+	perpendicular = Vector.multiply2DScalar(Vector.getAddition2D(penultimatePoint, ultimatePoint), 0.5)
+	var vectorLength = Vector.length2D(vector)
 	if (vectorLength == 0.0) {
 		vector = [1.0, 0.0]
 	}
 	else {
-		divide2DScalar(vector, vectorLength)
+		Vector.divide2DScalar(vector, vectorLength)
 	}
 
 	return {center:perpendicular.slice(0), mirrorStart:mirrorStart - 2, vector:vector}
@@ -470,7 +513,7 @@ function getCenterVectorMirrorStart(mirrorStart, points) {
 
 function getCenterVectorOnly(registry, statement, tag) {
 	var centerVector = {center:getPoint2DByDefault('center', registry, statement, tag, [0.0, 0.0])}
-	centerVector.vector = polarCounterclockwise(getFloatByDefault('direction', registry, statement, tag, 90.0) * gRadiansPerDegree)
+	centerVector.vector = Vector.polarCounterclockwise(getFloatByDefault('direction', registry, statement, tag, 90.0) * gRadiansPerDegree)
 	return centerVector
 }
 
@@ -481,7 +524,7 @@ function getDirectionMapZ(facets, points) {
 		if (normal != undefined) {
 			var facet = facets[facetIndex]
 			for (var pointIndex of facet) {
-				addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
+				mapKit.addElementToMapArray(horizontalDirectionMap, pointIndex, normal)
 			}
 		}
 	}
@@ -492,9 +535,9 @@ function getDirectionMapZ(facets, points) {
 		minimumZ = Math.min(minimumZ, z)
 		maximumZ = Math.max(maximumZ, z)
 		var normals = horizontalDirectionMap.get(key)
-		normals.sort(compareAbsoluteElementTwoAscending)
-		var addition = getAddition2D(normalize2D(normals[0]), normalize2D(normals[1]))
-		horizontalDirectionMap.set(key, multiply2DScalar(addition, 2.0 / lengthSquared2D(addition)))
+		normals.sort(arrayKit.compareAbsoluteElementTwoAscending)
+		var addition = Vector.getAddition2D(normalize2D(normals[0]), normalize2D(normals[1]))
+		horizontalDirectionMap.set(key, Vector.multiply2DScalar(addition, 2.0 / Vector.lengthSquared2D(addition)))
 	}
 	return {deltaZ:maximumZ - minimumZ, horizontalDirectionMap:horizontalDirectionMap , minimumZ:minimumZ, maximumZ:maximumZ}
 }
@@ -506,7 +549,7 @@ function getDotProduct2DRange(points, vector) {
 	var minimumDotProduct = Number.MAX_VALUE
 	var maximumDotProduct = -Number.MAX_VALUE
 	for (var point of points) {
-		var dotProduct = dotProduct2D(point, vector)
+		var dotProduct = Vector.dotProduct2D(point, vector)
 		minimumDotProduct = Math.min(minimumDotProduct, dotProduct)
 		maximumDotProduct = Math.max(maximumDotProduct, dotProduct)
 	}
@@ -521,7 +564,7 @@ function getDotProduct3DRange(points, vector) {
 	var minimumDotProduct = Number.MAX_VALUE
 	var maximumDotProduct = -Number.MAX_VALUE
 	for (var point of points) {
-		var dotProduct = dotProduct3D(point, vector)
+		var dotProduct = Vector.dotProduct3D(point, vector)
 		minimumDotProduct = Math.min(minimumDotProduct, dotProduct)
 		maximumDotProduct = Math.max(maximumDotProduct, dotProduct)
 	}
@@ -542,7 +585,7 @@ function getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap) {
 	var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
 	var endIndex = (pointIndex + 1) % points.length
 	var endPoint = points[endIndex]
-	var centerBeginDistance = distance2D(centerPoint, beginPoint)
+	var centerBeginDistance = Vector.distance2D(centerPoint, beginPoint)
 	var beginTangentLength = 0.0
 	var radiusMultiplier = 1.0
 	if (tangentSidesMap.has(beginIndex)) {
@@ -554,7 +597,7 @@ function getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap) {
 		radiusMultiplier = centerBeginDistance / totalBeginLength
 	}
 
-	var centerEndDistance = distance2D(centerPoint, endPoint)
+	var centerEndDistance = Vector.distance2D(centerPoint, endPoint)
 	var endTangentLength = 0.0
 	if (tangentSidesMap.has(endIndex)) {
 		endTangentLength = tangentSidesMap.get(endIndex).tangentLength
@@ -576,18 +619,19 @@ function getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap) {
 	var centerBegin = tangentSides.centerBegin
 	var centerVector = tangentSides.centerVector
 	var halfSideLength = Math.tan(absoluteHalfCornerAngle / numberOfFilletSides) * radius
-	var beginTangent = getAddition2D(centerPoint, getMultiplication2DScalar(centerBegin, tangentLength - halfSideLength))
-	var filletCenter = getAddition2D(centerPoint, getMultiplication2DScalar(centerVector, radius / tangentSides.perpendicular))
+	var beginTangent = Vector.add2D(centerPoint.slice(0), Vector.getMultiplication2DScalar(centerBegin, tangentLength - halfSideLength))
+	var filletCenter = Vector.add2D(centerPoint.slice(0), Vector.getMultiplication2DScalar(centerVector, radius / tangentSides.perpendicular))
 	var filletAngle = 2.0 * absoluteHalfCornerAngle / numberOfFilletSides
-	if (dotProduct2D([centerBegin[1], -centerBegin[0]], tangentSides.centerEnd) < 0.0) {
+	if (Vector.dotProduct2D([centerBegin[1], -centerBegin[0]], tangentSides.centerEnd) < 0.0) {
 		filletAngle = -filletAngle
 	}
+
 	var filletedCorner = [beginTangent]
-	var beginTangentCenter = getSubtraction2D(beginTangent, filletCenter)
-	var filletRotation = polarCounterclockwise(filletAngle)
+	var beginTangentCenter = Vector.getSubtraction2D(beginTangent, filletCenter)
+	var filletRotation = Vector.polarCounterclockwise(filletAngle)
 	for (var filletIndex = 1; filletIndex < numberOfFilletSides; filletIndex++) {
-		beginTangentCenter = getRotation2DVector(beginTangentCenter, filletRotation)
-		filletedCorner.push(getAddition2D(filletCenter, beginTangentCenter))
+		var beginTangentCenter = Vector.getRotation2DVector(beginTangentCenter, filletRotation)
+		filletedCorner.push(Vector.add2D(filletCenter.slice(0), beginTangentCenter))
 	}
 
 	return filletedCorner
@@ -596,7 +640,7 @@ function getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap) {
 function getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes) {
 	var minimumAngle = gPI2 / numberOfSides
 	if (pointIndexes == undefined) {
-		pointIndexes = getSequence(points.length)
+		pointIndexes = arrayKit.getSequence(points.length)
 	}
 
 	var tangentSidesMap = new Map()
@@ -604,20 +648,20 @@ function getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes
 		var beginPoint = points[(pointIndex - 1 + points.length) % points.length]
 		var centerPoint = points[pointIndex]
 		var endPoint = points[(pointIndex + 1) % points.length]
-		var centerBegin = getSubtraction2D(beginPoint, centerPoint)
-		var centerBeginLength = length2D(centerBegin)
-		var centerEnd = getSubtraction2D(endPoint, centerPoint)
-		var centerEndLength = length2D(centerEnd)
+		var centerBegin = Vector.getSubtraction2D(beginPoint, centerPoint)
+		var centerBeginLength = Vector.length2D(centerBegin)
+		var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
+		var centerEndLength = Vector.length2D(centerEnd)
 		if (centerBeginLength > 0.0 && centerEndLength > 0.0) {
-			divide2DScalar(centerBegin, centerBeginLength)
-			divide2DScalar(centerEnd, centerEndLength)
+			Vector.divide2DScalar(centerBegin, centerBeginLength)
+			Vector.divide2DScalar(centerEnd, centerEndLength)
 			var twoOverAngle = 2.0 / minimumAngle
-			var absoluteHalfCornerAngle = Math.acos(0.5 * distance2D(centerBegin, centerEnd))
+			var absoluteHalfCornerAngle = Math.acos(0.5 * Vector.distance2D(centerBegin, centerEnd))
 			var cornerOverMinimum = twoOverAngle * absoluteHalfCornerAngle
 			var numberOfFilletSides = Math.ceil(cornerOverMinimum - gClose)
 			if (numberOfFilletSides > 1) {
-				var centerVector = normalize2D(getAddition2D(centerBegin, centerEnd))
-				var dotProduct = dotProduct2D(centerVector, centerBegin)
+				var centerVector = normalize2D(Vector.getAddition2D(centerBegin, centerEnd))
+				var dotProduct = Vector.dotProduct2D(centerVector, centerBegin)
 				var perpendicular = Math.sqrt(1.0 - dotProduct * dotProduct)
 				var tangentLength = radius * dotProduct / perpendicular
 				var tangentSides = {absoluteHalfCornerAngle:absoluteHalfCornerAngle, centerBegin:centerBegin, centerEnd:centerEnd}
@@ -632,24 +676,33 @@ function getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes
 
 	var filletedPolygon = []
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		pushArray(filletedPolygon, getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap))
+		arrayKit.pushArray(filletedPolygon, getFilletedCornerByMap(points, radius, pointIndex, tangentSidesMap))
 	}
 
 	return filletedPolygon
 }
 
-function getFlatInterpolationAlongBeginEnd(x, points) {
+function getFilletedPolygonBySet(points, radius, numberOfSides, pointIndexSet) {
+	var pointIndexes = Array.from(pointIndexSet)
+	pointIndexes.sort(arrayKit.compareNumberAscending)
+	return getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes)
+}
+
+function getFlatInterpolationAlongBeginEnd(x = 0, points) {
 	var beginPoint = points[0]
 	if (points.length == 1) {
 		return [0.0, points[0], points[0]]
 	}
+
 	if (x <= beginPoint[0]) {
 		return [0.0, points[0], points[0]]
 	}
+
 	var upperIndex = points.length - 1
 	if (x >= points[upperIndex][0]) {
 		return [0.0, points[upperIndex], points[upperIndex]]
 	}
+
 	return getInsideInterpolationAlongBeginEnd(x, points)
 }
 
@@ -696,7 +749,7 @@ function getMeshRegion(key, registry, statement) {
 }
 
 function getMirrorPoints(centerVector, mirrorStart, points) {
-	var mirrorPoints = getArraysCopy(points.slice(0, mirrorStart))
+	var mirrorPoints = arrayKit.getArraysCopy(points.slice(0, mirrorStart))
 	mirrorPoints.reverse()
 	mirrorPointsByCenterVector(centerVector, mirrorPoints)
 	return mirrorPoints
@@ -728,7 +781,7 @@ function getOutsetPolygonsByStatement(points, registry, statement, tag) {
 
 function getOutsets(registry, statement, tag) {
 	var outsets = getPointsByKey('outsets', registry, statement)
-	if (getIsEmpty(outsets)) {
+	if (arrayKit.getIsEmpty(outsets)) {
 		outsets = [getPoint2DByDefault('outset', registry, statement, tag, [1.0, 1.0])]
 	}
 	else {
@@ -745,7 +798,7 @@ function getOutsets(registry, statement, tag) {
 function getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement) {
 	var pointIndexSet = new Set()
 	if (region == undefined) {
-		addRangeToSet(pointIndexSet, 0, points.length)
+		setKit.addRangeToSet(pointIndexSet, 0, points.length)
 	}
 	else {
 		addMeshRegionToPointIndexSet(mesh, pointIndexSet, points, region, registry, statement)
@@ -757,7 +810,7 @@ function getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, regis
 
 	var removalIndexSet = new Set()
 	addMeshRegionToPointIndexSet(mesh, removalIndexSet, points, antiregion, registry, statement)
-	deleteElementsFromSet(pointIndexSet, removalIndexSet)
+	setKit.deleteElementsFromSet(pointIndexSet, removalIndexSet)
 	return pointIndexSet
 }
 
@@ -766,12 +819,12 @@ function getPointIndexSetByOutside(center, isOutside, points, mesh) {
 	for (var facet of mesh.facets) {
 		var facetCenter = getCenter(facet, points)
 		var normal = getNormalByFacet(facet, points)
-		var centerFacet = getSubtraction2D(facetCenter, center)
-		var centerFacetLength = length2D(centerFacet)
+		var centerFacet = Vector.getSubtraction2D(facetCenter, center)
+		var centerFacetLength = Vector.length2D(centerFacet)
 		if (centerFacetLength > 0.0) {
-			divide3DScalar(centerFacet, centerFacetLength)
+			Vector.divide3DScalar(centerFacet, centerFacetLength)
 		}
-		var dotProduct = dotProduct2D(normal, centerFacet)
+		var dotProduct = Vector.dotProduct2D(normal, centerFacet)
 		if (Math.abs(dotProduct) > gClose) {
 			if (dotProduct > 0.0 == isOutside) {
 				for (var pointIndex of facet) {
@@ -786,7 +839,7 @@ function getPointIndexSetByOutside(center, isOutside, points, mesh) {
 function getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement) {
 	var pointIndexSet = new Set()
 	if (region == undefined) {
-		addRangeToSet(pointIndexSet, 0, points.length)
+		setKit.addRangeToSet(pointIndexSet, 0, points.length)
 	}
 	else {
 		addRegionToPointIndexSet(pointIndexSet, points, region, registry, statement)
@@ -798,30 +851,21 @@ function getPointIndexSetByRegionIDs(antiregion, points, region, registry, state
 
 	var removalIndexSet = new Set()
 	addRegionToPointIndexSet(removalIndexSet, points, antiregion, registry, statement)
-	deleteElementsFromSet(pointIndexSet, removalIndexSet)
+	setKit.deleteElementsFromSet(pointIndexSet, removalIndexSet)
 	return pointIndexSet
 }
 
 function getPointsExcept(points, registry, statement) {
-//	if (statement.attributeMap.has('alteration')) {
-//		var alterations = statement.attributeMap.get('alteration').split(',').filter(lengthCheck)
-
-//deprecated24
-	if (statement.attributeMap.has('alteration') || statement.attributeMap.has('alterations')) {
-		var alterations = undefined
-		if (statement.attributeMap.has('alteration')) {
-			alterations = statement.attributeMap.get('alteration').replaceAll(',', ' ').split(' ').filter(lengthCheck)
-		}
-		else {
-			alterations = statement.attributeMap.get('alterations').replaceAll(',', ' ').split(' ').filter(lengthCheck)
-		}
-
+	var alterationString = statement.attributeMap.get('alteration')
+	if (alterationString != undefined) {
+		var alterations = alterationString.replaceAll(',', ' ').split(' ').filter(lengthCheck)
 		for (var alteration of alterations) {
 			if (gGetPointsMap.has(alteration)) {
 				points = gGetPointsMap.get(alteration).getPoints(points, registry, statement)
 			}
 		}
 	}
+
 	return points
 }
 
@@ -832,7 +876,7 @@ function getRegion(key, registry, statement) {
 	}
 
 	var regionIDs = value.split(' ').filter(lengthCheck)
-	var region = {equations:[], pointStringSet:new Set(), polygons:[], polygonStratas:[]}
+	var region = {}
 	for (var regionID of regionIDs) {
 		addToRegion(region, regionID, registry, statement)
 	}
@@ -872,15 +916,15 @@ function mirrorPointsByCenterVector(centerVector, points) {
 	}
 
 	for (var point of points) {
-		rotate2DVector(point, reverseRotation)
+		Vector.rotate2DVector(point, reverseRotation)
 		point[1] = mirrorFromY - point[1]
-		rotate2DVector(point, centerVector.vector)
+		Vector.rotate2DVector(point, centerVector.vector)
 	}
 }
 
 var gPlacer = {
 	getPoints: function(points, registry, statement) {
-		var placerPoints = getArraysCopy(points)
+		var placerPoints = arrayKit.getArraysCopy(points)
 		if (statement.attributeMap.has('placerPoints')) {
 			placerPoints = getPointsByValue(registry, statement, statement.attributeMap.get('placerPoints'))
 		}
@@ -892,18 +936,18 @@ var gPlacer = {
 
 		var begin = placerPoints[0]
 		var end = placerPoints[placerPoints.length - 1]
-		var beginEnd = getSubtraction2D(end, begin)
-		var beginEndLength = length2D(beginEnd)
+		var beginEnd = Vector.getSubtraction2D(end, begin)
+		var beginEndLength = Vector.length2D(beginEnd)
 		if (beginEndLength == 0.0) {
 			noticeByList(['beginEndLength == 0.0 in placer in alteration.', points, placerPoints, statement])
 			return points
 		}
 
-		var center = multiply2DScalar(getAddition2D(begin, end), 0.5)
+		var center = Vector.multiply2DScalar(Vector.getAddition2D(begin, end), 0.5)
 		var direction = getFloatByDefault('direction', registry, statement, this.tag, 90.0)
 		var distance = getFloatByDefault('distance', registry, statement, this.tag, 10.0)
-		multiply2DScalar(beginEnd, distance / beginEndLength)
-		add2D(center, rotate2DVector(beginEnd, polarCounterclockwise(direction * gRadiansPerDegree)))
+		Vector.multiply2DScalar(beginEnd, distance / beginEndLength)
+		Vector.add2D(center, Vector.rotate2DVector(beginEnd, Vector.polarCounterclockwise(direction * gRadiansPerDegree)))
 		var variableMap = getVariableMapByStatement(statement.parent)
 		variableMap.set('placerX', center[0].toString())
 		variableMap.set('placerY', center[1].toString())
@@ -913,15 +957,7 @@ var gPlacer = {
 	processStatement:function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in outset in alteration.', workStatement, statement])
-				}
-				else {
-					this.getPoints(points, registry, statement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 		}
 		else {
 			noticeByList(['No workStatements could be found for placer in alteration.', statement])
@@ -940,8 +976,32 @@ function removeDeadEnds(facets) {
 			}
 		}
 
-		removeUndefineds(facet)
+		arrayKit.removeUndefineds(facet)
 	}
+}
+
+var roundProcessor = {
+	alterMesh: function(mesh, registry, statement) {
+		return roundPoints(mesh.points, getIntByDefault('decimalPlaces', registry, statement, this.tag, 1))
+	},
+	getPoints: function(points, registry, statement) {
+		return roundPoints(points, getIntByDefault('decimalPlaces', registry, statement, this.tag, 1))
+	},
+	processStatement:function(registry, statement) {
+		var workMeshes = getWorkMeshes(registry, statement)
+		for (var workMesh of workMeshes) {
+			this.alterMesh(workMesh, registry, statement)
+			analyzeOutputMesh(workMesh, registry, statement)
+		}
+
+		var workStatements = getWorkStatements(registry, statement)
+		if (workStatements.length > 0) {
+			alterProcessorPoints(this, registry, statement, workStatements)
+		}
+
+		noticeByList(['No work mesh or points could be found for round in alteration.', statement])
+	},
+	tag: 'round'
 }
 
 function setPointsExcept(points, registry, statement) {
@@ -949,7 +1009,7 @@ function setPointsExcept(points, registry, statement) {
 }
 
 function splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement) {
-	if (mesh == undefined || getIsEmpty(splitHeights)) {
+	if (mesh == undefined || arrayKit.getIsEmpty(splitHeights)) {
 		return
 	}
 
@@ -1022,7 +1082,7 @@ function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
 	var height = overhangSlope * inset + highestFacetZ
 	var insetFacet = new Array(highestFacet.length)
 	var pointsLength = inversePoints.length
-	pushArray(inversePoints, insetPolygon)
+	arrayKit.pushArray(inversePoints, insetPolygon)
 	for (var vertexIndex = 0; vertexIndex < highestFacet.length; vertexIndex++) {
 		insetFacet[vertexIndex] = pointsLength
 		inversePoints[pointsLength][2] = height
@@ -1030,13 +1090,13 @@ function taperMesh(matrix3D, maximumSpan, mesh, overhangAngle, sagAngle) {
 	}
 	addFacetsByBottomTopFacet(highestFacet, facets, insetFacet)
 	facets[highestFacetIndex] = insetFacet.reverse()
-	pushArray(originalPoints, get3DsByMatrix3D(inversePoints.slice(originalPoints.length), getInverseRotationTranslation3D(matrix3D)))
+	arrayKit.pushArray(originalPoints, get3DsByMatrix3D(inversePoints.slice(originalPoints.length), getInverseRotationTranslation3D(matrix3D)))
 	mesh.points = originalPoints
 }
 
 function threadPointByAxials(axials, center, heights, point, taperAngle, translations) {
-	var centerPoint = getSubtraction2D(point, center)
-	var centerPointLength = length2D(centerPoint)
+	var centerPoint = Vector.getSubtraction2D(point, center)
+	var centerPointLength = Vector.length2D(centerPoint)
 	if (centerPointLength == 0.0) {
 		return
 	}
@@ -1091,7 +1151,7 @@ function threadPointByAxials(axials, center, heights, point, taperAngle, transla
 			}
 		}
 		z -= deltaZ * cycle
-		if (!getIsEmpty(heights)) {
+		if (!arrayKit.getIsEmpty(heights)) {
 			var cycleEnd = cycle - (heights[0] - bottom) / deltaZ
 			if (cycleEnd < gClose) {
 				return
@@ -1105,18 +1165,18 @@ function threadPointByAxials(axials, center, heights, point, taperAngle, transla
 		}
 	}
 	var interpolation = additionInterpolation3D(z, translations)
-	multiply2DScalar(centerPoint, radialMultiplier * (interpolation[1] + axialInterpolation[2]) / centerPointLength)
-	add2D(point, centerPoint)
-	var rotationVector = polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
-	subtract2D(point, center)
-	rotate2DVector(point, rotationVector)
-	add2D(point, center)
+	Vector.multiply2DScalar(centerPoint, radialMultiplier * (interpolation[1] + axialInterpolation[2]) / centerPointLength)
+	Vector.add2D(point, centerPoint)
+	var rotationVector = Vector.polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
+	Vector.subtract2D(point, center)
+	Vector.rotate2DVector(point, rotationVector)
+	Vector.add2D(point, center)
 	point[2] += interpolation[0]
 }
 
 function threadPointByTranslations(center, heights, numberOfThreads, point, taperPortion, translations) {
-	var centerPoint = getSubtraction2D(point, center)
-	var centerPointLength = length2D(centerPoint)
+	var centerPoint = Vector.getSubtraction2D(point, center)
+	var centerPointLength = Vector.length2D(centerPoint)
 	if (centerPointLength == 0.0) {
 		return
 	}
@@ -1144,7 +1204,7 @@ function threadPointByTranslations(center, heights, numberOfThreads, point, tape
 				z += deltaZ * below
 			}
 		}
-		if (!getIsEmpty(heights)) {
+		if (!arrayKit.getIsEmpty(heights)) {
 			var cycleEnd = cycle - (heights[0] - bottom) / deltaZ
 			if (cycleEnd < gClose) {
 				return
@@ -1164,12 +1224,12 @@ function threadPointByTranslations(center, heights, numberOfThreads, point, tape
 		}
 	}
 	var interpolation = additionInterpolation3D(z, translations)
-	multiply2DScalar(centerPoint, radialMultiplier * interpolation[1] / centerPointLength)
-	add2D(point, centerPoint)
-	var rotationVector = polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
-	subtract2D(point, center)
-	rotate2DVector(point, rotationVector)
-	add2D(point, center)
+	Vector.multiply2DScalar(centerPoint, radialMultiplier * interpolation[1] / centerPointLength)
+	Vector.add2D(point, centerPoint)
+	var rotationVector = Vector.polarCounterclockwise(interpolation[2] * gRadiansPerDegree)
+	Vector.subtract2D(point, center)
+	Vector.rotate2DVector(point, rotationVector)
+	Vector.add2D(point, center)
 	point[2] += interpolation[0]
 }
 
@@ -1178,32 +1238,33 @@ function threadPoints(axials, center, heights, numberOfThreads, points, taperAng
 	for (var translation of translations) {
 		maximumLength = Math.max(maximumLength, translation.length)
 	}
+
 	for (var translation of translations) {
 		translation.length = maximumLength
-		setUndefinedElementsToValue(translation, 0)
+		arrayKit.setUndefinedElementsToValue(translation, 0)
 	}
-	if (getIsEmpty(axials)) {
+
+	if (arrayKit.getIsEmpty(axials)) {
 		var taperPortion = taperAngle / 360.0
-		console.log(center)
-		console.log(points)
-		console.log(translations)
 		for (var point of points) {
 			threadPointByTranslations(center, heights, numberOfThreads, point, taperPortion, translations)
 		}
 		return
 	}
+
 	maximumLength = 2
 	for (var axial of axials) {
 		maximumLength = Math.max(maximumLength, axial.length)
 	}
+
 	for (var axial of axials) {
 		axial.length = maximumLength
-		setUndefinedElementsToValue(axial, 0)
+		arrayKit.setUndefinedElementsToValue(axial, 0)
 	}
+
 	for (var point of points) {
 		threadPointByAxials(axials, center, heights, point, taperAngle, translations)
 	}
-
 }
 
 var transform3DProcessor = {
@@ -1224,7 +1285,7 @@ var transform3DProcessor = {
 		for (var point of points) {
 			if (point.length < 3) {
 				point.length = 3
-				setUndefinedElementsToValue(point)				
+				arrayKit.setUndefinedElementsToValue(point)				
 			}
 		}
 
@@ -1232,14 +1293,8 @@ var transform3DProcessor = {
 		transform3DPointsBySet(getChainMatrix3D(registry, statement, 'regionTransform3D'), pointIndexSet, points)
 		return points
 	},
-	initialize: function() {
-		gAlterMeshMap.set(this.tag, this)
-		gGetPointsMap.set(this.tag, this)
-		gTagCenterMap.set(this.tag, this)
-	},
 	tag: 'transform3D',
 	processStatement:function(registry, statement) {
-		statement.tag = 'g'
 		var workMeshes = getWorkMeshes(registry, statement)
 		for (var workMesh of workMeshes) {
 			this.alterMesh(workMesh, registry, statement)
@@ -1248,16 +1303,7 @@ var transform3DProcessor = {
 
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in bend in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 
@@ -1266,11 +1312,11 @@ var transform3DProcessor = {
 }
 
 function transformPoints2DByEquation(center, points, registry, statement, translationEquations, translations, vector) {
-	if (!getIsEmpty(translationEquations)) {
+	if (!arrayKit.getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
 			var variableMap = getVariableMapByStatement(statement)
 			for (var point of points) {
-				variableMap.set('point', point.toString())
+				variableMap.set('point', point)
 				var value = getValueByEquation(registry, statement, translationEquation)
 				if (value != undefined) {
 					if (Array.isArray(value)) {
@@ -1281,32 +1327,36 @@ function transformPoints2DByEquation(center, points, registry, statement, transl
 					else {
 						value = [value, 0.0]
 					}
-					add2D(point, value)
+					Vector.add2D(point, value)
 				}
 			}
 		}
 	}
-	if (getIsEmpty(translations)) {
+
+	if (arrayKit.getIsEmpty(translations)) {
 		return
 	}
-	if (getIsEmpty(center)) {
+
+	if (arrayKit.getIsEmpty(center)) {
 		center = [0.0, 0.0]
 	}
-	if (vector.length == 1) {
-		vector.push(0.0)
+
+	if (Vector.length == 1) {
+		Vector.push(0.0)
 	}
+
 	normalize2D(vector)
 	for (var point of points) {
-		add2D(point, additionInterpolation2D(dotProduct2D(vector, getSubtraction2D(point, center)), translations))
+		Vector.add2D(point, additionInterpolation2D(Vector.dotProduct2D(vector, Vector.getSubtraction2D(point, center)), translations))
 	}
 }
 
 function transformPoints3DByEquation(center, points, registry, statement, translationEquations, translations, vector) {
-	if (!getIsEmpty(translationEquations)) {
+	if (!arrayKit.getIsEmpty(translationEquations)) {
 		for (var translationEquation of translationEquations) {
 			var variableMap = getVariableMapByStatement(statement)
 			for (var point of points) {
-				variableMap.set('point', point.toString())
+				variableMap.set('point', point)
 				var value = getValueByEquation(registry, statement, translationEquation)
 				if (value != undefined) {
 					if (Array.isArray(value)) {
@@ -1320,28 +1370,30 @@ function transformPoints3DByEquation(center, points, registry, statement, transl
 					else {
 						value = [value, 0.0, 0.0]
 					}
-					add3D(point, value)
+					Vector.add3D(point, value)
 				}
 			}
 		}
 	}
-	if (getIsEmpty(translations)) {
+
+	if (arrayKit.getIsEmpty(translations)) {
 		return
 	}
+
 	for (var point of points) {
-		add3D(point, additionInterpolation3D(dotProduct3D(vector, getSubtraction3D(point, center)), translations))
+		Vector.add3D(point, additionInterpolation3D(Vector.dotProduct3D(vector, Vector.getSubtraction3D(point, center)), translations))
 	}
 }
 
 function trimBeginEnd(beginPoints, endPoints) {
 	var endPoint = endPoints[endPoints.length - 1]
-	if (distanceSquaredArray(beginPoints[0], endPoint) > gCloseSquared) {
+	if (Vector.distanceSquaredArray(beginPoints[0], endPoint) > gCloseSquared) {
 		return
 	}
 
 	if (endPoints.length > 1 && beginPoints.length > 1) {
-		var midpoint = multiplyArrayScalar(getAdditionArray(beginPoints[1], endPoints[endPoints.length - 2]), 0.5)
-		if (distanceSquaredArray(midpoint, endPoint) < gCloseSquared) {
+		var midpoint = Vector.multiplyArrayScalar(Vector.getAdditionArray(beginPoints[1], endPoints[endPoints.length - 2]), 0.5)
+		if (Vector.distanceSquaredArray(midpoint, endPoint) < gCloseSquared) {
 			beginPoints.splice(0, 1)
 		}
 	}
@@ -1363,8 +1415,8 @@ function wedgeMesh(inset, matrix3D, mesh) {
 	var oneOverDeltaZ = 1.0 / directionMapZ.deltaZ
 	for (var key of horizontalDirectionMap.keys()) {
 		var centerPoint = mesh.points[key]
-		var insetAtZ = getMultiplication2DScalar(inset, (directionMapZ.minimumZ - centerPoint[2]) * oneOverDeltaZ)
-		mesh.points[key] = add2D(centerPoint.slice(0), getMultiplication2D(horizontalDirectionMap.get(key), insetAtZ))
+		var insetAtZ = Vector.getMultiplication2DScalar(inset, (directionMapZ.minimumZ - centerPoint[2]) * oneOverDeltaZ)
+		mesh.points[key] = Vector.add2D(centerPoint.slice(0), Vector.getMultiplication2D(horizontalDirectionMap.get(key), insetAtZ))
 	}
 	mesh.points = get3DsByMatrix3D(mesh.points, getInverseRotationTranslation3D(matrix3D))
 }
@@ -1390,47 +1442,32 @@ var gBend = {
 		var region = getRegion('region', registry, statement)
 		var pointIndexSet = getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement)
 		var boundedPoints = getBoundedPointsBySet(pointIndexSet, points)
-		if (getIsEmpty(boundedPoints)) {
+		if (arrayKit.getIsEmpty(boundedPoints)) {
 			return points
 		}
 
-		var translations = getPointsByKey('translation', registry, statement)
+		var translations = getFloatListsByStatement('translation', registry, statement)
 		var center = getFloatsByDefault('center', registry, statement, statement.tag, [0.0, 0.0])
 		var translationEquations = getEquations('translationEquation', statement)
-		var vector = getPoint3DByStatement('vector', registry, statement)
+		var vector = getVector2DByStatement(registry, statement)
 		transformPoints2DByEquation(center, boundedPoints, registry, statement, translationEquations, translations, vector)
 		return points
 	},
 	initialize: function() {
-		gAlterMeshMap.set(this.tag, this)
 		gCopyIDKeySet.add('region')
-		gGetPointsMap.set(this.tag, this)
-		gTagCenterMap.set(this.tag, this)
 	},
 	tag: 'bend',
 	processStatement:function(registry, statement) {
 		convertToGroupIfParent(statement)
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
 
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in bend in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 
@@ -1439,33 +1476,33 @@ var gBend = {
 }
 
 var gBevel = {
-	alterMesh: function(mesh, registry, statement) {
-		var antiregion = getMeshRegion('antiregion', registry, statement)
-		var bevels = getPointsByKey('bevel', registry, statement)
-		var matrix3D = getChainMatrix3D(registry, statement)
-		var points = get3DsByMatrix3D(mesh.points, matrix3D)
-		var region = getMeshRegion('region', registry, statement)
-		var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
-		if (pointIndexSet.size == 0) {
-			return
-		}
-
-		bevelPoints(bevels, mesh, pointIndexSet, points)
-		mesh.points = get3DsByMatrix3D(points, getInverseRotationTranslation3D(matrix3D))
-	},
-	tag: 'bevel',
-	processStatement:function(registry, statement) {
-		statement.tag = 'g'
-		var workMeshes = getWorkMeshes(registry, statement)
-		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
-			return
-		}
-		noticeByList(['No work mesh could be found for bevel in alteration.', statement])
+alterMesh: function(mesh, registry, statement) {
+	var antiregion = getMeshRegion('antiregion', registry, statement)
+	var bevels = getPointsByKey('bevel', registry, statement)
+	var matrix3D = getChainMatrix3D(registry, statement)
+	var points = get3DsByMatrix3D(mesh.points, matrix3D)
+	var region = getMeshRegion('region', registry, statement)
+	var pointIndexSet = getPointIndexSetByMeshRegionIDs(antiregion, points, mesh, region, registry, statement)
+	if (pointIndexSet.size == 0) {
+		return
 	}
+
+	bevelPoints(bevels, mesh, pointIndexSet, points)
+	mesh.points = get3DsByMatrix3D(points, getInverseRotationTranslation3D(matrix3D))
+},
+
+processStatement:function(registry, statement) {
+	convertToGroupIfParent(statement)
+	var workMeshes = getWorkMeshes(registry, statement)
+	if (workMeshes.length > 0) {
+		alterProcessorMesh(this, registry, statement, workMeshes)
+		return
+	}
+
+	noticeByList(['No work mesh could be found for bevel in alteration.', statement])
+},
+
+tag: 'bevel'
 }
 
 var gExpand = {
@@ -1480,12 +1517,10 @@ var gExpand = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		noticeByList(['No work mesh could be found for expand in alteration.', statement])
 	}
 }
@@ -1513,25 +1548,13 @@ var gFillet = {
 
 		var region = getRegion('region', registry, statement)
 		var pointIndexSet = getPointIndexSetByRegionIDs(antiregion, points, region, registry, statement)
-		var pointIndexes = Array.from(pointIndexSet)
-		pointIndexes.sort(compareNumberAscending)
-		return getFilletedPolygonByIndexes(points, radius, numberOfSides, pointIndexes)
+		return getFilletedPolygonBySet(points, radius, numberOfSides, pointIndexSet)
 	},
 	tag: 'fillet',
 	processStatement:function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
-
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in fillet in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 	},
@@ -1558,25 +1581,13 @@ var gMirror = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
 
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in mirror in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 
@@ -1593,61 +1604,53 @@ var gMirror = {
 }
 
 var gMirrorJoin = {
-	alterMesh: function(mesh, registry, statement) {
-		var mirroredMesh = getMeshCopy(mesh)
-		mirrorMesh(getCenterVectorOnly(registry, statement, this.tag), getChainMatrix3D(registry, statement), mirroredMesh)
-		addMeshToJoinedMesh(mesh, mirroredMesh)
-	},
-	getDefinitions: function() {
-		return [viewBroker.center, viewBroker.direction, viewBroker.segment]
-	},
-	getPoints: function(points, registry, statement) {
-		var centerVector = getCenterVector(registry, statement, this.tag)
-		var mirrorStart = points.length
-		if (centerVector.isSegment == true) {
-			centerVector = getCenterVectorMirrorStart(mirrorStart, points)
-			mirrorStart = centerVector.mirrorStart
-		}
+alterMesh: function(mesh, registry, statement) {
+	var mirroredMesh = getMeshCopy(mesh)
+	mirrorMesh(getCenterVectorOnly(registry, statement, this.tag), getChainMatrix3D(registry, statement), mirroredMesh)
+	addMeshToJoinedMesh(mesh, mirroredMesh)
+},
 
-		addMirrorPoints(centerVector, mirrorStart, points)
-		return points
-	},
-	tag: 'mirrorJoin',
-	processStatement:function(registry, statement) {
-		var workMeshes = getWorkMeshes(registry, statement)
-		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
-			return
-		}
+getDefinitions: function() {
+	return [viewBroker.center, viewBroker.direction, viewBroker.segment]
+},
 
-		var workStatements = getWorkStatements(registry, statement)
-		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in mirrorJoin in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
-			return
-		}
-
-		var points = getPointsHD(registry, statement)
-		if (points == undefined) {
-			noticeByList(['No work mesh or points could be found for mirrorJoin in alteration.', statement])
-			return
-		}
-
-		statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polygon')
-		points = this.getPoints(points, registry, statement)
-		setPointsExcept(points, registry, statement)
+getPoints: function(points, registry, statement) {
+	var centerVector = getCenterVector(registry, statement, this.tag)
+	var mirrorStart = points.length
+	if (centerVector.isSegment == true) {
+		centerVector = getCenterVectorMirrorStart(mirrorStart, points)
+		mirrorStart = centerVector.mirrorStart
 	}
+
+	addMirrorPoints(centerVector, mirrorStart, points)
+	return points
+},
+
+tag: 'mirrorJoin',
+
+processStatement:function(registry, statement) {
+	var workMeshes = getWorkMeshes(registry, statement)
+	if (workMeshes.length > 0) {
+		alterProcessorMesh(this, registry, statement, workMeshes)
+		return
+	}
+
+	var workStatements = getWorkStatements(registry, statement)
+	if (workStatements.length > 0) {
+		alterProcessorPoints(this, registry, statement, workStatements)
+		return
+	}
+
+	var points = getPointsHD(registry, statement)
+	if (points == undefined) {
+		noticeByList(['No work mesh or points could be found for mirrorJoin in alteration.', statement])
+		return
+	}
+
+	statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polygon')
+	points = this.getPoints(points, registry, statement)
+	setPointsExcept(points, registry, statement)
+}
 }
 
 var gMove = {
@@ -1656,60 +1659,100 @@ var gMove = {
 		mesh.points = get3DsByMatrix3D(mesh.points, matrix3D)
 		var boundingBox = getMeshBoundingBox(mesh)
 		var lowerLeft = getFloatsByStatement('lowerLeft', registry, statement)
-		if (getIsEmpty(lowerLeft)) {
+		if (arrayKit.getIsEmpty(lowerLeft)) {
 			var center = getFloatsByStatement('center', registry, statement)
-			var dimensions2D = getSubtraction2D(boundingBox[1], boundingBox[0])
-			if (getIsEmpty(center)) {
+			var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
+			if (arrayKit.getIsEmpty(center)) {
 				var bedSize = getFloatsByStatement('bedSize', registry, statement)
-				if (!getIsEmpty(bedSize)) {
+				if (!arrayKit.getIsEmpty(bedSize)) {
 					if (bedSize.length == 1) {
 						bedSize.push(bedSize[0])
 					}
-					if (dimensions2D[0] > bedSize[0] || dimensions2D[1] > bedSize[1]) {
-						warningByList(['The mesh is bigger than the bed.', statement, dimensions2D, bedSize])
+					if (size[0] > bedSize[0] || size[1] > bedSize[1]) {
+						warningByList(['The mesh is bigger than the bed.', statement, size, bedSize])
 					}
-					center = getMultiplication2DScalar(bedSize, 0.5)
+					center = Vector.getMultiplication2DScalar(bedSize, 0.5)
 				}
 			}
-			if (!getIsEmpty(center)) {
-				multiply2DScalar(dimensions2D, 0.5)
-				lowerLeft = getSubtraction2D(center, dimensions2D)
+			if (!arrayKit.getIsEmpty(center)) {
+				lowerLeft = Vector.getSubtraction2D(center, Vector.multiply2DScalar(size, 0.5))
 			}
 		}
-		if (getIsEmpty(lowerLeft)) {
+
+		if (arrayKit.getIsEmpty(lowerLeft)) {
 			lowerLeft = [0.0]
 		}
-		if (!getIsEmpty(lowerLeft)) {
-			if (lowerLeft.length == 1) {
-				lowerLeft.push(lowerLeft[0])
-			}
-			if (lowerLeft.length == 2) {
-				lowerLeft.push(0.0)
-			}
-			add3Ds(mesh.points, getSubtraction3D(lowerLeft, boundingBox[0]))
-			statement.attributeMap.set('lowerLeft', lowerLeft.toString())
+
+		if (lowerLeft.length == 1) {
+			lowerLeft.push(lowerLeft[0])
 		}
+
+		if (lowerLeft.length == 2) {
+			lowerLeft.push(0.0)
+		}
+
+		Vector.add3Ds(mesh.points, Vector.getSubtraction3D(lowerLeft, boundingBox[0]))
+		statement.attributeMap.set('lowerLeft', lowerLeft.toString())
 		statement.attributeMap.set('boundingBox', getMeshBoundingBox(mesh).toString())
 	},
-	tag: 'move',
+	getPoints: function(points, registry, statement) {
+		if (arrayKit.getIsEmpty(points)) {
+			return points
+		}
+
+		var boundingBox = getBoundingBox(points)
+		var lowerLeft = getFloatsByStatement('lowerLeft', registry, statement)
+		if (arrayKit.getIsEmpty(lowerLeft)) {
+			var center = getFloatsByStatement('center', registry, statement)
+			if (!arrayKit.getIsEmpty(center)) {
+				lowerLeft = Vector.getSubtraction2D(center, Vector.multiply2DScalar(Vector.getSubtraction2D(boundingBox[1], boundingBox[0]), 0.5))
+			}
+		}
+
+		if (arrayKit.getIsEmpty(lowerLeft)) {
+			lowerLeft = [0.0]
+		}
+
+		if (lowerLeft.length == 1) {
+			lowerLeft.push(lowerLeft[0])
+		}
+
+		Vector.add2Ds(points, Vector.getSubtraction2D(lowerLeft, boundingBox[0]))
+		points = getPolygonRotatedToLower(points)
+		statement.attributeMap.set('lowerLeft', lowerLeft.toString())
+		statement.attributeMap.set('boundingBox', getBoundingBox(points).toString())
+		return points
+	},
 	processStatement: function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
-		noticeByList(['No work mesh could be found for move in alteration.', statement])
-	}
+
+		var workStatements = getWorkStatements(registry, statement)
+		if (workStatements.length > 0) {
+			alterProcessorPoints(this, registry, statement, workStatements)
+		}
+
+		var points = getPointsHD(registry, statement)
+		if (points == undefined) {
+			noticeByList(['No work mesh or points could be found for move in alteration.', statement])
+			return
+		}
+
+		statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polygon')
+		points = this.getPoints(points, registry, statement)
+		setPointsExcept(points, registry, statement)
+	},
+	tag: 'move'
 }
 
 var gMultiplyJoin = {
 	alterMesh: function(mesh, registry, statement) {
 		var vector = getVector3DByStatement(registry, statement)
 		var increments = getFloatsByStatement('increment', registry, statement)
-		if (getIsEmpty(increments)) {
+		if (arrayKit.getIsEmpty(increments)) {
 			var dotProductRange = getDotProduct3DRange(mesh.points, vector)
 			increments = [dotProductRange[1] - dotProductRange[0]]
 		}
@@ -1718,26 +1761,26 @@ var gMultiplyJoin = {
 			return
 		}
 		if (quantity < 0) {
-			reverseSigns(increments)
+			Vector.reverseSigns(increments)
 			quantity = -quantity
 		}
 		var meshCopy = getMeshCopy(mesh)
 		var translation = [0.0, 0.0, 0.0]
 		for (var additionIndex = 0; additionIndex < quantity - 1; additionIndex++) {
 			var additionMesh = getMeshCopy(meshCopy)
-			add3D(translation, getMultiplication3DScalar(vector, increments[additionIndex % increments.length]))
-			add3Ds(additionMesh.points, translation)
+			Vector.add3D(translation, Vector.getMultiplication3DScalar(vector, increments[additionIndex % increments.length]))
+			Vector.add3Ds(additionMesh.points, translation)
 			addMeshToJoinedMesh(mesh, additionMesh)
 		}
 	},
 	getPoints: function(points, registry, statement) {
-		if (getIsEmpty(points)) {
+		if (arrayKit.getIsEmpty(points)) {
 			noticeByList(['No points for multiplyJoin in alteration.', statement])
 			return points
 		}
 		var vector = getVector2DByStatement(registry, statement)
 		var increments = getFloatsByStatement('increment', registry, statement)
-		if (getIsEmpty(increments)) {
+		if (arrayKit.getIsEmpty(increments)) {
 			var dotProductRange = getDotProduct2DRange(points, vector)
 			increments = [dotProductRange[1] - dotProductRange[0]]
 		}
@@ -1746,19 +1789,19 @@ var gMultiplyJoin = {
 			return points
 		}
 		if (quantity < 0) {
-			reverseSigns(increments)
+			Vector.reverseSigns(increments)
 			quantity = -quantity
 		}
-		var multipliedPoints = getArraysCopy(points)
+		var multipliedPoints = arrayKit.getArraysCopy(points)
 		var translation = [0.0, 0.0, 0.0]
 		for (var additionIndex = 0; additionIndex < quantity - 1; additionIndex++) {
-			var additionPoints = getArraysCopy(multipliedPoints)
-			add2D(translation, getMultiplication2DScalar(vector, increments[additionIndex % increments.length]))
-			add2Ds(additionPoints, translation)
-			if (distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
+			var additionPoints = arrayKit.getArraysCopy(multipliedPoints)
+			Vector.add2D(translation, Vector.getMultiplication2DScalar(vector, increments[additionIndex % increments.length]))
+			Vector.add2Ds(additionPoints, translation)
+			if (Vector.distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
 				additionPoints.splice(0, 1)
 			}
-			pushArray(points, additionPoints)
+			arrayKit.pushArray(points, additionPoints)
 		}
 		return points
 	},
@@ -1766,33 +1809,22 @@ var gMultiplyJoin = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		var workStatements = getWorkStatements(registry, statement)
-
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in multiplyJoin in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
-		var points = getPointsHD(registry, statement)
 
+		var points = getPointsHD(registry, statement)
 		if (points == undefined) {
 			noticeByList(['No work mesh or points could be found for multiplyJoin in alteration.', statement])
 			return
 		}
+
 		statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polyline')
 		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
@@ -1807,16 +1839,7 @@ var gOutset = {
 	processStatement:function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in outset in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 
@@ -1828,7 +1851,7 @@ var gOutset = {
 
 		statement.tag = 'polygon'
 		var outsetPolygons = getOutsetPolygonsByStatement(points, registry, statement, this.tag)
-		if (getIsEmpty(outsetPolygons)) {
+		if (arrayKit.getIsEmpty(outsetPolygons)) {
 			setPointsExcept([], registry, statement)
 			return
 		}
@@ -1851,12 +1874,10 @@ var gPolygonate = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		noticeByList(['No work mesh could be found for polygonate in alteration.', statement])
 	}
 }
@@ -1865,19 +1886,18 @@ var gPolygonJoin = {
 	alterMesh: function(mesh, registry, statement) {
 		var betweenAlign = getFloatByDefault('betweenAlign', registry, statement, this.tag, 0.0)
 		var path = getPath2DByStatement(registry, statement)
-		console.log(path)
 		if (path.length == 0) {
 			return
 		}
 		var beginPoint = path[0]
 		if (path.length == 1) {
-			add2Ds(mesh.points, beginPoint)
+			Vector.add2Ds(mesh.points, beginPoint)
 			return
 		}
 		var endsBetween = getEndsBetween(mesh)
-		var beginEnd = getSubtraction2D(path[1], beginPoint)
-		var beginEndLength = length2D(beginEnd)
-		divide2DScalar(beginEnd, beginEndLength)
+		var beginEnd = Vector.getSubtraction2D(path[1], beginPoint)
+		var beginEndLength = Vector.length2D(beginEnd)
+		Vector.divide2DScalar(beginEnd, beginEndLength)
 		var meshCopy = getMeshCopy(mesh)
 		var rightOffset = beginEndLength - endsBetween.rightX
 		var betweenOffset = betweenAlign * rightOffset
@@ -1892,9 +1912,9 @@ var gPolygonJoin = {
 			return
 		}
 		var beforePoint = path[path.length - 1]
-		var beforeBegin = normalize2D(getSubtraction2D(beginPoint, beforePoint))
-		var beforeEnd = normalize2D(getAddition2D(beforeBegin, beginEnd))
-		var dotProduct = Math.max(dotProduct2D(beforeEnd, beforeBegin), 0.01)
+		var beforeBegin = normalize2D(Vector.getSubtraction2D(beginPoint, beforePoint))
+		var beforeEnd = normalize2D(Vector.getAddition2D(beforeBegin, beginEnd))
+		var dotProduct = Math.max(Vector.dotProduct2D(beforeEnd, beforeBegin), 0.01)
 		var leftMatrix2D = getMatrix2DByTranslate([-endsBetween.leftX])
 		leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByScale([1.0, 1.0 / dotProduct]), leftMatrix2D)
 		leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByRotationVectorTranslation(beforeEnd, beginPoint), leftMatrix2D)
@@ -1902,18 +1922,18 @@ var gPolygonJoin = {
 		var pointIndexMap = new Map()
 		for (var outerIndex = 1; outerIndex < path.length; outerIndex++) {
 			beginPoint = path[outerIndex]
-			beginEnd = getSubtraction2D(path[(outerIndex + 1) % path.length], beginPoint)
-			beginEndLength = length2D(beginEnd)
-			divide2DScalar(beginEnd, beginEndLength)
+			beginEnd = Vector.getSubtraction2D(path[(outerIndex + 1) % path.length], beginPoint)
+			beginEndLength = Vector.length2D(beginEnd)
+			Vector.divide2DScalar(beginEnd, beginEndLength)
 			var additionCopy = getMeshCopy(meshCopy)
 			var betweenMatrix2D = getMatrix2DByTranslate([betweenAlign * (beginEndLength - endsBetween.rightX)])
 			var matrix2D = getMatrix2DByRotationVectorTranslation(beginEnd, beginPoint)
 			betweenMatrix2D = getMultiplied2DMatrix(matrix2D, betweenMatrix2D)
 			transform2DPointsByFacet(endsBetween.betweens, betweenMatrix2D, additionCopy.points)
 			var beforePoint = path[outerIndex - 1]
-			var beforeBegin = normalize2D(getSubtraction2D(beginPoint, beforePoint))
-			var beforeEnd = normalize2D(getAddition2D(beforeBegin, beginEnd))
-			var dotProduct = Math.max(dotProduct2D(beforeEnd, beforeBegin), 0.01)
+			var beforeBegin = normalize2D(Vector.getSubtraction2D(beginPoint, beforePoint))
+			var beforeEnd = normalize2D(Vector.getAddition2D(beforeBegin, beginEnd))
+			var dotProduct = Math.max(Vector.dotProduct2D(beforeEnd, beforeBegin), 0.01)
 			var leftMatrix2D = getMatrix2DByTranslate([-endsBetween.leftX])
 			leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByScale([1.0, 1.0 / dotProduct]), leftMatrix2D)
 			leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByRotationVectorTranslation(beforeEnd, beginPoint), leftMatrix2D)
@@ -1948,59 +1968,47 @@ var gPolygonJoin = {
 		removeUnfacetedPoints(mesh)
 	},
 	getPoints: function(points, registry, statement) {
-		if (getIsEmpty(points)) {
+		if (arrayKit.getIsEmpty(points)) {
 			noticeByList(['No points for polygonJoin in alteration.', statement])
 			return points
 		}
 		var path = getPath2DByStatement(registry, statement)
-		var originalPoints = getArraysCopy(points)
+		var originalPoints = arrayKit.getArraysCopy(points)
 		points.length = 0
 		for (var vertexIndex = 0; vertexIndex < path.length; vertexIndex++) {
 			var beginPoint = path[vertexIndex]
-			var beginEnd = normalize2D(getSubtraction2D(path[(vertexIndex + 1) % path.length], beginPoint))
+			var beginEnd = normalize2D(Vector.getSubtraction2D(path[(vertexIndex + 1) % path.length], beginPoint))
 			var additionPoints = getRotation2DsVector(originalPoints, beginEnd)
-			add2Ds(additionPoints, beginPoint)
+			Vector.add2Ds(additionPoints, beginPoint)
 			if (points.length > 0) {
-				if (distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
+				if (Vector.distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
 					additionPoints.splice(0, 1)
 				}
 			}
-			pushArray(points, additionPoints)
+			arrayKit.pushArray(points, additionPoints)
 		}
 		return points
 	},
 	tag: 'polygonJoin',
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
-
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		var workStatements = getWorkStatements(registry, statement)
-
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in polygonJoin in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
-		var points = getPointsHD(registry, statement)
 
+		var points = getPointsHD(registry, statement)
 		if (points == undefined) {
 			noticeByList(['No work mesh or points could be found for polygonJoin in alteration.', statement])
 			return
 		}
+
 		statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polygon')
 		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
@@ -2016,13 +2024,13 @@ var gPolylineJoin = {
 		}
 		var beginPoint = path[0]
 		if (path.length == 1) {
-			add2Ds(mesh.points, beginPoint)
+			Vector.add2Ds(mesh.points, beginPoint)
 			return
 		}
 		var endsBetween = getEndsBetween(mesh)
-		var beginEnd = getSubtraction2D(path[1], beginPoint)
-		var beginEndLength = length2D(beginEnd)
-		divide2DScalar(beginEnd, beginEndLength)
+		var beginEnd = Vector.getSubtraction2D(path[1], beginPoint)
+		var beginEndLength = Vector.length2D(beginEnd)
+		Vector.divide2DScalar(beginEnd, beginEndLength)
 		var meshCopy = getMeshCopy(mesh)
 		var rightOffset = beginEndLength - endsBetween.rightX
 		var betweenOffset = betweenAlign * rightOffset
@@ -2032,22 +2040,21 @@ var gPolylineJoin = {
 		var matrix2D = getMatrix2DByRotationVectorTranslation(beginEnd, beginPoint)
 		transform2DPointsByFacet(endsBetween.betweens, matrix2D, mesh.points)
 		transform2DPointsByFacet(endsBetween.leftAll, matrix2D, mesh.points)
-		console.log(endsBetween)
 		var pointIndexMap = new Map()
 		for (var outerIndex = 1; outerIndex < path.length - 1; outerIndex++) {
 			beginPoint = path[outerIndex]
-			beginEnd = getSubtraction2D(path[outerIndex + 1], beginPoint)
-			beginEndLength = length2D(beginEnd)
-			divide2DScalar(beginEnd, beginEndLength)
+			beginEnd = Vector.getSubtraction2D(path[outerIndex + 1], beginPoint)
+			beginEndLength = Vector.length2D(beginEnd)
+			Vector.divide2DScalar(beginEnd, beginEndLength)
 			var additionCopy = getMeshCopy(meshCopy)
 			var betweenMatrix2D = getMatrix2DByTranslate([betweenAlign * (beginEndLength - endsBetween.rightX)])
 			var matrix2D = getMatrix2DByRotationVectorTranslation(beginEnd, beginPoint)
 			betweenMatrix2D = getMultiplied2DMatrix(matrix2D, betweenMatrix2D)
 			transform2DPointsByFacet(endsBetween.betweens, betweenMatrix2D, additionCopy.points)
 			var beforePoint = path[outerIndex - 1]
-			var beforeBegin = normalize2D(getSubtraction2D(beginPoint, beforePoint))
-			var beforeEnd = normalize2D(getAddition2D(beforeBegin, beginEnd))
-			var dotProduct = Math.max(dotProduct2D(beforeEnd, beforeBegin), 0.01)
+			var beforeBegin = normalize2D(Vector.getSubtraction2D(beginPoint, beforePoint))
+			var beforeEnd = normalize2D(Vector.getAddition2D(beforeBegin, beginEnd))
+			var dotProduct = Math.max(Vector.dotProduct2D(beforeEnd, beforeBegin), 0.01)
 			var leftMatrix2D = getMatrix2DByTranslate([-endsBetween.leftX])
 			leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByScale([1.0, 1.0 / dotProduct]), leftMatrix2D)
 			leftMatrix2D = getMultiplied2DMatrix(getMatrix2DByRotationVectorTranslation(beforeEnd, beginPoint), leftMatrix2D)
@@ -2076,59 +2083,47 @@ var gPolylineJoin = {
 		removeUnfacetedPoints(mesh)
 	},
 	getPoints: function(points, registry, statement) {
-		if (getIsEmpty(points)) {
+		if (arrayKit.getIsEmpty(points)) {
 			noticeByList(['No points for polylineJoin in alteration.', statement])
 			return points
 		}
 		var path = getPath2DByStatement(registry, statement)
-		var originalPoints = getArraysCopy(points)
+		var originalPoints = arrayKit.getArraysCopy(points)
 		points.length = 0
 		for (var vertexIndex = 0; vertexIndex < path.length - 1; vertexIndex++) {
 			var beginPoint = path[vertexIndex]
-			var beginEnd = normalize2D(getSubtraction2D(path[vertexIndex + 1], beginPoint))
+			var beginEnd = normalize2D(Vector.getSubtraction2D(path[vertexIndex + 1], beginPoint))
 			var additionPoints = getRotation2DsVector(originalPoints, beginEnd)
-			add2Ds(additionPoints, beginPoint)
+			Vector.add2Ds(additionPoints, beginPoint)
 			if (points.length > 0) {
-				if (distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
+				if (Vector.distanceSquaredArray(points[points.length - 1], additionPoints[0], 3) < gCloseSquared) {
 					additionPoints.splice(0, 1)
 				}
 			}
-			pushArray(points, additionPoints)
+			arrayKit.pushArray(points, additionPoints)
 		}
 		return points
 	},
 	tag: 'polylineJoin',
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
-
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		var workStatements = getWorkStatements(registry, statement)
-
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in polylineJoin in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
-		var points = getPointsHD(registry, statement)
 
+		var points = getPointsHD(registry, statement)
 		if (points == undefined) {
 			noticeByList(['No work mesh or points could be found for polylineJoin in alteration.', statement])
 			return
 		}
+
 		statement.tag = getValueByKeyDefault('tag', registry, statement, this.tag, 'polyline')
 		points = this.getPoints(points, registry, statement)
 		setPointsExcept(points, registry, statement)
@@ -2137,23 +2132,14 @@ var gPolylineJoin = {
 
 var gReverse = {
 	getPoints: function(points, registry, statement) {
-		return getArraysCopy(points).reverse()
+		return arrayKit.getArraysCopy(points).reverse()
 	},
 	tag: 'reverse',
 	processStatement:function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
 
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (points == undefined) {
-					noticeByList(['No points could be found for a workStatement in reverse in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
+			alterProcessorPoints(this, registry, statement, workStatements)
 			return
 		}
 
@@ -2170,6 +2156,11 @@ var gReverse = {
 }
 
 var gSplit = {
+	addSplitPolygonsByStatement: function(polygons, registry, statement) {
+		var splitPolygons = []
+		addSplitPolygonsByHeights(polygons, this.splitHeights, splitPolygons)
+		addPolygonsToGroup(splitPolygons, registry, statement)
+	},
 	alterMesh: function(mesh, registry, statement) {
 		var antiregion = getMeshRegion('antiregion', registry, statement)
 		var id = statement.attributeMap.get('id')
@@ -2178,33 +2169,40 @@ var gSplit = {
 		var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
 		splitMesh(antiregion, id, matrix3D, mesh, region, registry, splitHeights, statement)
 	},
-	tag: 'split',
 	processStatement:function(registry, statement) {
-		convertToGroupIfParent(statement)
+		convertToGroup(statement)
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
+		this.splitHeights = getFloatsByStatement('splitHeight', registry, statement)
+		var workStatements = getWorkStatements(registry, statement)
+		if (workStatements.length > 0) {
+			for (var workStatement of workStatements) {
+				var polygons = getChainPointListsHDRecursivelyDelete(registry, workStatement, 'polygon')
+				if (polygons.length == 0) {
+					noticeByList(['No polygons could be found for a workStatement in split in alteration.', workStatement, statement])
+				}
+				else {
+					this.addSplitPolygonsByStatement(polygons, registry, statement)
+				}
+			}
+			setPointsExcept([], registry, statement)
+			return
+		}
+
 		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
-		if (getIsEmpty(polygons)) {
+		if (arrayKit.getIsEmpty(polygons)) {
 			noticeByList(['No work mesh or polygons could be found for split in alteration.', statement])
 			return
 		}
-		var splitHeights = getFloatsByStatement('splitHeight', registry, statement)
 
-		//deprecated24
-		if (getIsEmpty(splitHeights)) {
-			splitHeights = getPointsByKey('splitHeights', registry, statement)
-		}
-
-		var splitPolygons = []
-		addSplitPolygonsByHeights(polygons, splitHeights, splitPolygons)
-		addPolygonsToGroup(splitPolygons, registry, statement)
-	}
+		this.addSplitPolygonsByStatement(polygons, registry, statement)
+		setPointsExcept([], registry, statement)
+	},
+	tag: 'split'
 }
 
 var gTaper = {
@@ -2219,12 +2217,10 @@ var gTaper = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		noticeByList(['No work mesh could be found for taper in alteration.', statement])
 	}
 }
@@ -2252,12 +2248,10 @@ var gThread = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		noticeByList(['No work mesh could be found for thread in alteration.', statement])
 	}
 }
@@ -2270,19 +2264,18 @@ var gTriangulate = {
 	processStatement:function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		var polygons = getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon')
-		if (getIsEmpty(polygons)) {
+		if (arrayKit.getIsEmpty(polygons)) {
 			noticeByList(['No work mesh or polygons could be found for triangulate in alteration.', statement])
 			return
 		}
+
 		var triangulatedPolygons = get3DTriangulatedPolygons(polygons)
-		if (getIsEmpty(triangulatedPolygons)) {
+		if (arrayKit.getIsEmpty(triangulatedPolygons)) {
 			noticeByList(['No triangulatedPolygons could be found for triangulate in alteration.', statement])
 		}
 		else{
@@ -2295,7 +2288,7 @@ var gTriangulate = {
 var gVerticalBound = {
 	getPoints: function(points, registry, statement) {
 		var verticalBound = getFloatsByStatement('verticalBound', registry, statement)
-		if (getIsEmpty(verticalBound)) {
+		if (arrayKit.getIsEmpty(verticalBound)) {
 			verticalBound = [0.0, 100.0]
 		}
 
@@ -2332,10 +2325,10 @@ var gVerticalBound = {
 			return points
 		}
 
-		var center = multiply2DScalar(getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
+		var center = Vector.multiply2DScalar(Vector.getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
 		subtract2Ds(points, center)
 		multiply2DsScalar(points, (verticalBound[1] - verticalBound[0]) / boundingBoxHeight)
-		add2Ds(points, center)
+		Vector.add2Ds(points, center)
 		addArraysByIndex(points, (verticalBound[0] + verticalBound[1] - boundingBox[0][1] - boundingBox[1][1]) * 0.5, 1)
 		return points
 	},
@@ -2343,17 +2336,7 @@ var gVerticalBound = {
 	processStatement:function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
-			for (var workStatement of workStatements) {
-				var points = getPointsHD(registry, workStatement)
-				if (getIsEmpty(points)) {
-					noticeByList(['No points could be found for a workStatement in verticalBound in alteration.', workStatement, statement])
-				}
-				else {
-					points = this.getPoints(points, registry, statement)
-					setPointsHD(getPointsExcept(points, registry, statement), workStatement)
-				}
-			}
-			return
+			alterProcessorPoints(this, registry, statement, workStatements)
 		}
 	}
 }
@@ -2370,17 +2353,16 @@ var gWedge = {
 		statement.tag = 'g'
 		var workMeshes = getWorkMeshes(registry, statement)
 		if (workMeshes.length > 0) {
-			for (var workMesh of workMeshes) {
-				this.alterMesh(workMesh, registry, statement)
-				analyzeOutputMesh(workMesh, registry, statement)
-			}
+			alterProcessorMesh(this, registry, statement, workMeshes)
 			return
 		}
+
 		var polygons = getPolygonsHDRecursively(registry, statement)
-		if (getIsEmpty(polygons)) {
+		if (arrayKit.getIsEmpty(polygons)) {
 			noticeByList(['No work mesh or polygons could be found for wedge in alteration.', statement])
 			return
 		}
+
 		var heights = getHeights(registry, statement, this.tag)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var pillarMesh = extrusion.getMesh(heights, matrix3D, polygons)
@@ -2391,7 +2373,7 @@ var gWedge = {
 
 var gAlterationProcessors = [
 gBend, gBevel, gExpand, gFillet, gMirror, gMirrorJoin, gMove, gMultiplyJoin,
-gOutset, gPlacer, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, gSplit, gTaper, gThread, transform3DProcessor,
+gOutset, gPlacer, gPolygonate, gPolygonJoin, gPolylineJoin, gReverse, roundProcessor, gSplit, gTaper, gThread, transform3DProcessor,
 gTriangulate, gVerticalBound, gWedge]
 var gAlterMeshMap = new Map()
 var gGetPointsMap = new Map()
