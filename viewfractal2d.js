@@ -26,8 +26,8 @@ class Fractal2DControl extends CanvasControl {
 		var lowerX = this.view.x - 0.5 * screenMultiplier * (this.view.numberOfHorizontalPixels - 1)
 		var lowerY = this.view.y + 0.5 * screenMultiplier * (this.view.numberOfVerticalPixels - 1)
 		var pixelSize = this.view.pixelSize
-		var greenVector = polarCounterclockwise(gPI2 / 3.0)
-		var blueVector = polarCounterclockwise(-gPI2 / 3.0)
+		var greenVector = Vector.polarCounterclockwise(gPI2 / 3.0)
+		var blueVector = Vector.polarCounterclockwise(-gPI2 / 3.0)
 		for (var verticalIndex = 0; verticalIndex < this.view.numberOfVerticalPixels; verticalIndex++) {
 			for (var horizontalIndex = 0; horizontalIndex < this.view.numberOfHorizontalPixels; horizontalIndex++) {
 				var point = [lowerX + screenMultiplier * horizontalIndex, lowerY - screenMultiplier * verticalIndex]
@@ -39,12 +39,12 @@ class Fractal2DControl extends CanvasControl {
 				red = Math.floor(127.999 * Math.sin(red) + 128.0)
 				var green = escape * greenFrequency + greenPhase
 				if (this.view.greenColorControl.getValue()) {
-					green += Math.acos(dotProduct2D(greenVector, normalize2D(point))) / Math.PI
+					green += Math.acos(Vector.dotProduct2D(greenVector, normalize2D(point))) / Math.PI
 				}
 				green = Math.floor(127.999 * Math.sin(green) + 128.0)
 				var blue = escape * blueFrequency + bluePhase
 				if (this.view.blueColorControl.getValue()) {
-					blue += Math.acos(dotProduct2D(blueVector, normalize2D(point))) / Math.PI
+					blue += Math.acos(Vector.dotProduct2D(blueVector, normalize2D(point))) / Math.PI
 				}
 				blue = Math.floor(127.999 * Math.sin(blue) + 128.0)
 				context.fillStyle = 'rgb(' + red + ', ' + green + ', ' + blue + ')'
@@ -66,8 +66,8 @@ function getEscapeCount(escapeRadius, iterations, point) {
 	var escapeCount = 0
 	for (; escapeCount < iterations;) {
 		escapeCount++
-		add2D(rotate2DVector(point, point), originalPoint)
-		var lengthSquared = lengthSquared2D(point)
+		Vector.add2D(Vector.rotate2DVector(point, point), originalPoint)
+		var lengthSquared = Vector.lengthSquared2D(point)
 		if (lengthSquared > radiusSquared) {
 			var before = Math.log(Math.log2(Math.sqrt(lengthSquared)))
 			var escapeExtra = 1.0 - before
@@ -106,7 +106,7 @@ var moveXYManipulator = {
 			return
 		}
 		var mouseMovement = [event.offsetX - viewCanvas.mouseDown2D[0], event.offsetY - viewCanvas.mouseDown2D[1]]
-		var movementLength = length2D(mouseMovement)
+		var movementLength = Vector.length2D(mouseMovement)
 		if (movementLength == 0.0) {
 			return
 		}
@@ -139,13 +139,13 @@ class NumberDisplay extends CanvasControl {
 	constructor(boundingBox, numbers, decimalPlaces) {
 		super()
 		this.boundingBox = boundingBox
-		this.decimalPlaces = getValueDefault(decimalPlaces, 0)
+		this.decimalPlaces = Value.getValueDefault(decimalPlaces, 0)
 		this.numbers = numbers
 	}
 	drawPrivate(context) {
 		var boundingBox = this.boundingBox
 		var x = getXClearBoxSetContext(boundingBox, context, this)
-		drawNumericArrays(context, this.numbers, viewCanvas.textSpace, x, boundingBox[0][1] + viewCanvas.textSpace, this.decimalPlaces)
+		drawNumericArrays(context, this.numbers, viewCanvas.textSpace, x, boundingBox[0][1] + viewCanvas.textDown, this.decimalPlaces)
 	}
 }
 
@@ -154,12 +154,12 @@ class StringDisplay extends CanvasControl {
 		super()
 		this.boundingBox = boundingBox
 		this.strings = strings
-		this.textAlign = getValueDefault(textAlign, 'left')
+		this.textAlign = Value.getValueDefault(textAlign, 'left')
 	}
 	drawPrivate(context) {
 		var boundingBox = this.boundingBox
 		var x = getXClearBoxSetContext(boundingBox, context, this)
-		drawArrays(context, this.strings, viewCanvas.textSpace, x, boundingBox[0][1] + viewCanvas.textSpace)
+		drawArrays(context, this.strings, viewCanvas.textSpace, x, boundingBox[0][1] + viewCanvas.textDown)
 	}
 }
 
@@ -181,7 +181,7 @@ function ViewFractal2D() {
 	this.mouseMove = function(context, event) {
 		if (viewCanvas.mouseMoveManipulator != undefined) {
 			var boundingBoxArea = this.viewBoundingBoxSize[0] * this.viewBoundingBoxSize[1]
-			this.pixelSize = Math.round(Math.sqrt(boundingBoxArea / this.changePixelsControl.value))
+			this.pixelSize = Math.round(Math.max(this.pixelSizeControl.value, Math.sqrt(boundingBoxArea / this.changePixelsControl.value)))
 			this.setPixelVariables()
 			viewCanvas.mouseMoveManipulator.mouseMove(context, event)
 		}
@@ -212,12 +212,12 @@ function ViewFractal2D() {
 		var nextBottom = bottom - Checkbox.defaultHeightNew()
 		this.controls = controls
 		this.viewBoundingBox = [[0, 0], [viewBroker.heightMinus, height]]
-		this.viewBoundingBoxSize = getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0])
+		this.viewBoundingBoxSize = Vector.getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0])
 		this.viewControl = new Fractal2DControl(this.viewBoundingBox)
 		controls.push(this.viewControl)
 
 		var zoomBoundingBox = [[viewBroker.heightMinus, 0], [height, height]]
-		this.zoomControl = new VerticalSlider(zoomBoundingBox, Math.log(0.5), 'Z', Math.log(1000000))
+		this.zoomControl = new VerticalSlider(zoomBoundingBox, Math.log(0.5), 'Z', Math.log(5000000000))
 		this.zoomControl.value = Math.log(this.zoom)
 		this.zoomControl.controlChanged = updateZoomDrawFractal2D
 		controls.push(this.zoomControl)
@@ -226,7 +226,7 @@ function ViewFractal2D() {
 		var characterBegin = viewBroker.analysisCharacterBegin
 		var variableEndX = viewBroker.canvas.width
 
-		var intervals = intervalsFromToQuantity(height, variableEndX, 2, false, false)
+		var intervals = Vector.intervalsFromToQuantity(height, variableEndX, 4, false, false)
 		this.redColorControl = new Checkbox([[height, nextBottom], [intervals[0], bottom]], 'Red', false)
 		this.redColorControl.controlChanged = drawFractal2DWithoutArguments
 		controls.push(this.redColorControl)
@@ -247,7 +247,7 @@ function ViewFractal2D() {
 		bottom = nextBottom
 		nextBottom -= viewCanvas.wideHeight
 		var changeBoundingBox = [[height, nextBottom], [variableEndX, bottom]]
-		this.changePixelsControl = new HorizontalSliderWide(changeBoundingBox, 1000, 'Change Pixels', 100000, this.changePixels)
+		this.changePixelsControl = new HorizontalSliderWide(changeBoundingBox, 1000, 'Change Pixels', 30000, this.changePixels)
 		this.changePixelsControl.controlChanged = drawFractal2DWithoutArguments
 		controls.push(this.changePixelsControl)
 
@@ -304,11 +304,11 @@ function ViewFractal2D() {
 
 		var variableBeginX = titleEndX + viewCanvas.halfTextSpace
 		var xyVariableBox = [[variableBeginX, 0], [variableEndX, nextTop]]
-		this.xyDisplay = new NumberDisplay(xyVariableBox, [this.x, this.y], 8)
+		this.xyDisplay = new NumberDisplay(xyVariableBox, [this.x, this.y], 11)
 		controls.push(this.xyDisplay)
 
 		var top = nextTop
-		nextTop += viewCanvas.textSpace
+		nextTop += viewCanvas.textSpace+1
 		var zoomTitleBox = [[characterBegin, top], [titleEndX, nextTop]]
 		controls.push(new StringDisplay(zoomTitleBox, ['Zoom'], 'right'))
 
