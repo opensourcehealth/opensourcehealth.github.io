@@ -14,7 +14,7 @@ function addPolylineControl(closestValueIndex, functionValues, parameterIndex, p
 	var functionValue = functionValues[parameterIndex]
 	if (definition.checked != undefined) {
 		var parameter = definition.checked
-		if (!getIsEmpty(functionValue)) {
+		if (!arrayKit.getIsEmpty(functionValue)) {
 			parameter = getBooleanByStatementValue(undefined, viewBroker.registry, analysis.statement, functionValue)
 		}
 		var nextTitleTop = polylineControl.titleTop + Checkbox.defaultHeightNew()
@@ -34,11 +34,11 @@ function addPolylineControl(closestValueIndex, functionValues, parameterIndex, p
 
 	if (definition.point != undefined) {
 		var parameter = definition.point
-		if (!getIsEmpty(functionValue)) {
+		if (!arrayKit.getIsEmpty(functionValue)) {
 			parameter = getPoint2DByStatementValue(undefined, viewBroker.registry, analysis.statement, functionValue)
 		}
-		var lower = getValueDefault(definition.lower, -360.0)
-		var upper = getValueDefault(definition.upper, 360.0)
+		var lower = Value.getValueDefault(definition.lower, -360.0)
+		var upper = Value.getValueDefault(definition.upper, 360.0)
 		var nextTitleTop = polylineControl.titleTop + HorizontalSliderPoint.defaultHeightNew()
 		var boundingBox = [[viewBroker.canvas.height, polylineControl.titleTop], [viewBroker.canvas.width, nextTitleTop]]
 		polylineControl.titleTop = nextTitleTop
@@ -61,12 +61,12 @@ function addPolylineControl(closestValueIndex, functionValues, parameterIndex, p
 	}
 
 	var parameter = definition.value
-	if (!getIsEmpty(functionValue)) {
+	if (!arrayKit.getIsEmpty(functionValue)) {
 		parameter = getFloatByStatementValue(undefined, viewBroker.registry, analysis.statement, functionValue)
 	}
 
-	var lower = getValueDefault(definition.lower, -360.0)
-	var upper = getValueDefault(definition.upper, 360.0)
+	var lower = Value.getValueDefault(definition.lower, -360.0)
+	var upper = Value.getValueDefault(definition.upper, 360.0)
 	var nextTitleTop = polylineControl.titleTop + HorizontalSliderWide.defaultHeightNew()
 	var boundingBox = [[viewBroker.canvas.height, polylineControl.titleTop], [viewBroker.canvas.width, nextTitleTop]]
 	polylineControl.titleTop = nextTitleTop
@@ -91,7 +91,7 @@ function addScrollBarDraw(context, control, controlsTop) {
 		var controlRight = width - viewCanvas.controlWidth
 		control.controlsClipBox[1][0] = controlRight
 		for (var childControl of control.controls) {
-			var boundingBox = getArraysCopy(childControl.boundingBox)
+			var boundingBox = arrayKit.getArraysCopy(childControl.boundingBox)
 			boundingBox[1][0] = controlRight
 			childControl.oldBoundingBox = boundingBox
 			childControl.resize(boundingBox)
@@ -143,8 +143,8 @@ function addTagControl(definition, definitionMap, view) {
 		if (definitionMapValue != undefined) {
 			parameter = getPoint2DByStatementValue(undefined, viewBroker.registry, analysis.statement, definitionMapValue)
 		}
-		var lower = getValueDefault(definition.lower, -360.0)
-		var upper = getValueDefault(definition.upper, 360.0)
+		var lower = Value.getValueDefault(definition.lower, -360.0)
+		var upper = Value.getValueDefault(definition.upper, 360.0)
 		var nextTitleTop = tagControl.titleTop + HorizontalSliderPoint.defaultHeightNew()
 		var boundingBox = [[viewBroker.canvas.height, tagControl.titleTop], [viewBroker.canvas.width, nextTitleTop]]
 		tagControl.titleTop = nextTitleTop
@@ -168,8 +168,8 @@ function addTagControl(definition, definitionMap, view) {
 		parameter = getFloatByStatementValue(undefined, viewBroker.registry, analysis.statement, definitionMapValue)
 	}
 
-	var lower = getValueDefault(definition.lower, -360.0)
-	var upper = getValueDefault(definition.upper, 360.0)
+	var lower = Value.getValueDefault(definition.lower, -360.0)
+	var upper = Value.getValueDefault(definition.upper, 360.0)
 	var nextTitleTop = tagControl.titleTop + HorizontalSliderWide.defaultHeightNew()
 	var boundingBox = [[viewBroker.canvas.height, tagControl.titleTop], [viewBroker.canvas.width, nextTitleTop]]
 	tagControl.titleTop = nextTitleTop
@@ -214,7 +214,7 @@ class AnalysisPoints {
 		var points = this.points
 		if (points.length > 0) {	
 			if (this.addPointIndex != undefined) {
-				points = getArraysCopy(points)
+				points = arrayKit.getArraysCopy(points)
 				points.splice(this.addPointIndex, 0, view.mouseMovePoint.slice(0))
 			}
 			if (this.tagPointArrays != undefined) {
@@ -223,7 +223,7 @@ class AnalysisPoints {
 				}
 				for (var tagPoints of this.tagPointArrays) {
 					context.lineWidth = lineWidth * 0.8
-					drawLines(context, convertPointsToScreen(getArraysCopy(tagPoints), control), tagPoints.length - 1)
+					drawLines(context, convertPointsToScreen(arrayKit.getArraysCopy(tagPoints), control), tagPoints.length - 1)
 				}
 			}
 			if (isColor) {
@@ -234,7 +234,7 @@ class AnalysisPoints {
 			}
 			var polylineLength = points.length - 1 * (!this.isPolygon)
 			context.lineWidth = lineWidth
-			drawLines(context, convertPointsToScreen(getArraysCopy(points), control), polylineLength)
+			drawLines(context, convertPointsToScreen(arrayKit.getArraysCopy(points), control), polylineLength)
 			this.drawMarker(context, control)
 		}
 	}
@@ -250,7 +250,7 @@ class AnalysisPoints {
 		var width = viewBroker.canvas.width
 		var texts = ['Display', 'Inspect', 'Mouse', 'Polyline', 'Tag']
 		var analysisTableBox = [[height, 0], [width, controlWidth * 2]]
-		this.analysisControl = new TableChoice(analysisTableBox, texts, 2, getKeyMapDefault('pointsAnalysis', valueMap, 1))
+		this.analysisControl = new TableChoice(analysisTableBox, texts, 2, mapKit.getKeyMapDefault('pointsAnalysis', valueMap, 1))
 		this.analysisControl.controlChanged = drawAnalysisControls
 		controls.push(this.analysisControl)
 		var analysisBottom = controlWidth * 2
@@ -258,28 +258,28 @@ class AnalysisPoints {
 		this.displayAnalysisControl = new DisplayAnalysisPoints()
 		this.inspectControl = new InspectPoints()
 		this.mouseControl = new Mouse()
-		this.polylineControl = new Polyline()
+		this.polylineControl = new PolylineControl()
 		this.tagControl = new Tag()
 		var displayTop = analysisBottom
 		var nextDisplayTop = displayTop + controlWidth
 		var displayBoxRight = height + (width - height) / 3.0
 		var colorBoundingBox = [[height, displayTop], [displayBoxRight, nextDisplayTop]]
-		this.colorControl = new Checkbox(colorBoundingBox, 'Color', getKeyMapDefault('pointsColor', valueMap, true))
+		this.colorControl = new Checkbox(colorBoundingBox, 'Color', mapKit.getKeyMapDefault('pointsColor', valueMap, true))
 		this.colorControl.controlChanged = drawPointsWithoutArguments
 		this.colorControl.name = 'Display'
 		this.gridAnalysisBottom = nextDisplayTop + viewCanvas.textSpace
 		displayTop = this.gridAnalysisBottom + viewCanvas.halfTextSpace
 		var gridBoundingBox = [[height, displayTop], [displayBoxRight, displayTop + controlWidth]]
-		this.gridControl = new Checkbox(gridBoundingBox, 'Grid', getKeyMapDefault('pointsGrid', valueMap, false))
+		this.gridControl = new Checkbox(gridBoundingBox, 'Grid', mapKit.getKeyMapDefault('pointsGrid', valueMap, false))
 		this.gridControl.controlChanged = drawPointsUpdateGrid
 		this.gridControl.name = 'Display'
 		this.displayAnalysisControl.controls = [this.gridControl, this.colorControl]
 		this.shapeControls = [this.inspectControl, this.polylineControl, this.tagControl]
 		this.analysisControls = this.shapeControls.slice(0)
-		pushArray(this.analysisControls, [this.displayAnalysisControl, this.mouseControl])
-		pushArray(this.analysisControls, this.displayAnalysisControl.controls)
+		arrayKit.pushArray(this.analysisControls, [this.displayAnalysisControl, this.mouseControl])
+		arrayKit.pushArray(this.analysisControls, this.displayAnalysisControl.controls)
 		setDisplayFunctionControls(this.analysisControls, controlIsAnalysisName)
-		pushArray(controls, this.analysisControls)
+		arrayKit.pushArray(controls, this.analysisControls)
 		setViewControls(controls, this.view)
 	}
 	updateView(isViewHidden) {
@@ -311,10 +311,10 @@ function completeParameterControl(parameterControl, parentControl, view) {
 }
 
 function convertPointToScreen(point, control) {
-	add2D(point, control.centerOffset)
-	subtract2D(point, control.halfSize)
-	multiply2DScalar(point, getExponentialZoom())
-	add2D(point, control.halfSize)
+	Vector.add2D(point, control.centerOffset)
+	Vector.subtract2D(point, control.halfSize)
+	Vector.multiply2DScalar(point, getExponentialZoom())
+	Vector.add2D(point, control.halfSize)
 	point[0] += control.boundingBox[0][0]
 	if (control.scale < 0.0) {
 		point[1] = control.boundingBox[1][1] - point[1]
@@ -359,11 +359,11 @@ function drawImageByControl(analysis, context, control) {
 
 	if (analysis.image.complete) {
 		if (analysis.lowerPoint == undefined) {
-			var size = getSubtraction2D(control.boundingBox[1], control.boundingBox[0])
+			var size = Vector.getSubtraction2D(control.boundingBox[1], control.boundingBox[0])
 			var zoomRatio = 1.0 * size[1] / Math.max(analysis.image.naturalHeight, analysis.image.naturalWidth)
 			analysis.height = zoomRatio * analysis.image.naturalHeight
 			analysis.width = zoomRatio * analysis.image.naturalWidth
-			multiply2DScalar(size, 0.5)
+			Vector.multiply2DScalar(size, 0.5)
 			analysis.lowerPoint = [size[0] - analysis.width * 0.5, analysis.height * 1.5 - size[1]]
 		}
 		var lowerScreen = getScreenByPoint(analysis.lowerPoint, control)
@@ -387,8 +387,8 @@ function drawPointsGrid(context, control) {
 	var boundingBox = control.boundingBox
 	var isColor = control.view.analysis.colorControl.getValue()
 	var gridSpacing = getIntegerStep(getHeightMinusOverZoom() * gGridSpacingMultiplier)
-	var lowerOver = divide2DScalar(getPointByScreen(boundingBox[0], control), gridSpacing)
-	var upperOver = divide2DScalar(getPointByScreen(boundingBox[1], control), gridSpacing)
+	var lowerOver = Vector.divide2DScalar(getPointByScreen(boundingBox[0], control), gridSpacing)
+	var upperOver = Vector.divide2DScalar(getPointByScreen(boundingBox[1], control), gridSpacing)
 	var halfGridSpacing = 0.5 * gridSpacing
 	var floorX = gridSpacing * Math.floor(lowerOver[0])
 	var ceilX = gridSpacing * Math.ceil(upperOver[0])
@@ -423,7 +423,7 @@ function drawPointsMarker(context, control) {
 	var valueIndexes = analysis.valueIndexes
 	context.lineWidth = 1.5
 	if (analysis.colorControl.getValue()) {
-		context.strokeStyle = getValueDefault(gActionColorMap.get(view.editControl.getSelectedName()), 'black')
+		context.strokeStyle = Value.getValueDefault(gActionColorMap.get(view.editControl.getSelectedName()), 'black')
 	}
 	else {
 		context.strokeStyle = 'black'
@@ -461,26 +461,26 @@ function drawPointsMarker(context, control) {
 		var end = points[(analysis.closestPointIndex + 1) % points.length]
 		var rotationVector = [0.0, 0.0]
 		var centerScreen = getScreenByPoint(center, control)
-		var beginCenter = getSubtraction2D(centerScreen, getScreenByPoint(begin, control))
-		var beginCenterLength = length2D(beginCenter)
+		var beginCenter = Vector.getSubtraction2D(centerScreen, getScreenByPoint(begin, control))
+		var beginCenterLength = Vector.length2D(beginCenter)
 		if (beginCenterLength > 0.0) {
-			add2D(rotationVector, divide2DScalar(beginCenter, beginCenterLength))
+			Vector.add2D(rotationVector, Vector.divide2DScalar(beginCenter, beginCenterLength))
 		}
-		var centerEnd = getSubtraction2D(getScreenByPoint(end, control), centerScreen)
-		var centerEndLength = length2D(centerEnd)
+		var centerEnd = Vector.getSubtraction2D(getScreenByPoint(end, control), centerScreen)
+		var centerEndLength = Vector.length2D(centerEnd)
 		if (centerEndLength > 0.0) {
-			add2D(rotationVector, divide2DScalar(centerEnd, centerEndLength))
+			Vector.add2D(rotationVector, Vector.divide2DScalar(centerEnd, centerEndLength))
 		}
-		var rotationVectorLength = length2D(rotationVector)
+		var rotationVectorLength = Vector.length2D(rotationVector)
 		if (rotationVectorLength > gClose) {
 			marker = [[6,0], [-6,4], [-6,-4]]
-			divide2DScalar(rotationVector, rotationVectorLength)
+			Vector.divide2DScalar(rotationVector, rotationVectorLength)
 			rotate2DsVector(marker, rotationVector)
 		}
 		else {
 			marker = [[5,-5], [5,5], [-5,5], [-5,-5]]
 		}
-		add2Ds(marker, centerScreen)
+		Vector.add2Ds(marker, centerScreen)
 	}
 
 	drawLines(context, marker)
@@ -553,7 +553,7 @@ function getCommaSeparatedAddition(addition, decimalPlaces, valueStrings) {
 }
 
 function getDefinedValueStrings(analysis, valueStrings) {
-	var secondCommaIndex = getIndexOfBracketed(valueStrings[1], ',')
+	var secondCommaIndex = getIndexOfUnbracketed(valueStrings[1], ',')
 	if (secondCommaIndex != -1) {
 		valueStrings.push(valueStrings[1].slice(secondCommaIndex + 1).trim())
 		valueStrings[1] = valueStrings[1].slice(0, secondCommaIndex).trim()
@@ -601,11 +601,11 @@ function getFloatListsByStatementValue(registry, statement, value, valueIndexes,
 		}
 		valueIsArrays[floatListIndex] = isNestedArray
 		if (isNestedArray) {
-			pushArray(points, floats)
-			pushArray(valueIndexes, new Array(floats.length).fill(floatListIndex))
+			arrayKit.pushArray(points, floats)
+			arrayKit.pushArray(valueIndexes, new Array(floats.length).fill(floatListIndex))
 		}
 		else {
-			setUndefinedElementsToArrayZero(floats, oldPoint)
+			arrayKit.setUndefinedElementsToArrayZero(floats, oldPoint)
 			points.push(floats)
 			valueIndexes.push(floatListIndex)
 		}
@@ -631,7 +631,7 @@ function getFunctionSliceIndexesByName(text, name) {
 		return undefined
 	}
 
-	var indexOfEnd = getIndexOfBracketed(secondWord, ')')
+	var indexOfEnd = getIndexOfUnbracketed(secondWord, ')')
 	if (indexOfEnd == -1) {
 		return undefined
 	}
@@ -683,20 +683,20 @@ function getMovePointString(addition, analysis, closestValueIndex, values) {
 	var arrayCommaIndex = -1
 	var valueString = values[closestValueIndex]
 	if (valueString.startsWith('Vector.getAddition2D')) {
-		arrayCommaIndex = getIndexOfBracketed(valueString, ',', 1)
+		arrayCommaIndex = getIndexOfUnbracketed(valueString, ',', 1)
 	}
 
 	if (arrayCommaIndex == -1) {
 		if (analysis.valueIsArrays[closestValueIndex]) {
-			valueString = 'Vector.getAddition2Ds(' + valueString
+			valueString = 'Vector.Vector.getAddition2Ds(' + valueString
 		}
 		else {
-			var pointCommaIndex = getIndexOfBracketed(valueString, ',')
+			var pointCommaIndex = getIndexOfUnbracketed(valueString, ',')
 			if (pointCommaIndex != -1) {
 				var valueStrings = [valueString.slice(0, pointCommaIndex).trim(), valueString.slice(pointCommaIndex + 1).trim()]
 				return getCommaSeparatedAddition(addition, 1, getDefinedValueStrings(analysis, valueStrings))
 			}
-			valueString = 'Vector.getAddition2D(' + valueString
+			valueString = 'Vector.Vector.getAddition2D(' + valueString
 		}
 		return valueString + ', [' + getFixedStrings(addition).join(',') + '])'
 	}
@@ -706,7 +706,7 @@ function getMovePointString(addition, analysis, closestValueIndex, values) {
 		afterComma = afterComma.slice(1, -1)
 	}
 
-	add2D(addition, getFloatsUpdateByStatementValue(viewBroker.registry, analysis.statement, afterComma)[0])
+	Vector.add2D(addition, getFloatsUpdateByStatementValue(viewBroker.registry, analysis.statement, afterComma)[0])
 	return valueString.slice(0, arrayCommaIndex) + ', [' + getFixedStrings(addition).join(',') + '])'
 }
 
@@ -717,18 +717,18 @@ function getParameterPointString(control, valueString) {
 		controlPoint[sliderIndex] = sliders[sliderIndex].value
 	}
 
-	var decimalPlaces = getValueDefault(control.decimalPlaces, 1)
-	if (getIsEmpty(valueString)) {
+	var decimalPlaces = Value.getValueDefault(control.decimalPlaces, 1)
+	if (arrayKit.getIsEmpty(valueString)) {
 		if (getIsPointControlCloseToDefault(control)) {
 			return undefined
 		}
 		return '[' + getFixedStrings(controlPoint, decimalPlaces) + ']'
 	}
 
-	var addition = getSubtraction2D(controlPoint, control.oldParameter)
+	var addition = Vector.getSubtraction2D(controlPoint, control.oldParameter)
 	var arrayCommaIndex = -1
 	if (valueString.startsWith('Vector.getAddition2D')) {
-		arrayCommaIndex = getIndexOfBracketed(valueString, ',', 1)
+		arrayCommaIndex = getIndexOfUnbracketed(valueString, ',', 1)
 	}
 
 	var parameterString = undefined
@@ -738,7 +738,7 @@ function getParameterPointString(control, valueString) {
 		if (trimmedStartsWithBracket) {
 			trimmedString = trimmedString.slice(1, -1)
 		}
-		var pointCommaIndex = getIndexOfBracketed(trimmedString, ',')
+		var pointCommaIndex = getIndexOfUnbracketed(trimmedString, ',')
 		if (pointCommaIndex != -1) {
 			var valueStrings = [trimmedString.slice(0, pointCommaIndex).trim(), trimmedString.slice(pointCommaIndex + 1).trim()]
 			var commaSeparatedAddition = getCommaSeparatedAddition(addition, decimalPlaces, valueStrings)
@@ -750,14 +750,14 @@ function getParameterPointString(control, valueString) {
 			}
 			return commaSeparatedAddition
 		}
-		parameterString = 'Vector.getAddition2D(' + valueString
+		parameterString = 'Vector.Vector.getAddition2D(' + valueString
 	}
 	else {
 		var afterComma = valueString.slice(arrayCommaIndex + 1, -1).trim()
 		if (afterComma.startsWith('[')) {
 			afterComma = afterComma.slice(1, -1)
 		}
-		add2D(addition, getFloatsUpdateByStatementValue(viewBroker.registry, view.analysis.statement, afterComma)[0])
+		Vector.add2D(addition, getFloatsUpdateByStatementValue(viewBroker.registry, view.analysis.statement, afterComma)[0])
 		parameterString = valueString.slice(0, arrayCommaIndex)
 	}
 
@@ -765,7 +765,7 @@ function getParameterPointString(control, valueString) {
 }
 
 function getParameterValueString(control, valueString) {
-	if (getIsEmpty(valueString)) {
+	if (arrayKit.getIsEmpty(valueString)) {
 		if (getIsFloatControlCloseToDefault(control)) {
 			return undefined
 		}
@@ -806,10 +806,10 @@ function getPointByScreen(screenPoint, control) {
 	}
 
 	var point = [screenPoint[0] - control.boundingBox[0][0], y]
-	subtract2D(point, control.halfSize)
-	divide2DScalar(point, getExponentialZoom())
-	add2D(point, control.halfSize)
-	return subtract2D(point, control.centerOffset)
+	Vector.subtract2D(point, control.halfSize)
+	Vector.divide2DScalar(point, getExponentialZoom())
+	Vector.add2D(point, control.halfSize)
+	return Vector.subtract2D(point, control.centerOffset)
 }
 
 function getScreenByPoint(point, control) {
@@ -833,7 +833,7 @@ class InspectPoints extends CanvasControl {
 		var boundingBox = view.analysis.analysisBoundingBox
 		var points = view.analysis.points
 		clearBoundingBox(boundingBox, context)
-		if (getIsEmpty(points)) {
+		if (arrayKit.getIsEmpty(points)) {
 			return
 		}
 
@@ -841,14 +841,14 @@ class InspectPoints extends CanvasControl {
 		var titleTop = boundingBox[0][1] + viewCanvas.textSpace
 		var y = titleTop + viewCanvas.textSpace
 		var pointsBox = getBoundingBox(points)
-		var size = getSubtraction2D(pointsBox[1], pointsBox[0])
+		var size = Vector.getSubtraction2D(pointsBox[1], pointsBox[0])
 		drawArrays(context, 'X: Y:'.split(' '), viewCanvas.textSpace, viewBroker.analysisCharacterBegin, y)
-		context.fillText('Size', viewBroker.analysisSizeBegin, titleTop)
-		drawNumericArrays(context, size, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 		context.fillText('Lower', viewBroker.analysisLowerBegin, titleTop)
 		drawNumericArrays(context, pointsBox[0], viewCanvas.textSpace, viewBroker.analysisLowerBegin, y)
 		context.fillText('Upper', viewBroker.analysisUpperBegin, titleTop)
 		drawNumericArrays(context, pointsBox[1], viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
+		context.fillText('Size', viewBroker.analysisSizeBegin, titleTop)
+		drawNumericArrays(context, size, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 		y += viewCanvas.textSpace * (pointsBox[0].length + 1)
 		context.fillText('Number of Points: ' + analysis.points.length, viewBroker.analysisCharacterBegin, y)
 		y += viewCanvas.textSpace * 2
@@ -873,16 +873,16 @@ class InspectPoints extends CanvasControl {
 		titleTop = y + viewCanvas.textSpace * 2.0
 		y = titleTop + viewCanvas.textSpace
 		drawArrays(context, 'X: Y:'.split(' '), viewCanvas.textSpace, viewBroker.analysisCharacterBegin, y)
-		context.fillText('Mouse', viewBroker.analysisSizeBegin, titleTop)
-		drawNumericArrays(context, this.mousePoint, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
+		context.fillText('Mouse', viewBroker.analysisUpperBegin, titleTop)
+		drawNumericArrays(context, this.mousePoint, viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
 		if (this.change == undefined) {
 			return
 		}
 
 		context.fillText('Last', viewBroker.analysisLowerBegin, titleTop)
 		drawNumericArrays(context, this.lastDisplay, viewCanvas.textSpace, viewBroker.analysisLowerBegin, y)
-		context.fillText('Change', viewBroker.analysisUpperBegin, titleTop)
-		drawNumericArrays(context, this.change, viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
+		context.fillText('Change', viewBroker.analysisSizeBegin, titleTop)
+		drawNumericArrays(context, this.change, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 	}
 	name = 'Inspect'
 }
@@ -926,8 +926,8 @@ function mouseDownPointsInspect(context, control, event) {
 	inspectControl.mousePoint = points[analysis.closestPointIndex]
 	inspectControl.change = undefined
 	if (inspectControl.last != undefined) {
-		inspectControl.change = getSubtraction2D(inspectControl.mousePoint, inspectControl.last)
-		inspectControl.change.push(length2D(inspectControl.change))
+		inspectControl.change = Vector.getSubtraction2D(inspectControl.mousePoint, inspectControl.last)
+		inspectControl.change.push(Vector.length2D(inspectControl.change))
 		inspectControl.lastDisplay = inspectControl.last
 		if (inspectControl.change[2] < gClose) {
 			inspectControl.change = undefined
@@ -945,33 +945,36 @@ function mouseDownReverse(context, control, event) {
 }
 
 var moveManipulator = {
-	mouseMove: function(context, event) {
-		var viewControl = viewBroker.view.viewControl
-		var mouseMovementFlipped = getMouseMovementFlipped(event, viewControl.scale)
-		if (mouseMovementFlipped == undefined) {
-			return
-		}
-
-		divide2DScalar(mouseMovementFlipped, getExponentialZoom())
-		viewControl.centerOffset = getAddition2D(mouseMovementFlipped, viewCanvas.mouseDownCenterOffset)
-		drawPointsWithoutArguments()
-	},
-	mouseOut: function(context, event) {
-		viewBroker.view.viewControl.centerOffset = viewCanvas.mouseDownCenterOffset
-		pointsMouseOut()
-	},
-	mouseUp: function(context, event) {
-		var viewControl = viewBroker.view.viewControl
-		var mouseMovementFlipped = getMouseMovementFlipped(event, viewControl.scale)
-		if (mouseMovementFlipped == undefined) {
-			this.mouseOut(context, event)
-			return
-		}
-
-		divide2DScalar(mouseMovementFlipped, getExponentialZoom())
-		viewControl.centerOffset = getAddition2D(mouseMovementFlipped, viewCanvas.mouseDownCenterOffset)
-		pointsMouseOut()
+mouseMove: function(context, event) {
+	var viewControl = viewBroker.view.viewControl
+	var mouseMovementFlipped = getMouseMovementFlipped(event, viewControl.scale)
+	if (mouseMovementFlipped == undefined) {
+		return
 	}
+
+	Vector.divide2DScalar(mouseMovementFlipped, getExponentialZoom())
+	viewControl.centerOffset = Vector.getAddition2D(mouseMovementFlipped, viewCanvas.mouseDownCenterOffset)
+	if (event.shiftKey) {
+		Vector.stepArray(viewControl.centerOffset, getIntegerStep(getHeightMinusOverZoom() * gGridSpacingMultiplier))
+	}
+
+	drawPointsWithoutArguments()
+},
+
+mouseOut: function(context, event) {
+	viewBroker.view.viewControl.centerOffset = viewCanvas.mouseDownCenterOffset
+	pointsMouseOut()
+},
+
+mouseUp: function(context, event) {
+	var viewControl = viewBroker.view.viewControl
+	var mouseMovementFlipped = getMouseMovementFlipped(event, viewControl.scale)
+	if (mouseMovementFlipped == undefined) {
+		this.mouseOut(context, event)
+		return
+	}
+	pointsMouseOut()
+}
 }
 
 function movePointByEvent(event, manipulator, mouseMovementFlipped, view) {
@@ -982,7 +985,14 @@ function movePointByEvent(event, manipulator, mouseMovementFlipped, view) {
 	var analysis = view.analysis
 	var closestValueIndex = analysis.valueIndexes[analysis.closestPointIndex]
 	var values = manipulator.oldValues.slice(0)
-	var addition = divide2DScalar(mouseMovementFlipped, getExponentialZoom())
+	var addition = Vector.divide2DScalar(mouseMovementFlipped, getExponentialZoom())
+	if (event.shiftKey) {
+		var point = Vector.getAddition2D(manipulator.oldPoints[analysis.closestPointIndex], addition)
+		Vector.subtract2D(addition, point)
+		Vector.stepArray(point, getIntegerStep(getHeightMinusOverZoom() * gGridSpacingMultiplier))
+		Vector.add2D(addition, point)
+	}
+
 	values[closestValueIndex] = getMovePointString(addition, analysis, closestValueIndex, values)
 	setPointsInput(analysis, values.join(' '))
 }
@@ -999,7 +1009,7 @@ var movePointManipulator = {
 		pointsMouseMove(event)
 	},
 	mouseOut: function(context, event) {
-		viewBroker.view.analysis.points = getArraysCopy(this.oldPoints)
+		viewBroker.view.analysis.points = arrayKit.getArraysCopy(this.oldPoints)
 		pointsMouseOut()
 	},
 	mouseUp: function(context, event) {
@@ -1022,7 +1032,7 @@ function outputPointsDrawPoints(analysis, context) {
 	if (points.length > 0) {
 		var boundingBox = getBoundingBox(points)
 		var minimumPoint = boundingBox[0]
-		var size = getSubtraction2D(boundingBox[1], minimumPoint)
+		var size = Vector.getSubtraction2D(boundingBox[1], minimumPoint)
 		var maximumDimension = Math.max(Math.max(size[0], size[1]), 1.0)
 		var multiplier = 100.0 / maximumDimension
 		for (var fittedIndex = 0; fittedIndex < points.length; fittedIndex++) {
@@ -1090,7 +1100,7 @@ class PointsControl extends CanvasControl {
 		if (name == 'Move Point') {
 			if (analysis.points.length > 0) {
 				viewCanvas.mouseMoveManipulator = movePointManipulator
-				movePointManipulator.oldPoints = getArraysCopy(analysis.points)
+				movePointManipulator.oldPoints = arrayKit.getArraysCopy(analysis.points)
 				movePointManipulator.oldValues = getValues(pointString)
 				analysis.closestPointIndex = getClosestPointIndex(point, analysis.points)
 			}
@@ -1123,48 +1133,50 @@ function pointsMouseUp() {
 	viewCanvas.mouseMoveManipulator = undefined
 }
 
-class Polyline extends CanvasControl {
-	constructor() {
-		super()
+class PolylineControl extends CanvasControl {
+constructor() {
+	super()
+}
+
+drawPrivate(context) {
+	var view = this.view
+	var analysis = view.analysis
+	clearBoundingBox(analysis.analysisBoundingBox, context)
+	removeByGeneratorName(view.controls, 'Polyline')
+	if (arrayKit.getIsEmpty(analysis.points) || analysis.closestPointIndex == undefined) {
+		return
 	}
-	drawPrivate(context) {
-		var view = this.view
-		var analysis = view.analysis
-		clearBoundingBox(analysis.analysisBoundingBox, context)
-		removeByGeneratorName(view.controls, 'Polyline')
-		if (getIsEmpty(analysis.points) || analysis.closestPointIndex == undefined) {
-			return
-		}
 
-		var closestValueIndex = view.analysis.valueIndexes[analysis.closestPointIndex]
-		if (!analysis.valueIsArrays[closestValueIndex]) {
-			return
-		}
+	var closestValueIndex = view.analysis.valueIndexes[analysis.closestPointIndex]
+	if (!analysis.valueIsArrays[closestValueIndex]) {
+		return
+	}
 
-		createPolylineDefinitionsMap()
-		var values = getValues(analysis.pointString)
-		for (var polylineDefinitionsKey of gPolylineDefinitionsMap.keys()) {
-			var functionValues = getFunctionValuesByName(values[closestValueIndex], polylineDefinitionsKey)
-			if (functionValues != undefined) {
-				this.titleTop = analysis.analysisBoundingBox[0][1] + viewCanvas.textSpace
-				setTextContext(context)
-				context.fillText(polylineDefinitionsKey, viewBroker.analysisCharacterBegin, this.titleTop)
-				this.titleTop += viewCanvas.halfTextSpace
-				var controlsTop = this.titleTop
-				var height = viewBroker.canvas.height
-				var width = viewBroker.canvas.width
-				this.controlsClipBox = [[height, controlsTop], [width, height]]
-				this.controls = []
-				var definitionsLength = gPolylineDefinitionsMap.get(polylineDefinitionsKey).length
-				for (var parameterIndex = 0; parameterIndex < definitionsLength; parameterIndex++) {
-					addPolylineControl(closestValueIndex, functionValues, parameterIndex, polylineDefinitionsKey, values, view)
-				}
-				addScrollBarDraw(context, this, controlsTop)
-				return
+	createPolylineDefinitionsMap()
+	var values = getValues(analysis.pointString)
+	for (var polylineDefinitionsKey of gPolylineDefinitionsMap.keys()) {
+		var functionValues = getFunctionValuesByName(values[closestValueIndex], polylineDefinitionsKey)
+		if (functionValues != undefined) {
+			this.titleTop = analysis.analysisBoundingBox[0][1] + viewCanvas.textSpace
+			setTextContext(context)
+			context.fillText(polylineDefinitionsKey, viewBroker.analysisCharacterBegin, this.titleTop)
+			this.titleTop += viewCanvas.halfTextSpace
+			var controlsTop = this.titleTop
+			var height = viewBroker.canvas.height
+			var width = viewBroker.canvas.width
+			this.controlsClipBox = [[height, controlsTop], [width, height]]
+			this.controls = []
+			var definitionsLength = gPolylineDefinitionsMap.get(polylineDefinitionsKey).length
+			for (var parameterIndex = 0; parameterIndex < definitionsLength; parameterIndex++) {
+				addPolylineControl(closestValueIndex, functionValues, parameterIndex, polylineDefinitionsKey, values, view)
 			}
+			addScrollBarDraw(context, this, controlsTop)
+			return
 		}
 	}
-	name = 'Polyline'
+}
+
+name = 'Polyline'
 }
 
 function polylineBoolean(context, control) {
@@ -1172,7 +1184,7 @@ function polylineBoolean(context, control) {
 	var values = control.oldValues.slice(0)
 	var valueString = values[closestValueIndex]
 	control.functionValues[control.parameterIndex] = getValueStringIfDifferent(control.getValue(), control.defaultState)
-	removeLastEmpties(control.functionValues)
+	arrayKit.removeLastEmpties(control.functionValues)
 	var indexes = getFunctionSliceIndexesByName(valueString, control.polylineDefinitionsKey)
 	values[closestValueIndex] = valueString.slice(0, indexes[0]) + control.functionValues.join(',') + valueString.slice(indexes[1])
 	setPointsInput(viewBroker.view.analysis, values.join(' '))
@@ -1185,7 +1197,7 @@ function polylinePoint(context, control) {
 	var valueString = values[closestValueIndex]
 	var functionValue = control.oldFunctionValues[control.parameterIndex]
 	control.functionValues[control.parameterIndex] = getParameterPointString(control, functionValue)
-	removeLastEmpties(control.functionValues)
+	arrayKit.removeLastEmpties(control.functionValues)
 	var indexes = getFunctionSliceIndexesByName(valueString, control.polylineDefinitionsKey)
 	values[closestValueIndex] = valueString.slice(0, indexes[0]) + control.functionValues.join(',') + valueString.slice(indexes[1])
 	setPointsInput(viewBroker.view.analysis, values.join(' '))
@@ -1198,7 +1210,7 @@ function polylineValue(context, control) {
 	var valueString = values[closestValueIndex]
 	var functionValue = control.oldFunctionValues[control.parameterIndex]
 	control.functionValues[control.parameterIndex] = getParameterValueString(control, functionValue)
-	removeLastEmpties(control.functionValues)
+	arrayKit.removeLastEmpties(control.functionValues)
 	var indexes = getFunctionSliceIndexesByName(valueString, control.polylineDefinitionsKey)
 	values[closestValueIndex] = valueString.slice(0, indexes[0]) + control.functionValues.join(',') + valueString.slice(indexes[1])
 	setPointsInput(viewBroker.view.analysis, values.join(' '))
@@ -1210,7 +1222,7 @@ function scrollControls(context, control) {
 	var down = control.value
 	clearBoundingBox(control.parent.controlsClipBox, context)
 	for (var childControl of controls) {
-		var boundingBox = getArraysCopy(childControl.oldBoundingBox)
+		var boundingBox = arrayKit.getArraysCopy(childControl.oldBoundingBox)
 		boundingBox[0][1] += down
 		boundingBox[1][1] += down
 		childControl.resize(boundingBox)
@@ -1226,12 +1238,13 @@ function setGridLineColor(context, gridSpacing, isColor, value) {
 
 	var valueOverSpacing = Math.round(Math.abs(value / gridSpacing))
 	if (valueOverSpacing == 0) {
-		context.strokeStyle = 'purple'
+		context.strokeStyle = 'lime'
 		return
 	}
 
 	if (valueOverSpacing % 5 == 0) {
-		context.strokeStyle = '#3A5F0B' // Green Leaves
+		context.strokeStyle = 'violet'
+//		context.strokeStyle = '#3A5F0B' // Green Leaves
 		return
 	}
 
@@ -1258,7 +1271,7 @@ function setStatementToKeyValue(statement, key, value) {
 	if (linePointsValue == undefined) {
 		line = line.trim()
 		var indexOfSpace = line.indexOf(' ')
-		if (indexOfSpace != -1 && !getIsEmpty(value)) {
+		if (indexOfSpace != -1 && !arrayKit.getIsEmpty(value)) {
 			lines[lineIndex] = line.slice(0, indexOfSpace) + ' ' + key + '=' + value + line.slice(indexOfSpace)
 		}
 	}
@@ -1293,7 +1306,7 @@ function setValueIndexesTagPoints(analysis) {
 	if (statement == undefined) {
 		var values = getValues(pointString)
 		analysis.points = new Array(values.length)
-		analysis.valueIndexes = getSequence(values.length)
+		analysis.valueIndexes = arrayKit.getSequence(values.length)
 		analysis.valueIsArrays = new Array(values.length).fill(false)
 		for (var valueIndex = 0; valueIndex < values.length; valueIndex++) {
 			analysis.points[valueIndex] = values[valueIndex].split(',').map(parseFloat)
@@ -1374,7 +1387,7 @@ class Tag extends CanvasControl {
 		clearBoundingBox(analysis.analysisBoundingBox, context)
 		removeByGeneratorName(view.controls, 'Tag')
 		var statement = analysis.statement
-		if (getIsEmpty(analysis.points) || statement == undefined) {
+		if (arrayKit.getIsEmpty(analysis.points) || statement == undefined) {
 			return
 		}
 
@@ -1469,6 +1482,10 @@ function updateClosestPointIndex() {
 		else {
 			if (name == 'Add') {
 				if (isPointInsideBoundingBox(view.viewControl.boundingBox, view.mouseScreenPoint)) {
+					if (event.shiftKey) {
+						Vector.stepArray(point, getIntegerStep(getHeightMinusOverZoom() * gGridSpacingMultiplier))
+					}
+
 					var valueIndexes = analysis.valueIndexes
 					var closestValueIndex = valueIndexes[closestPointIndex]
 					var valuesLength = valueIndexes[valueIndexes.length - 1] + 1
@@ -1589,17 +1606,17 @@ class ViewPoints {
 		var valueMap = viewCanvas.valueMap
 		var width = viewBroker.canvas.width
 		this.controls = controls
-		var intervals = intervalsFromToQuantity(0.0, height, 5, false)
+		var intervals = Vector.intervalsFromToQuantity(0.0, height, 6, false)
 		intervals.forEach(Math.round)
 
-		var bottomIntervals = intervalsFromToQuantity(0.0, height, 2, false)
+		var bottomIntervals = Vector.intervalsFromToQuantity(0.0, height, 3, false)
 		bottomIntervals.forEach(Math.round)
-		var reverseButton = new Button([[bottomIntervals[0], viewBroker.heightMinus], [bottomIntervals[1], height]], 'Reverse')
+		var reverseButton = new Button([[0.0, viewBroker.heightMinus], [bottomIntervals[0], height]], 'Reverse')
 		reverseButton.onClick = mouseDownReverse
 		controls.push(reverseButton)
 
 		var viewBoundingBox = [[controlWidth, controlWidth], [viewBroker.heightMinus, viewBroker.heightMinus]]
-		var halfSize = multiply2DScalar(getSubtraction2D(viewBoundingBox[1], viewBoundingBox[0]), 0.5)
+		var halfSize = Vector.multiply2DScalar(Vector.getSubtraction2D(viewBoundingBox[1], viewBoundingBox[0]), 0.5)
 		this.viewControl = new PointsControl(viewBoundingBox, halfSize, getChainMatrix2D(this.analysis.registry, this.analysis.statement))
 		controls.push(this.viewControl)
 		var zoomBoundingBox = [[viewBroker.heightMinus, controlWidth], [height, viewBroker.heightMinus]]
