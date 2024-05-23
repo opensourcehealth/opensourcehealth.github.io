@@ -51,13 +51,13 @@
 <textarea id="svgArea" rows="40" cols="120"></textarea><br>
 <br>
 <script src="maparray.js"></script>
+<script src="help.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
 <script src="filesaver.js"></script>
 <script src="function.js"></script>
-<script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
 <script src="generatorcenter.js"></script>
@@ -70,9 +70,10 @@
 <script src="pixel.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
+<script src="polyline.js"></script>
+<script src="science.js"></script>
 <script src="statement.js"></script>
 <script src="vector.js"></script>
-<script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
 <script src="viewcanvas.js"></script>
 <script src="viewfractal2d.js"></script>
@@ -126,6 +127,7 @@ function updateWordArea(wordString) {
 	var paragraphTextElement = document.getElementById('paragraphText')
 	var registry = {dataMap:new Map(), generatedIDSet:new Set(), idCountMap:new Map(), idMap:new Map(), lines:lines, meshMap:new Map()}
 	registry.views = []
+	lineFormatProcessor.alterLines(lines)
 	var svgStatement = getDocumentRoot(lines, 'svg')
 	if (svgStatement == undefined) {
 		document.getElementById('svgArea').value = ''
