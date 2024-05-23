@@ -5,39 +5,6 @@ const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
 
-function add2DAlongAxis(point, addition) {
-	if (Math.abs(addition[0]) > Math.abs(addition[1])) {
-		point[0] += addition[0]
-	}
-	else {
-		point[1] += addition[1]
-	}
-}
-
-function add2DArrays(arrays, xy) {
-	for (var array of arrays) {
-		add2Ds(array, xy)
-	}
-
-	return arrays
-}
-
-function add2Ds(elements, point) {
-	for (var element of elements) {
-		add2D(element, point)
-	}
-
-	return elements
-}
-
-function add3Ds(elements, point) {
-	for (var element of elements) {
-		add3D(element, point)
-	}
-
-	return elements
-}
-
 function addArrayArraysByIndex(arrayArrays, addition, index) {
 	for (var arrays of arrayArrays) {
 		addArraysByIndex(arrays, addition, index)
@@ -45,6 +12,8 @@ function addArrayArraysByIndex(arrayArrays, addition, index) {
 
 	return arrayArrays
 }
+
+//deprecated26 to be replace by addArraysByIndex(arrays, addition, 1)
 function addArrayArraysByY(arrays, y) {
 	for (var array of arrays) {
 		addArraysByIndex(array, y, 1)
@@ -53,9 +22,9 @@ function addArrayArraysByY(arrays, y) {
 	return arrays
 }
 
-function addArrays(elements, point, until) {
+function addArrays(elements, adders, until) {
 	for (var element of elements) {
-		addArray(element, point, until)
+		Vector.addArray(element, adders, until)
 	}
 
 	return elements
@@ -82,7 +51,7 @@ function addPointToMatrix3D(matrix, point) {
 //	1 5 9  13
 //	2 6 10 14
 //	3 7 11 15
-	if (getIsEmpty(point)) {
+	if (arrayKit.getIsEmpty(point)) {
 		return matrix
 	}
 
@@ -137,7 +106,7 @@ function get3DByKey(key) {
 }
 
 function get3DsByMatrix3D(points, matrix3D) {
-	if (getIsEmpty(matrix3D)) {
+	if (arrayKit.getIsEmpty(matrix3D)) {
 		return points
 	}
 
@@ -152,7 +121,7 @@ function get3DsByMatrix3D(points, matrix3D) {
 function getArraysMultiplicationByScalar(elementLists, scalarMultiplier) {
 	var arraysMultiplication = new Array(elementLists.length)
 	for (var elementListIndex = 0; elementListIndex < elementLists.length; elementListIndex++) {
-		arraysMultiplication[elementListIndex] = getMultiplicationArrayScalar(elementLists[elementListIndex], scalarMultiplier)
+		arraysMultiplication[elementListIndex] = Vector.getMultiplicationArrayScalar(elementLists[elementListIndex], scalarMultiplier)
 	}
 
 	return arraysMultiplication
@@ -164,7 +133,7 @@ function getBrightness256(brightness) {
 
 //use getRelativeDirection for ordering because getDirectionalProximity loses accuracy close to the x axis
 function getDirectionalProximity(a2D, b2D) {
-	var dotProduct = dotProduct2D(a2D, b2D)
+	var dotProduct = Vector.dotProduct2D(a2D, b2D)
 	if (a2D[0] * b2D[1] <= a2D[1] * b2D[0]) {
 		return dotProduct
 	}
@@ -177,7 +146,7 @@ function getFloats(floats) {
 }
 
 function getInteriorAngle(begin, end, radius) {
-	var halfDistance = 0.5 * distance2D(begin, end)
+	var halfDistance = 0.5 * Vector.distance2D(begin, end)
 	if (halfDistance > radius) {
 		noticeByList(['halfDistance is greater than radius in getInteriorAngle in matrix.', begin, end, radius])
 	}
@@ -276,7 +245,7 @@ function getMatrices3DByPath(points) {
 	}
 
 	for (var vertexIndex = points.length - 2; vertexIndex > -1; vertexIndex--) {
-		if (equal3D(points[vertexIndex], points[vertexIndex + 1])) {
+		if (Vector.equal3D(points[vertexIndex], points[vertexIndex + 1])) {
 			points.splice(vertexIndex, 1)
 		}
 	}
@@ -287,7 +256,7 @@ function getMatrices3DByPath(points) {
 
 	var vectors = new Array(points.length - 1)
 	for (var pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
-		vectors[pointIndex] = normalize3D(getSubtraction3D(points[pointIndex + 1], points[pointIndex]))
+		vectors[pointIndex] = normalize3D(Vector.getSubtraction3D(points[pointIndex + 1], points[pointIndex]))
 	}
 
 	var matrices = new Array(points.length)
@@ -455,7 +424,7 @@ function getMatrix2DBySegment(beginPoint, endPoint) {
 //	b d f		1 3 5
 	latestMatrix[4] = beginPoint[0]
 	latestMatrix[5] = beginPoint[1]
-	var subtraction = getSubtraction2D(endPoint, beginPoint)
+	var subtraction = Vector.getSubtraction2D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 	latestMatrix[2] = -subtraction[1]
@@ -467,7 +436,7 @@ function getMatrix2DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 	var latestMatrix = getMatrix2DBySegment(beginPoint, endPoint)
 //	a c e		0 2 4
 //	b d f		1 3 5
-	if (getIsEmpty(scalePortion)) {
+	if (arrayKit.getIsEmpty(scalePortion)) {
 		return latestMatrix
 	}
 
@@ -576,7 +545,7 @@ function getMatrix3DByBasis(points) {
 	latestMatrix[4] = y[0]
 	latestMatrix[5] = y[1]
 	latestMatrix[6] = y[2]
-	var product = crossProduct(x, y)
+	var product = Vector.crossProduct(x, y)
 	latestMatrix[8] = product[0]
 	latestMatrix[9] = product[1]
 	latestMatrix[10] = product[2]
@@ -598,14 +567,14 @@ function getMatrix3DByBasis(points) {
 }
 
 function getMatrix3DByPair(a, b) {
-	var cos = dotProduct3D(a, b)
-	var product = crossProduct(a, b)
-	var sin = length3D(product)
+	var cos = Vector.dotProduct3D(a, b)
+	var product = Vector.crossProduct(a, b)
+	var sin = Vector.length3D(product)
 	if (sin == 0.0) {
 		return getUnitMatrix3D()
 	}
 
-	divide3DScalar(product, sin)
+	Vector.divide3DScalar(product, sin)
 	return getMatrix3DByVectorCosSin([product[0], product[1], product[2], cos, sin])
 }
 
@@ -806,7 +775,7 @@ function getMatrix3DBySegment(beginPoint, endPoint) {
 	latestMatrix[12] = beginPoint[0]
 	latestMatrix[13] = beginPoint[1]
 	latestMatrix[14] = beginPoint[2]
-	var subtraction = getSubtraction3D(endPoint, beginPoint)
+	var subtraction = Vector.getSubtraction3D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 //	latestMatrix[2] = subtraction[2]
@@ -822,7 +791,7 @@ function getMatrix3DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 //	1 5 9  13
 //	2 6 10 14
 //	3 7 11 15
-	if (getIsEmpty(scalePortion)) {
+	if (arrayKit.getIsEmpty(scalePortion)) {
 		return latestMatrix
 	}
 
@@ -1000,12 +969,12 @@ function getMatrix3DZByCosSin(cos, sin) {
 }
 
 function getMeldedArray(elements, otherElements) {
-	var meldedArray = getArraysCopy(elements)
+	var meldedArray = arrayKit.getArraysCopy(elements)
 	var weightIncrement = 1.0 / (elements.length - 1)
 	var elementWeight = 1.0
 	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		multiplyArrayScalar(meldedArray[elementIndex], elementWeight)
-		addArray(meldedArray[elementIndex], getMultiplicationArrayScalar(otherElements[elementIndex], (1.0 - elementWeight)))
+		Vector.multiplyArrayScalar(meldedArray[elementIndex], elementWeight)
+		Vector.addArray(meldedArray[elementIndex], Vector.getMultiplicationArrayScalar(otherElements[elementIndex], (1.0 - elementWeight)))
 		elementWeight -= weightIncrement
 	}
 
@@ -1013,15 +982,15 @@ function getMeldedArray(elements, otherElements) {
 }
 
 function getMidpoint2D(a2D, b2D) {
-	return multiply2DScalar(getAddition2D(a2D, b2D), 0.5)
+	return Vector.multiply2DScalar(Vector.getAddition2D(a2D, b2D), 0.5)
 }
 
 function getMidpoint3D(a3D, b3D) {
-	return multiply3DScalar(getAddition3D(a3D, b3D), 0.5)
+	return Vector.multiply3DScalar(Vector.getAddition3D(a3D, b3D), 0.5)
 }
 
 function getMidpointArray(elements, others, until) {
-	return multiplyArrayScalar(getAdditionArray(elements, others, until), 0.5)
+	return Vector.multiplyArrayScalar(Vector.getAdditionArray(elements, others, until), 0.5)
 }
 
 function getMultiplied2DMatrix(matrixA, matrixB) {
@@ -1122,7 +1091,7 @@ function getRGBByIndex(rgbIndex) {
 function getRotation2DsVector(points, vector) {
 	var rotations2D = new Array(points.length)
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		rotations2D[pointIndex] = getRotation2DVector(points[pointIndex], vector)
+		rotations2D[pointIndex] = Vector.getRotation2DVector(points[pointIndex], vector)
 	}
 
 	return rotations2D
@@ -1134,8 +1103,8 @@ function getTranslateMultiplyTranslate(floats, matrix3D) {
 	}
 
 	var x = floats[1]
-	var y = getValueDefault(floats[2], 0.0)
-	var z = getValueDefault(floats[3], 0.0)
+	var y = Value.getValueDefault(floats[2], 0.0)
+	var z = Value.getValueDefault(floats[3], 0.0)
 	var translationMatrix3D = getUnitMatrix3D()
 	translationMatrix3D[12] = -x
 	translationMatrix3D[13] = -y
@@ -1194,11 +1163,11 @@ function isUnitMatrix(matrix) {
 }
 
 function isUnitMatrix2D(matrix2D) {
-	return arrayIsClose(matrix3D, gUnitMatrix2D)
+	return arrayKit.arrayIsClose(matrix3D, gUnitMatrix2D)
 }
 
 function isUnitMatrix3D(matrix3D) {
-	return arrayIsClose(matrix3D, gUnitMatrix3D)
+	return arrayKit.arrayIsClose(matrix3D, gUnitMatrix3D)
 }
 
 function multiply2DArrays(xyArrays, b2D) {
@@ -1219,7 +1188,7 @@ function multiply2DArraysScalar(xyArrays, multiplier) {
 
 function multiply2Ds(elements, b2D) {
 	for (var xy of elements) {
-		multiply2D(xy, b2D)
+		Vector.multiply2D(xy, b2D)
 	}
 
 	return elements
@@ -1244,7 +1213,7 @@ function multiply3DArraysScalar(xyzArrays, multiplier) {
 
 function multiply3Ds(elementArrays, multiplier3D) {
 	for (var elements of elementArrays) {
-		multiply3D(elements, multiplier3D)
+		Vector.multiply3D(elements, multiplier3D)
 	}
 
 	return elementArrays
@@ -1277,18 +1246,18 @@ function multiplyArraysByIndex(arrays, multiplier, index) {
 }
 
 function normalize2D(xy) {
-	var xyLength = length2D(xy)
+	var xyLength = Vector.length2D(xy)
 	if (xyLength > 0.0) {
-		divide2DScalar(xy, xyLength)
+		Vector.divide2DScalar(xy, xyLength)
 	}
 
 	return xy
 }
 
 function normalize3D(xyz) {
-	var xyzLength = length3D(xyz)
+	var xyzLength = Vector.length3D(xyz)
 	if (xyzLength > 0.0) {
-		divide3DScalar(xyz, xyzLength)
+		Vector.divide3DScalar(xyz, xyzLength)
 	}
 
 	return xyz
@@ -1296,7 +1265,7 @@ function normalize3D(xyz) {
 
 function rotate2DsVector(points, vector) {
 	for (var point of points) {
-		rotate2DVector(point, vector)
+		Vector.rotate2DVector(point, vector)
 	}
 
 	return points
@@ -1318,7 +1287,7 @@ function rotate3DsByBasis(rotationBasis, xyzs, xyRotator) {
 
 function subtract2Ds(elements, point) {
 	for (var element of elements) {
-		subtract2D(element, point)
+		Vector.subtract2D(element, point)
 	}
 
 	return elements
