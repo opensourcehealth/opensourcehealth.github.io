@@ -1,9 +1,8 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-const gGridSpacingMultiplier = 0.2
+const gGridSpacingMultiplier = 0.1
 
 function controlIsAnalysisName(control) {
-//	return control.display != false && control.view.analysisControl.getSelectedName() == control.name
 	return control.display != false && control.view.analysis.analysisControl.getSelectedName() == control.name
 }
 
@@ -66,14 +65,14 @@ function drawLine(context, begin, end) {
 }
 
 function drawLines(context, points, pointLength) {
-	pointLength = getValueDefault(pointLength, points.length)
+	pointLength = Value.getValueDefault(pointLength, points.length)
 	for (var vertexIndex = 0; vertexIndex < pointLength; vertexIndex++) {
 		drawLine(context, points[vertexIndex], points[(vertexIndex + 1) % points.length])
 	}
 }
 
 function drawNumericArray(context, element, x, y, decimalPlaces) {
-	decimalPlaces = getValueDefault(decimalPlaces, 0)
+	decimalPlaces = Value.getValueDefault(decimalPlaces, 0)
 	if (Array.isArray(element)) {
 		if (element.length > 0) {
 			var text = getSignificant(decimalPlaces, element[0])
@@ -116,8 +115,8 @@ function exportClippedCanvasAsPNG() {
 		}
 	}
 
-	boundingBox[1] = getAddition2D(boundingBox[0], upperPoint)
-	boundingBox[0] = getAddition2D(boundingBox[0], lowerPoint)
+	boundingBox[1] = Vector.getAddition2D(boundingBox[0], upperPoint)
+	boundingBox[0] = Vector.getAddition2D(boundingBox[0], lowerPoint)
 	exportImageData(getImageDataByBoundingBox(boundingBox))
 }
 
@@ -151,7 +150,7 @@ function getImageDataByBoundingBox(boundingBox) {
 		view.draw(viewBroker.context)
 	}
 
-	var size = getSubtraction2D(boundingBox[1], boundingBox[0])
+	var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
 	var imageData = viewBroker.context.getImageData(boundingBox[0][0], boundingBox[0][1], size[0], size[1])
 	viewBroker.canvas = oldCanvas
 	viewBroker.context = oldContext
@@ -182,7 +181,7 @@ function getMouseMovement(event) {
 		return undefined
 	}
 
-	if (event.shiftKey) {
+	if (event.ctrlKey) {
 		if (Math.abs(mouseMovement[0]) > Math.abs(mouseMovement[1])) {
 			mouseMovement[1] = 0.0 
 		}
@@ -247,7 +246,7 @@ function removeByGeneratorName(elements, generatorName) {
 		}
 	}
 
-	removeUndefineds(elements)
+	arrayKit.removeUndefineds(elements)
 }
 
 function removeStatementsByGeneratorName(generatorName, registry, statements) {
@@ -259,7 +258,7 @@ function removeStatementsByGeneratorName(generatorName, registry, statements) {
 		}
 	}
 
-	removeUndefineds(statements)
+	arrayKit.removeUndefineds(statements)
 }
 
 function setDisplayFunctionControls(controls, displayFunction) {
@@ -303,7 +302,7 @@ var svgContext = {
 	},
 	getCenteredText: function() {
 		var boundingBox = this.getBoundingBox()
-		var center = multiply2DScalar(getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
+		var center = Vector.multiply2DScalar(Vector.getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
 		subtract2Ds(boundingBox, center)
 		for (var shape of this.shapes) {
 			subtract2Ds(shape.points, center)
@@ -316,7 +315,7 @@ var svgContext = {
 	},
 	getTextByBoundingBox: function(boundingBox) {
 		var svgLines = new Array(this.shapes.length + 2)
-		var size = getSubtraction2D(boundingBox[1], boundingBox[0])
+		var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
 		pointsToFixed(boundingBox)
 		svgLines[0] = '<g boundingBox="' + boundingBox.join(' ') + '" size="' + getFixedStrings(size).join(',') + '">'
 		for (var shapeIndex = 0; shapeIndex < this.shapes.length; shapeIndex++) {
@@ -379,7 +378,7 @@ var viewBroker = {
 	minimumHeight:256,
 	numberOfBigSides:{text:'Sides', lower:3, upper:60, value:36},
 	numberOfInteriorSides:{text:'Sides', lower:3, upper:20, value:8},
-	numberOfSides:{text:'Sides', lower:3, upper:60, value:24},
+	numberOfSides:{text:'Sides', lower:3, upper:60, value:gFillet.sides},
 	segment:{text:'Segment', checked:false},
 	setView: function(viewIndex) {
 		if (this.view != undefined) {
@@ -415,7 +414,7 @@ var viewBroker = {
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var viewKeys = ['', 'Export Canvas As PNG', 'Export Clipped Canvas As PNG', 'Output Canvas As SVG', 'Output Centered Canvas As SVG']
 		setSelectToKeysIndexTitle(document.getElementById('viewMenuSelectID'), viewKeys, 0, 'View')
-		views.sort(compareIDAscending)
+		views.sort(arrayKit.compareIDAscending)
 		var ids = new Array(views.length)
 		for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
 			ids[viewIndex] = views[viewIndex].id
@@ -426,9 +425,9 @@ var viewBroker = {
 		this.setView(viewSelectedIndex)
 		this.heightMinus = height - viewCanvas.controlWidth
 		this.analysisCharacterBegin = height + 0.5 * viewCanvas.textHeight
-		this.analysisSizeBegin = height + 2 * viewCanvas.textHeight
-		this.analysisLowerBegin = height + 7 * viewCanvas.textHeight
-		this.analysisUpperBegin = height + 12 * viewCanvas.textHeight
+		this.analysisLowerBegin = height + 2 * viewCanvas.textHeight
+		this.analysisUpperBegin = height + 7 * viewCanvas.textHeight
+		this.analysisSizeBegin = height + 12 * viewCanvas.textHeight
 		this.boundingBox = [[0, 0], [viewBroker.canvas.width, height]]
 		for (var view of views) {
 			view.start()
