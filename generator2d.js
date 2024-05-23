@@ -17,7 +17,7 @@ function addPolygonsToGroup(polygons, registry, statement, copyKeys = true) {
 		var polygonStatement = getStatementByParentTag(new Map(), 0, statement, 'polygon')
 		getUniqueID(idStart + polygonIndex.toString(), registry, polygonStatement)
 		if (copyKeys) {
-			copyMissingKeysExcept(polygonStatement.attributeMap, statement.attributeMap, gPolygonExceptionSet)
+			mapKit.copyMissingKeysExcept(polygonStatement.attributeMap, statement.attributeMap, gPolygonExceptionSet)
 		}
 		setPointsHD(polygons[polygonIndex], polygonStatement)
 		gPolygon.processStatement(registry, polygonStatement)
@@ -34,7 +34,7 @@ function addPolylinesToGroup(polylines, registry, statement) {
 
 function addRectangle(boundingBox, color, registry, statement, strokeWidthString) {
 	var lowerPoint = boundingBox[0]
-	var size = getSubtraction2D(boundingBox[1], lowerPoint)
+	var size = Vector.getSubtraction2D(boundingBox[1], lowerPoint)
 	var xString = lowerPoint[0].toString()
 	var yString = lowerPoint[1].toString()
 	var rectangleAttributeMap = new Map([['x', xString], ['y', yString], ['width', size[0].toString()], ['height', size[1].toString()]])
@@ -228,7 +228,7 @@ function addTextStatements(format, registry, statement, text) {
 }
 
 function arcFromTo(fromX, fromY, toX, toY, radius, numberOfSides) {
-	return arcFromToRadius(null, {parent:{variableMap:null}}, fromX, fromY, toX, toY, radius, true, numberOfSides)
+	return Polyline.arcFromToRadius(null, {parent:{variableMap:null}}, fromX, fromY, toX, toY, radius, true, numberOfSides)
 }
 
 function BoldMonad() {
@@ -301,19 +301,19 @@ function createCharacterPolylineMap() {
 	var topLine = [[0, 2], [1, 2]]
 	var topRightArc = arcFromTo(0.5, 2, 1.0, 1.97, 0.8)
 	var topSemicircle = multiplyArraysByIndex(arcFromTo(0, 2, 0, 1, 0.5), 2.0, 0)
-	gLetteringMap.set('.', [arcCenterRadius(0, 0, 0.015, 0, 360, 12)])
-	gLetteringMap.set('0', [leftTallSemicircle, rightTallSemicircle, arcCenterRadius(0.5, 1, 0.015, 0, 360, 12)])
+	gLetteringMap.set('.', [Polyline.arcCenterRadius(0, 0, 0.015, 0, 360, 12)])
+	gLetteringMap.set('0', [leftTallSemicircle, rightTallSemicircle, Polyline.arcCenterRadius(0.5, 1, 0.015, 0, 360, 12)])
 	gLetteringMap.set('1', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
-	gLetteringMap.set('2', [arcCenterRadius(0.5, 1.5, 0.5, 165, -45).concat(bottomLine)])
-	var three = arcCenterRadius(0.5, 1.5, 0.5, 165, -90).concat([[0.45, 1]]).concat(arcCenterRadius(0.5, 0.5, 0.5, 90, -90))
-	gLetteringMap.set('3', [three.concat(arcCenterRadius(0.5, 1.5, 1.5, -90, -109))])
+	gLetteringMap.set('2', [Polyline.arcCenterRadius(0.5, 1.5, 0.5, 165, -45).concat(bottomLine)])
+	var three = Polyline.arcCenterRadius(0.5, 1.5, 0.5, 165, -90).concat([[0.45, 1]]).concat(Polyline.arcCenterRadius(0.5, 0.5, 0.5, 90, -90))
+	gLetteringMap.set('3', [three.concat(Polyline.arcCenterRadius(0.5, 1.5, 1.5, -90, -109))])
 	gLetteringMap.set('4', [[[0.75,], [, 0.7], [, 2]], [[, 2], [, 0.7], [0.75,], [1,]]])
 	gLetteringMap.set('5', [[[1, 2], [0.45, 2]].concat(arcFromTo(0.2, 1.27, 0.1, 0.03, -0.653))])
 	var six = arcFromTo(0.005, 0.5, 1, 0.55, 0.4982).concat(arcFromTo(1, 0.5, 0.005, 0.45, 0.4982))
 	gLetteringMap.set('6', [six.concat(arcFromTo(0.005, 0.45, 0.2, 1.6, 1.3)).concat(arcFromTo(0.2, 1.6, 1, 2, 1.05))])
 	gLetteringMap.set('7', [arcFromTo(0.2, 0, 1, 2, 4).concat([[0, 2]])])
-	var eight = center.concat(arcCenterRadius(0.5, 1.5, 0.5, 240, -60)).concat(center)
-	gLetteringMap.set('8', [eight.concat(arcCenterRadius(0.5, 0.5, 0.5, 60, -240)).concat(center)])
+	var eight = center.concat(Polyline.arcCenterRadius(0.5, 1.5, 0.5, 240, -60)).concat(center)
+	gLetteringMap.set('8', [eight.concat(Polyline.arcCenterRadius(0.5, 0.5, 0.5, 60, -240)).concat(center)])
 	gLetteringMap.set('9', [[[0.25, 0], [0.5, 0], [0.75, 0]], middleVerticalLine, [[0.25, 1.85], [0.5, 2]]])
 	gLetteringMap.set('A', [[[,], [0.14, 0.4], [0.7, 2], [0.8,], [1.36, 0.4], [1.5, 0]], [[0.14, 0.4], [1.36,]]])
 	gLetteringMap.set('B', [bottomSemicircle, leftBisectedPolyline, topSemicircle])
@@ -334,7 +334,7 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5,], [0.9, -0.15]]])
 	gLetteringMap.set('R', [leftBisectedPolyline, topSemicircle, bottomDiagonal])
 	var s = [arcFromTo(0.5, 0, 0.1, 0.03, 0.8), arcFromTo(0.853, 0.853, 0.5, 0, 0.5), [[0.853, 0.853], [0.147, 1.147]]]
-	pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
+	arrayKit.pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
 	gLetteringMap.set('S', s)
 	gLetteringMap.set('T', [middleVerticalLine, [[, 2], [0.5, 2], [1,]]])
 	gLetteringMap.set('U', [lowRightLine, bottomHorizontalSemicircle, lowLeftLine])
@@ -428,7 +428,7 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 				outlines = outlines.filter(getIsCounterclockwise)
 			}
 			var polygon = getConnectedPolygon(outlines)
-			polygon = getArraysCopy(polygon)
+			polygon = arrayKit.getArraysCopy(polygon)
 			multiply2DsScalar(polygon, halfHeight)
 			var boundingX = getBoundingXByPolygons([polygon])
 			x -= boundingX[0]
@@ -445,7 +445,7 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 
 function getMarker(key, outsets, registry, statement) {
 	var marker = getPointsByKey(key, registry, statement)
-	if (!getIsEmpty(marker)) {
+	if (!arrayKit.getIsEmpty(marker)) {
 		return marker
 	}
 
@@ -453,8 +453,8 @@ function getMarker(key, outsets, registry, statement) {
 		return undefined
 	}
 
-	var sides = getValueDefault(getFloatByStatement(key + 'Sides', registry, statement), 24)
-	return arcCenterRadius(undefined, undefined, outsets[0][0], 0.0, 180.0, sides, false, false)
+	var sides = Value.getValueDefault(getFloatByStatement(key + 'Sides', registry, statement), 24)
+	return Polyline.arcCenterRadius(undefined, undefined, outsets[0][0], 0.0, 180.0, sides, false, false)
 }
 
 function getNextYString(fontSize, monad, yString) {
@@ -487,15 +487,15 @@ function getTextLength(text) {
 	if (gCharacterLengthMap == undefined) {
 		gCharacterLengthMap = new Map()
 		var characterLengths = 'a 435 b 500 c 444 d 499 e 444 f 373 g 467 h 498 i 278'.split(' ')
-		pushArray(characterLengths, 'j 348 k 513 l 258 m 779 n 489 o 491 p 500 q 499 r 345'.split(' '))
-		pushArray(characterLengths, 's 367 t 283 u 490 v 468 w 683 x 482 y 471 z 417'.split(' '))
-		pushArray(characterLengths, 'A 721 B 631 C 670 D 719 E 610 F 564 G 722 H 714 I 327'.split(' '))
-		pushArray(characterLengths, 'J 385 K 709 L 611 M 881 N 725 O 724 P 576 Q 723 R 667'.split(' '))
-		pushArray(characterLengths, 'S 529 T 606 U 721 V 701 W 947 X 714 Y 701 Z 613'.split(' '))
-		pushArray(characterLengths, '0 500 1 500 2 500 3 500 4 500 5 500 6 500 7 500 8 500 9 500'.split(' '))
-		pushArray(characterLengths, ') 333 ! 333 @ 865 # 500 $ 500 % 833 ^ 469 & 778 * 500 ( 333'.split(' '))
-		pushArray(characterLengths, ', 250 < 564 . 250 > 564 / 296 ? 444 ; 250 : 250 [ 333'.split(' '))
-		pushArray(characterLengths, '{ 480 ] 333 } 480 | 200 - 333 _ 500 = 564 + 564 ` 250 ~ 500'.split(' '))
+		arrayKit.pushArray(characterLengths, 'j 348 k 513 l 258 m 779 n 489 o 491 p 500 q 499 r 345'.split(' '))
+		arrayKit.pushArray(characterLengths, 's 367 t 283 u 490 v 468 w 683 x 482 y 471 z 417'.split(' '))
+		arrayKit.pushArray(characterLengths, 'A 721 B 631 C 670 D 719 E 610 F 564 G 722 H 714 I 327'.split(' '))
+		arrayKit.pushArray(characterLengths, 'J 385 K 709 L 611 M 881 N 725 O 724 P 576 Q 723 R 667'.split(' '))
+		arrayKit.pushArray(characterLengths, 'S 529 T 606 U 721 V 701 W 947 X 714 Y 701 Z 613'.split(' '))
+		arrayKit.pushArray(characterLengths, '0 500 1 500 2 500 3 500 4 500 5 500 6 500 7 500 8 500 9 500'.split(' '))
+		arrayKit.pushArray(characterLengths, ') 333 ! 333 @ 865 # 500 $ 500 % 833 ^ 469 & 778 * 500 ( 333'.split(' '))
+		arrayKit.pushArray(characterLengths, ', 250 < 564 . 250 > 564 / 296 ? 444 ; 250 : 250 [ 333'.split(' '))
+		arrayKit.pushArray(characterLengths, '{ 480 ] 333 } 480 | 200 - 333 _ 500 = 564 + 564 ` 250 ~ 500'.split(' '))
 		for (var characterIndex = 0; characterIndex < characterLengths.length; characterIndex += 2) {
 			gCharacterLengthMap.set(characterLengths[characterIndex], 0.001 * parseFloat(characterLengths[characterIndex + 1]))
 		}
@@ -771,9 +771,9 @@ function TableMonad() {
 		var fontSize = getAttributeFloat('font-size', this)
 		var sourceStatement = registry.idMap.get(src)
 		var sourceChildren = sourceStatement.children
-		var numberOfColumns = parseInt(getValueDefault(getAttributeValue('columns', this), '1'))
+		var numberOfColumns = parseInt(Value.getValueDefault(getAttributeValue('columns', this), '1'))
 		var x = getAttributeFloat('padding', this)
-		var numberOfRows = parseInt(getValueDefault(getAttributeValue('rows', this), '1'))
+		var numberOfRows = parseInt(Value.getValueDefault(getAttributeValue('rows', this), '1'))
 		var numberOfCells = Math.min(numberOfColumns * numberOfRows, sourceChildren.length)
 		var width = getAttributeFloat('width', this)
 		var remainingLength = sourceChildren.length - numberOfCells
@@ -785,7 +785,7 @@ function TableMonad() {
 		var originalYString = getAttributeValue('y', this)
 		var xAdvance = width / numberOfColumns
 		var yString = originalYString
-		pushArray(statement.children, tableChildren)
+		arrayKit.pushArray(statement.children, tableChildren)
 		for (var cellIndex = 0; cellIndex < numberOfCells; cellIndex++) {
 			var child = tableChildren[cellIndex]
 			if (rowIndex == endIndex) {
@@ -876,13 +876,13 @@ var gFormattedText = {
 								}
 								previousCharacter = character
 							}
-							removeUndefineds(textPhrase)
+							arrayKit.removeUndefineds(textPhrase)
 							textPhrase = textPhrase.join('')
 						}
 						textPhrases[textPhraseIndex] = textPhrase
 					}
 				}
-				removeUndefineds(textPhrases)
+				arrayKit.removeUndefineds(textPhrases)
 				text = '<p> ' + textPhrases.join(' </p> <p> ') + ' </p>'
 			}
 		}
@@ -942,14 +942,13 @@ var gFractal2D = {
 var gGrid = {
 	initialize: function() {
 		gParentFirstSet.add(this.tag)
-		gTagCenterMap.set(this.tag, this)
 
 //deprecated24
-		addFunctionToMap(cellX, gSetR)
-		addFunctionToMap(cellY, gSetR)
+		addFunctionToMap(cellX, gMapR)
+		addFunctionToMap(cellY, gMapR)
 
-		addFunctionToMap(gridCellX, gSetR)
-		addFunctionToMap(gridCellY, gSetR)
+		addFunctionToMap(gridCellX, gMapR)
+		addFunctionToMap(gridCellY, gMapR)
 	},
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
@@ -1061,16 +1060,16 @@ var gList = {
 		var children = []
 		var parent = statement.parent
 		var variableValue = getVariableValue('list_children', parent)
-		if (!getIsEmpty(variableValue)) {
+		if (!arrayKit.getIsEmpty(variableValue)) {
 			children = variableValue.split(' ')
 		}
 
 		var padding = getFloatByDefault('listPadding', registry, statement, this.tag, 2.0)
 		padding = getFloatByDefault('listMargin', registry, statement, this.tag, padding)
-		var transform = getValueDefault(getAttributeValue('listTransform', statement), attributeMap.get('transform'))
+		var transform = Value.getValueDefault(getAttributeValue('listTransform', statement), attributeMap.get('transform'))
 		var width = getFloatByDefault('gridCellWidth', registry, statement, this.tag, 0.0)
 		var x = 0.5 * width
-		if (!getIsEmpty(transform)) {
+		if (!arrayKit.getIsEmpty(transform)) {
 			attributeMap.set('transform', transform)
 		}
 
@@ -1101,13 +1100,13 @@ var gList = {
 			return
 		}
 
-		replaceAllKeys(attributeMap, '&lt;', '<')
+		arrayKit.replaceAllKeys(attributeMap, '&lt;', '<')
 		for (var formatMapValue of registry.textFormatMapMap.values()) {
 			var formatID = formatMapValue.get('id')
 			if (attributeMap.has(formatID)) {
 				var formatMonad = {attributeMap:new Map(formatMapValue), parent:anchorFontParent}
 				var value = attributeMap.get(formatID)
-				value = getValueDefault(getVariableValue(value, statement), value)
+				value = Value.getValueDefault(getVariableValue(value, statement), value)
 				var key = getAttributeValue('key', formatMonad)
 				if (key != undefined) {
 					value = value.trim()
@@ -1150,8 +1149,8 @@ var gList = {
 					var x = getAttributeFloatByDefault('x', formatMonad, 0.0) + getAttributeFloatByDefault('dx', formatMonad, 0.0)
 					var y = getAttributeFloatByDefault('y', formatMonad, 0.0) + getAttributeFloatByDefault('dy', formatMonad, 0.0)
 					var imageMap = new Map([['href', value.replaceAll(' ', '')], ['x', x.toString()], ['y', y.toString()]])
-					setMapIfDefined('height', imageMap, getAttributeValue('height', formatMonad))
-					setMapIfDefined('width', imageMap, getAttributeValue('width', formatMonad))
+					mapKit.setMapIfDefined('height', imageMap, getAttributeValue('height', formatMonad))
+					mapKit.setMapIfDefined('width', imageMap, getAttributeValue('width', formatMonad))
 					var imageStatement = getStatementByParentTag(imageMap, 0, statement, 'image')
 					var idStart = getAttributeValue('id', formatMonad)
 					if (value != undefined) {
@@ -1187,47 +1186,80 @@ var gList = {
 			}
 		}
 
-		replaceAllKeys(attributeMap, '<', '&lt;')
+		arrayKit.replaceAllKeys(attributeMap, '<', '&lt;')
 	},
 	tag: 'list'
 }
 
 var gMap = {
-	processStatement: function(registry, statement) {
-		statement.tag = 'g'
-		var step = getFloatsByDefault('step', registry, statement, this.tag, [10.0])
-		if (step.length == 1) {
-			step.push(step[0])
-		}
-		var add3DTransform = getBooleanByDefault('3D', registry, statement, this.tag, false)
-		var translate = [0.0, 0.0]
-		for (var child of statement.children) {
-			if (child.nestingIncrement == 1) {
-				for (var grandchild of child.children) {
-					if (grandchild.nestingIncrement > -1) {
-						var attributeMap = grandchild.attributeMap
-						var translateString = 'translate(' + translate.toString() + ')'
-						var totalString = translateString
-						if (attributeMap.has('transform')) {
-							totalString += ',' + attributeMap.get('transform')
-						}
-						attributeMap.set('transform', totalString)
-						if (add3DTransform) {
-							totalString = translateString
-							if (attributeMap.has('transform3D')) {
-								totalString += ',' + attributeMap.get('transform3D')
-							}
-							attributeMap.set('transform3D', totalString)
-						}
-						translate[0] += step[0]
+addText: function(registry, statement, textStatement) {
+	if (textStatement.tag != 'text') {
+		return
+	}
+
+	var innerHTML = textStatement.attributeMap.get('innerHTML')
+	if (innerHTML == undefined) {
+		return
+	}
+
+	var cellStrings = innerHTML.split(' ').filter(lengthCheck)
+	for (var cellString of cellStrings) {
+		var cells = cellString.split(',').filter(lengthCheck)
+		if (cells.length > 0) {
+			var attributeMap = undefined
+			var groupStatement = statement
+			if (cells.length > 1) {
+				attributeMap = new Map()
+				groupStatement = getStatementByParentTag(attributeMap, 1, statement, 'g')
+				getStatementID(registry, groupStatement)
+			}
+			for (var cell of cells) {
+				if (registry.idMap.has(cell)) {
+					var workStatement = registry.idMap.get(cell)
+					var child = getStatementByParentTag(new Map(), workStatement.nestingIncrement, groupStatement, workStatement.tag)
+					getStatementID(registry, child)
+					copyStatementRecursively(registry, child, workStatement)
+					if (attributeMap == undefined) {
+						attributeMap = child.attributeMap
 					}
 				}
 			}
-			translate[0] = 0.0
-			translate[1] += step[1]
+			var translateString = 'translate(' + this.translate.toString() + ')'
+			var totalString = translateString
+			if (attributeMap.has('transform')) {
+				totalString += ',' + attributeMap.get('transform')
+			}
+			attributeMap.set('transform', totalString)
+			if (this.add3DTransform) {
+				totalString = translateString
+				if (attributeMap.has('transform3D')) {
+					totalString += ',' + attributeMap.get('transform3D')
+				}
+				attributeMap.set('transform3D', totalString)
+			}
+			this.translate[0] += this.step[0]
 		}
-	},
-	tag: 'map'
+	}
+
+	this.translate[0] = 0.0
+	this.translate[1] += this.step[1]
+},
+
+processStatement: function(registry, statement) {
+	statement.tag = 'g'
+	this.step = getFloatsByDefault('step', registry, statement, this.tag, [10.0])
+	if (this.step.length == 1) {
+		this.step.push(this.step[0])
+	}
+
+	this.add3DTransform = getBooleanByDefault('3D', registry, statement, this.tag, false)
+	this.translate = [0.0, 0.0]
+	for (var child of statement.children) {
+		this.addText(registry, statement, child)
+	}
+},
+
+tag: 'map'
 }
 
 var gOutline = {
@@ -1251,13 +1283,13 @@ var gOutline = {
 		}
 
 		var outlines = getOutlines(baseLocation, baseMarker, checkIntersection, markerAbsolute, outsets, polylines, tipMarker)
-		if (getIsEmpty(outlines)) {
+		if (arrayKit.getIsEmpty(outlines)) {
 			noticeByList(['No outlines could be found for outline in generator2d.', statement])
 			return
 		}
 
 		convertToGroup(statement)
-		if (getIsEmpty(hole)) {
+		if (arrayKit.getIsEmpty(hole)) {
 			var holeRadius = getFloatByDefault('holeRadius', registry, statement, this.tag, 0.0)
 			if (holeRadius > 0.0) {
 				var sides = getIntByDefault('sides', registry, statement, this.tag, 24)
@@ -1265,7 +1297,7 @@ var gOutline = {
 			}
 		}
 
-		if (!getIsEmpty(hole)) {
+		if (!arrayKit.getIsEmpty(hole)) {
 			var hole = getDirectedPolygon(!getIsCounterclockwise(outlines[0]), hole)
 			var holes = []
 			var pointStringSet = new Set()
@@ -1273,7 +1305,7 @@ var gOutline = {
 				for (var point of polyline) {
 					var pointString = point.slice(0, 2).toString()
 					if (!pointStringSet.has(pointString)) {
-						holes.push(getAddition2Ds(hole, point))
+						holes.push(Vector.getAddition2Ds(hole, point))
 						pointStringSet.add(pointString)
 					}
 				}
@@ -1296,7 +1328,7 @@ var gScreen = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'polygon'
 		var box = getBox(registry, statement)
-		if (getIsEmpty(box)) {
+		if (arrayKit.getIsEmpty(box)) {
 			noticeByList(['No box could be generated for screen in generator2d.', statement])
 			return
 		}
@@ -1317,8 +1349,13 @@ var gScreen = {
 var gTable = {
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
-		var spreadsheetID = getValueDefault(attributeMap.get('spreadsheetID'), attributeMap.get('id'))
+		var spreadsheetID = Value.getValueDefault(attributeMap.get('spreadsheetID'), attributeMap.get('id'))
 		var tableID = getValueByKeyDefault('tableID', registry, statement, this.tag, 'table_0')
+		var delimiter = getSpreadsheetDelimiter(statement)
+		for (var child of statement.children) {
+			gSpreadsheet.addTextToSpreadsheet(delimiter, spreadsheetID, registry, child)
+		}
+
 		var table = getSpreadsheetTable(registry, spreadsheetID, tableID)
 		if (table == undefined) {
 			noticeByList(['No table for table in generator2D.', statement, attributeMap])
@@ -1343,11 +1380,26 @@ var gTable = {
 }
 
 var gText = {
-	processStatement: function(registry, statement) {
-		statement.attributeMap.set('x', getFloatByDefault('x', registry, statement, this.tag, 0.0).toString())
-		statement.attributeMap.set('y', getFloatByDefault('y', registry, statement, this.tag, 0.0).toString())
-	},
-	tag: 'text'
+processStatement: function(registry, statement) {
+	var attributeMap = statement.attributeMap
+	attributeMap.set('x', getFloatByDefault('x', registry, statement, this.tag, 0.0).toString())
+	attributeMap.set('y', getFloatByDefault('y', registry, statement, this.tag, 0.0).toString())
+	if (attributeMap.get('compression') == 'alphabeticRepeatQ') {
+		var originalText = attributeMap.get('innerHTML')
+		var compressedText = AlphabeticRepeatQ.getCompressed(originalText)
+		attributeMap.set('compressionPercentage', getRoundedPercentageString(1.0 - compressedText.length / originalText.length))
+		attributeMap.set('innerHTML', compressedText)
+	}
+
+	if (attributeMap.get('expansion') == 'alphabeticRepeatQ') {
+		var originalText = attributeMap.get('innerHTML')
+		var expandedText = AlphabeticRepeatQ.getExpanded(originalText)
+		attributeMap.set('compressionPercentage', getRoundedFloatString(1.0 - originalText.length / expandedText.length))
+		attributeMap.set('innerHTML', expandedText)
+	}
+},
+
+tag: 'text',
 }
 
 var gTextFormat = {
