@@ -11,13 +11,13 @@ function getEntryLocation(childrenMaps, entryCenter, terrain) {
 	for (var shellIndex = 1; shellIndex < 9; shellIndex++) {
 		for (var signedShellIndex = - shellIndex; signedShellIndex <= shellIndex; signedShellIndex += shellIndex + shellIndex) {
 			for (var x = 1 - shellIndex; x < shellIndex; x++) {
-				var entryLocation = getAddition2D(entryCenter, [x, signedShellIndex])
+				var entryLocation = Vector.getAddition2D(entryCenter, [x, signedShellIndex])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
 			}
 			for (var y = - shellIndex; y <= shellIndex; y++) {
-				var entryLocation = getAddition2D(entryCenter, [signedShellIndex, y])
+				var entryLocation = Vector.getAddition2D(entryCenter, [signedShellIndex, y])
 				if (!getIsOccupied(childrenMaps, entryLocation, terrain)) {
 					return entryLocation
 				}
@@ -38,7 +38,7 @@ function getIsOccupied(childrenMaps, location, terrain) {
 		if (childrenMap.has(xyKey)) {
 			var children = childrenMap.get(xyKey)
 			for (var child of children) {
-				if (equal2D(child.location[0], location[1])) {
+				if (Vector.equal2D(child.location[0], location[1])) {
 					return true
 				}
 			}
@@ -88,7 +88,7 @@ function Region(terrain) {
 		for (var mapIndex = this.childrenMaps.length; mapIndex < child.scaleIndex + 1; mapIndex++) {
 			this.childrenMaps.push(new Map())
 		}
-		add2D(child.location, this.entry)
+		Vector.add2D(child.location, this.entry)
 		child.location = getEntryLocation(this.childrenMaps, child.location, this.terrain)
 		var childrenMap = this.childrenMaps[child.scaleIndex]
 		var locationAtScale = this.terrain.getLocationAtScale(child.location, child.scaleIndex)
@@ -109,7 +109,7 @@ function Region(terrain) {
 		var allChildren = []
 		for (var childrenMap of this.childrenMaps) {
 			for (var children of this.childrenMap.values()) {
-				pushArray(allChildren, children)
+				arrayKit.pushArray(allChildren, children)
 			}
 		}
 		return allChildren
@@ -117,9 +117,6 @@ function Region(terrain) {
 }
 
 var gCreature = {
-	initialize: function() {
-		gTagCenterMap.set(this.tag, this)
-	},
 	tag: 'creature',
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
@@ -148,9 +145,6 @@ var gCreature = {
 }
 
 var gLaunch = {
-	initialize: function() {
-		gTagCenterMap.set(this.tag, this)
-	},
 	tag: 'launch',
 	processStatement:function(registry, statement) {
 		var workStatement = getWorkStatement(registry, statement)
@@ -178,9 +172,6 @@ var gLaunch = {
 }
 
 var gRegion = {
-	initialize: function() {
-		gTagCenterMap.set(this.tag, this)
-	},
 	tag: 'region',
 	processStatement:function(registry, statement) {
 		var attributeMap = statement.attributeMap
@@ -202,9 +193,6 @@ var gRegion = {
 }
 
 var gTerrainView = {
-	initialize: function() {
-		gTagCenterMap.set(this.tag, this)
-	},
 	tag: 'terrainView',
 	processStatement:function(registry, statement) {
 		var maximumWidth = getFloatByDefault('maximumWidth', registry, statement, this.tag, 390.0)
