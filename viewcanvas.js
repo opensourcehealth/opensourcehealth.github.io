@@ -10,7 +10,7 @@ class CanvasControl {
 				var clipBox = this.clipBox
 				context.save()
 				var region = new Path2D()
-				var size = getSubtraction2D(clipBox[1], clipBox[0])
+				var size = Vector.getSubtraction2D(clipBox[1], clipBox[0])
 				region.rect(clipBox[0][0], clipBox[0][1], size[0], size[1])
 				context.clip(region)
 			}
@@ -65,8 +65,12 @@ class CanvasControl {
 }
 
 function boundDrawControlSlider(context, control) {
-	control.value = Math.max(control.value, control.lower)
-	control.value = Math.min(control.value, control.upper)
+	control.value = Value.getBounded(control.value, control.lower, control.upper)
+	if (event.shiftKey) {
+		var along = Value.getStep((control.value - control.lower) / (control.upper - control.lower), 1.0 / 30.0)
+		control.value = (1.0 - along) * control.lower + along * control.upper
+	}
+
 	drawControlSlider(context, control)
 }
 
@@ -97,7 +101,7 @@ class Checkbox extends CanvasControl {
 			return
 		}
 
-		this.value = getValueTrue(value)
+		this.value = Value.getValueTrue(value)
 	}
 	drawPrivate(context) {
 		var boundingBox = this.boundingBox
@@ -150,7 +154,7 @@ class Choice extends CanvasControl {
 			return
 		}
 
-		this.value = getValueDefault(value, 0)
+		this.value = Value.getValueDefault(value, 0)
 	}
 	drawPrivate(context) {
 		clearFillBoundingBox(this.boundingBox, context)
@@ -169,7 +173,7 @@ class Choice extends CanvasControl {
 }
 
 function clearBoundingBox(boundingBox, context) {
-	var size = getSubtraction2D(boundingBox[1], boundingBox[0])
+	var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
 	context.clearRect(boundingBox[0][0], boundingBox[0][1], size[0], size[1])
 }
 
@@ -291,7 +295,7 @@ function getControlValue(control, value) {
 }
 
 function getSelectedIndexByWidth(event, left, texts, width) {
-	return getBoundedValue(Math.floor((event.offsetX - left) / width), 0, texts.length - 1)
+	return Value.getBounded(Math.floor((event.offsetX - left) / width), 0, texts.length - 1)
 }
 
 function getTitleEndX(lower, upper) {
@@ -314,7 +318,7 @@ class HorizontalSlider extends CanvasControl {
 		drawHorizontalBarThumb(this.barRadius, context, this.rangeLeft, this.thumbRadius, this.rangeRight, thumbLeft, this.midY)
 	}
 	mouseDownPrivate(context, event) {
-		mouseDownHorizontalSlider(this)
+		mouseDownHorizontalSlider(context, this)
 	}
 	resize(boundingBox) {
 		resizeHorizontalSlider(boundingBox, this)
@@ -324,8 +328,8 @@ class HorizontalSlider extends CanvasControl {
 
 var horizontalSliderManipulator = {
 	mouseMove: function(context, event) {
-		this.control.value = this.control.mouseDownValue + (event.offsetX - viewCanvas.mouseDown2D[0]) / this.control.rangeOverValue
-		boundDrawControlSlider(context, this.control)
+		this.control.value = this.control.mouseValueOffset + event.offsetX / this.control.rangeOverValue
+		boundDrawControlSlider(context, this.control, event)
 	},
 	mouseOut: function(context, event) {
 		this.control.value = this.control.mouseDownValue
@@ -340,7 +344,7 @@ class HorizontalSliderPoint extends CanvasControl {
 	constructor(boundingBox, lower, text, upper, point) {
 		super()
 		this.width = viewCanvas.controlWidth
-		point = getValueDefault(point, [lower, lower])
+		point = Value.getValueDefault(point, [lower, lower])
 		lower = Math.min(lower, Math.min(point[0], point[1]))
 		upper = Math.max(upper, Math.max(point[0], point[1]))
 		this.sliders = new Array(2)
@@ -376,7 +380,7 @@ class HorizontalSliderPoint extends CanvasControl {
 			var rangeLeft = slider.rangeLeft
 			var thumbLeft = rangeLeft + slider.rangeOverValue * (slider.value - slider.lower)
 			drawHorizontalBarThumb(slider.barRadius, context, rangeLeft, slider.thumbRadius, slider.rangeRight, thumbLeft, slider.midY)
-			valueStrings.push(getControlValue(this, slider.value).toFixed(getValueDefault(this.decimalPlaces, 0)))
+			valueStrings.push(getControlValue(this, slider.value).toFixed(Value.getValueDefault(this.decimalPlaces, 0)))
 		}
 
 		drawTextBeforeAfter(context, this.text, valueStrings.join(', '), this.titleEndX, this.textY)
@@ -387,7 +391,7 @@ class HorizontalSliderPoint extends CanvasControl {
 			var sliderBox = slider.boundingBox
 			var mouseY = viewCanvas.mouseDown2D[1]
 			if (mouseY < sliderBox[1][1] && mouseY > sliderBox[0][1]) {
-				mouseDownHorizontalSlider(slider)
+				mouseDownHorizontalSlider(context, slider)
 			}
 		}
 	}
@@ -414,11 +418,11 @@ class HorizontalSliderWide extends CanvasControl {
 		var thumbLeft = this.rangeLeft + this.rangeOverValue * (this.value - this.lower)
 		clearFillBoundingBox(boundingBox, context)
 		drawHorizontalBarThumb(this.barRadius, context, this.rangeLeft, this.thumbRadius, this.rangeRight, thumbLeft, this.midY)
-		var textAfter = getControlValue(this, this.value).toFixed(getValueDefault(this.decimalPlaces, 0))
+		var textAfter = getControlValue(this, this.value).toFixed(Value.getValueDefault(this.decimalPlaces, 0))
 		drawTextBeforeAfter(context, this.text, textAfter, this.titleEndX, this.textY)
 	}
 	mouseDownPrivate(context, event) {
-		mouseDownHorizontalSlider(this)
+		mouseDownHorizontalSlider(context, this)
 	}
 }
 
@@ -426,16 +430,19 @@ function lineToContextPoint(context, point) {
 	context.lineTo(point[0], point[1])
 }
 
-function mouseDownHorizontalSlider(control) {
+function mouseDownHorizontalSlider(context, control) {
 	var thumbLeft = control.rangeLeft + control.rangeOverValue * (control.value - control.lower)
 	var mouseDownX = viewCanvas.mouseDown2D[0]
-	if (mouseDownX < thumbLeft || mouseDownX > thumbLeft + control.thumbDiameter) {
-		return
-	}
-
 	control.mouseDownValue = control.value
+	control.mouseValueOffset = control.value - mouseDownX / control.rangeOverValue
 	horizontalSliderManipulator.control = control
 	viewCanvas.mouseMoveManipulator = horizontalSliderManipulator
+	if (mouseDownX < thumbLeft || mouseDownX > thumbLeft + control.thumbDiameter) {
+		var thumbX = thumbLeft + control.thumbRadius
+		control.mouseValueOffset += (mouseDownX - thumbX) / control.rangeOverValue
+		horizontalSliderManipulator.mouseMove(context, event)
+	}
+
 }
 
 function resizeHorizontalSlider(boundingBox, control) {
@@ -458,14 +465,14 @@ function resizeHorizontalSlider(boundingBox, control) {
 		control.lower = control.oldLower
 	}
 
-	control.lower = Math.round(control.lower / integerStep) * integerStep
+	control.lower = Value.getStep(control.lower, integerStep)
 	control.upper = control.lower + integerSpan
 	upperMinusLower = control.upper - control.lower
 	control.rangeOverValue = rangeLength / upperMinusLower
 }
 
 function roundRectPath(beginX, beginY, context, endX, endY, outset) {
-	outset = getValueDefault(outset, 8)
+	outset = Value.getValueDefault(outset, 8)
 	context.beginPath()
 	context.arc(endX - outset, beginY + outset, outset, -0.5 * Math.PI, 0.0)
 	context.lineTo(endX, endY - outset)
@@ -478,7 +485,7 @@ function roundRectPath(beginX, beginY, context, endX, endY, outset) {
 }
 
 function setHorizontalSlider(control, lower, text, upper, value) {
-	control.value = getValueDefault(value, lower)
+	control.value = Value.getValueDefault(value, lower)
 	control.oldLower = Math.min(lower, control.value)
 	control.oldUpper = Math.max(upper, control.value)
 	control.text = text
@@ -487,7 +494,7 @@ function setHorizontalSlider(control, lower, text, upper, value) {
 function setTextContext(context, textAlign) {
 	context.font = viewCanvas.textHeight.toString() + 'px freeserif,Palatino'
 	context.fillStyle = 'black'
-	context.textAlign = getValueDefault(textAlign, 'left')
+	context.textAlign = Value.getValueDefault(textAlign, 'left')
 }
 
 function strokeRoundRect(beginX, beginY, context, endX, endY, outset) {
@@ -509,7 +516,7 @@ function moveToContextPoint(context, point) {
 class TableChoice extends Choice {
 	constructor(boundingBox, texts, numberOfRows, value) {
 		super(boundingBox, texts, value)
-		this.numberOfRows = getValueDefault(numberOfRows, 2)
+		this.numberOfRows = Value.getValueDefault(numberOfRows, 2)
 		this.boundingBoxes = new Array(numberOfRows)
 		this.choiceWidths = new Array(numberOfRows)
 		this.rowTextArrays = new Array(numberOfRows)
@@ -548,7 +555,7 @@ class TableChoice extends Choice {
 	}
 	mouseDownPrivate(context, event) {
 		var left = this.boundingBox[0][0]
-		var rowSelected = getBoundedValue(Math.floor((event.offsetY - this.boundingBox[0][1]) / this.rowHeight), 0, this.numberOfRows)
+		var rowSelected = Value.getBounded(Math.floor((event.offsetY - this.boundingBox[0][1]) / this.rowHeight), 0, this.numberOfRows)
 		this.setValue(getSelectedIndexByWidth(event, left, this.rowTextArrays[rowSelected], this.choiceWidths[rowSelected]))
 		for (var rowIndex = 0; rowIndex < rowSelected; rowIndex++) {
 			this.setValue(this.getValue() + this.rowTextArrays[rowIndex].length)
@@ -562,7 +569,7 @@ class TableChoice extends Choice {
 class VerticalScrollBar extends CanvasControl {
 	constructor(boundingBox, lower, span, upper, value) {
 		super()
-		value = getValueDefault(value, lower)
+		value = Value.getValueDefault(value, lower)
 		this.lower = Math.min(lower, value)
 		this.upper = Math.max(upper, value)
 		this.boundingBox = boundingBox
@@ -598,13 +605,23 @@ class VerticalScrollBar extends CanvasControl {
 	mouseDownPrivate(context, event) {
 		var thumbLower = this.rangeBottom + this.rangeOverValue * (this.value - this.lower)
 		var mouseDownY = viewCanvas.mouseDown2D[1]
-		if (mouseDownY < thumbLower + this.thumbNegativeOuter || mouseDownY > thumbLower) {
+		this.mouseDownValue = this.value
+		this.mouseValueOffset = this.value - mouseDownY / this.rangeOverValue
+		verticalSliderManipulator.control = this
+		viewCanvas.mouseMoveManipulator = verticalSliderManipulator
+		var thumbY = thumbLower - this.thumbRadius
+		if (mouseDownY > thumbLower) {
+			this.mouseValueOffset += (mouseDownY - thumbY) / this.rangeOverValue
+			verticalSliderManipulator.mouseMove(context, event)
 			return
 		}
 
-		this.mouseDownValue = this.value
-		verticalSliderManipulator.control = this
-		viewCanvas.mouseMoveManipulator = verticalSliderManipulator
+		if (mouseDownY < thumbLower + this.thumbNegativeOuter) {
+			var thumbTopY = thumbY + this.thumbNegativeOuter + this.thumbDiameter
+			this.mouseValueOffset += (mouseDownY - thumbTopY) / this.rangeOverValue
+			verticalSliderManipulator.mouseMove(context, event)
+			return
+		}
 	}
 
 }
@@ -612,7 +629,7 @@ class VerticalScrollBar extends CanvasControl {
 class VerticalSlider extends CanvasControl {
 	constructor(boundingBox, lower, text, upper, value) {
 		super()
-		value = getValueDefault(value, lower)
+		value = Value.getValueDefault(value, lower)
 		this.lower = Math.min(lower, value)
 		this.upper = Math.max(upper, value)
 		this.boundingBox = boundingBox
@@ -642,20 +659,22 @@ class VerticalSlider extends CanvasControl {
 	mouseDownPrivate(context, event) {
 		var thumbLower = this.rangeBottom + this.rangeOverValue * (this.value - this.lower)
 		var mouseDownY = viewCanvas.mouseDown2D[1]
-		if (mouseDownY < thumbLower - this.thumbDiameter || mouseDownY > thumbLower) {
-			return
-		}
-
 		this.mouseDownValue = this.value
+		this.mouseValueOffset = this.value - mouseDownY / this.rangeOverValue
 		verticalSliderManipulator.control = this
 		viewCanvas.mouseMoveManipulator = verticalSliderManipulator
+		if (mouseDownY < thumbLower - this.thumbDiameter || mouseDownY > thumbLower) {
+			var thumbY = thumbLower - this.thumbRadius
+			this.mouseValueOffset += (mouseDownY - thumbY) / this.rangeOverValue
+			verticalSliderManipulator.mouseMove(context, event)
+		}
 	}
 }
 
 var verticalSliderManipulator = {
 	mouseMove: function(context, event) {
-		this.control.value = this.control.mouseDownValue + (event.offsetY - viewCanvas.mouseDown2D[1]) / this.control.rangeOverValue
-		boundDrawControlSlider(context, this.control)
+		this.control.value = this.control.mouseValueOffset + event.offsetY / this.control.rangeOverValue
+		boundDrawControlSlider(context, this.control, event)
 	},
 	mouseOut: function(context, event) {
 		this.control.value = this.control.mouseDownValue
@@ -670,6 +689,7 @@ var viewCanvas = {
 	initializeControlText: function(controlWidth, textHeight) {
 		this.controlWidth = controlWidth
 		this.textHeight = textHeight
+		this.textDown = this.textHeight * 1.4
 		this.textSpace = this.textHeight * 1.5
 		this.halfTextSpace = this.textSpace * 0.5
 		this.textControlLift = this.controlWidth * 0.5 - 0.4 * this.textHeight
