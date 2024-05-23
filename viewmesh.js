@@ -16,7 +16,7 @@ function addEdgeExistenceMap(mesh) {
 				edgeMap.set(key, [new Array(3).fill(1.0 / Math.sqrt(3.0)), undefined, undefined])
 			}
 			else {
-				addElementToMapArray(edgeMap, edgeKey, normal)
+				mapKit.addElementToMapArray(edgeMap, edgeKey, normal)
 			}
 		}
 	}
@@ -26,16 +26,16 @@ function addEdgeExistenceMap(mesh) {
 		var normal = value[0]
 		if (value.length == 2) {
 			var otherNormal = value[1]
-			var existence = distanceSquared3D(normal, otherNormal) > gCloseSquared
+			var existence = Vector.distanceSquared3D(normal, otherNormal) > gCloseSquared
 			if (existence) {
-				normal = getAddition3D(normal, otherNormal)
-				var normalLength = length3D(normal)
+				normal = Vector.getAddition3D(normal, otherNormal)
+				var normalLength = Vector.length3D(normal)
 				if (normalLength == 0.0) {
 					normal = otherNormal
 					existence = false
 				}
 				else {
-					normal = divide3DScalar(normal, normalLength)
+					normal = Vector.divide3DScalar(normal, normalLength)
 				}
 			}
 			if (existence) {
@@ -75,9 +75,8 @@ class AnalysisMesh {
 		var width = viewBroker.canvas.width
 		this.controls = controls
 
-
 		var analysisChoiceBox = [[height, 0], [width, controlWidth]]
-		this.analysisControl = new Choice(analysisChoiceBox, ['Display', 'Inspect'], getKeyMapDefault('meshAnalysis', valueMap, 1))
+		this.analysisControl = new Choice(analysisChoiceBox, ['Display', 'Inspect'], mapKit.getKeyMapDefault('meshAnalysis', valueMap, 1))
 		this.analysisControl.controlChanged = drawAnalysisControls
 		controls.push(this.analysisControl)
 		var analysisBottom = controlWidth
@@ -88,20 +87,20 @@ class AnalysisMesh {
 		var nextDisplayTop = displayTop + controlWidth
 		var displayBoxRight = height + (width - height) / 3.0
 		var colorBoundingBox = [[height, displayTop], [displayBoxRight, nextDisplayTop]]
-		this.colorControl = new Checkbox(colorBoundingBox, 'Color', getKeyMapDefault('meshColor', valueMap, true))
+		this.colorControl = new Checkbox(colorBoundingBox, 'Color', mapKit.getKeyMapDefault('meshColor', valueMap, true))
 		this.colorControl.controlChanged = drawMeshWithoutArguments
 		this.colorControl.name = 'Display'
 		this.gridAnalysisBottom = nextDisplayTop + viewCanvas.textSpace
 		displayTop = this.gridAnalysisBottom + viewCanvas.halfTextSpace
 		var gridBoundingBox = [[height, displayTop], [displayBoxRight, displayTop + controlWidth]]
-		this.gridControl = new Checkbox(gridBoundingBox, 'Grid', getKeyMapDefault('meshGrid', valueMap, false))
+		this.gridControl = new Checkbox(gridBoundingBox, 'Grid', mapKit.getKeyMapDefault('meshGrid', valueMap, false))
 		this.gridControl.controlChanged = drawMeshUpdateGrid
 		this.gridControl.name = 'Display'
 		this.displayAnalysisControl.controls = [this.gridControl, this.colorControl]
 		this.analysisControls = [this.displayAnalysisControl, this.inspectControl]
-		pushArray(this.analysisControls, this.displayAnalysisControl.controls)
+		arrayKit.pushArray(this.analysisControls, this.displayAnalysisControl.controls)
 		setDisplayFunctionControls(this.analysisControls, controlIsAnalysisName)
-		pushArray(controls, this.analysisControls)
+		arrayKit.pushArray(controls, this.analysisControls)
 		setViewControls(controls, this.view)
 	}
 	updateView(isViewHidden) {
@@ -225,7 +224,7 @@ function getCanvasRotationMatrix(view) {
 }
 
 function getCenterRotationMatrix(view) {
-	var zoomScalePoint = getMultiplication3DScalar(view.scalePoint, getExponentialZoom())
+	var zoomScalePoint = Vector.getMultiplication3DScalar(view.scalePoint, getExponentialZoom())
 	var scaleCenterMatrix = getMultiplied3DMatrix(getMatrix3DByScale3D(zoomScalePoint), getMatrix3DByTranslate(view.centerOffset))
 	var rotationScaleMatrix = getMultiplied3DMatrix(view.rotationMatrix, scaleCenterMatrix)
 	return getMultiplied3DMatrix(getMatrix3DByScaleY([-1]), rotationScaleMatrix)
@@ -284,16 +283,16 @@ class InspectMesh extends CanvasControl {
 
 		setTextContext(context)
 		var meshBox = view.meshBox
-		var size = getSubtraction3D(meshBox[1], meshBox[0])
+		var size = Vector.getSubtraction3D(meshBox[1], meshBox[0])
 		var titleTop = view.analysis.analysisBoundingBox[0][1] + viewCanvas.textSpace
 		var y = titleTop + viewCanvas.textSpace
 		drawArrays(context, 'X: Y: Z:'.split(' '), viewCanvas.textSpace, viewBroker.analysisCharacterBegin, y)
-		context.fillText('Size', viewBroker.analysisSizeBegin, titleTop)
-		drawNumericArrays(context, size, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 		context.fillText('Lower', viewBroker.analysisLowerBegin, titleTop)
 		drawNumericArrays(context, meshBox[0], viewCanvas.textSpace, viewBroker.analysisLowerBegin, y)
 		context.fillText('Upper', viewBroker.analysisUpperBegin, titleTop)
 		drawNumericArrays(context, meshBox[1], viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
+		context.fillText('Size', viewBroker.analysisSizeBegin, titleTop)
+		drawNumericArrays(context, size, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 		y += viewCanvas.textSpace * (meshBox[0].length + 1)
 		context.fillText('Number of Points: ' + view.mesh.points.length, viewBroker.analysisCharacterBegin, y)
 		y += viewCanvas.textSpace
@@ -306,16 +305,16 @@ class InspectMesh extends CanvasControl {
 		var boundingBoxTopPlus = y
 		y = boundingBoxTopPlus + viewCanvas.textSpace
 		drawArrays(context, 'X: Y: Z:'.split(' '), viewCanvas.textSpace, viewBroker.analysisCharacterBegin, y)
-		context.fillText('Mouse', viewBroker.analysisSizeBegin, boundingBoxTopPlus)
-		drawNumericArrays(context, this.mousePoint, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
+		context.fillText('Mouse', viewBroker.analysisUpperBegin, boundingBoxTopPlus)
+		drawNumericArrays(context, this.mousePoint, viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
 		if (this.change == undefined) {
 			return
 		}
 
 		context.fillText('Last', viewBroker.analysisLowerBegin, boundingBoxTopPlus)
 		drawNumericArrays(context, this.lastDisplay, viewCanvas.textSpace, viewBroker.analysisLowerBegin, y)
-		context.fillText('Change', viewBroker.analysisUpperBegin, boundingBoxTopPlus)
-		drawNumericArrays(context, this.change, viewCanvas.textSpace, viewBroker.analysisUpperBegin, y)
+		context.fillText('Change', viewBroker.analysisSizeBegin, boundingBoxTopPlus)
+		drawNumericArrays(context, this.change, viewCanvas.textSpace, viewBroker.analysisSizeBegin, y)
 	}
 	name = 'Inspect'
 }
@@ -374,7 +373,7 @@ class MeshControl extends CanvasControl {
 			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 				zPolygon[0][vertexIndex] = canvasPoints[facet[vertexIndex]][2]
 			}
-			zPolygon[0].sort(compareNumberDescending)
+			zPolygon[0].sort(arrayKit.compareNumberDescending)
 			if (view.type[0] == 'S') {
 				if (getIsClockwise(getPolygonByFacet(facet, canvasPoints))) {
 					zPolygons.push(zPolygon)
@@ -385,7 +384,7 @@ class MeshControl extends CanvasControl {
 			}
 		}
 
-		zPolygons.sort(compareArrayAscending)
+		zPolygons.sort(arrayKit.compareArrayAscending)
 		var oldFillStyle = context.fillStyle
 		for (var zPolygonIndex = 0; zPolygonIndex < zPolygons.length; zPolygonIndex++) {
 			var facet = zPolygons[zPolygonIndex][1]
@@ -460,12 +459,7 @@ class MeshControl extends CanvasControl {
 		}
 
 		setViewToTurn(view)
-		if (name == 'Turn') {
-			viewCanvas.mouseMoveManipulator = turnManipulator
-		}
-		else {
-			viewCanvas.mouseMoveManipulator = stepTurnManipulator
-		}
+		viewCanvas.mouseMoveManipulator = turnManipulator
 	}
 }
 
@@ -499,7 +493,7 @@ function mouseDownAlign(context, control, event) {
 	normalize3D(highestTransformed)
 	highestZ = highestTransformed[2]
 	var zAxis = [0.0, 0.0, 1.0]
-	var crossTurn = crossProduct(zAxis, highestTransformed)
+	var crossTurn = Vector.crossProduct(zAxis, highestTransformed)
 	normalize3D(crossTurn)
 	crossTurn.push(highestZ)
 	crossTurn.push(-Math.sqrt(1.0 - highestZ * highestZ))
@@ -548,7 +542,7 @@ function mouseDownMeshInspect(context, control, event) {
 	var closestDistanceSquared = Number.MAX_VALUE
 	for (var pointIndex = 0; pointIndex < mesh.points.length; pointIndex++) {
 		var canvasPoint = canvasPoints[pointIndex]
-		var distanceSquared = distanceSquared2D(canvasPoint, viewCanvas.mouseDown2D) + multiplierZ * (rangeZ.upperZ - canvasPoint[2])
+		var distanceSquared = Vector.distanceSquared2D(canvasPoint, viewCanvas.mouseDown2D) + multiplierZ * (rangeZ.upperZ - canvasPoint[2])
 		if (distanceSquared < closestDistanceSquared) {
 			closestDistanceSquared = distanceSquared
 			closestPointIndex = pointIndex
@@ -558,8 +552,8 @@ function mouseDownMeshInspect(context, control, event) {
 	inspectControl.mousePoint = mesh.points[closestPointIndex]
 	inspectControl.change = undefined
 	if (inspectControl.last != undefined) {
-		inspectControl.change = getSubtraction3D(inspectControl.mousePoint, inspectControl.last)
-		inspectControl.change.push(length3D(inspectControl.change))
+		inspectControl.change = Vector.getSubtraction3D(inspectControl.mousePoint, inspectControl.last)
+		inspectControl.change.push(Vector.length3D(inspectControl.change))
 		inspectControl.lastDisplay = inspectControl.last
 		if (inspectControl.change[3] < gClose) {
 			inspectControl.change = undefined
@@ -571,49 +565,37 @@ function mouseDownMeshInspect(context, control, event) {
 }
 
 var moveMatrixManipulator = {
-	mouseMove: function(context, event) {
-		var mouseMovement = getMouseMovement(event)
-		if (mouseMovement == undefined) {
-			return
-		}
-
-		var view = viewBroker.view
-		var inverseMatrix3D = getInverseRotation3D(getCenterRotationMatrix(view))
-		mouseMovement.push(0.0)
-		var invertedMovement = get3DByMatrix3D(mouseMovement, inverseMatrix3D)
-		view.centerOffset = getAddition3D(invertedMovement, viewCanvas.mouseDownCenterOffset)
-		drawMeshWithoutArguments()
-	},
-	mouseOut: function(context, event) {
-		meshMouseOut(viewBroker.view)
-	},
-	mouseUp: function(context, event) {
-		meshMouseUp(viewBroker.view)
+mouseMove: function(context, event) {
+	var mouseMovement = getMouseMovement(event)
+	if (mouseMovement == undefined) {
+		return
 	}
+
+	var view = viewBroker.view
+	var inverseMatrix3D = getInverseRotation3D(getCenterRotationMatrix(view))
+	mouseMovement.push(0.0)
+	var invertedMovement = get3DByMatrix3D(mouseMovement, inverseMatrix3D)
+	view.centerOffset = Vector.getAddition3D(invertedMovement, viewCanvas.mouseDownCenterOffset)
+	if (event.shiftKey) {
+		Vector.stepArray(view.centerOffset, getIntegerStep(getHeightMinusOverScale(viewBroker.view) * gGridSpacingMultiplier))
+	}
+
+	drawMeshWithoutArguments()
+},
+
+mouseOut: function(context, event) {
+	meshMouseOut(viewBroker.view)
+},
+
+mouseUp: function(context, event) {
+	meshMouseUp(viewBroker.view)
+}
 }
 
 function setViewToTurn(view) {
 	view.mouseDownNegative = viewBroker.getOffsetNormal(event)
 	view.mouseDownNegative[1] = -view.mouseDownNegative[1]
 	view.lastRotationMatrix = view.rotationMatrix
-}
-
-var stepTurnManipulator = {
-	mouseMove: function(context, event) {
-		var view = viewBroker.view
-		var mouseMoveNormal = viewBroker.getOffsetNormal(event)
-		var rotationXY = getRotation2DVector(mouseMoveNormal, view.mouseDownNegative)
-		var stepRotation = Math.round(12.0 * Math.atan2(rotationXY[1], rotationXY[0]) / Math.PI) * Math.PI / 12.0
-		var rotationZMatrix = getMatrix3DZByCosSin(Math.cos(stepRotation), Math.sin(stepRotation))
-		view.rotationMatrix = getMultiplied3DMatrix(rotationZMatrix, view.lastRotationMatrix)
-		drawMeshWithoutArguments()
-	},
-	mouseOut: function(context, event) {
-		meshMouseOut(viewBroker.view)
-	},
-	mouseUp: function(context, event) {
-		meshMouseUp(viewBroker.view)
-	}
 }
 
 var swivelMatrixManipulator = {
@@ -624,10 +606,14 @@ var swivelMatrixManipulator = {
 		}
 
 		var view = viewBroker.view
-		var movementLength = length2D(mouseMovement)
-		divide2DScalar(mouseMovement, movementLength)
+		var movementLength = Vector.length2D(mouseMovement)
+		Vector.divide2DScalar(mouseMovement, movementLength)
 		view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(mouseMovement), view.lastRotationMatrix)
 		var rotationY = viewBroker.rotationMultiplier * movementLength
+		if (event.shiftKey) {
+			rotationY = Value.getStep(rotationY, 15.0)
+		}
+
 		view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotateY([-rotationY]), view.rotationMatrix)
 		mouseMovement[1] = -mouseMovement[1]
 		view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(mouseMovement), view.rotationMatrix)
@@ -645,8 +631,14 @@ var turnManipulator = {
 	mouseMove: function(context, event) {
 		var view = viewBroker.view
 		var mouseMoveNormal = viewBroker.getOffsetNormal(event)
-		var rotationXY = getRotation2DVector(mouseMoveNormal, view.mouseDownNegative)
-		view.rotationMatrix = getMultiplied3DMatrix(getMatrix3DRotatedBy2D(rotationXY), view.lastRotationMatrix)
+		var rotationXY = Vector.getRotation2DVector(mouseMoveNormal, view.mouseDownNegative)
+		var rotationZMatrix = getMatrix3DRotatedBy2D(rotationXY)
+		if (event.shiftKey) {
+			var stepRotation = Value.getStep(Math.atan2(rotationXY[1], rotationXY[0]), Math.PI / 12.0)
+			rotationZMatrix = getMatrix3DZByCosSin(Math.cos(stepRotation), Math.sin(stepRotation))
+		}
+
+		view.rotationMatrix = getMultiplied3DMatrix(rotationZMatrix, view.lastRotationMatrix)
 		drawMeshWithoutArguments()
 	},
 	mouseOut: function(context, event) {
@@ -670,9 +662,9 @@ class ViewMesh {
 	draw(context) {
 		if (this.rotationMatrix == undefined) {
 			this.meshBox = getMeshBoundingBox(this.mesh)
-			this.scale = viewBroker.modelDiameter / length3D(getSubtraction3D(this.meshBox[1], this.meshBox[0]))
+			this.scale = viewBroker.modelDiameter / Vector.length3D(Vector.getSubtraction3D(this.meshBox[1], this.meshBox[0]))
 			this.scalePoint = [this.scale, this.scale, this.scale]
-			this.centerOffset = multiply3DScalar(getAddition3D(this.meshBox[0], this.meshBox[1]), -0.5)
+			this.centerOffset = Vector.multiply3DScalar(Vector.getAddition3D(this.meshBox[0], this.meshBox[1]), -0.5)
 			this.rotationMatrix = this.analysis.viewTransform3D.slice(0)
 			this.lastRotationMatrix = this.rotationMatrix
 		}
@@ -709,10 +701,11 @@ class ViewMesh {
 		var width = viewBroker.canvas.width
 		this.mesh = getMeshByID(this.id, viewBroker.registry)
 		this.controls = controls
-		var intervals = intervalsFromToQuantity(0.0, height, 5, false)
+		var texts = ['Swivel', 'Turn', 'Inspect', 'Move']
+		var intervals = Vector.intervalsFromToQuantity(0.0, height, texts.length + 1, false)
 		intervals.forEach(Math.round)
 
-		var bottomIntervals = intervalsFromToQuantity(0.0, height, 2, false)
+		var bottomIntervals = Vector.intervalsFromToQuantity(0.0, height, 3, false)
 		bottomIntervals.forEach(Math.round)
 		var alignButton = new Button([[0.0, viewBroker.heightMinus], [bottomIntervals[0], height]], 'Align')
 		alignButton.onClick = mouseDownAlign
@@ -730,18 +723,17 @@ class ViewMesh {
 		this.zoomControl.controlChanged = drawMeshUpdateGrid
 		controls.push(this.zoomControl)
 
-		var texts = ['Swivel', 'Step Turn', 'Turn', 'Inspect', 'Move']
-		this.editControl = new Choice([[0, 0], [intervals[4], controlWidth]], texts)
+		this.editControl = new Choice([[0, 0], [intervals[texts.length - 1], controlWidth]], texts)
 		controls.push(this.editControl)
 		controls.push(this.analysis)
 		setViewControls(controls, this)
 		this.analysis.start()
 
 		this.types = ['Solid Convex', 'Solid Convex Edge', 'Solid Convex All']
-		pushArray(this.types, ['Solid Polyhedral', 'Solid Polyhedral Edge', 'Solid Polyhedral All'])
-		pushArray(this.types, ['Solid Triangular', 'Solid Triangular Edge', 'Solid Triangular All'])
-		pushArray(this.types, ['Wireframe Convex', 'Wireframe Polyhedral', 'Wireframe Polyhedral Outline', 'Wireframe Triangular'])
-		viewBroker.typeSelectedIndex = getValueDefault(viewBroker.typeSelectedIndex, 1)
+		arrayKit.pushArray(this.types, ['Solid Polyhedral', 'Solid Polyhedral Edge', 'Solid Polyhedral All'])
+		arrayKit.pushArray(this.types, ['Solid Triangular', 'Solid Triangular Edge', 'Solid Triangular All'])
+		arrayKit.pushArray(this.types, ['Wireframe Convex', 'Wireframe Polyhedral', 'Wireframe Polyhedral Outline', 'Wireframe Triangular'])
+		viewBroker.typeSelectedIndex = Value.getValueDefault(viewBroker.typeSelectedIndex, 1)
 		this.type = this.types[viewBroker.typeSelectedIndex]
 		setSelectToKeysIndexTitle(document.getElementById('typeSelectID'), this.types, viewBroker.typeSelectedIndex)
 		this.setType(viewBroker.typeSelectedIndex)
