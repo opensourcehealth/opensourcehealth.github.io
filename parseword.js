@@ -195,14 +195,38 @@ function getEndOfLine(text) {
 	return '\n'
 }
 
-function getIndexOfBracketed(text, searchCharacter, searchBracketDepth) {
+function getIndexOfUnbracketed(text, searchCharacter, searchBracketDepth) {
 	var bracketDepth = 0
-	searchBracketDepth = getValueDefault(searchBracketDepth, 0)
+	searchBracketDepth = Value.getValueDefault(searchBracketDepth, 0)
 	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
 		var character = text[characterIndex]
 		bracketDepth += 1 * (character == '(' || character == '[') - 1 * (character == ')' || character == ']')
 		if (bracketDepth == searchBracketDepth && character == searchCharacter) {
 			return characterIndex
+		}
+	}
+
+	return -1
+}
+
+function getIndexOfUnquoted(text, searchCharacter) {
+	var quoteCharacter = undefined
+	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
+		var character = text[characterIndex]
+		if (quoteCharacter == undefined) {
+			if (gQuoteSet.has(character)) {
+				quoteCharacter = character
+			}
+			else {
+				if (character == searchCharacter) {
+					return characterIndex
+				}
+			}
+		}
+		else {
+			if (character == quoteCharacter) {
+				quoteCharacter = undefined
+			}
 		}
 	}
 
@@ -398,7 +422,7 @@ function removeExtraSpaces(text) {
 		}
 	}
 
-	removeUndefineds(characters)
+	arrayKit.removeUndefineds(characters)
 	for (var characterIndex = 0; characterIndex < characters.length - 2; characterIndex++) {
 		if (characters[characterIndex] == '.' && characters[characterIndex + 1] == ' ' && gUpperCaseSet.has(characters[characterIndex + 2])) {
 			for (var innerIndex = characterIndex + 2; innerIndex < characters.length; innerIndex++) {
