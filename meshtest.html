@@ -3,13 +3,13 @@
 <head><meta charset="utf-8"/></head>
 <body>
 <script src="maparray.js"></script>
+<script src="help.js"></script>
 <script src="alteration.js"></script>
 <script src="construction.js"></script>
 <script src="codec.js"></script>
 <script src="evaluation.js"></script>
 <script src="filesaver.js"></script>
 <script src="function.js"></script>
-<script src="help.js"></script>
 <script src="generator2d.js"></script>
 <script src="generator3d.js"></script>
 <script src="generatorcenter.js"></script>
@@ -22,9 +22,10 @@
 <script src="pixel.js"></script>
 <script src="polygon.js"></script>
 <script src="polyhedron.js"></script>
+<script src="polyline.js"></script>
+<script src="science.js"></script>
 <script src="statement.js"></script>
 <script src="vector.js"></script>
-<script src="vectorcheck.js"></script>
 <script src="viewbroker.js"></script>
 <script src="viewcanvas.js"></script>
 <script src="viewfractal2d.js"></script>
@@ -155,7 +156,7 @@ function drawMesh(mesh) {
 		var polygon = new Array(facet.length)
 		for (var keyIndex = 0; keyIndex < polygon.length; keyIndex++) {
 			polygon[keyIndex] = points[facet[keyIndex]].slice(0)
-			polygon[keyIndex] = getAddition3D(polygon[keyIndex], [0.06 * (index % 3), 0.04 * (index % 5), 0.028 * (index % 7)])
+			polygon[keyIndex] = Vector.getAddition3D(polygon[keyIndex], [0.06 * (index % 3), 0.04 * (index % 5), 0.028 * (index % 7)])
 //			z = polygon[keyIndex][2]
 		}
 //		if (!isNaN(z)) {
@@ -200,7 +201,7 @@ function drawVoxelMap(voxelMap) {
 				direction = gDirections[directionIndex]
 				var cTip = getXYPointStringByXYZ(xyz).split(',')
 				document.writeln('<circle cx="' + cTip[0] + '" cy="' + cTip[1] + '" r="0.08' + rgbString)
-				var cDirection = getXYPointStringByXYZ(add3D(getMultiplication3DScalar(direction, 0.3), parameters)).split(',')
+				var cDirection = getXYPointStringByXYZ(Vector.add3D(Vector.getMultiplication3DScalar(direction, 0.3), parameters)).split(',')
 				document.writeln('<circle cx="' + cDirection[0] + '" cy="' + cDirection[1] + '" r="0.04' + rgbString)
 			}
 		}
@@ -208,8 +209,8 @@ function drawVoxelMap(voxelMap) {
 }
 
 function drawXYInsetPolygon(xyPolygon, inset) {
-	inset = getValueDefault(inset, 0.2)
-	drawXYPolygon(getOutsetPolygon([inset, inset], getArraysCopy(xyPolygon)), getRGB())
+	inset = Value.getValueDefault(inset, 0.2)
+	drawXYPolygon(getOutsetPolygon([inset, inset], arrayKit.getArraysCopy(xyPolygon)), getRGB())
 }
 
 function drawXYInsetPolygons(xyPolygons, inset) {
@@ -226,7 +227,7 @@ function drawXYLines(lines, pointMap) {
 }
 
 function drawXYPolygon(xyPolygon, rgb) {
-	rgb = getValueDefault(rgb, getRGB())
+	rgb = Value.getValueDefault(rgb, getRGB())
 	var pointStrings = new Array(xyPolygon.length)
 	for (var pointIndex = 0; pointIndex < xyPolygon.length; pointIndex++) {
 		if (xyPolygon[pointIndex].length < 3) {
@@ -244,13 +245,13 @@ function drawXYPolygon(xyPolygon, rgb) {
 
 function drawXYPolygons(xyPolygons, increments) {
 	var addition = [0, 0]
-	var increments = getValueDefault(increments, [[0.0, 0.0]])
+	var increments = Value.getValueDefault(increments, [[0.0, 0.0]])
 	for (var polygonIndex = 0; polygonIndex < xyPolygons.length; polygonIndex++) {
 		var xyPolygon = xyPolygons[polygonIndex]
-		var xyPolygonCopy = getArraysCopy(xyPolygon)
-		add2Ds(xyPolygonCopy, addition)
+		var xyPolygonCopy = arrayKit.getArraysCopy(xyPolygon)
+		Vector.add2Ds(xyPolygonCopy, addition)
 		drawXYPolygon(xyPolygonCopy, getRGB())
-		add2D(addition, increments[polygonIndex % increments.length])
+		Vector.add2D(addition, increments[polygonIndex % increments.length])
 	}
 }
 
@@ -342,8 +343,8 @@ function testBend() {
 	var translations = [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0, -3.0]]
 	var boundedPoints = points
 	console.log('boundedPoints')
-	console.log(getArraysCopy(boundedPoints))
-	console.log(getArraysCopy(points))
+	console.log(arrayKit.getArraysCopy(boundedPoints))
+	console.log(arrayKit.getArraysCopy(points))
 	console.log(boundaryPolygons)
 //	transformPoints2DByEquation(null, boundedPoints, null, statement, null, translations, null)
 	transformPoints2DByEquation([0.0, -5.0], boundedPoints, null, statement, null, translations, [0.0, 1.0])
@@ -414,59 +415,132 @@ function testDrillByMesh() {
 //	drawXYZPolygons(getPolygonsByFacets(facets, points))
 }
 
-function testEquation() {
-	console.log('testEquation')
-//	var valueString = ' 5 * ( 1 + 1 ) * 3 * ( 2 + 2 ) '
-//	var valueString = ' ( 3 % 2 ) * .3 * Math.min(8,11) + stringLength( testString ) '
-//	var valueString = ' -Math.min(8,11) -Math.min(8,11) -Math.min(8,11) '
-//	var valueString = ' min(8,1.5*max(3,4)) '
+
+
+
+function testEquationStrings(equationStrings, statement) {
+	var value = getValueByEquation(null, statement, equationStrings[1])
+	console.log(equationStrings[0] + '; ' + equationStrings[1] + ': ' + value.toString() + ' ~ ' + equationStrings[2])
+	console.log(value)
+	console.log(evaluator.getValueByEquation(undefined, statement, equationStrings[1]))
+	if (value.toString() != equationStrings[2]) {
+		console.log('Unequal')
+	}
+}
+
+function testNewEquationStrings(equationStrings, statement) {
+	var value = evaluator.getValueByEquation(undefined, statement, equationStrings[1])
+	console.log(equationStrings[0] + '; ' + equationStrings[1] + ': ' + value.toString() + ' ~ ' + equationStrings[2])
+	console.log(value)
+	if (value.toString() != equationStrings[2]) {
+		console.log('Unequal')
+	}
+}
+
+function testEvaluate() {
+	console.log('testEvaluate')
+	console.log(evaluator.getValueByEquation(undefined, statement, '{b:34,c:3}.c+2'))
+	return
 //	var valueString = 'intervalsFromToIncrement(0,3.5,1)[1]'
-//	var valueString = ' -2+1 '
-//	var valueString = ' true && false '
-//	var valueString = ' 4, '
-//	var valueString = ' 1+2*3+4 '
 //	var valueString = ' stringLength( testString ) '
 //	var valueString = ' ( 5 % 3 ) + stringLength( testString ) '
-//	var valueString = ' intervalsFromToIncrement(0,3.5,1) '
-//	var valueString = ' testMap.value '
-//	var valueString = ' testMap.value + Math.sin(0.1) * testMap.value '
-//	var valueString = '1+2*2'
-	var valueString = '1+2*2*0.1'
-//	var valueString = '7-2-1'
-//	var valueString = ' Math.sin(1) '
-//	var valueString = ' testArray[0][0] '
-//	var valueString = ',2'
-//	var valueString = ' 1,2 '
-//	var valueString = ' [[3,5,7]] '
-//	var valueString = ' [[3,5], [7,9] ] '
-//	var valueString = ' [[3,5,7],[4,6,8]][0][1] '
-//	var valueString = ' [5*[2][0]] '
-//	var valueString = ' -2e5 '
-//	var valueString = 'zigzag(1,8)'
-//	var valueString = 'zigzag([2,3])'
-//	var valueString = 'zigzag([4,5],9)'
-//	var valueString = 'zigzag([[0,0], [1,3],[2,0],[3,4]], 0.17)'
-//	var valueString = 'zigzag([[[1,2],3,4],5])'
-	var mathMap = new Map([['min', Math.min], ['sin', Math.sin]])
+	var mathMap = new Map([['max', Math.max], ['pow', Math.pow], ['sin', Math.sin]])
 	var testMap = new Map([['value', '3']])
-	stringLength.optionSet = gSetS
-	zigzag.optionSet = undefined
+	stringLength.optionMap = gMapS
+	zigzag.optionMap = undefined
 	var variableMap = new Map([
+		['intervalsFromToQuantity', intervalsFromToQuantity],
 		['intervalsFromToIncrement', intervalsFromToIncrement],
 		['max', Math.max],
-		['min', Math.min],
+		['sin', Math.sin],
 		['stringLength', stringLength],
 		['Math', mathMap],
-		['test', '2'],
-		['testArray', '[[3,4],[5,6]]'],
+		['number2', 2],
+		['nestedArray', [[3,4],[5,6]]],
+		['testArray', '[2,3]'],
 		['testMap', testMap],
+		['testString', 'testString'],
 		['zigzag', zigzag]])
 	var parent = {parent:undefined, variableMap:variableMap}
 	var statement = {parent:parent}
-	var value = getValueByEquation(null, statement, valueString)
-	console.log('value')
-	console.log(value)
-//	console.log(parseFloat(valueString))
+//	var value = getValueByEquation(null, statement, valueString)
+//	console.log('value')
+//	console.log(value)
+	var equationArrays = []
+	equationArrays.push(['number', '2', '2'])
+	equationArrays.push(['implicitArray', '1,2', '1,2'])
+	equationArrays.push(['arrayOne', '[1]', '1'])
+	equationArrays.push(['array', '[1,2]', '1,2'])
+	equationArrays.push(['addition', '1+2', '3'])
+	equationArrays.push(['nestedArray', '[1, [2,3] ]', '1,2,3'])
+	equationArrays.push(['nestedArrayAccess', '[[3,5,7],[4,6,8]][0][1]', '5'])
+	equationArrays.push(['nestedArrayUndefined', '[1, 2, [, 4, ], 6],', '1,2,,4,,6,'])
+	equationArrays.push(['arrayAccess', '[1,2,][0]', '1'])
+	equationArrays.push(['arrayAccessMultiplication', ' [5*[2][0]] ', '10'])
+	equationArrays.push(['plusTimes', '1+2*2*0.1', '1.4'])
+	equationArrays.push(['equal', '3::3', 'true'])
+	equationArrays.push(['equal', '3 == 3', 'true'])
+	equationArrays.push(['plusMinus', '--+-4+2*3-5', '-3'])
+	equationArrays.push(['spaced', ' 5 * ( 1 + 1 ) * 3 * ( 2 + 2 ) ', '120'])
+	equationArrays.push(['scientific', ' -2e5 ', '-200000'])
+	equationArrays.push(['not', ' !false', 'true'])
+	equationArrays.push(['bitshiftRight', ' 4>>2 ', '1'])
+	equationArrays.push(['bitshiftLeft', ' 4<<2 ', '16'])
+	equationArrays.push(['modulo', ' 3%2 ', '1'])
+	equationArrays.push(['bitwiseOR', ' 3|6 ', '7'])
+	equationArrays.push(['bitwiseAND', ' 3&6 ', '2'])
+	equationArrays.push(['bitwiseXOR', ' 3^6 ', '5'])
+	equationArrays.push(['greaterThan', ' 2 > 1 ', 'true'])
+	equationArrays.push(['lessThan', ' 2 < 1 ', 'false'])
+	equationArrays.push(['"c"', '"c"', "c"])
+	equationArrays.push(["'d'", "'d'", 'd'])
+	equationArrays.push(['sin', 'sin(1)', '0.8414709848078965'])
+	equationArrays.push(['max', 'max(1,2)', '2'])
+	equationArrays.push(['Math.max', 'Math.max( 1,2 )', '2'])
+	equationArrays.push(['Math.pow', 'Math.pow( 2 , 3 )', '8'])
+	equationArrays.push(['multipleMax', ' -Math.max(8,11) - Math.max(8,11) - Math.max(8,11)', '-33'])
+	equationArrays.push(['intervals', ' intervalsFromToIncrement(0,3.5,1)', '0,1.1666666666666667,2.3333333333333335,3.5'])
+	equationArrays.push(['testMap', ' testMap.value', '3'])
+	equationArrays.push(['zigzag', ' zigzag([[[1,2],3,4],5])', '1,2,3,4,5'])
+
+//	var equationArrays = []
+//	equationArrays.push(['max', 'max(1,2)', '2'])
+//	equationArrays.push(['stringLength', ' stringLength("testString") ', '10'])
+//	equationArrays.push(['stringLengthString', ' stringLength(test) ', '4'])
+//	equationArrays.push(['intervalsFromToQuantity', 'intervalsFromToQuantity(0,10,4)', '0,3.3333333333333335,6.666666666666667,10'])
+//	equationArrays.push(['sixNumber2', '2*3+number2', '1,2,3,4,5'])
+//	equationArrays.push(['minusBracket', '-(2)', '-2'])
+	equationArrays.push(['commaArray', ',testArray[0]', 'undefined, 2'])
+
+	console.log()
+	console.log('Old and New Equation Value')
+	for (var equationStrings of equationArrays) {
+		testEquationStrings(equationStrings, statement)
+	}
+
+	console.log()
+	console.log('New Equation Value')
+	var equationArrays = []
+	equationArrays.push(['scientificOperations', '-1e1+(2+3)*4/2+5', '5'])
+	equationArrays.push(['notEqual', ' 2 != 2', 'false'])
+	equationArrays.push(['greaterThanEqual', ' 2 >= 2 ', 'true'])
+	equationArrays.push(['greaterThanEqual', ' 2 => 2 ', 'true'])
+	equationArrays.push(['equal', ' 2 == 2 ', 'true'])
+	equationArrays.push(['and', ' true and false ', 'false'])
+	equationArrays.push(['or', ' false or true ', 'true'])
+	equationArrays.push(['number2', 'number2', '2'])
+	equationArrays.push(['variable', 'number2', 2])
+	equationArrays.push(['variableNestedArray', ' nestedArray[0][0] ', 3])
+	equationArrays.push(['object', '{a:12 }', 3])
+	for (var equationStrings of equationArrays) {
+		testNewEquationStrings(equationStrings, statement)
+	}
+
+	console.log()
+	console.log('New Equation Console')
+	console.log(evaluator.getValueByEquation(undefined, statement, ''))
+	console.log(evaluator.getValueByEquation(undefined, statement, 'null'))
+	console.log(evaluator.getValueByEquation(undefined, statement, 'undefined'))
 }
 
 function testExpand() {
@@ -529,7 +603,7 @@ function testFace() {
 //	drawLines(lines, pointMap)
 //	drawMesh(getMeshByTipMap(pointMap, tipMap))
 	mesh = getPolygonateMesh(getMeshByTipMap(pointMap, tipMap))
-	add2Ds(mesh.points, [7, -6])
+	Vector.add2Ds(mesh.points, [7, -6])
 	drawMesh(mesh)
 	drawXYZPoints(mesh.points)
 
@@ -699,11 +773,11 @@ function testLettering() {
 	var letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringA, 0.2)
 	drawXYPolygons(letteringOutlines)
 	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringB, 0.2)
-	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -5.0]))
+	drawXYPolygons(Vector.add2DArrays(letteringOutlines, [0.0, -5.0]))
 	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringC, 0.2)
-	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -10.0]))
+	drawXYPolygons(Vector.add2DArrays(letteringOutlines, [0.0, -10.0]))
 	letteringOutlines = getLetteringOutlines(2.4, true, 0.3, letteringStringD, 0.2)
-	drawXYPolygons(add2DArrays(letteringOutlines, [0.0, -15.0]))
+	drawXYPolygons(Vector.add2DArrays(letteringOutlines, [0.0, -15.0]))
 }
 
 function testLinkMap() {
@@ -763,13 +837,13 @@ function testMatrix() {
 function testMeshBoolean() {
 	var pointString = '0,0,0 5,0,0 0,0,4 0,4,0'
 	var pointsA = getPointsByString(pointString)
-//	add2Ds(pointsA, [0.00001, 0.0])
+//	Vector.add2Ds(pointsA, [0.00001, 0.0])
 	multiply2DsScalar(pointsA, 2.0)
 	var meshA = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsA}
 	var lattice = getXYZLatticeByMesh(meshA)
 	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
 	var pointsB = getPointsByString(pointStringB)
-	add2Ds(pointsB, [1, 0.0])
+	Vector.add2Ds(pointsB, [1, 0.0])
 	multiply2DsScalar(pointsB, 2.0)
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var offsetMultiplier = 0.0
@@ -872,7 +946,7 @@ function testPixelBoolean() {
 	var tipMap = new Map()
 	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
 //	var xyPolygonA = [[0, -1], [0, 4], [6, -1]]
-	add2Ds(xyPolygonA, [6, 0])
+	Vector.add2Ds(xyPolygonA, [6, 0])
 //	addTestPixels(pixelMap)
 //	createPixelTips(pixelMap)
 //	addPixelLines(pixelMap, lines, pointMap, tipMap)
@@ -883,7 +957,7 @@ function testPixelBoolean() {
 //	drawXYPolygon(xyPolygons[0], [255, 0, 0])
 //	var pointStringB = '0,-1,0 6,-1,0 0,-1,4 0,4,0'
 	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
-	add2Ds(xyPolygonB, [10, 0])
+	Vector.add2Ds(xyPolygonB, [10, 0])
 //	var xyPolygonB = [[8.5,1.5], [8.5,3.5], [9.5,3.5], [9.5,1.5]]
 	var xyLatticeB = getXYLattice([xyPolygonB])
 //	console.log(xyLatticeB)
@@ -920,10 +994,10 @@ function testPolygonBoolean() {
 	var xyPolygonA = [[0, 0], [4, 0], [0, 4]]
 	multiply2DsScalar(xyPolygonA, 2.0)
 //	var xyPolygonA = [[0, 0], [0, 4], [4, 0]]
-//	add2Ds(xyPolygonA, [6, 0])
+//	Vector.add2Ds(xyPolygonA, [6, 0])
 	var xyPolygonB = [[0, -1], [0, 4], [6, -1]]
-	add2Ds(xyPolygonB, [1, 0])
-//	add2Ds(xyPolygonB, [9, 0])
+	Vector.add2Ds(xyPolygonB, [1, 0])
+//	Vector.add2Ds(xyPolygonB, [9, 0])
 	multiply2DsScalar(xyPolygonB, 2.0)
 //	drawXYPolygons([xyPolygonA])
 //	drawXYPolygons([xyPolygonB])
@@ -960,13 +1034,13 @@ function testPolygonJoining() {
 //	polygonKeyStrings = ['0,0,0 -1,0,0 0,1,0', '0,0,0 0,1,0 1,0,0', '0,0,0 1,0,0 0,-1,0', '0,0,0 0,-1,0 -1,0,0']
 //	polygonKeyStrings = ['0,-1,0 -1,0,0 0,0,0', '0,-1,0 0,0,0 1,0,0', '-1,0,0 0,1,1 1,0,0 0,0,0']
 	var xyPolygonKeyStrings = ['-1,0 -1,2 0,2 1,1 2,2 3,2 4,1 5,2 6,2 6,0', '0,2 -1,2 -1,4 3,4 6,4 6,2 5,2 4,3 3,2 2,2 1,3']
-	var xyFacets = getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
-	drawXYPolygons(convertFacetsToPolygons(getArraysCopy(xyFacets)))
+	var xyFacets = arrayKit.getArraysBySplittingStrings(xyPolygonKeyStrings, ' ')
+	drawXYPolygons(convertFacetsToPolygons(arrayKit.getArraysCopy(xyFacets)))
 	var joinedFacets = getJoinedFacets(xyFacets)
 	var joinedPolygons = convert2DPolygonsTo3D(convertFacetsToPolygons(joinedFacets), 0)
 	var joinedMesh = getMeshByPolygons(joinedPolygons)
 	var connectedFacet = getConnectedFacet(joinedMesh.facets, joinedMesh.points)
-	drawMesh({facets:[connectedFacet], points:add2Ds(joinedMesh.points, [0, -6])})
+	drawMesh({facets:[connectedFacet], points:Vector.add2Ds(joinedMesh.points, [0, -6])})
 }
 
 function testRemoveTooThinFacets() {
@@ -1279,7 +1353,7 @@ function testTriangulate() {
 	var convexFacets = getConvexFacets(facet.slice(0), points)
 //	var xyTriangleFacets = getXYTriangleFacets(facet, points)
 //	var triangles = getPolygonsByFacets(xyTriangleFacets, points)
-	add2Ds(points, [0,60])
+	Vector.add2Ds(points, [0,60])
 	multiply3DsScalar(points, 0.2)
 //	drawXYPolygon(getPolygonByFacet(facet, points), getRGB())
 	var convexPolygons = getPolygonsByFacets(convexFacets, points)
@@ -1309,7 +1383,7 @@ function testTriangulate() {
 	console.log(points)
 	drawXYPolygons(triangles)
 	var lastTriangle = triangles[triangles.length - 1]
-	add2Ds(lastTriangle, [2, 0.0])
+	Vector.add2Ds(lastTriangle, [2, 0.0])
 //	drawXYPolygon(lastTriangle, getRGB())
 }
 
@@ -1358,7 +1432,7 @@ function testVoxelBoolean() {
 //	var pointStringB = '0,0,0 6,0,0 0,0,4 0,4,0'
 //	var pointStringB = '0,0,0 4,0,0 0,0,1 0,2,0'
 	var pointsB = getPointsByString(pointStringB)
-	add2Ds(pointsB, [1, 0])
+	Vector.add2Ds(pointsB, [1, 0])
 	var meshB = {facets:[[0, 1, 2], [0, 2, 3], [1, 3, 2], [0, 3, 1]], points:pointsB}
 	var latticeB = getXYZLatticeByMesh(meshB)
 	var voxelMapB = getVoxelMapByXYZLattice(latticeB)
@@ -1433,7 +1507,7 @@ function createSVGTest() {
 //	testDrillByMesh()
 //	testDrillByPolygon()
 //	testExpand()
-//	testEquation()
+	testEvaluate()
 //	testExtrusion()
 //	testFace()
 //	testFacetSubtraction()
@@ -1450,7 +1524,7 @@ function createSVGTest() {
 //	testMeshBoolean()
 //	testMirrorJoin()
 //	testOutline()
-	testOutset()
+//	testOutset()
 //	testOverlap()
 //	testPixelBoolean()
 //	testPolygonate()
