@@ -60,7 +60,9 @@ function addMeshesRecursively(depth, meshes, registry, statement) {
 
 	var mesh = getMeshByID(statement.attributeMap.get('id'), registry)
 	if (mesh != undefined) {
-		meshes.push(getMeshCopy(mesh))
+		var meshCopy = getMeshCopy(mesh)
+		transform3DPoints(getChainMatrix3D(registry, statement), meshCopy.points)
+		meshes.push(meshCopy)
 	}
 
 	depth += 1
