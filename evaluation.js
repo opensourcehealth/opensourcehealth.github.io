@@ -133,6 +133,29 @@ function getResultUpdatePrevious(monad, registry, statement) {
 }
 
 function getValueByEquation(registry, statement, valueString) {
+	return evaluator.getValueByEquation(registry, statement, valueString)
+/*
+	var valueOld = getValueByEquationOld(registry, statement, valueString)
+	var value = evaluator.getValueByEquation(registry, statement, valueString)
+	if (value == undefined) {
+		console.log('valueString')
+		console.log(valueString)
+		console.log(valueOld)
+		console.log(value)
+		return
+	}
+
+	if (value.toString() != valueOld.toString()) {
+		console.log('valueString')
+		console.log(valueString)
+		console.log(valueOld)
+		console.log(value)
+	}
+	return value
+*/
+}
+
+function getValueByEquationOld(registry, statement, valueString) {
 	var monad = new StartMonad()
 	for (var character of valueString) {
 		monad = monad.getNextMonad(character, registry, statement)
@@ -266,8 +289,8 @@ function BracketOpenFunctionMonad() {
 	}
 	this.getResult = function(registry, statement, value) {
 		var argumentLength = this.functionInformation.length
-		if (this.functionInformation.optionSet != null) {
-			if (this.functionInformation.optionSet.has('r')) {
+		if (this.functionInformation.optionMap != null) {
+			if (this.functionInformation.optionMap.has('r')) {
 				return this.functionInformation.apply(null, [registry, statement].concat(value))
 			}
 		}
@@ -280,12 +303,12 @@ function BracketOpenFunctionMonad() {
 		this.functionInformation = this.previousMonad.getRawValue(statement)
 		if (this.functionInformation == null) {
  			warningByList(['In BracketOpenFunctionMonad, could not find function for: ', this.previousMonad.valueString])
-  			zeroFunction.optionSet = null
+  			zeroFunction.optionMap = null
 			this.functionInformation = zeroFunction
 		}
 		this.previousMonad = this.previousMonad.previousMonad
-		if (this.functionInformation.optionSet != null) {
-			if (this.functionInformation.optionSet.has('s')) {
+		if (this.functionInformation.optionMap != null) {
+			if (this.functionInformation.optionMap.has('s')) {
 				this.monadMap = gStringMonadMap
 			}
 		}
@@ -786,4 +809,685 @@ gValueMonadMap.set(',', UndefinedCommaMonad)
 gAlphabetSet = new Set(gAlphabetCharacters)
 gEquationSet = new Set(gGreaterLessCharacters.concat(gNotCharacters).concat(gQuoteCharacters).concat('()[]'.split('')))
 gFloatSet = new Set(gFloatCharacters)
+gLowerCaseSet = new Set('abcdefghijklmnopqrstuvwxyz'.split(''))
 gUpperCaseSet = new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var evaluator = {
+accessElement: function(evaluation, value) {
+	evaluation.monad = evaluation.monad.parent
+	evaluation.monad.value = evaluation.monad.value[value]
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorOperator
+},
+
+accessOpen: function(character, evaluation) {
+	evaluation.monad = {close:evaluator.accessElement, parent:evaluation.monad}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+},
+
+addition: function(a, b) {
+	return a + b
+},
+
+and: function(a, b) {
+	return a && b
+},
+
+arrayOpen: function(character, evaluation) {
+	var value = evaluator.getValueIfDefined(evaluation)
+	if (value != undefined) {
+		evaluation.monad = {parent:evaluation.monad, value:value}
+		evaluator.accessOpen(character, evaluation)
+		return
+	}
+
+	evaluation.monad = {close:evaluator.squareClose, parent:evaluation.monad, value:[]}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+},
+
+bitwise: function(character, evaluation) {
+	evaluator.convertToMonad(evaluation)
+	evaluator.setOperationMonadToKey(evaluation, character, evaluationProcessorOperator.bitwiseMap)
+},
+
+bitwiseAND: function(a, b) {
+	return a & b
+},
+
+bitwiseXOR: function(a, b) {
+	return a ^ b
+},
+
+bitwiseOR: function(a, b) {
+	return a | b
+},
+
+bitwiseShiftLeft: function(a, b) {
+	return a << b
+},
+
+bitwiseShiftRight: function(a, b) {
+	return a >> b
+},
+
+bracketClose: function(character, evaluation) {
+	evaluator.convertToMonad(evaluation)
+	var value = evaluator.getTotalValue(evaluation)
+	if (evaluation.monad.close == undefined) {
+		return
+	}
+
+	evaluation.monad.close(evaluation, value)
+	evaluation.monad.close = undefined
+},
+
+callFunction: function(evaluation, value) {
+	evaluation.monad.value.push(value)
+	var arguments = evaluation.monad.value
+	var optionMap = evaluation.monad.monadFunction.optionMap
+	if (optionMap != undefined) {
+		if (optionMap.has('r')) {
+			arguments = [evaluation.registry, evaluation.statement].concat(arguments)
+		}
+	}
+
+	evaluation.monad.value = evaluation.monad.monadFunction.apply(null, arguments)
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorOperator
+},
+
+comma: function(character, evaluation) {
+	evaluator.convertValuePush(evaluation)
+	if (evaluation.monad.processor == undefined) {
+		evaluation.processor = evaluationProcessorValue
+	}
+	else {
+		evaluation.processor = evaluation.monad.processor
+	}
+},
+
+comparison: function(character, evaluation) {
+	evaluator.convertToMonadIfDefined(evaluation)
+	evaluation.processor = evaluationProcessorComparison
+	evaluation.processor.process(character, evaluation)
+},
+
+convertToMonad: function(evaluation) {
+	if (evaluation.processor.getValue != undefined) {
+		evaluation.monad = {parent:evaluation.monad, value:evaluation.processor.getValue(evaluation)}
+	}
+
+	evaluation.processorCharacters.length = 0
+},
+
+convertToMonadIfDefined: function(evaluation) {
+	var value = this.getValueIfDefined(evaluation)
+	if (value != undefined) {
+		evaluation.monad = {parent:evaluation.monad, value:value}
+	}
+
+	evaluation.processorCharacters.length = 0
+},
+
+convertValuePush: function(evaluation) {
+	this.convertToMonad(evaluation)
+	this.totalValuePush(evaluation)
+},
+
+division: function(a, b) {
+	return a / b
+},
+
+dot: function(character, evaluation) {
+	evaluation.monad = {operation:evaluator.memberAccess, parent:evaluation.monad, precedence: 20}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorString
+	evaluation.processor.stringMap = evaluationProcessorValue.valueMap
+},
+
+equal: function(a, b) {
+	return a == b
+},
+
+getTotalValue: function (evaluation) {
+	var endMonad = evaluation.monad
+	var monad = evaluation.monad
+	var precedenceMonads = []
+	for (var whileCount = 0; whileCount < gLengthLimit; whileCount++) {
+		var parent = monad.parent
+		if (Array.isArray(parent.value) || parent.close != undefined) {
+			break
+		}
+		var granparent = parent.parent
+		if (parent.operation != undefined) {
+			if (granparent.value == undefined || Array.isArray(granparent.value)) {
+				monad.parent = granparent
+				if (parent.operation == this.division) {
+					monad.value = 1.0 / monad.value
+				}
+				if (parent.operation == this.not) {
+					monad.value = !monad.value
+				}
+				if (parent.operation == this.subtraction) {
+					monad.value = -monad.value
+				}
+				if (Array.isArray(monad.parent.value)) {
+					break
+				}
+			}
+		}
+		monad = parent
+	}
+
+	var parent = evaluation.monad.parent
+	for (var whileCount = 0; whileCount < gLengthLimit; whileCount++) {
+		if (parent.operation == undefined) {
+			break
+		}
+		var granparent = parent.parent
+		precedenceMonads.push([parent.precedence, whileCount, parent])
+		parent.child = evaluation.monad
+		evaluation.monad = granparent
+		parent = evaluation.monad.parent
+	}
+
+	evaluation.monad = evaluation.monad.parent
+	precedenceMonads.sort(arrayKit.compareElementZeroOneDescending)
+	for (var precedenceMonad of precedenceMonads) {
+		var operationMonad = precedenceMonad[2]
+		var child = operationMonad.child
+		var grandparent = operationMonad.parent
+		child.value = operationMonad.operation(grandparent.value, child.value)
+		child.parent = grandparent.parent
+		child.parent.child = child
+	}
+
+	return endMonad.value
+},
+
+getValueByEquation: function (registry, statement, valueString) {
+	var evaluation = {processor:evaluationProcessorValue, processorCharacters:[], registry: registry, statement:statement}
+	evaluation.monad = {value:[], parent:undefined}
+	for (var character of valueString) {
+		evaluation.processor.process(character, evaluation)
+	}
+
+	this.convertValuePush(evaluation)
+	if (evaluation.monad.value == undefined) {
+		return undefined
+	}
+
+	if (evaluation.monad.value.length == 0) {
+		return undefined
+	}
+
+	if (evaluation.monad.value.length == 1) {
+		return evaluation.monad.value[0]
+	}
+
+	return evaluation.monad.value
+},
+
+getValueIfDefined: function(evaluation) {
+	if (evaluation.processor.getValue == undefined) {
+		return undefined
+	}
+
+	return evaluation.processor.getValue(evaluation)
+},
+
+greaterThan: function(a, b) {
+	return a > b
+},
+
+greaterThanEqual: function(a, b) {
+	return a >= b
+},
+
+lessThan: function(a, b) {
+	return a < b
+},
+
+logical: function(character, evaluation) {
+	evaluator.convertToMonad(evaluation)
+	evaluation.processor = evaluationProcessorLogical
+	evaluation.processor.process(character, evaluation)
+},
+
+memberAccess: function(a, b) {
+	return a[b]
+},
+
+modulo: function(a, b) {
+	return a % b
+},
+
+multiplication: function(a, b) {
+	return a * b
+},
+
+multiplyDivide: function(character, evaluation) {
+	evaluator.convertToMonadIfDefined(evaluation)
+	evaluation.isInverted = false
+	evaluation.processor = evaluationProcessorMultiplyDivide
+	evaluation.processor.process(character, evaluation)
+},
+
+not: function(a) {
+	return !a
+},
+
+notEqual: function(a, b) {
+	return a != b
+},
+
+objectClose: function(evaluation, value) {
+	evaluation.monad.value.push(value)
+	evaluation.monad.value = mapKit.getObjectBySkips(evaluation.monad.value)
+	evaluation.processor = evaluationProcessorOperator
+},
+
+objectOpen: function(character, evaluation) {
+	evaluation.monad = {close:evaluator.objectClose, parent:evaluation.monad, processor:evaluationProcessorString, value:[]}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorString
+	evaluation.processor.stringMap = new Map([[':', evaluator.variableEnd]])
+},
+
+or: function(a, b) {
+	return a || b
+},
+
+plusMinus: function(character, evaluation) {
+	evaluator.convertToMonadIfDefined(evaluation)
+	evaluation.isInverted = false
+	evaluation.processor = evaluationProcessorPlusMinus
+	evaluation.processor.process(character, evaluation)
+},
+
+quoteClose: function(character, evaluation) {
+	evaluation.monad = {parent:evaluation.monad, value:evaluation.processor.getValue(evaluation)}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorOperator
+},
+
+quoteOpen: function(character, evaluation) {
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorString
+	evaluationProcessorString.stringMap = evaluationProcessorString.quoteMapMap.get(character)
+	evaluation.processor.character = character
+},
+
+roundClose: function(evaluation, value) {
+	evaluation.monad.value = value
+	evaluation.processor = evaluationProcessorOperator
+},
+
+roundOpen: function(character, evaluation) {
+	var value = evaluator.getValueIfDefined(evaluation)
+	if (value == undefined) {
+		evaluation.monad = {close:evaluator.roundClose, parent:evaluation.monad}
+		evaluation.processorCharacters.length = 0
+		evaluation.processor = evaluationProcessorValue
+		return
+	}
+
+	evaluation.monad = {close:evaluator.callFunction, monadFunction:value, parent:evaluation.monad, value:[]}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+	var optionMap = evaluation.monad.monadFunction.optionMap
+	if (optionMap == undefined) {
+		return
+	}
+
+	if (optionMap.has('s')) {
+		evaluation.monad.processor = evaluationProcessorFunction
+		evaluation.processor = evaluationProcessorFunction
+	}
+},
+
+setBracket: function(monad) {
+	evaluation.monad = monad.parent
+	evaluation.monad.value = monad.value
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+},
+
+setOperationMonadToKey: function(evaluation, key, map) {
+	var operationPrecedence = map.get(key)
+	evaluation.monad = {operation:operationPrecedence[0], parent:evaluation.monad, precedence:operationPrecedence[1]}
+	evaluation.processor = evaluationProcessorValue
+},
+
+space: function(character, evaluation) {
+	if (evaluation.processorCharacters.length == 0) {
+		return
+	}
+
+	evaluation.monad = {parent:evaluation.monad, value:evaluation.processor.getValue(evaluation)}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorOperator
+},
+
+squareClose: function(evaluation, value) {
+	evaluation.monad.value.push(value)
+	evaluation.processor = evaluationProcessorOperator
+},
+
+stringEnd: function(character, evaluation) {
+	var value = evaluation.processor.getValue(evaluation).trim()
+	if (value.length > 1) {
+		var valueZero = value[0]
+		if (valueZero == value[value.length - 1]) {
+			if (valueZero == '"' || valueZero == "'") {
+				value = value.slice(1, value.length - 1)
+			}
+		}
+	}
+
+	evaluation.monad = {parent:evaluation.monad, value}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorOperator
+	evaluation.processor.process(character, evaluation)
+},
+
+subtraction: function(a, b) {
+	return a - b
+},
+
+totalValuePush: function (evaluation) {
+	var parent = evaluation.monad.parent
+	if (parent == undefined) {
+		return
+	}
+
+	var value = this.getTotalValue(evaluation)
+	if (evaluation.monad.value == undefined) {
+		return
+	}
+
+	evaluation.monad.value.push(value)
+},
+
+variableEnd: function(character, evaluation) {
+	var value = evaluation.processor.getValue(evaluation).trim()
+	evaluation.monad.value.push(value)
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+}
+}
+
+var evaluationProcessorPairs = arrayKit.continueArrays([
+['|', evaluator.bitwise], '^', '&',
+[')', evaluator.bracketClose], ']', '}',
+[',', evaluator.comma],
+['=', evaluator.comparison], ':', '>', '<', '!',
+['*', evaluator.multiplyDivide], '/', '%',
+['+', evaluator.plusMinus], '-',
+['(', evaluator.roundOpen]])
+
+var evaluationComparisonPairs = arrayKit.continueArrays([
+['<<', [evaluator.bitwiseShiftLeft, 13]],
+['>>', [evaluator.bitwiseShiftRight, 13]],
+['==', evaluator.equal],
+['>', evaluator.greaterThan],
+['>=', evaluator.greaterThanEqual], '=>',
+['<', evaluator.lessThan],
+['!', evaluator.not],
+['!=', evaluator.notEqual], '<>', '><'])
+
+var evaluationOperatorPairs = evaluationProcessorPairs.concat(arrayKit.continueArrays([
+['[', evaluator.accessOpen],
+['.', evaluator.dot],
+['a', evaluator.logical], 'o', 'n']))
+
+var evaluationValuePairs = evaluationProcessorPairs.concat(arrayKit.continueArrays([
+['[', evaluator.arrayOpen],
+['{', evaluator.objectOpen],
+['"', evaluator.quoteOpen], "'",
+[' ', evaluator.space]]))
+
+var evaluationProcessorComparison = {
+process: function(character, evaluation) {
+	if (character == (' ')) {
+		return
+	}
+
+	if (character == ':') {
+		character = '='
+	}
+
+	if (this.pushSet.has(character)) {
+		evaluation.processorCharacters.push(character)
+		return
+	}
+
+	processorString = evaluation.processorCharacters.join('')
+	var operation = this.operationMap.get(processorString)
+	if (operation == undefined) {
+		return
+	}
+
+	var precedence = 5
+	if (Array.isArray(operation)) {
+		operation = operation[0]
+		precedence = operation[1]
+	}
+
+	evaluation.monad = {operation:operation, parent:evaluation.monad, precedence: precedence}
+	evaluation.processorCharacters.length = 0
+	evaluation.processor = evaluationProcessorValue
+	evaluation.processor.process(character, evaluation)
+},
+
+operationMap: new Map(evaluationComparisonPairs),
+
+pushSet: new Set([':', '=', '>', '<', '!', ' '])
+}
+
+var evaluationProcessorLogical = {
+process: function(character, evaluation) {
+	if (character == ' ') {
+		evaluation.processorCharacters.length = 0
+		evaluation.processor = evaluationProcessorValue
+		return
+	}
+
+	evaluation.processorCharacters.push(character)
+	processorString = evaluation.processorCharacters.join('')
+	if (this.logicalMap.has(processorString)) {
+		evaluator.setOperationMonadToKey(evaluation, processorString, this.logicalMap)
+		evaluation.processorCharacters.length = 0
+	}
+},
+
+logicalMap: new Map([['and', [evaluator.and, 2]], ['or', [evaluator.or, 0]]])
+}
+
+var evaluationProcessorMultiplyDivide = {
+process: function(character, evaluation) {
+	if (character == ' ' || character == '*') {
+		return
+	}
+
+	if (character == '/') {
+		evaluation.isInverted = !evaluation.isInverted
+		return
+	}
+
+	var operation = evaluator.multiplication
+	if (evaluation.isInverted) {
+		operation = evaluator.division
+	}
+
+	evaluation.monad = {parent:evaluation.monad, precedence: 16}
+	evaluation.processor = evaluationProcessorValue
+	if (character == '%') {
+		evaluation.monad.operation = evaluator.modulo
+	}
+	else {
+		evaluation.monad.operation = operation
+		evaluation.processor.process(character, evaluation)
+	}
+}
+}
+
+var evaluationProcessorFunction = {
+process: function(character, evaluation) {
+	evaluation.processor = evaluationProcessorValue
+	var monad = evaluation.monad
+	var string = monad.monadFunction.optionMap.get('s')
+	if (monad.value.length >= string.length) {
+		evaluation.processor.process(character, evaluation)
+		return
+	}
+
+	if (string[monad.value.length] == '0') {
+		evaluation.processor.process(character, evaluation)
+		return
+	}
+
+	evaluation.processor = evaluationProcessorString
+	evaluation.processor.stringMap = new Map(arrayKit.continueArrays([
+	['"', evaluator.quoteOpen], "'",
+	[',', evaluator.stringEnd],
+	[')', evaluator.stringEnd]]))
+	evaluation.processor.process(character, evaluation)
+}
+}
+
+var evaluationProcessorOperator = {
+bitwiseMap: new Map([
+['&', [evaluator.bitwiseAND, 12]],
+['^', [evaluator.bitwiseXOR, 11]],
+['|', [evaluator.bitwiseOR, 10]]]),
+
+process: function(character, evaluation) {
+	if (this.operatorMap.has(character)) {
+		this.operatorMap.get(character)(character, evaluation)
+	}
+},
+
+operatorMap: new Map(evaluationOperatorPairs)
+}
+
+var evaluationProcessorPlusMinus = {
+process: function(character, evaluation) {
+	if (character == ' ' || character == '+') {
+		return
+	}
+
+	if (character == '-') {
+		evaluation.isInverted = !evaluation.isInverted
+		return
+	}
+
+	var operation = evaluator.addition
+	if (evaluation.isInverted) {
+		operation = evaluator.subtraction
+	}
+
+	evaluation.monad = {operation:operation, parent:evaluation.monad, precedence: 15}
+	evaluation.processor = evaluationProcessorValue
+	evaluation.processor.process(character, evaluation)
+}
+}
+
+var evaluationProcessorString = {
+getValue: function(evaluation) {
+	return evaluation.processorCharacters.join('')
+},
+
+process: function(character, evaluation) {
+	if (this.stringMap.has(character)) {
+		this.stringMap.get(character)(character, evaluation)
+		return
+	}
+
+	evaluation.processorCharacters.push(character)
+},
+
+quoteMapMap: new Map([['"', new Map([['"', evaluator.quoteClose]])], ["'", new Map([["'", evaluator.quoteClose]])]])
+}
+
+var evaluationProcessorValue = {
+alphabetUnderscoreSet: new Set('abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')),
+
+floatStartSet: new Set('-.0123456789'.split('')),
+
+getValue: function(evaluation) {
+	if (evaluation.processorCharacters.length == 0) {
+		return undefined
+	}
+
+	processorString = evaluation.processorCharacters.join('')
+	if (this.alphabetUnderscoreSet.has(processorString[0])) {
+		if (this.reservedMap.has(processorString)) {
+			return this.reservedMap.get(processorString)
+		}
+
+		var processorStrings = processorString.split('.')
+		var processorStringZero = processorStrings[0]
+		var processorString = getVariableValue(processorStringZero, evaluation.statement)
+		if (processorString == undefined) {
+			if (gFunctionMap.has(processorStringZero)) {
+				processorString = gFunctionMap.get(processorStringZero)
+			}
+		}
+
+		if (processorString == undefined) {
+			return undefined
+		}
+
+		for (var processorStringIndex = 1; processorStringIndex < processorStrings.length; processorStringIndex++) {
+			processorString = processorString.get(processorStrings[processorStringIndex])
+		}
+	}
+
+	if (!arrayKit.getIsEmpty(processorString)) {
+		if (this.floatStartSet.has(processorString[0])) {
+			if (processorString.indexOf('.') > -1 || processorString.indexOf('e') > -1) {
+				return parseFloat(processorString)
+			}
+			return parseInt(processorString)
+		}
+		if (processorString[0] == '[') {
+			return evaluator.getValueByEquation(evaluation.registry, evaluation.statement, processorString)
+		}
+	}
+
+	return processorString
+},
+
+process: function(character, evaluation) {
+	if (this.valueMap.has(character)) {
+		this.valueMap.get(character)(character, evaluation)
+		return
+	}
+
+	evaluation.processorCharacters.push(character)
+},
+
+reservedMap: new Map([['false', false], ['null', null], ['true', true], ['undefined', undefined]]),
+
+valueMap: new Map(evaluationValuePairs)
+}
