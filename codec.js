@@ -55,6 +55,118 @@ function addTextsToSelect(select, texts) {
 	}
 }
 
+var AlphabeticRepeatQ = {
+alphabetSet: new Set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'),
+
+compressWord: function(tokenMap, wordIndex, words) {
+	var word = words[wordIndex]
+	if (word.length < 2) {
+		return
+	}
+
+	var lastCharacter = word[word.length - 1]
+	if (gUpperCaseSet.has(lastCharacter)) {
+		words[wordIndex] = word + 'Q'
+		return
+	}
+
+	var lastCharacterUpper = lastCharacter.toUpperCase()
+	for (var tokenLowerLength = 1; tokenLowerLength < word.length - 1; tokenLowerLength++) {
+		var token = word.slice(0, tokenLowerLength) + lastCharacterUpper
+		if (tokenMap.has(token)) {
+			if (tokenMap.get(token) == word) {
+				words[wordIndex] = token
+				return
+			}
+		}
+		else {
+			tokenMap.set(token, word)
+			return
+		}
+	}
+},
+
+expandWord: function(tokenMap, wordIndex, words) {
+	var word = words[wordIndex]
+	if (word.length < 2) {
+		return
+	}
+
+	var lastCharacter = word[word.length - 1]
+	if (lastCharacter == 'Q') {
+		words[wordIndex] = word.slice(0, -1)
+		return
+	}
+
+	if (tokenMap.has(word)) {
+		words[wordIndex] = tokenMap.get(word)
+		return
+	}
+
+	var lastCharacterUpper = lastCharacter.toUpperCase()
+	for (var tokenLowerLength = 1; tokenLowerLength < word.length - 1; tokenLowerLength++) {
+		var token = word.slice(0, tokenLowerLength) + lastCharacterUpper
+		if (!tokenMap.has(token)) {
+			tokenMap.set(token, word)
+			return
+		}
+	}
+},
+
+getAlternatingAlphabeticWords: function(text) {
+	var alternatingWords = []
+	var wasAlphabet = false
+	var textCharacters = text.split('')
+	var wordCharacters = []
+	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
+		var character = text[characterIndex]
+		var isAlphabet = this.alphabetSet.has(character)
+		if (isAlphabet != wasAlphabet) {
+			alternatingWords.push(wordCharacters.join(''))
+			wordCharacters = [character]
+		}
+		else {
+			wordCharacters.push(character)
+		}
+		wasAlphabet = isAlphabet
+	}
+
+	if (wordCharacters.length > 0) {
+		alternatingWords.push(wordCharacters.join(''))
+	}
+
+	return alternatingWords
+},
+
+getCompressed: function(text) {
+	if (text == undefined) {
+		return text
+	}
+
+	var words = this.getAlternatingAlphabeticWords(text)
+	var tokenMap = new Map()
+	for (var wordIndex = 1; wordIndex < words.length; wordIndex += 2) {
+		this.compressWord(tokenMap, wordIndex, words)
+	}
+
+	return words.join('')
+},
+
+getExpanded: function(text) {
+	if (text == undefined) {
+		return text
+	}
+
+	var words = this.getAlternatingAlphabeticWords(text)
+	var tokenMap = new Map()
+	for (var wordIndex = 1; wordIndex < words.length; wordIndex += 2) {
+		this.expandWord(tokenMap, wordIndex, words)
+	}
+
+	return words.join('')
+}
+}
+
 function browse(input) {
 	var fileReader = new FileReader()
 	fileReader.onload = function() {
@@ -72,7 +184,7 @@ function deleteSession() {
 	var selectedIndex = deleteSessionSelect.selectedIndex
 	var key = deleteSessionSelect.options[selectedIndex].text
 	deleteSessionSelect.selectedIndex = 0
-	if (getIsEmpty(key) || selectedIndex < 2) {
+	if (arrayKit.getIsEmpty(key) || selectedIndex < 2) {
 		return
 	}
 
@@ -133,7 +245,7 @@ function getBracketReplacedLinesByText(wordString) {
 
 function getCompressToEncodedURI(text) {
 //	if (text.length < gURLMaximumLength) {
-		return text.replaceAll('\n', '%0A').replaceAll(',', '%2C').replaceAll('\t', '%09')
+		return text.replaceAll('\n', '%0A').replaceAll(',', '%2C').replaceAll('\t', '%09').replaceAll('"', '%22')
 //	}
 /*
 	var compressedText = gLZStringHeader + LZString.compressToEncodedURIComponent(text)
@@ -168,7 +280,7 @@ function getDraftTitle(title) {
 }
 
 function getIsWordStringNew(wordString) {
-	if (getIsEmpty(wordString) || getIsEmpty(gTitle)) {
+	if (arrayKit.getIsEmpty(wordString) || arrayKit.getIsEmpty(gTitle)) {
 		return false
 	}
 
@@ -190,7 +302,7 @@ function getSessionBoolean(booleanKey) {
 function getSessionKey() {
 	var item = sessionStorage.getItem('goCount@')
 	var goCount = 0
-	if (!getIsEmpty(item)) {
+	if (!arrayKit.getIsEmpty(item)) {
 		goCount = parseInt(item) + 1
 	}
 
@@ -241,7 +353,7 @@ function redo() {
 
 function saveToArchive() {
 	var wordString = document.getElementById('wordAreaID').value
-	if (wordString == undefined || getIsEmpty(gTitle)) {
+	if (wordString == undefined || arrayKit.getIsEmpty(gTitle)) {
 		return
 	}
 
@@ -535,7 +647,7 @@ function updateSelect(select) {
 
 function updateStorageTextLink() {
 	var wordString = sessionStorage.getItem(gCurrentKey)
-	if (getIsEmpty(wordString)) {
+	if (arrayKit.getIsEmpty(wordString)) {
 		wordString = ''
 	}
 
