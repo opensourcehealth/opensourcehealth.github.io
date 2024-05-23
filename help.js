@@ -19,6 +19,15 @@ function noticeByList(notices) {
 	console.log((new Error()).stack)
 }
 
+function printMap(map, count = 0) {
+	for (var entry of map.entries()) {
+		console.log(count + ': ' + entry[0] + ' ' + entry[1])
+		count++
+	}
+
+	console.log('Size: ' + map.size)
+}
+
 function warning(text, variables) {
 	var textLines = text.split('\n')
 	var maximumLength = Math.max(textLines.length, variables.length)
