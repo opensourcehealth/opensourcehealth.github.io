@@ -41,7 +41,7 @@ function addMatrices3DByWord(matrices3D, registry, statement, word) {
 
 	if (g3DMatricesMap.has(transformType)) {
 		var points = getPointsByValue(registry, statement, entry[1])
-		pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
+		arrayKit.pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
 	}
 }
 
@@ -53,9 +53,9 @@ function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists,
 		return
 	}
 
-	if (!getIsEmpty(statement.attributeMap) && statement.tag == tag) {
+	if (!arrayKit.getIsEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
-		if (getIsLong(points, minimumLength)) {
+		if (arrayKit.getIsArrayLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
 			if (chainMatrix2D != undefined) {
 				transform2DPoints(chainMatrix2D, points)
@@ -82,9 +82,9 @@ function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagS
 		return
 	}
 
-	if (!getIsEmpty(statement.attributeMap) && statement.tag == tag) {
+	if (!arrayKit.getIsEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
-		if (getIsLong(points, minimumLength)) {
+		if (arrayKit.getIsArrayLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
 			if (chainMatrix2D != undefined) {
 				transform2DPoints(chainMatrix2D, points)
@@ -184,7 +184,7 @@ function getBooleanByStatement(key, registry, statement) {
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
-	if (getIsEmpty(value)) {
+	if (arrayKit.getIsEmpty(value)) {
 		return undefined
 	}
 
@@ -338,7 +338,7 @@ function getChainSkipMatrix2DUntil(caller, registry, statement) {
 }
 
 function getCloseString(floatValue) {
-	return (Math.round(floatValue * gOneOverClose) * gClose).toString()
+	return Value.getStep(floatValue, gClose).toString()
 }
 
 function getEquation(key, statement) {
@@ -354,7 +354,7 @@ function getEquation(key, statement) {
 	}
 
 	var equationValue = getVariableValue(equationString, statement)
-	if (!getIsEmpty(equationValue)) {
+	if (!arrayKit.getIsEmpty(equationValue)) {
 		return equationValue
 	}
 
@@ -377,7 +377,7 @@ function getEquations(key, statement) {
 	var equationStrings = equationString.split(' ').filter(lengthCheck)
 	for (var equationString of equationStrings) {
 		var equationValue = getVariableValue(equationString, statement)
-		if (!getIsEmpty(equationValue)) {
+		if (!arrayKit.getIsEmpty(equationValue)) {
 			equations.push(equationValue)
 		}
 	}
@@ -387,7 +387,7 @@ function getEquations(key, statement) {
 
 function getFixedStrings(floats, numberOfDecimals) {
 	var fixedStrings = new Array(floats.length)
-	numberOfDecimals = getValueDefault(numberOfDecimals, 1)
+	numberOfDecimals = Value.getValueDefault(numberOfDecimals, 1)
 	for (var floatIndex = 0; floatIndex < floats.length; floatIndex++) {
 		fixedStrings[floatIndex] = floats[floatIndex].toFixed(numberOfDecimals)
 	}
@@ -457,11 +457,11 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 			}
 		}
 		if (isNestedArray) {
-			pushArray(points, floats)
+			arrayKit.pushArray(points, floats)
 		}
 		else {
 			if (replaceUndefined) {
-				setUndefinedElementsToArrayZero(floats, oldPoint)
+				arrayKit.setUndefinedElementsToArrayZero(floats, oldPoint)
 			}
 			points.push(floats)
 		}
@@ -495,13 +495,13 @@ function getFloatsByStatementValue(key, registry, statement, value) {
 function getFloatsIncludingZero(key, registry, statement, tag) {
 	var floats = getFloatsByDefault(key, registry, statement, tag, [1.0])
 	addZeroToFloats(floats)
-	replaceElements(floats, undefined, 0.0)
+	arrayKit.replaceElements(floats, undefined, 0.0)
 	statement.attributeMap.set(key, floats.toString())
 	return floats
 }
 
 function getFloatsUpdateByStatementValue(registry, statement, value) {
-	if (getIsEmpty(value)) {
+	if (arrayKit.getIsEmpty(value)) {
 		return [undefined, false]
 	}
 
@@ -523,14 +523,14 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 		else {
 			if (isNaN(floatWord)) {
 				var equationValue = getValueByEquation(registry, statement, floatWord)
-				if (getIsEmpty(equationValue)) {
+				if (arrayKit.getIsEmpty(equationValue)) {
 					var noticeDescription = 'No equationValue could be found for getFloatsUpdateByStatementValue in parsenumber.'
 					noticeByList([noticeDescription, floatWord, floatWords.slice(0), value, statement])
 					floats.push(undefined)
 				}
 				else {
 					if (Array.isArray(equationValue)) {
-						pushArray(floats, equationValue)
+						arrayKit.pushArray(floats, equationValue)
 					}
 					else {
 						floats.push(equationValue)
@@ -744,7 +744,7 @@ function getMatrix2DsByChildren(children, registry) {
 	var matrix2DsByChildren = []
 	for (var child of children) {
 		matrix2Ds = getPointsByTag('matrix2D', registry, child, 'matrix2D')
-		matrix2DsByChildren = getPushArray(matrix2DsByChildren, matrix2Ds)
+		matrix2DsByChildren = arrayKit.getPushArray(matrix2DsByChildren, matrix2Ds)
 	}
 	return matrix2DsByChildren
 }
@@ -771,7 +771,7 @@ function getMatrix2DUntil(caller, registry, statement) {
 }
 
 function getMatrix3D(registry, statement, key) {
-	key = getValueDefault(key, 'transform3D')
+	key = Value.getValueDefault(key, 'transform3D')
 	var attributeMap = statement.attributeMap
 	if (!statement.attributeMap.has(key)) {
 		return undefined
@@ -820,7 +820,7 @@ function getMatrix3DsByChildren(children, registry) {
 	var matrix3DsByChildren = []
 	for (var child of children) {
 		matrix3Ds = getPointsByTag('matrix3D', registry, child, 'matrix3D')
-		matrix3DsByChildren = getPushArray(matrix3DsByChildren, matrix3Ds)
+		matrix3DsByChildren = arrayKit.getPushArray(matrix3DsByChildren, matrix3Ds)
 	}
 	return matrix3DsByChildren
 }
@@ -843,7 +843,7 @@ function getPoint2DByDefault(key, registry, statement, tag, valueDefault) {
 function getPoint2DByStatementValue(key, registry, statement, value) {
 	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
 	var point = floatsUpdate[0]
-	if (getIsEmpty(point)) {
+	if (arrayKit.getIsEmpty(point)) {
 		point = [0.0]
 	}
 
@@ -851,7 +851,7 @@ function getPoint2DByStatementValue(key, registry, statement, value) {
 		point.push(point[0])
 	}
 
-	setUndefinedElementsToValue(point, 0.0)
+	arrayKit.setUndefinedElementsToValue(point, 0.0)
 	if (floatsUpdate[1] && key != undefined) {
 		statement.attributeMap.set(key, point.toString())
 	}
@@ -861,7 +861,7 @@ function getPoint2DByStatementValue(key, registry, statement, value) {
 
 function getPoint3DByStatement(key, registry, statement) {
 	var value = getAttributeValue(key, statement)
-	if (getIsEmpty(value)) {
+	if (arrayKit.getIsEmpty(value)) {
 		return undefined
 	}
 	var update = false
@@ -927,9 +927,13 @@ function getPointsByKey(key, registry, statement) {
 	if (attributeMap == undefined) {
 		return undefined
 	}
+
 	if (attributeMap.has(key)) {
-		return getPointsByValue(registry, statement, attributeMap.get(key))
+		var points = getPointsByValue(registry, statement, attributeMap.get(key))
+		statement.attributeMap.set(key, points.join(' '))
+		return points
 	}
+
 	return undefined
 }
 
@@ -961,7 +965,7 @@ function getPointsHDByStatementOnly(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (attributeMap.has('pointsHD')) {
 		var points = getPointsByValue(registry, statement, attributeMap.get('pointsHD'))
-		attributeMap.set('points', getShortArrays(points, 2).join(' '))
+		attributeMap.set('points', arrayKit.getShortArrays(points, 2).join(' '))
 		return points
 	}
 
@@ -977,7 +981,7 @@ function getPolygonsHDRecursively(registry, statement) {
 }
 
 function getPolygonStatementsRecursively(registry, statement, minimumLength) {
-	minimumLength = getValueDefault(minimumLength, 3)
+	minimumLength = Value.getValueDefault(minimumLength, 3)
 	var polygonStatements = []
 	addToTagStatementsRecursivelyByDepth(statement, 0, minimumLength, polygonStatements, registry, statement, 'polygon')
 	return polygonStatements
@@ -996,6 +1000,14 @@ function getRotatedLow24Bit(a, rotation)
 function getRoundedFloat(float, decimalPlaces = 1) {
 	var powerTen = Math.round(Math.pow(10.0, decimalPlaces))
 	return Math.round(float * powerTen) / powerTen
+}
+
+function getRoundedFloatString(float, decimalPlaces) {
+	return getRoundedFloat(float, decimalPlaces).toString()
+}
+
+function getRoundedPercentageString(float, decimalPlaces) {
+	return getRoundedFloat(float * 100.0, decimalPlaces).toString()
 }
 
 function getSignificant(decimalPlaces, value) {
@@ -1023,6 +1035,10 @@ function getSignificant(decimalPlaces, value) {
 function getString(value) {
 	if (Array.isArray(value)) {
 		return getStringByArray(0, value)
+	}
+
+	if (typeof(value) == 'object') {
+		return mapKit.toStringByEntries(Object.entries(value))
 	}
 
 	if (value == undefined) {
@@ -1139,37 +1155,44 @@ function getVariableValue(key, statement) {
 
 function getVector2DByStatement(registry, statement) {
 	var vector = getPoint3DByStatement('vector', registry, statement)
-	if (getIsEmpty(vector)) {
+	if (arrayKit.getIsEmpty(vector)) {
 		return [1.0, 0.0]
 	}
-	if (vector.length == 1) {
-		vector.push(0.0)
+
+	if (Vector.length == 1) {
+		Vector.push(0.0)
 	}
-	var vectorLength = length2D(vector)
+
+	var vectorLength = Vector.length2D(vector)
 	if (vectorLength == 0.0) {
 		noticeByList(['Zero length vector in getVector2DByStatement in parsenumber.', statement])
 		return [1.0, 0.0]
 	}
-	return divide3DScalar(vector, vectorLength)
+
+	return Vector.divide3DScalar(vector, vectorLength)
 }
 
 function getVector3DByStatement(registry, statement) {
 	var vector = getPoint3DByStatement('vector', registry, statement)
-	if (getIsEmpty(vector)) {
+	if (arrayKit.getIsEmpty(vector)) {
 		return [1.0, 0.0, 0.0]
 	}
-	if (vector.length == 1) {
-		vector.push(0.0)
+
+	if (Vector.length == 1) {
+		Vector.push(0.0)
 	}
-	if (vector.length == 2) {
-		vector.push(0.0)
+
+	if (Vector.length == 2) {
+		Vector.push(0.0)
 	}
-	var vectorLength = length3D(vector)
+
+	var vectorLength = Vector.length3D(vector)
 	if (vectorLength == 0.0) {
 		noticeByList(['Zero length vector in getVector3DByStatement in parsenumber.', statement])
 		return [1.0, 0.0, 0.0]
 	}
-	return divide3DScalar(vector, vectorLength)
+
+	return Vector.divide3DScalar(vector, vectorLength)
 }
 
 function pointsToFixed(points, numberOfDecimals) {
@@ -1180,12 +1203,12 @@ function pointsToFixed(points, numberOfDecimals) {
 	return points
 }
 
-function roundFloatArrays(floatArrays, decimalPlaces) {
-	for (var floats of floatArrays) {
-		roundFloats(floats, decimalPlaces)
+function roundPoints(points, decimalPlaces) {
+	for (var point of points) {
+		roundFloats(point, decimalPlaces)
 	}
 
-	return floatArrays
+	return points
 }
 
 function roundFloats(floats, decimalPlaces) {
@@ -1215,7 +1238,7 @@ function setPointsHD(points, statement) {
 	if (points.length > 0) {
 		if (points[0].length > 2) {
 			statement.attributeMap.set('pointsHD', points.join(' '))
-			statement.attributeMap.set('points', getShortArrays(points, 2).join(' '))
+			statement.attributeMap.set('points', arrayKit.getShortArrays(points, 2).join(' '))
 			return
 		}
 	}
