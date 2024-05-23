@@ -37,7 +37,7 @@ function addHolesToFacet(facetIndex, holePolygonLists, mesh) {
 		}
 		holeFacets[holeIndex] = holeFacet
 	}
-	mesh.facets[facetIndex] = getConnectedFacet(pushArray([facet], holeFacets), points)
+	mesh.facets[facetIndex] = getConnectedFacet(arrayKit.pushArray([facet], holeFacets), points)
 }
 
 function addHolesToFence(bottoms, mesh, overhangAngle, thickness, tops, width) {
@@ -47,7 +47,7 @@ function addHolesToFence(bottoms, mesh, overhangAngle, thickness, tops, width) {
 		var top = tops[topIndex]
 		var nextTop = tops[nextIndex]
 		var bottom = Math.max(bottoms[topIndex], bottoms[nextIndex])
-		var outerTopRight = [distance2D(top, nextTop), Math.min(top[2], nextTop[2])]
+		var outerTopRight = [Vector.distance2D(top, nextTop), Math.min(top[2], nextTop[2])]
 		var innerLeft = thickness
 		if (topIndex > 0) {
 			innerLeft *= 0.5
@@ -83,7 +83,7 @@ function convertPlankToRoad(betweens, centers, curve, matrix3D, mesh, registry, 
 		point[2] = -point[1]
 		point[1] = z
 	}
-	if (getIsEmpty(centers)) {
+	if (arrayKit.getIsEmpty(centers)) {
 		return mesh
 	}
 	var oldWidth = 1.0
@@ -111,17 +111,17 @@ function convertPlankToRoad(betweens, centers, curve, matrix3D, mesh, registry, 
 	var insetDeltas = new Array(centers.length)
 	for (var vertexIndex = 1; vertexIndex < centersLengthMinus; vertexIndex++) {
 		var centerPoint = centers[vertexIndex]
-		var centerBegin = normalize2D(getSubtraction2D(centers[(vertexIndex - 1 + centers.length) % centers.length], centerPoint))
-		var centerEnd = normalize2D(getSubtraction2D(centers[(vertexIndex + 1) % centers.length], centerPoint))
+		var centerBegin = normalize2D(Vector.getSubtraction2D(centers[(vertexIndex - 1 + centers.length) % centers.length], centerPoint))
+		var centerEnd = normalize2D(Vector.getSubtraction2D(centers[(vertexIndex + 1) % centers.length], centerPoint))
 		insetDeltas[vertexIndex] = getInsetDelta(centerBegin, centerEnd)
 	}
-	var centerEnd = normalize2D(getSubtraction2D(centers[1], centers[0]))
+	var centerEnd = normalize2D(Vector.getSubtraction2D(centers[1], centers[0]))
 	insetDeltas[0] = [centerEnd[1], -centerEnd[0]]
-	var centerBegin = normalize2D(getSubtraction2D(centers[centersLengthMinus], centers[centers.length - 2]))
+	var centerBegin = normalize2D(Vector.getSubtraction2D(centers[centersLengthMinus], centers[centers.length - 2]))
 	insetDeltas[centersLengthMinus] = [centerBegin[1], -centerBegin[0]]
 	for (var centerIndex = 0; centerIndex < centers.length; centerIndex++) {
 		var center = centers[centerIndex]
-		var insetRight = getMultiplication2DScalar(insetDeltas[centerIndex], 0.5 * center[2])
+		var insetRight = Vector.getMultiplication2DScalar(insetDeltas[centerIndex], 0.5 * center[2])
 		lefts[centerIndex] = [center[0] - insetRight[0], center[1] - insetRight[1]]
 		rights[centerIndex] = [center[0] + insetRight[0], center[1] + insetRight[1]]
 	}
@@ -159,13 +159,13 @@ function convertPlankToFence(betweens, bottoms, curve, matrix3D, mesh, registry,
 	var topsLengthMinus = tops.length - 1
 	for (var vertexIndex = 1; vertexIndex < topsLengthMinus; vertexIndex++) {
 		var centerPoint = tops[vertexIndex]
-		var centerBegin = normalize2D(getSubtraction2D(tops[(vertexIndex - 1 + tops.length) % tops.length], centerPoint))
-		var centerEnd = normalize2D(getSubtraction2D(tops[(vertexIndex + 1) % tops.length], centerPoint))
+		var centerBegin = normalize2D(Vector.getSubtraction2D(tops[(vertexIndex - 1 + tops.length) % tops.length], centerPoint))
+		var centerEnd = normalize2D(Vector.getSubtraction2D(tops[(vertexIndex + 1) % tops.length], centerPoint))
 		insetDeltas[vertexIndex] = getInsetDelta(centerBegin, centerEnd)
 	}
-	var centerEnd = normalize2D(getSubtraction2D(tops[1], tops[0]))
+	var centerEnd = normalize2D(Vector.getSubtraction2D(tops[1], tops[0]))
 	insetDeltas[0] = [centerEnd[1], -centerEnd[0]]
-	var centerBegin = normalize2D(getSubtraction2D(tops[topsLengthMinus], tops[tops.length - 2]))
+	var centerBegin = normalize2D(Vector.getSubtraction2D(tops[topsLengthMinus], tops[tops.length - 2]))
 	insetDeltas[topsLengthMinus] = [centerBegin[1], -centerBegin[0]]
 	//y>z -z>y
 	for (var point of mesh.points) {
@@ -190,8 +190,8 @@ function convertPlankToFence(betweens, bottoms, curve, matrix3D, mesh, registry,
 		point[2] *= oneMinusAlong * tops[xIndex][2] + along * tops[nextIndex][2]
 		point[2] += oneMinusAlong * bottoms[xIndex] + along * bottoms[nextIndex]
 		var minusY = -point[1] - value
-		var inset = getAddition2D(tops[xIndex], getMultiplication2DScalar(insetDeltas[xIndex], minusY))
-		var nextInset = getAddition2D(tops[nextIndex], getMultiplication2DScalar(insetDeltas[nextIndex], minusY))
+		var inset = Vector.getAddition2D(tops[xIndex], Vector.getMultiplication2DScalar(insetDeltas[xIndex], minusY))
+		var nextInset = Vector.getAddition2D(tops[nextIndex], Vector.getMultiplication2DScalar(insetDeltas[nextIndex], minusY))
 		point[0] = oneMinusAlong * inset[0] + along * nextInset[0]
 		point[1] = oneMinusAlong * inset[1] + along * nextInset[1]
 	}
@@ -295,7 +295,7 @@ var extrusion = {
 
 function getBottoms(registry, statement, tops) {
 	var bottoms = getFloatsByStatement('bottoms', registry, statement)
-	if (getIsEmpty(bottoms)) {
+	if (arrayKit.getIsEmpty(bottoms)) {
 		bottoms = [0.0]
 	}
 	var oldBottomLength = bottoms.length
@@ -467,7 +467,7 @@ function getVerticalHingeMesh
 	var chamferDepth = chamferOutset / Math.tan(0.5 * chamferAngle * gRadiansPerDegree)
 	var layers = []
 	var outsetPolygon = getOutsetPolygon([chamferOutset, chamferOutset], innerPolygon)
-	stopperThickness = getValueDefault(stopperThickness, 0.0)
+	stopperThickness = Value.getValueDefault(stopperThickness, 0.0)
 	if (stopperThickness <= 0.0) {
 		layers.push({matrix3D:getMatrix3DByTranslateZ([0]), polygons:[polygon, outsetPolygon], vertical:true})
 		layers.push({matrix3D:getMatrix3DByTranslateZ([chamferDepth]), polygons:[polygon, innerPolygon], vertical:false})
@@ -521,7 +521,7 @@ function removeClosePoints(mesh) {
 		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 			var pointIndex = facet[vertexIndex]
 			var nextPointIndex = facet[(vertexIndex + 1) % facet.length]
-			if (distanceSquaredArray(points[pointIndex], points[nextPointIndex], 3) < gCloseSquared) {
+			if (Vector.distanceSquaredArray(points[pointIndex], points[nextPointIndex], 3) < gCloseSquared) {
 				addToLinkMap(pointIndex, nextPointIndex, linkMap)
 			}
 		}
@@ -535,10 +535,10 @@ function removeClosePoints(mesh) {
 				facet[vertexIndex] = getLinkTop(pointIndex, linkMap)
 			}
 		}
-		removeRepeats(facet)
+		arrayKit.removeRepeats(facet)
 	}
 
-	removeShortArrays(facets, 3)
+	arrayKit.removeShortArrays(facets, 3)
 }
 
 function removeTooThinFacets(mesh) {
@@ -566,7 +566,7 @@ function removeTooThinFacets(mesh) {
 						var beginPointIndex = facet[checkIndex % facet.length]
 						var endPointIndex = facet[(checkIndex + 1) % facet.length]
 						if (getIsXYZSegmentClose(points[beginPointIndex], points[endPointIndex], point)) {
-							addElementToMapArray(segmentMap, getEdgeKey(beginPointIndex, endPointIndex), pointIndex)
+							mapKit.addElementToMapArray(segmentMap, getEdgeKey(beginPointIndex, endPointIndex), pointIndex)
 						}
 					}
 				}
@@ -580,7 +580,7 @@ function removeTooThinFacets(mesh) {
 		addPointsToFacets(mesh, segmentMap)
 		for (var facetIndex = facets.length - 1; facetIndex > -1; facetIndex--) {
 			var facet = facets[facetIndex]
-			removeRepeats(facet)
+			arrayKit.removeRepeats(facet)
 			var pointIndexSet = new Set()
 			for (var pointIndex of facet) {
 				if (pointIndexSet.has(pointIndex)) {
@@ -643,7 +643,7 @@ var extrusionProcessor = {
 		var matrices = getMatrices3DAndZeroHeight(registry, statement, null)
 		var matrix3D = getChainMatrix3D(registry, statement)
 		var polygons = getPolygonsHDRecursively(registry, statement)
-		if (getIsEmpty(polygons)) {
+		if (arrayKit.getIsEmpty(polygons)) {
 			noticeByList(['No polygons could be found for extrusion in generator3d.', statement])
 			return
 		}
@@ -798,7 +798,7 @@ var sculpture = {
 			var arrowHighOnePoint = points[arrowHigh[1]]
 			for (var vertexIndex = 0; vertexIndex < arrowLow.length; vertexIndex++) {
 				var point = points[arrowLow[vertexIndex]]
-				var diagonalLength = Math.max(distanceSquared2D(point, arrowHighZeroPoint), distanceSquared2D(point, arrowHighOnePoint))
+				var diagonalLength = Math.max(Vector.distanceSquared2D(point, arrowHighZeroPoint), Vector.distanceSquared2D(point, arrowHighOnePoint))
 				if (diagonalLength < shortestDiagonalLength) {
 					shortestDiagonalLength = diagonalLength
 					shortestIndex = vertexIndex
@@ -820,7 +820,7 @@ var sculpture = {
 		}
 
 		polygonateFacets(joinedFacets, points)
-		pushArray(facets, joinedFacets)
+		arrayKit.pushArray(facets, joinedFacets)
 	},
 	addPointToLayer: function(layer, point, pointLayerMap, points, sculptureObject, topFacet) {
 		layer.pointIndexes.push(points.length)
@@ -841,14 +841,14 @@ var sculpture = {
 		var polygons = sculptureObject.polygonMap.get(id)
 		var isClockwise = getIsClockwise(polygons[0])
 		if (statement != undefined) {
-			connectionMultiplier = getValueDefault(getFloatByStatement('connectionMultiplier', registry, statement), connectionMultiplier)
+			connectionMultiplier = Value.getValueDefault(getFloatByStatement('connectionMultiplier', registry, statement), connectionMultiplier)
 			var connectionIDs = statement.attributeMap.get('connectionID')
 			if (connectionIDs != undefined) {
 				connectionIDs = connectionIDs.replaceAll(',', ' ').split(' ').filter(lengthCheck)
 			}
-			vertical = getValueDefault(getBooleanByStatement('vertical', registry, statement), vertical)
+			vertical = Value.getValueDefault(getBooleanByStatement('vertical', registry, statement), vertical)
 			if (polygons[0].length < 3) {
-				isClockwise = getValueFalse(getBooleanByStatement('clockwise', registry, statement))
+				isClockwise = Value.getValueFalse(getBooleanByStatement('clockwise', registry, statement))
 			}
 		}
 
@@ -866,13 +866,13 @@ var sculpture = {
 		var points = mesh.points
 		if (connectionIDs == undefined) {
 			for (var previousID of previousLayer.ids) {
-				pushArray(oldTopFacets, facetsMap.get(previousID))
+				arrayKit.pushArray(oldTopFacets, facetsMap.get(previousID))
 			}
 		}
 		else {
 			for (var connectionID of connectionIDs) {
-				pushArray(oldTopFacets, sculptureObject.facetsMapDirections[0].get(connectionID))
-				pushArray(oldTopFacets, sculptureObject.facetsMapDirections[1].get(connectionID))
+				arrayKit.pushArray(oldTopFacets, sculptureObject.facetsMapDirections[0].get(connectionID))
+				arrayKit.pushArray(oldTopFacets, sculptureObject.facetsMapDirections[1].get(connectionID))
 			}
 			if (oldTopFacets.length > 0) {
 				if (oldTopFacets[0].length > 0) {
@@ -942,7 +942,7 @@ var sculpture = {
 			}
 		}
 
-		addElementToMapArray(facetsMap, id, topFacet)
+		mapKit.addElementToMapArray(facetsMap, id, topFacet)
 	},
 	addSlopedSculptureFacets: function(connectionFacet, connectionIndex, layer, mesh, oldTopFacets, points, polygon3D) {
 		var connection = connectionFacet[connectionIndex]
@@ -975,8 +975,8 @@ var sculpture = {
 		var centerEnd = undefined
 		var beginPoint = polygon3D[(vertexIndex - 1 + polygon3D.length) % polygon3D.length]
 		var endPoint = polygon3D[(vertexIndex + 1) % polygon3D.length]
-		var centerBegin = normalize2D(getSubtraction2D(beginPoint, point))
-		var centerEnd = normalize2D(getSubtraction2D(endPoint, point))
+		var centerBegin = normalize2D(Vector.getSubtraction2D(beginPoint, point))
+		var centerEnd = normalize2D(Vector.getSubtraction2D(endPoint, point))
 
 		var closestIndex = undefined
 		var closestTopFacetIndex = undefined
@@ -987,13 +987,13 @@ var sculpture = {
 			for (var vertexIndex = 0; vertexIndex < topFacet.length; vertexIndex++) {
 				var pointIndex = topFacet[vertexIndex]
 				var centerPoint = points[pointIndex]
-				var distanceSquared = distanceSquared2D(point, centerPoint)
+				var distanceSquared = Vector.distanceSquared2D(point, centerPoint)
 				var beginPoint = points[topFacet[(vertexIndex - 1 + topFacet.length) % topFacet.length]]
 				var endPoint = points[topFacet[(vertexIndex + 1) % topFacet.length]]
-				var oldCenterBegin = normalize2D(getSubtraction2D(beginPoint, centerPoint))
-				var oldCenterEnd = normalize2D(getSubtraction2D(endPoint, centerPoint))
-				var dotBegin = Math.max(Math.min(dotProduct2D(centerBegin, oldCenterBegin), 1.0), -1.0)
-				var dotEnd = Math.max(Math.min(dotProduct2D(centerEnd, oldCenterEnd), 1.0), -1.0)
+				var oldCenterBegin = normalize2D(Vector.getSubtraction2D(beginPoint, centerPoint))
+				var oldCenterEnd = normalize2D(Vector.getSubtraction2D(endPoint, centerPoint))
+				var dotBegin = Math.max(Math.min(Vector.dotProduct2D(centerBegin, oldCenterBegin), 1.0), -1.0)
+				var dotEnd = Math.max(Math.min(Vector.dotProduct2D(centerEnd, oldCenterEnd), 1.0), -1.0)
 				distanceSquared *= 1.0 + (Math.acos(dotBegin) + Math.acos(dotEnd)) * connectionMultiplier
 				var shouldSetClosest = distanceSquared < leastDistanceSquared
 				if (shouldSetClosest) {
@@ -1051,32 +1051,32 @@ var sculpture = {
 		var arrowLow = [connection.low]
 		var connectionPoint = points[connection.low]
 		var nextConnectionPoint = points[nextConnection.low]
-		var delta = normalize2D(getSubtraction2D(nextConnectionPoint, connectionPoint))
+		var delta = normalize2D(Vector.getSubtraction2D(nextConnectionPoint, connectionPoint))
 		var reverseRotation = [delta[0], -delta[1]]
-		var nextRotated = getRotation2DVector(connectionPoint, reverseRotation)
+		var nextRotated = Vector.getRotation2DVector(connectionPoint, reverseRotation)
 		var rotatedX = nextConnectionPoint[0] * reverseRotation[0] - nextConnectionPoint[1] * reverseRotation[1]
 		var segmentIndexes = []
 		for (var oldTopFacet of oldTopFacets) {
 			for (var pointIndex of oldTopFacet) {
 				var point = points[pointIndex]
-				var pointRotated = getRotation2DVector(point, reverseRotation)
+				var pointRotated = Vector.getRotation2DVector(point, reverseRotation)
 				if (Math.abs(pointRotated[1] - nextRotated[1]) < gHalfClose) {
-					if (distanceSquared2D(point, connectionPoint) > gCloseSquared) {
-						if (distanceSquared2D(point, nextConnectionPoint) > gCloseSquared) {
+					if (Vector.distanceSquared2D(point, connectionPoint) > gCloseSquared) {
+						if (Vector.distanceSquared2D(point, nextConnectionPoint) > gCloseSquared) {
 							if (pointRotated[0] > nextRotated[0] && pointRotated[0] < rotatedX) {
-								var nextVector = normalize2D(getSubtraction2D(nextConnectionPoint, connectionPoint))
-								segmentIndexes.push([dotProduct2D(nextVector, point), pointIndex])
+								var nextVector = normalize2D(Vector.getSubtraction2D(nextConnectionPoint, connectionPoint))
+								segmentIndexes.push([Vector.dotProduct2D(nextVector, point), pointIndex])
 							}
 						}
 					}
 				}
 			}
 		}
-		segmentIndexes.sort(compareFirstElementAscending)
+		segmentIndexes.sort(arrayKit.compareElementZeroAscending)
 		for (var segmentIndexIndex = 0; segmentIndexIndex < segmentIndexes.length; segmentIndexIndex++) {
 			segmentIndexes[segmentIndexIndex] = segmentIndexes[segmentIndexIndex][1]
 		}
-		pushArray(arrowLow, segmentIndexes)
+		arrayKit.pushArray(arrowLow, segmentIndexes)
 		arrowLow.push(nextConnection.low)
 		this.addOrJoinFacet([nextConnection.high, connection.high], arrowLow, layer.arrowMap, mesh.facets, points)
 	},
@@ -1122,8 +1122,8 @@ var sculpture = {
 					sculptureObject.polygonMap.set(id, polygon)
 				}
 			}
-			layer.connectionMultiplier = getValueDefault(layer.connectionMultiplier, oldConnectionMultiplier)
-			layer.vertical = getValueDefault(layer.vertical, oldVertical)
+			layer.connectionMultiplier = Value.getValueDefault(layer.connectionMultiplier, oldConnectionMultiplier)
+			layer.vertical = Value.getValueDefault(layer.vertical, oldVertical)
 			oldConnectionMultiplier = layer.connectionMultiplier
 			oldVertical = layer.vertical
 			if (layer.matrix3D == undefined) {
@@ -1166,7 +1166,7 @@ var sculpture = {
 				if (sculptureObject.statementMap != undefined) {
 					statement = sculptureObject.statementMap.get(id)
 					if (statement != undefined && polygon.length < 3) {
-						isClockwise = getValueFalse(getBooleanByStatement('clockwise', registry, statement))
+						isClockwise = Value.getValueFalse(getBooleanByStatement('clockwise', registry, statement))
 					}
 				}
 				var polygon3D = getPolygon3D(polygon, 0.0)
@@ -1174,7 +1174,7 @@ var sculpture = {
 				for (var vertexIndex = 0; vertexIndex < polygon3D.length; vertexIndex++) {
 					this.addPointToLayer(layer, polygon3D[vertexIndex], pointLayerMap, points, sculptureObject, topFacet)
 				}
-				addElementToMapArray(sculptureObject.facetsMapDirections[1 * isClockwise], id, topFacet)
+				mapKit.addElementToMapArray(sculptureObject.facetsMapDirections[1 * isClockwise], id, topFacet)
 			}
 		}
 
@@ -1225,7 +1225,7 @@ var sculptureProcessor = {
 		var layers = []
 		for (var child of statement.children) {
 			if (child.tag == 'layer') {
-				connectionMultiplier = getValueDefault(getFloatByStatement('connectionMultiplier', registry, child), connectionMultiplier)
+				connectionMultiplier = Value.getValueDefault(getFloatByStatement('connectionMultiplier', registry, child), connectionMultiplier)
 				var childMatrices = getMatrices3D(registry, child, null)
 				if (childMatrices.length == 0) {
 					childMatrices.push(0.0)
@@ -1241,12 +1241,12 @@ var sculptureProcessor = {
 						if (layerMap.has(layerID)) {
 							var oldLayer = layerMap.get(layerID)
 							var oldIDs = oldLayer.ids
-							var newIDs = new Array(oldIDs)
+							var newIDs = new Array(oldIDs.length)
 							for (var newIDIndex = 0; newIDIndex < newIDs.length; newIDIndex++) {
 								var oldID = oldIDs[newIDIndex]
 								var newID = this.getNewSculptureID(oldID, sculptureObject.polygonMap)
 								newIDs[newIDIndex] = newID
-								sculptureObject.polygonMap.set(newID, getArraysCopy(sculptureObject.polygonMap.get(oldID)))
+								sculptureObject.polygonMap.set(newID, arrayKit.getArraysCopy(sculptureObject.polygonMap.get(oldID)))
 								sculptureObject.statementMap.set(newID, sculptureObject.statementMap.get(oldID))
 							}
 							layer = {connectionMultiplier:oldLayer.connectionMultiplier, ids:newIDs, vertical:oldLayer.vertical}
@@ -1263,7 +1263,7 @@ var sculptureProcessor = {
 							var points = polygonStatement.points
 							if (sculptureObject.polygonMap.has(polygonStatementID)) {
 								polygonStatementID = this.getNewSculptureID(polygonStatementID, sculptureObject.polygonMap)
-								points = getArraysCopy(points)
+								points = arrayKit.getArraysCopy(points)
 							}
 							sculptureObject.polygonMap.set(polygonStatementID, points)
 							sculptureObject.statementMap.set(polygonStatementID, polygonStatement.statement)
