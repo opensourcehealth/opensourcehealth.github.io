@@ -13,77 +13,86 @@ var gCircle = {
 }
 
 var gDowel = {
-	defaultSlope: 0.01,
-	getDowelMesh: function(dowelPolygon, matrix3D, registry, statement) {
-		var doubleTipBevel = this.tipBevel * 2.0
-		var doubleTipSlope = this.slope * doubleTipBevel
-		var slopeBottom = this.slope * this.bottomDowelHeight
-		var layers = []
-		if (this.bottomDowelHeight != 0.0) {
-			var z = -this.bottomDowelHeight - this.bottomBaseHeight
-			layers.push({matrix3D:z, polygons:[getWidenedPolygon(dowelPolygon, -slopeBottom - this.tipBevel)]})
-			if (this.tipBevel != 0.0) {
-				var widening = doubleTipSlope - slopeBottom
-				layers.push({matrix3D:z + doubleTipBevel, polygons:[getWidenedPolygon(dowelPolygon, widening)], vertical:false})
-			}
-		}
+defaultSlope: 0.01,
 
-		if (this.bottomBaseHeight != 0.0) {
-			layers.push({matrix3D:-this.bottomBaseHeight, polygons:[dowelPolygon], vertical:false})
+getDowelMesh: function(dowelPolygon, matrix3D, registry, statement) {
+	var doubleTipBevel = this.tipBevel * 2.0
+	var doubleTipSlope = this.slope * doubleTipBevel
+	var slopeBottom = this.slope * this.bottomDowelHeight
+	var layers = []
+	if (this.bottomDowelHeight != 0.0) {
+		var z = -this.bottomDowelHeight - this.bottomBaseHeight
+		layers.push({matrix3D:z, polygons:[getWidenedPolygon(dowelPolygon, -slopeBottom - this.tipBevel)]})
+		if (this.tipBevel != 0.0) {
+			var widening = doubleTipSlope - slopeBottom
+			layers.push({matrix3D:z + doubleTipBevel, polygons:[getWidenedPolygon(dowelPolygon, widening)], vertical:false})
 		}
+	}
 
-		var slopeTop = this.slope * this.topDowelHeight
-		if (this.topBaseHeight != 0.0) {
-			if (layers.length == 0) {
-				layers.push({polygons:[dowelPolygon]})
-			}
-			layers.push({matrix3D:this.topBaseHeight, polygons:[dowelPolygon], vertical:false})
+	if (this.bottomBaseHeight != 0.0) {
+		layers.push({matrix3D:-this.bottomBaseHeight, polygons:[dowelPolygon], vertical:false})
+	}
+
+	if (this.topBaseHeight == 0.0) {
+		if (this.bottomBaseHeight == 0.0) {
+			layers.push({matrix3D:0.0, polygons:[dowelPolygon]})
 		}
-
-		if (this.topDowelHeight != 0.0) {
-			if (layers.length == 0) {
-				layers.push({polygons:[dowelPolygon]})
-			}
-			var z = this.topBaseHeight + this.topDowelHeight
-			if (this.tipBevel != 0.0) {
-				var widening = doubleTipSlope - slopeTop
-				layers.push({matrix3D:z - doubleTipBevel, polygons:[getWidenedPolygon(dowelPolygon, widening)], vertical:false})
-			}
-			layers.push({matrix3D:z, polygons:[getWidenedPolygon(dowelPolygon, -this.tipBevel - slopeTop)], vertical:false})
+	}
+	else {
+		if (layers.length == 0) {
+			layers.push({polygons:[dowelPolygon]})
 		}
+		layers.push({matrix3D:this.topBaseHeight, polygons:[dowelPolygon], vertical:false})
+	}
 
-		return polygonateMesh(sculpture.getMesh(layers, matrix3D))
-	},
-	octagonalEdgeDivider: 1.0 + Math.sqrt(2.0),
-	processStatement: function(registry, statement) {
-		this.bottomBaseHeight = getFloatByDefault('bottomBaseHeight', registry, statement, this.tag, 0.0)
-		this.bottomDowelHeight = getFloatByDefault('bottomDowelHeight', registry, statement, this.tag, 0.0)
-		var cx = getFloatByDefault('cx', registry, statement, this.tag, 0.0)
-		var cy = getFloatByDefault('cy', registry, statement, this.tag, 0.0)
-		var overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
-		var radius = getFloatByDefault('r', registry, statement, this.tag, 10.0)
-		this.slope = getFloatByDefault('slope', registry, statement, this.tag, this.defaultSlope)
-		this.tipBevel = getFloatByDefault('tipBevel', registry, statement, this.tag, 1.0)
-		this.topBaseHeight = getFloatByDefault('topBaseHeight', registry, statement, this.tag, 0.0)
-		this.topDowelHeight = getFloatByDefault('topDowelHeight', registry, statement, this.tag, 0.0)
-		var widening = getFloatByDefault('widening', registry, statement, this.tag, 0.0)
-		statement.tag = 'polygon'
-		var center = [0.0, 0.0]
-		var edge = radius / this.octagonalEdgeDivider
-		var dowelPolygon = [[radius - (radius - edge) * Math.tan(overhangAngle), -radius], [radius, -edge]]
-		addMirrorPoints({center:center, vector:[1.0, 0.0]}, dowelPolygon.length, dowelPolygon)
-		addArraysByIndex(dowelPolygon, widening, 0)
-		addMirrorPoints({center:center, vector:[0.0, 1.0]}, dowelPolygon.length, dowelPolygon)
-		add2Ds(dowelPolygon, [cx, cy])
-		if (this.bottomBaseHeight == 0.0 && this.bottomDowelHeight == 0.0 && this.topBaseHeight == 0.0 && this.topDowelHeight == 0.0) {
-			setPointsExcept(dowelPolygon, registry, statement)
-			return
+	var slopeTop = this.slope * this.topDowelHeight
+	if (this.topDowelHeight != 0.0) {
+		if (layers.length == 0) {
+			layers.push({polygons:[dowelPolygon]})
 		}
+		var z = this.topBaseHeight + this.topDowelHeight
+		if (this.tipBevel != 0.0) {
+			var widening = doubleTipSlope - slopeTop
+			layers.push({matrix3D:z - doubleTipBevel, polygons:[getWidenedPolygon(dowelPolygon, widening)], vertical:false})
+		}
+		layers.push({matrix3D:z, polygons:[getWidenedPolygon(dowelPolygon, -this.tipBevel - slopeTop)], vertical:false})
+	}
 
-		var matrix3D = getChainMatrix3D(registry, statement)
-		analyzeOutputMesh(this.getDowelMesh(dowelPolygon, matrix3D, registry, statement), registry, statement)
-	},
-	tag: 'dowel'
+	return polygonateMesh(sculpture.getMesh(layers, matrix3D))
+},
+
+octagonalEdgeDivider: 1.0 + Math.sqrt(2.0),
+
+processStatement: function(registry, statement) {
+	this.bottomBaseHeight = getFloatByDefault('bottomBaseHeight', registry, statement, this.tag, 0.0)
+	this.bottomDowelHeight = getFloatByDefault('bottomDowelHeight', registry, statement, this.tag, 0.0)
+	var cx = getFloatByDefault('cx', registry, statement, this.tag, 0.0)
+	var cy = getFloatByDefault('cy', registry, statement, this.tag, 0.0)
+	var overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
+	var radius = getFloatByDefault('r', registry, statement, this.tag, 10.0)
+	this.slope = getFloatByDefault('slope', registry, statement, this.tag, this.defaultSlope)
+	this.tipBevel = getFloatByDefault('tipBevel', registry, statement, this.tag, 1.0)
+	this.topBaseHeight = getFloatByDefault('topBaseHeight', registry, statement, this.tag, 0.0)
+	this.topDowelHeight = getFloatByDefault('topDowelHeight', registry, statement, this.tag, 0.0)
+	var widening = getFloatByDefault('widening', registry, statement, this.tag, 0.0)
+	statement.tag = 'polygon'
+	var center = [0.0, 0.0]
+	var edge = radius / this.octagonalEdgeDivider
+	var dowelPolygon = [[radius - (radius - edge) * Math.tan(overhangAngle), -radius], [radius, -edge]]
+	addMirrorPoints({center:center, vector:[1.0, 0.0]}, dowelPolygon.length, dowelPolygon)
+	addArraysByIndex(dowelPolygon, widening, 0)
+	addMirrorPoints({center:center, vector:[0.0, 1.0]}, dowelPolygon.length, dowelPolygon)
+	Vector.add2Ds(dowelPolygon, [cx, cy])
+	if (this.bottomBaseHeight == 0.0 && this.bottomDowelHeight == 0.0 && this.topBaseHeight == 0.0 && this.topDowelHeight == 0.0) {
+		setPointsExcept(dowelPolygon, registry, statement)
+		return
+	}
+
+	var matrix3D = getChainMatrix3D(registry, statement)
+	analyzeOutputMesh(this.getDowelMesh(dowelPolygon, matrix3D, registry, statement), registry, statement)
+},
+
+tag: 'dowel'
 }
 
 var gGear = {
@@ -119,21 +128,21 @@ var gGear = {
 		var angle = involuteBeginAngle
 		var angleIncrement = (involuteEndAngle - involuteBeginAngle) / profileSides
 		for (var vertexIndex = 0; vertexIndex < profileSidesPlus; vertexIndex++) {
-			var toothVector = polarCounterclockwise(angle)
-			var toothPoint = multiply2DScalar([toothVector[1], -toothVector[0]], zeroAngleDistance + angle * baseRadius)
-			add2D(toothPoint, multiply2DScalar(toothVector, baseRadius))
+			var toothVector = Vector.polarCounterclockwise(angle)
+			var toothPoint = Vector.multiply2DScalar([toothVector[1], -toothVector[0]], zeroAngleDistance + angle * baseRadius)
+			Vector.add2D(toothPoint, Vector.multiply2DScalar(toothVector, baseRadius))
 			tooth[vertexIndex] = toothPoint
 			angle += angleIncrement
 		}
 
-		rotate2DsVector(tooth, polarCounterclockwise(-Math.PI * 0.5 / teeth))
+		rotate2DsVector(tooth, Vector.polarCounterclockwise(-Math.PI * 0.5 / teeth))
 		addMirrorPoints({vector:[1.0, 0.0]}, tooth.length, tooth)
 		var gear = []
-		var rotationVector = polarCounterclockwise(gPI2 / teeth)
-		var toothVector = polarCounterclockwise(startAngle)
+		var rotationVector = Vector.polarCounterclockwise(gPI2 / teeth)
+		var toothVector = Vector.polarCounterclockwise(startAngle)
 		for (var toothIndex = 0; toothIndex < teeth; toothIndex++) {
-			pushArray(gear, getRotation2DsVector(tooth, toothVector))
-			rotate2DVector(toothVector, rotationVector)
+			arrayKit.pushArray(gear, getRotation2DsVector(tooth, toothVector))
+			Vector.rotate2DVector(toothVector, rotationVector)
 		}
 
 		return gear
@@ -155,7 +164,7 @@ var gGear = {
 		var additionX = 0.0
 		var gear = []
 		for (var toothIndex = 0; toothIndex < teeth; toothIndex++) {
-			pushArray(gear, addArraysByIndex(getArraysCopy(tooth), additionX, 0))
+			arrayKit.pushArray(gear, addArraysByIndex(arrayKit.getArraysCopy(tooth), additionX, 0))
 			additionX += toothWavelength
 		}
 
@@ -186,21 +195,21 @@ var gGear = {
 		var angle = involuteBeginAngle
 		var angleIncrement = (involuteEndAngle - involuteBeginAngle) / profileSides
 		for (var vertexIndex = 0; vertexIndex < profileSidesPlus; vertexIndex++) {
-			var toothVector = polarCounterclockwise(angle)
-			var toothPoint = multiply2DScalar([toothVector[1], -toothVector[0]], zeroAngleDistance + angle * baseRadius)
-			add2D(toothPoint, multiply2DScalar(toothVector, baseRadius))
+			var toothVector = Vector.polarCounterclockwise(angle)
+			var toothPoint = Vector.multiply2DScalar([toothVector[1], -toothVector[0]], zeroAngleDistance + angle * baseRadius)
+			Vector.add2D(toothPoint, Vector.multiply2DScalar(toothVector, baseRadius))
 			tooth[vertexIndex] = toothPoint
 			angle += angleIncrement
 		}
 
-		rotate2DsVector(tooth, polarCounterclockwise(-Math.PI * 0.5 / teeth))
+		rotate2DsVector(tooth, Vector.polarCounterclockwise(-Math.PI * 0.5 / teeth))
 		addMirrorPoints({vector:[1.0, 0.0]}, tooth.length, tooth)
 		var gear = []
-		var rotationVector = polarCounterclockwise(gPI2 / teeth)
-		var toothVector = polarCounterclockwise(startAngle)
+		var rotationVector = Vector.polarCounterclockwise(gPI2 / teeth)
+		var toothVector = Vector.polarCounterclockwise(startAngle)
 		for (var toothIndex = 0; toothIndex < teeth; toothIndex++) {
-			pushArray(gear, getRotation2DsVector(tooth, toothVector))
-			rotate2DVector(toothVector, rotationVector)
+			arrayKit.pushArray(gear, getRotation2DsVector(tooth, toothVector))
+			Vector.rotate2DVector(toothVector, rotationVector)
 		}
 
 		return gear
@@ -212,13 +221,13 @@ var gGear = {
 
 		if (gearObject.oldDedendum == undefined) {
 			var dedendum = pitchRadius * (1.0 - Math.cos(gearObject.pressureAngle))
-			gearObject.dedendum = Math.min(getValueDefault(gearObject.dedendum, dedendum), dedendum)
+			gearObject.dedendum = Math.min(Value.getValueDefault(gearObject.dedendum, dedendum), dedendum)
 		}
 		else {
 			gearObject.dedendum = gearObject.oldDedendum
 		}
 
-		gearObject.addendum = getValueDefault(gearObject.oldAddendum, gearObject.dedendum * 0.85)
+		gearObject.addendum = Value.getValueDefault(gearObject.oldAddendum, gearObject.dedendum * 0.85)
 	},
 	processStatement: function(registry, statement) {
 		this.oldAddendum = getFloatByStatement('addendum', registry, statement)
@@ -236,7 +245,7 @@ var gGear = {
 		startAngle += gPI2 * sideOffset / gearTeeth
 		this.minimizeAddendumDedendum(this, pitchRadius, gearSectorDegree, gearTeeth)
 		var gear = this.getGear(this, pitchRadius, gearSectorDegree, startAngle, gearTeeth)
-		setPointsExcept(add2Ds(gear, [cx, cy]), registry, statement)
+		setPointsExcept(Vector.add2Ds(gear, [cx, cy]), registry, statement)
 	},
 	tag: 'gear'
 }
@@ -244,7 +253,7 @@ var gGear = {
 var gGearSet = {
 	addGear: function(center, gear, registry, statement) {
 		var gearMap = new Map()
-		copyKeysExcept(gearMap, statement.attributeMap, gIDTransformSet)
+		mapKit.copyKeysExcept(gearMap, statement.attributeMap, gIDTransformSet)
 		if (this.gearColors.length > 0) {
 			var styleJoined = 'fill:' + this.gearColors[this.gearCount % this.gearColors.length]
 			if (gearMap.has('style')) {
@@ -263,7 +272,7 @@ var gGearSet = {
 		var gearStatement = getStatementByParentTag(gearMap, 0, statement, 'polygon')
 		getUniqueID(this.idStart + 'gear', registry, gearStatement)
 		gearStatement.generatorName = 'gear'
-		setPointsHD(add2Ds(gear, center), gearStatement)
+		setPointsHD(Vector.add2Ds(gear, center), gearStatement)
 		this.gearCount += 1
 	},
 	processStatement: function(registry, statement) {
@@ -342,7 +351,7 @@ var gPulley = {
 		removeByGeneratorName(statement.children, 'pulley')
 		var pulleyMap = new Map()
 		var idStart = statement.attributeMap.get('id') + '_generated_'
-		copyKeysExcept(pulleyMap, statement.attributeMap, gIDTransformSet)
+		mapKit.copyKeysExcept(pulleyMap, statement.attributeMap, gIDTransformSet)
 		var pulleyStatement = getStatementByParentTag(pulleyMap, 0, statement, 'polygon')
 		getUniqueID(idStart + 'pulley', registry, pulleyStatement)
 		pulleyStatement.generatorName = 'pulley'
@@ -350,11 +359,11 @@ var gPulley = {
 		var rope = spiralCenterRadiusOnly(center, radius, fromAngle, toAngle, sides)
 		var counterclockwiseMinusHalfPi = (1.0 * (toAngle > fromAngle) - 0.5) * Math.PI
 		if (fromDistance > 0.0) {
-			rope.splice(0, 0, add2D(polarRadius(fromAngle - counterclockwiseMinusHalfPi, fromDistance), rope[0]))
+			rope.splice(0, 0, Vector.add2D(Vector.polarRadius(fromAngle - counterclockwiseMinusHalfPi, fromDistance), rope[0]))
 		}
 
 		if (toDistance > 0.0) {
-			rope.push(add2D(polarRadius(toAngle + counterclockwiseMinusHalfPi, toDistance), rope[rope.length - 1]))
+			rope.push(Vector.add2D(Vector.polarRadius(toAngle + counterclockwiseMinusHalfPi, toDistance), rope[rope.length - 1]))
 		}
 
 		var ropeMap = new Map([['style', 'fill:none;stroke:' + ropeColor], ['stroke-width', ropeWidth.toString()]])
@@ -372,7 +381,7 @@ var gPulley = {
 			setPointsHD(wraparound, ropeWraparoundStatement)
 		}
 
-		deleteKeysExcept(statement.attributeMap, gIDTransformSet)
+		mapKit.deleteKeysExcept(statement.attributeMap, gIDTransformSet)
 	},
 	tag: 'pulley'
 }
@@ -394,57 +403,59 @@ var gRegularPolygon = {
 }
 
 var gSocket = {
-	getSocketMesh: function(matrix3D, registry, socketPolygon, statement) {
-		var narrowedPolygons = [getWidenedPolygon(socketPolygon, -this.slope * (Math.abs(this.height) + this.extraHeight))]
-		var layers = []
-		if (this.height < 0.0) {
-			layers.push({matrix3D:this.height - this.extraHeight, polygons:narrowedPolygons})
-		}
+getSocketMesh: function(matrix3D, registry, socketPolygon, statement) {
+	var narrowedPolygons = [getWidenedPolygon(socketPolygon, -this.slope * (Math.abs(this.height) + this.extraHeight))]
+	var layers = []
+	if (this.height < 0.0) {
+		layers.push({matrix3D:this.height - this.extraHeight, polygons:narrowedPolygons})
+	}
 
-		layers.push({matrix3D:0.0, polygons:[socketPolygon], vertical:false})
-		if (this.height > 0.0) {
-			layers.push({matrix3D:this.height + this.extraHeight, polygons:narrowedPolygons})
-		}
+	layers.push({matrix3D:0.0, polygons:[socketPolygon], vertical:false})
+	if (this.height > 0.0) {
+		layers.push({matrix3D:this.height + this.extraHeight, polygons:narrowedPolygons})
+	}
 
-		return polygonateMesh(sculpture.getMesh(layers, matrix3D))
-	},
-	processStatement: function(registry, statement) {
-		var backFrontBevel = getFloatByDefault('backFrontBevel', registry, statement, this.tag, 1.0)
-		var backFrontSpace = getFloatByDefault('backFrontSpace', registry, statement, this.tag, 1.0)
-		var cx = getFloatByDefault('cx', registry, statement, this.tag, 0.0)
-		var cy = getFloatByDefault('cy', registry, statement, this.tag, 0.0)
-		this.extraHeight = getFloatByDefault('extraHeight', registry, statement, this.tag, 0.0)
-		this.height = getFloatByDefault('height', registry, statement, this.tag, 0.0)
-		var overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
-		var radius = getFloatByDefault('r', registry, statement, this.tag, 10.0)
-		this.slope = getFloatByDefault('slope', registry, statement, this.tag, gDowel.defaultSlope)
-		var widening = getFloatByDefault('widening', registry, statement, this.tag, 0.0)
-		statement.tag = 'polygon'
-		var center = [0.0, 0.0]
-		var edge = radius / gDowel.octagonalEdgeDivider
-		var socketBottom = -radius - backFrontSpace
-		var bottomPoint = [radius + (edge + socketBottom) * Math.tan(overhangAngle), socketBottom]
-		var rightPoint = [radius, -edge]
-		var socketPolygon = [bottomPoint]
-		if (backFrontBevel != 0.0) {
-			socketPolygon.push(multiply2DScalar(getAddition2D(bottomPoint, rightPoint), 0.5))
-			bottomPoint[0] += backFrontBevel
-		}
+	return polygonateMesh(sculpture.getMesh(layers, matrix3D))
+},
 
-		socketPolygon.push(rightPoint)
-		addMirrorPoints({center:center, vector:[1.0, 0.0]}, socketPolygon.length, socketPolygon)
-		addArraysByIndex(socketPolygon, widening, 0)
-		addMirrorPoints({center:center, vector:[0.0, 1.0]}, socketPolygon.length, socketPolygon)
-		add2Ds(socketPolygon, [cx, cy])
-		if (this.height == 0.0) {
-			setPointsExcept(socketPolygon, registry, statement)
-			return
-		}
+processStatement: function(registry, statement) {
+	var backFrontBevel = getFloatByDefault('backFrontBevel', registry, statement, this.tag, 1.0)
+	var backFrontSpace = getFloatByDefault('backFrontSpace', registry, statement, this.tag, 1.0)
+	var cx = getFloatByDefault('cx', registry, statement, this.tag, 0.0)
+	var cy = getFloatByDefault('cy', registry, statement, this.tag, 0.0)
+	this.extraHeight = getFloatByDefault('extraHeight', registry, statement, this.tag, 0.0)
+	this.height = getFloatByDefault('height', registry, statement, this.tag, 0.0)
+	var overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
+	var radius = getFloatByDefault('r', registry, statement, this.tag, 10.0)
+	this.slope = getFloatByDefault('slope', registry, statement, this.tag, gDowel.defaultSlope)
+	var widening = getFloatByDefault('widening', registry, statement, this.tag, 0.0)
+	statement.tag = 'polygon'
+	var center = [0.0, 0.0]
+	var edge = radius / gDowel.octagonalEdgeDivider
+	var socketBottom = -radius - backFrontSpace
+	var bottomPoint = [radius + (edge + socketBottom) * Math.tan(overhangAngle), socketBottom]
+	var rightPoint = [radius, -edge]
+	var socketPolygon = [bottomPoint]
+	if (backFrontBevel != 0.0) {
+		socketPolygon.push(Vector.multiply2DScalar(Vector.getAddition2D(bottomPoint, rightPoint), 0.5))
+		bottomPoint[0] += backFrontBevel
+	}
 
-		var matrix3D = getChainMatrix3D(registry, statement)
-		analyzeOutputMesh(this.getSocketMesh(matrix3D, registry, socketPolygon, statement), registry, statement)
-	},
-	tag: 'socket'
+	socketPolygon.push(rightPoint)
+	addMirrorPoints({center:center, vector:[1.0, 0.0]}, socketPolygon.length, socketPolygon)
+	addArraysByIndex(socketPolygon, widening, 0)
+	addMirrorPoints({center:center, vector:[0.0, 1.0]}, socketPolygon.length, socketPolygon)
+	Vector.add2Ds(socketPolygon, [cx, cy])
+	if (this.height == 0.0) {
+		setPointsExcept(socketPolygon, registry, statement)
+		return
+	}
+
+	var matrix3D = getChainMatrix3D(registry, statement)
+	analyzeOutputMesh(this.getSocketMesh(matrix3D, registry, socketPolygon, statement), registry, statement)
+},
+
+tag: 'socket'
 }
 
 var gTruncatedTeardrop = {
@@ -469,7 +480,7 @@ var gTruncatedTeardrop = {
 		endAngle += halfAngleIncrement + 0.001 * overhangAngle
 		var outerRadius = radius / Math.cos(halfAngleIncrement)
 		for (var pointAngle = beginAngle; pointAngle < endAngle; pointAngle += angleIncrement) {
-			points.push(polarRadius(pointAngle, outerRadius))
+			points.push(Vector.polarRadius(pointAngle, outerRadius))
 		}
 
 		var segmentRunOverRise = (points[0][0] - points[1][0]) / (points[0][1] - points[1][1])
@@ -485,8 +496,8 @@ var gTruncatedTeardrop = {
 
 		points[0] = [-side, top]
 		points[points.length - 1] = [side, top]
-		rotate2DsVector(points, polarCounterclockwise((tipDirection - 90) * gRadiansPerDegree))
-		add2Ds(points, [cx, cy])
+		rotate2DsVector(points, Vector.polarCounterclockwise((tipDirection - 90) * gRadiansPerDegree))
+		Vector.add2Ds(points, [cx, cy])
 		for (pointIndex = 0; pointIndex < points.length; pointIndex++) {
 			point = points[pointIndex]
 			points[pointIndex] = [point[0].toFixed(3), point[1].toFixed(3)]
