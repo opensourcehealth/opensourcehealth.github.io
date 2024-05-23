@@ -1,6 +1,6 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-gValidTagSet = new Set('comment default defs information layer license radialGradient stop svg xml'.split(' '))
+gValidTagSet = new Set('comment default defs information layer license radialGradient row stop svg xml'.split(' '))
 
 function addPassthroughLines(depth, passthrough, passthroughNesting, statement) {
 	if (depth > gRecursionLimit) {
@@ -343,6 +343,19 @@ function getProcessableDescendantsInsideFirst(statement) {
 	return descendants
 }
 
+function getSemicolonSeparatedStringsByValue(value) {
+	if (value == undefined) {
+		return []
+	}
+
+	var semicolonSeparatedStrings = value.split(';')
+	for (var stringIndex = 0; stringIndex < semicolonSeparatedStrings.length; stringIndex++) {
+		semicolonSeparatedStrings[stringIndex] = semicolonSeparatedStrings[stringIndex].trim()
+	}
+
+	return semicolonSeparatedStrings.filter(lengthCheck)
+}
+
 function getStatement(line) {
 	line = line.trim()
 	if (line.startsWith('</') || line.startsWith('}')) {
@@ -370,7 +383,7 @@ function getStatement(line) {
 	line = line.slice(sliceBegin, sliceEnd).trim()
 	var tag = line
 	var indexOfSpace = line.indexOf(' ')
-	if (indexOfSpace != -1) {
+	if (indexOfSpace > -1) {
 		tag = tag.slice(0, indexOfSpace)
 	}
 
@@ -381,15 +394,15 @@ function getStatement(line) {
 	line = line.slice(indexOfSpace + 1).trim()
 	var innerHTML = undefined
 	if (tag == 'text') {
-		var lastIndexOfGreaterThan = line.lastIndexOf('>')
-		if (lastIndexOfGreaterThan != -1) {
+		var indexOfUnquotedGreaterThan = getIndexOfUnquoted(line, '>')
+		if (indexOfUnquotedGreaterThan > -1) {
 			if (line.endsWith('<')) {
-				innerHTML = line.slice(lastIndexOfGreaterThan + 1, -1)
+				innerHTML = line.slice(indexOfUnquotedGreaterThan + 1, -1)
 			}
 			else {
-				innerHTML = line.slice(lastIndexOfGreaterThan + 1)
+				innerHTML = line.slice(indexOfUnquotedGreaterThan + 1)
 			}
-			line = line.slice(0, lastIndexOfGreaterThan).trim()
+			line = line.slice(0, indexOfUnquotedGreaterThan).trim()
 		}
 	}
 
@@ -582,8 +595,8 @@ function getWorkStatements(registry, statement) {
 
 function initializeProcessors(processors) {
 	for (var processor of processors) {
+		gTagCenterMap.set(processor.tag, processor)
 		if (processor.initialize == undefined) {
-			gTagCenterMap.set(processor.tag, processor)
 			if (processor.alterMesh != undefined) {
 				gAlterMeshMap.set(processor.tag, processor)
 			}
@@ -614,17 +627,21 @@ function processRootStatementByTagMap(registry, rootStatement, tagMap) {
 	}
 }
 
+function processStatementByTagMap(missingProcessorSet, registry, statement, tagMap) {
+	var tag = statement.tag
+	if (tagMap.has(tag)) {
+		tagMap.get(tag).processStatement(registry, statement)
+	}
+	else {
+		if (!gValidTagSet.has(tag) && !tag.startsWith('_')) {
+			missingProcessorSet.add(tag)
+		}
+	}
+}
+
 function processStatementsByTagMap(missingProcessorSet, registry, statements, tagMap) {
 	for (var statement of statements) {
-		var tag = statement.tag
-		if (tagMap.has(tag)) {
-			tagMap.get(tag).processStatement(registry, statement)
-		}
-		else {
-			if (!gValidTagSet.has(tag) && !tag.startsWith('_')) {
-				missingProcessorSet.add(tag)
-			}
-		}
+		processStatementByTagMap(missingProcessorSet, registry, statement, tagMap)
 	}
 }
 
