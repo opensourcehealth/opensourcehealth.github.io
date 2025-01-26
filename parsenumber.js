@@ -41,7 +41,7 @@ function addMatrices3DByWord(matrices3D, registry, statement, word) {
 
 	if (g3DMatricesMap.has(transformType)) {
 		var points = getPointsByValue(registry, statement, entry[1])
-		arrayKit.pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
+		Vector.pushArray(matrices3D, g3DMatricesMap.get(transformType)(points))
 	}
 }
 
@@ -53,9 +53,9 @@ function addToChainPointListsHDByDepth(caller, depth, minimumLength, pointLists,
 		return
 	}
 
-	if (!arrayKit.getIsEmpty(statement.attributeMap) && statement.tag == tag) {
+	if (!Vector.isEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
-		if (arrayKit.getIsArrayLong(points, minimumLength)) {
+		if (Vector.isArrayLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
 			if (chainMatrix2D != undefined) {
 				transform2DPoints(chainMatrix2D, points)
@@ -82,9 +82,9 @@ function addToTagStatementsRecursivelyByDepth(caller, depth, minimumLength, tagS
 		return
 	}
 
-	if (!arrayKit.getIsEmpty(statement.attributeMap) && statement.tag == tag) {
+	if (!Vector.isEmpty(statement.attributeMap) && statement.tag == tag) {
 		var points = getPointsHD(registry, statement)
-		if (arrayKit.getIsArrayLong(points, minimumLength)) {
+		if (Vector.isArrayLong(points, minimumLength)) {
 			var chainMatrix2D = getChainSkipMatrix2DUntil(caller, registry, statement)
 			if (chainMatrix2D != undefined) {
 				transform2DPoints(chainMatrix2D, points)
@@ -120,7 +120,7 @@ function getAlignment(key, registry, statement, tag) {
 	if (alignmentTable.has(value)) {
 		value = alignmentTable.get(value)
 	}
-	return getFloatByStatementValue(key, registry, statement, value)
+	return getFloatByKeyStatementValue(key, registry, statement, value)
 }
 
 function getAttributeFloat(key, statement) {
@@ -184,7 +184,7 @@ function getBooleanByStatement(key, registry, statement) {
 }
 
 function getBooleanByStatementValue(key, registry, statement, value) {
-	if (arrayKit.getIsEmpty(value)) {
+	if (Vector.isEmpty(value)) {
 		return undefined
 	}
 
@@ -354,7 +354,7 @@ function getEquation(key, statement) {
 	}
 
 	var equationValue = getVariableValue(equationString, statement)
-	if (!arrayKit.getIsEmpty(equationValue)) {
+	if (!Vector.isEmpty(equationValue)) {
 		return equationValue
 	}
 
@@ -377,7 +377,7 @@ function getEquations(key, statement) {
 	var equationStrings = equationString.split(' ').filter(lengthCheck)
 	for (var equationString of equationStrings) {
 		var equationValue = getVariableValue(equationString, statement)
-		if (!arrayKit.getIsEmpty(equationValue)) {
+		if (!Vector.isEmpty(equationValue)) {
 			equations.push(equationValue)
 		}
 	}
@@ -396,18 +396,10 @@ function getFixedStrings(floats, numberOfDecimals) {
 }
 
 function getFloatByDefault(key, registry, statement, tag, valueDefault) {
-	return getFloatByStatementValue(key, registry, statement, getValueByKeyDefault(key, registry, statement, tag, valueDefault))
+	return getFloatByKeyStatementValue(key, registry, statement, getValueByKeyDefault(key, registry, statement, tag, valueDefault))
 }
 
-function getFloatByStatement(key, registry, statement) {
-	if (statement.attributeMap.has(key)) {
-		return getFloatByStatementValue(key, registry, statement, statement.attributeMap.get(key))
-	}
-
-	return undefined
-}
-
-function getFloatByStatementValue(key, registry, statement, value) {
+function getFloatByKeyStatementValue(key, registry, statement, value) {
 	if (value.length == 0) {
 		return undefined
 	}
@@ -421,6 +413,26 @@ function getFloatByStatementValue(key, registry, statement, value) {
 			statement.attributeMap.set(key, float.toString())
 		}
 		return float
+	}
+
+	return parseFloat(value)
+}
+
+function getFloatByStatement(key, registry, statement) {
+	if (statement.attributeMap.has(key)) {
+		return getFloatByKeyStatementValue(key, registry, statement, statement.attributeMap.get(key))
+	}
+
+	return undefined
+}
+
+function getFloatByStatementValue(registry, statement, value) {
+	if (value.length == 0) {
+		return undefined
+	}
+
+	if (isNaN(value)) {
+		return getValueByEquation(registry, statement, value)
 	}
 
 	return parseFloat(value)
@@ -457,11 +469,11 @@ function getFloatListsUpdateByStatementValue(registry, replaceUndefined, stateme
 			}
 		}
 		if (isNestedArray) {
-			arrayKit.pushArray(points, floats)
+			Vector.pushArray(points, floats)
 		}
 		else {
 			if (replaceUndefined) {
-				arrayKit.setUndefinedElementsToArrayZero(floats, oldPoint)
+				Vector.setUndefinedElementsToArrayZero(floats, oldPoint)
 			}
 			points.push(floats)
 		}
@@ -495,13 +507,13 @@ function getFloatsByStatementValue(key, registry, statement, value) {
 function getFloatsIncludingZero(key, registry, statement, tag) {
 	var floats = getFloatsByDefault(key, registry, statement, tag, [1.0])
 	addZeroToFloats(floats)
-	arrayKit.replaceElements(floats, undefined, 0.0)
+	Vector.replaceElements(floats, undefined, 0.0)
 	statement.attributeMap.set(key, floats.toString())
 	return floats
 }
 
 function getFloatsUpdateByStatementValue(registry, statement, value) {
-	if (arrayKit.getIsEmpty(value)) {
+	if (Vector.isEmpty(value)) {
 		return [undefined, false]
 	}
 
@@ -523,14 +535,14 @@ function getFloatsUpdateByStatementValue(registry, statement, value) {
 		else {
 			if (isNaN(floatWord)) {
 				var equationValue = getValueByEquation(registry, statement, floatWord)
-				if (arrayKit.getIsEmpty(equationValue)) {
+				if (Vector.isEmpty(equationValue)) {
 					var noticeDescription = 'No equationValue could be found for getFloatsUpdateByStatementValue in parsenumber.'
-					noticeByList([noticeDescription, floatWord, floatWords.slice(0), value, statement])
+					printCaller([noticeDescription, floatWord, floatWords.slice(0), value, statement])
 					floats.push(undefined)
 				}
 				else {
 					if (Array.isArray(equationValue)) {
-						arrayKit.pushArray(floats, equationValue)
+						Vector.pushArray(floats, equationValue)
 					}
 					else {
 						floats.push(equationValue)
@@ -711,21 +723,28 @@ function getMatrices3DByValue(registry, statement, value) {
 	return matrices3D
 }
 
-function getMatrix2D(registry, statement) {
+function getMatrix2D(registry, statement, key) {
+	key = Value.getValueDefault(key, 'transform')
 	var attributeMap = statement.attributeMap
-	if (!attributeMap.has('transform')) {
+	if (!statement.attributeMap.has(key)) {
 		return undefined
 	}
 
+	var words = getBracketSeparatedWords(attributeMap.get(key))
+	var matrix2D = getMatrix2DByWords(registry, statement, words)
+	attributeMap.set(key, words.join(' '))
+	return matrix2D
+}
+
+function getMatrix2DByWords(registry, statement, words) {
 	var matrix = undefined
-	var separatedWords = getBracketSeparatedWords(attributeMap.get('transform'))
-	for (var wordIndex = separatedWords.length - 1; wordIndex > -1; wordIndex--) {
-		var entry = getBracketedEntry(separatedWords[wordIndex])
+	for (var wordIndex = words.length - 1; wordIndex > -1; wordIndex--) {
+		var entry = getBracketedEntry(words[wordIndex])
 		if (entry != undefined) {
 			var transformType = entry[0]
 			if (g2DTransformMap.has(transformType)) {
 				var floats = getFloatsUpdateByStatementValue(registry, statement, entry[1])[0]
-				separatedWords[wordIndex] = transformType + '(' + floats.toString() + ')'
+				words[wordIndex] = transformType + '(' + floats.toString() + ')'
 				var bracketMatrix = g2DTransformMap.get(transformType)(floats)
 				if (matrix == undefined) {
 					matrix = bracketMatrix
@@ -736,7 +755,7 @@ function getMatrix2D(registry, statement) {
 			}
 		}
 	}
-	attributeMap.set('transform', separatedWords.join(' '))
+
 	return matrix
 }
 
@@ -744,7 +763,7 @@ function getMatrix2DsByChildren(children, registry) {
 	var matrix2DsByChildren = []
 	for (var child of children) {
 		matrix2Ds = getPointsByTag('matrix2D', registry, child, 'matrix2D')
-		matrix2DsByChildren = arrayKit.getPushArray(matrix2DsByChildren, matrix2Ds)
+		matrix2DsByChildren = Vector.getPushArray(matrix2DsByChildren, matrix2Ds)
 	}
 	return matrix2DsByChildren
 }
@@ -778,8 +797,9 @@ function getMatrix3D(registry, statement, key) {
 	}
 
 	var words = getBracketSeparatedWords(attributeMap.get(key))
+	var matrix3D = getMatrix3DByWords(registry, statement, words)
 	attributeMap.set(key, words.join(' '))
-	return getMatrix3DByWords(registry, statement, words)
+	return matrix3D
 }
 
 function getMatrix3DByWords(registry, statement, words) {
@@ -820,7 +840,7 @@ function getMatrix3DsByChildren(children, registry) {
 	var matrix3DsByChildren = []
 	for (var child of children) {
 		matrix3Ds = getPointsByTag('matrix3D', registry, child, 'matrix3D')
-		matrix3DsByChildren = arrayKit.getPushArray(matrix3DsByChildren, matrix3Ds)
+		matrix3DsByChildren = Vector.getPushArray(matrix3DsByChildren, matrix3Ds)
 	}
 	return matrix3DsByChildren
 }
@@ -843,7 +863,7 @@ function getPoint2DByDefault(key, registry, statement, tag, valueDefault) {
 function getPoint2DByStatementValue(key, registry, statement, value) {
 	var floatsUpdate = getFloatsUpdateByStatementValue(registry, statement, value)
 	var point = floatsUpdate[0]
-	if (arrayKit.getIsEmpty(point)) {
+	if (Vector.isEmpty(point)) {
 		point = [0.0]
 	}
 
@@ -851,7 +871,7 @@ function getPoint2DByStatementValue(key, registry, statement, value) {
 		point.push(point[0])
 	}
 
-	arrayKit.setUndefinedElementsToValue(point, 0.0)
+	Vector.setUndefinedElementsToValue(point, 0.0)
 	if (floatsUpdate[1] && key != undefined) {
 		statement.attributeMap.set(key, point.toString())
 	}
@@ -861,7 +881,7 @@ function getPoint2DByStatementValue(key, registry, statement, value) {
 
 function getPoint3DByStatement(key, registry, statement) {
 	var value = getAttributeValue(key, statement)
-	if (arrayKit.getIsEmpty(value)) {
+	if (Vector.isEmpty(value)) {
 		return undefined
 	}
 	var update = false
@@ -965,7 +985,7 @@ function getPointsHDByStatementOnly(registry, statement) {
 	var attributeMap = statement.attributeMap
 	if (attributeMap.has('pointsHD')) {
 		var points = getPointsByValue(registry, statement, attributeMap.get('pointsHD'))
-		attributeMap.set('points', arrayKit.getShortArrays(points, 2).join(' '))
+		attributeMap.set('points', Vector.getShortArrays(points, 2).join(' '))
 		return points
 	}
 
@@ -1038,7 +1058,7 @@ function getString(value) {
 	}
 
 	if (typeof(value) == 'object') {
-		return mapKit.toStringByEntries(Object.entries(value))
+		return MapKit.toStringByEntries(Object.entries(value))
 	}
 
 	if (value == undefined) {
@@ -1155,7 +1175,7 @@ function getVariableValue(key, statement) {
 
 function getVector2DByStatement(registry, statement) {
 	var vector = getPoint3DByStatement('vector', registry, statement)
-	if (arrayKit.getIsEmpty(vector)) {
+	if (Vector.isEmpty(vector)) {
 		return [1.0, 0.0]
 	}
 
@@ -1163,18 +1183,18 @@ function getVector2DByStatement(registry, statement) {
 		Vector.push(0.0)
 	}
 
-	var vectorLength = Vector.length2D(vector)
+	var vectorLength = VectorFast.length2D(vector)
 	if (vectorLength == 0.0) {
-		noticeByList(['Zero length vector in getVector2DByStatement in parsenumber.', statement])
+		printCaller(['Zero length vector in getVector2DByStatement in parsenumber.', statement])
 		return [1.0, 0.0]
 	}
 
-	return Vector.divide3DScalar(vector, vectorLength)
+	return VectorFast.divide3DScalar(vector, vectorLength)
 }
 
 function getVector3DByStatement(registry, statement) {
 	var vector = getPoint3DByStatement('vector', registry, statement)
-	if (arrayKit.getIsEmpty(vector)) {
+	if (Vector.isEmpty(vector)) {
 		return [1.0, 0.0, 0.0]
 	}
 
@@ -1186,13 +1206,13 @@ function getVector3DByStatement(registry, statement) {
 		Vector.push(0.0)
 	}
 
-	var vectorLength = Vector.length3D(vector)
+	var vectorLength = VectorFast.length3D(vector)
 	if (vectorLength == 0.0) {
-		noticeByList(['Zero length vector in getVector3DByStatement in parsenumber.', statement])
+		printCaller(['Zero length vector in getVector3DByStatement in parsenumber.', statement])
 		return [1.0, 0.0, 0.0]
 	}
 
-	return Vector.divide3DScalar(vector, vectorLength)
+	return VectorFast.divide3DScalar(vector, vectorLength)
 }
 
 function pointsToFixed(points, numberOfDecimals) {
@@ -1238,7 +1258,7 @@ function setPointsHD(points, statement) {
 	if (points.length > 0) {
 		if (points[0].length > 2) {
 			statement.attributeMap.set('pointsHD', points.join(' '))
-			statement.attributeMap.set('points', arrayKit.getShortArrays(points, 2).join(' '))
+			statement.attributeMap.set('points', Vector.getShortArrays(points, 2).join(' '))
 			return
 		}
 	}
