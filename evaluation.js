@@ -1011,7 +1011,7 @@ getTotalValue: function (evaluation) {
 	}
 
 	evaluation.monad = evaluation.monad.parent
-	precedenceMonads.sort(arrayKit.compareElementZeroOneDescending)
+	precedenceMonads.sort(Vector.compareElementZeroOneDescending)
 	for (var precedenceMonad of precedenceMonads) {
 		var operationMonad = precedenceMonad[2]
 		var child = operationMonad.child
@@ -1102,7 +1102,7 @@ notEqual: function(a, b) {
 
 objectClose: function(evaluation, value) {
 	evaluation.monad.value.push(value)
-	evaluation.monad.value = mapKit.getObjectBySkips(evaluation.monad.value)
+	evaluation.monad.value = MapKit.getObjectBySkips(evaluation.monad.value)
 	evaluation.processor = evaluationProcessorOperator
 },
 
@@ -1236,7 +1236,7 @@ variableEnd: function(character, evaluation) {
 }
 }
 
-var evaluationProcessorPairs = arrayKit.continueArrays([
+var evaluationProcessorPairs = Vector.continueArrays([
 ['|', evaluator.bitwise], '^', '&',
 [')', evaluator.bracketClose], ']', '}',
 [',', evaluator.comma],
@@ -1245,7 +1245,7 @@ var evaluationProcessorPairs = arrayKit.continueArrays([
 ['+', evaluator.plusMinus], '-',
 ['(', evaluator.roundOpen]])
 
-var evaluationComparisonPairs = arrayKit.continueArrays([
+var evaluationComparisonPairs = Vector.continueArrays([
 ['<<', [evaluator.bitwiseShiftLeft, 13]],
 ['>>', [evaluator.bitwiseShiftRight, 13]],
 ['==', evaluator.equal],
@@ -1255,12 +1255,12 @@ var evaluationComparisonPairs = arrayKit.continueArrays([
 ['!', evaluator.not],
 ['!=', evaluator.notEqual], '<>', '><'])
 
-var evaluationOperatorPairs = evaluationProcessorPairs.concat(arrayKit.continueArrays([
+var evaluationOperatorPairs = evaluationProcessorPairs.concat(Vector.continueArrays([
 ['[', evaluator.accessOpen],
 ['.', evaluator.dot],
 ['a', evaluator.logical], 'o', 'n']))
 
-var evaluationValuePairs = evaluationProcessorPairs.concat(arrayKit.continueArrays([
+var evaluationValuePairs = evaluationProcessorPairs.concat(Vector.continueArrays([
 ['[', evaluator.arrayOpen],
 ['{', evaluator.objectOpen],
 ['"', evaluator.quoteOpen], "'",
@@ -1367,7 +1367,7 @@ process: function(character, evaluation) {
 	}
 
 	evaluation.processor = evaluationProcessorString
-	evaluation.processor.stringMap = new Map(arrayKit.continueArrays([
+	evaluation.processor.stringMap = new Map(Vector.continueArrays([
 	['"', evaluator.quoteOpen], "'",
 	[',', evaluator.stringEnd],
 	[')', evaluator.stringEnd]]))
@@ -1452,18 +1452,30 @@ getValue: function(evaluation) {
 			if (gFunctionMap.has(processorStringZero)) {
 				processorString = gFunctionMap.get(processorStringZero)
 			}
+			else {
+				printArray(['In getValue in evaluationProcessorValue in evaluation could not find the variable:',
+				processorStringZero, processorStrings, evaluation.statement])
+			}
 		}
 
 		if (processorString == undefined) {
 			return undefined
 		}
 
+		if (this.reservedMap.has(processorString)) {
+			return this.reservedMap.get(processorString)
+		}
+
 		for (var processorStringIndex = 1; processorStringIndex < processorStrings.length; processorStringIndex++) {
 			processorString = processorString.get(processorStrings[processorStringIndex])
+			if (processorString == undefined) {
+				printArray(['In getValue in evaluationProcessorValue in evaluation could not find the property:',
+				processorStrings[processorStringIndex], processorStrings, gFunctionMap, evaluation.statement])
+			}
 		}
 	}
 
-	if (!arrayKit.getIsEmpty(processorString)) {
+	if (!Vector.isEmpty(processorString)) {
 		if (this.floatStartSet.has(processorString[0])) {
 			if (processorString.indexOf('.') > -1 || processorString.indexOf('e') > -1) {
 				return parseFloat(processorString)
