@@ -17,7 +17,7 @@ function addPolygonsToGroup(polygons, registry, statement, copyKeys = true) {
 		var polygonStatement = getStatementByParentTag(new Map(), 0, statement, 'polygon')
 		getUniqueID(idStart + polygonIndex.toString(), registry, polygonStatement)
 		if (copyKeys) {
-			mapKit.copyMissingKeysExcept(polygonStatement.attributeMap, statement.attributeMap, gPolygonExceptionSet)
+			MapKit.copyMissingKeysExcept(polygonStatement.attributeMap, statement.attributeMap, gPolygonExceptionSet)
 		}
 		setPointsHD(polygons[polygonIndex], polygonStatement)
 		gPolygon.processStatement(registry, polygonStatement)
@@ -34,7 +34,7 @@ function addPolylinesToGroup(polylines, registry, statement) {
 
 function addRectangle(boundingBox, color, registry, statement, strokeWidthString) {
 	var lowerPoint = boundingBox[0]
-	var size = Vector.getSubtraction2D(boundingBox[1], lowerPoint)
+	var size = VectorFast.getSubtraction2D(boundingBox[1], lowerPoint)
 	var xString = lowerPoint[0].toString()
 	var yString = lowerPoint[1].toString()
 	var rectangleAttributeMap = new Map([['x', xString], ['y', yString], ['width', size[0].toString()], ['height', size[1].toString()]])
@@ -78,8 +78,8 @@ registry, rowColor, statement, strokeWidth, table, tableAlign, tableStrokeWidth,
 
 	var offset = x - tableAlign * columnRight
 	var polylineLeft = offset + halfTableStrokeWidth
-	addArrayScalar(columnXs, offset)
-	addArrayScalar(polylineXs, offset - halfTableStrokeWidth)
+	Vector.addArrayScalar(columnXs, offset)
+	Vector.addArrayScalar(polylineXs, offset - halfTableStrokeWidth)
 	var polylineRight = polylineXs[columnXs.length - 1]
 	if (caption != undefined) {
 		polylineY += yAddition
@@ -334,7 +334,7 @@ function createCharacterPolylineMap() {
 	gLetteringMap.set('Q', [leftTallSemicircle, rightTallSemicircle, [[0.5,], [0.9, -0.15]]])
 	gLetteringMap.set('R', [leftBisectedPolyline, topSemicircle, bottomDiagonal])
 	var s = [arcFromTo(0.5, 0, 0.1, 0.03, 0.8), arcFromTo(0.853, 0.853, 0.5, 0, 0.5), [[0.853, 0.853], [0.147, 1.147]]]
-	arrayKit.pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
+	Vector.pushArray(s, [arcFromTo(0.147, 1.147, 0.5, 2, 0.5), arcFromTo(0.5, 2, 0.9, 1.97, 0.8)])
 	gLetteringMap.set('S', s)
 	gLetteringMap.set('T', [middleVerticalLine, [[, 2], [0.5, 2], [1,]]])
 	gLetteringMap.set('U', [lowRightLine, bottomHorizontalSemicircle, lowLeftLine])
@@ -425,27 +425,28 @@ function getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign) 
 		else {
 			var outlines = getOutlines(null, null, gLetteringSet.has(character), true, outsets, polylines, null)
 			if (!isIsland) {
-				outlines = outlines.filter(getIsCounterclockwise)
+				outlines = outlines.filter(Polygon.isCounterclockwise)
 			}
 			var polygon = getConnectedPolygon(outlines)
-			polygon = arrayKit.getArraysCopy(polygon)
-			multiply2DsScalar(polygon, halfHeight)
+			polygon = Polyline.copy(polygon)
+			Polyline.multiply2DsScalar(polygon, halfHeight)
 			var boundingX = getBoundingXByPolygons([polygon])
 			x -= boundingX[0]
-			addArraysByIndex(polygon, x, 0)
+			Polyline.addByIndex(polygon, x, 0)
 			letteringOutlines.push(polygon)
 			x += boundingX[1]
 			maximumX = x
 			x += betweenCharacter
 		}
 	}
-	addArrayArraysByIndex(letteringOutlines, -textAlign * maximumX, 0)
+
+	Polyline.addArrayByIndex(letteringOutlines, -textAlign * maximumX, 0)
 	return letteringOutlines
 }
 
 function getMarker(key, outsets, registry, statement) {
 	var marker = getPointsByKey(key, registry, statement)
-	if (!arrayKit.getIsEmpty(marker)) {
+	if (!Vector.isEmpty(marker)) {
 		return marker
 	}
 
@@ -487,15 +488,15 @@ function getTextLength(text) {
 	if (gCharacterLengthMap == undefined) {
 		gCharacterLengthMap = new Map()
 		var characterLengths = 'a 435 b 500 c 444 d 499 e 444 f 373 g 467 h 498 i 278'.split(' ')
-		arrayKit.pushArray(characterLengths, 'j 348 k 513 l 258 m 779 n 489 o 491 p 500 q 499 r 345'.split(' '))
-		arrayKit.pushArray(characterLengths, 's 367 t 283 u 490 v 468 w 683 x 482 y 471 z 417'.split(' '))
-		arrayKit.pushArray(characterLengths, 'A 721 B 631 C 670 D 719 E 610 F 564 G 722 H 714 I 327'.split(' '))
-		arrayKit.pushArray(characterLengths, 'J 385 K 709 L 611 M 881 N 725 O 724 P 576 Q 723 R 667'.split(' '))
-		arrayKit.pushArray(characterLengths, 'S 529 T 606 U 721 V 701 W 947 X 714 Y 701 Z 613'.split(' '))
-		arrayKit.pushArray(characterLengths, '0 500 1 500 2 500 3 500 4 500 5 500 6 500 7 500 8 500 9 500'.split(' '))
-		arrayKit.pushArray(characterLengths, ') 333 ! 333 @ 865 # 500 $ 500 % 833 ^ 469 & 778 * 500 ( 333'.split(' '))
-		arrayKit.pushArray(characterLengths, ', 250 < 564 . 250 > 564 / 296 ? 444 ; 250 : 250 [ 333'.split(' '))
-		arrayKit.pushArray(characterLengths, '{ 480 ] 333 } 480 | 200 - 333 _ 500 = 564 + 564 ` 250 ~ 500'.split(' '))
+		Vector.pushArray(characterLengths, 'j 348 k 513 l 258 m 779 n 489 o 491 p 500 q 499 r 345'.split(' '))
+		Vector.pushArray(characterLengths, 's 367 t 283 u 490 v 468 w 683 x 482 y 471 z 417'.split(' '))
+		Vector.pushArray(characterLengths, 'A 721 B 631 C 670 D 719 E 610 F 564 G 722 H 714 I 327'.split(' '))
+		Vector.pushArray(characterLengths, 'J 385 K 709 L 611 M 881 N 725 O 724 P 576 Q 723 R 667'.split(' '))
+		Vector.pushArray(characterLengths, 'S 529 T 606 U 721 V 701 W 947 X 714 Y 701 Z 613'.split(' '))
+		Vector.pushArray(characterLengths, '0 500 1 500 2 500 3 500 4 500 5 500 6 500 7 500 8 500 9 500'.split(' '))
+		Vector.pushArray(characterLengths, ') 333 ! 333 @ 865 # 500 $ 500 % 833 ^ 469 & 778 * 500 ( 333'.split(' '))
+		Vector.pushArray(characterLengths, ', 250 < 564 . 250 > 564 / 296 ? 444 ; 250 : 250 [ 333'.split(' '))
+		Vector.pushArray(characterLengths, '{ 480 ] 333 } 480 | 200 - 333 _ 500 = 564 + 564 ` 250 ~ 500'.split(' '))
 		for (var characterIndex = 0; characterIndex < characterLengths.length; characterIndex += 2) {
 			gCharacterLengthMap.set(characterLengths[characterIndex], 0.001 * parseFloat(characterLengths[characterIndex + 1]))
 		}
@@ -785,7 +786,7 @@ function TableMonad() {
 		var originalYString = getAttributeValue('y', this)
 		var xAdvance = width / numberOfColumns
 		var yString = originalYString
-		arrayKit.pushArray(statement.children, tableChildren)
+		Vector.pushArray(statement.children, tableChildren)
 		for (var cellIndex = 0; cellIndex < numberOfCells; cellIndex++) {
 			var child = tableChildren[cellIndex]
 			if (rowIndex == endIndex) {
@@ -876,13 +877,13 @@ var gFormattedText = {
 								}
 								previousCharacter = character
 							}
-							arrayKit.removeUndefineds(textPhrase)
+							Vector.removeUndefineds(textPhrase)
 							textPhrase = textPhrase.join('')
 						}
 						textPhrases[textPhraseIndex] = textPhrase
 					}
 				}
-				arrayKit.removeUndefineds(textPhrases)
+				Vector.removeUndefineds(textPhrases)
 				text = '<p> ' + textPhrases.join(' </p> <p> ') + ' </p>'
 			}
 		}
@@ -902,7 +903,7 @@ var gFormattedText = {
 			}
 		}
 		if (text == '') {
-			noticeByList(['No text could be found for formattedText in generator2d.', statement])
+			printCaller(['No text could be found for formattedText in generator2d.', statement])
 			return
 		}
 		addTextStatements(getTextFormatMonad(registry, statement), registry, statement, text)
@@ -1045,7 +1046,7 @@ var gLettering = {
 		var textAlign = getAlignment('textAlign', registry, statement, this.tag)
 		var outlines = getLetteringOutlines(fontSize, isIsland, strokeWidth, text, textAlign)
 		if (outlines.length == 0) {
-			noticeByList(['No outlines could be generated for lettering in generator2d.', statement])
+			printCaller(['No outlines could be generated for lettering in generator2d.', statement])
 			return
 		}
 		convertToGroup(statement)
@@ -1060,7 +1061,7 @@ var gList = {
 		var children = []
 		var parent = statement.parent
 		var variableValue = getVariableValue('list_children', parent)
-		if (!arrayKit.getIsEmpty(variableValue)) {
+		if (!Vector.isEmpty(variableValue)) {
 			children = variableValue.split(' ')
 		}
 
@@ -1069,7 +1070,7 @@ var gList = {
 		var transform = Value.getValueDefault(getAttributeValue('listTransform', statement), attributeMap.get('transform'))
 		var width = getFloatByDefault('gridCellWidth', registry, statement, this.tag, 0.0)
 		var x = 0.5 * width
-		if (!arrayKit.getIsEmpty(transform)) {
+		if (!Vector.isEmpty(transform)) {
 			attributeMap.set('transform', transform)
 		}
 
@@ -1091,16 +1092,16 @@ var gList = {
 		setFloatByKeyStatement(parentAttributeMap, 'x', registry, statement, 0.5 * width)
 		setFloatByKeyStatement(parentAttributeMap, 'y', registry, statement, 0.0)
 		if (registry.textFormatMapMap == undefined) {
-			noticeByList(['No text formats could be found for list in generator2d.', statement])
+			printCaller(['No text formats could be found for list in generator2d.', statement])
 			return
 		}
 
 		if (registry.textFormatMapMap.size == 0) {
-			noticeByList(['No text formats could be found for list in generator2d.', statement])
+			printCaller(['No text formats could be found for list in generator2d.', statement])
 			return
 		}
 
-		arrayKit.replaceAllKeys(attributeMap, '&lt;', '<')
+		Vector.replaceAllKeys(attributeMap, '&lt;', '<')
 		for (var formatMapValue of registry.textFormatMapMap.values()) {
 			var formatID = formatMapValue.get('id')
 			if (attributeMap.has(formatID)) {
@@ -1149,8 +1150,8 @@ var gList = {
 					var x = getAttributeFloatByDefault('x', formatMonad, 0.0) + getAttributeFloatByDefault('dx', formatMonad, 0.0)
 					var y = getAttributeFloatByDefault('y', formatMonad, 0.0) + getAttributeFloatByDefault('dy', formatMonad, 0.0)
 					var imageMap = new Map([['href', value.replaceAll(' ', '')], ['x', x.toString()], ['y', y.toString()]])
-					mapKit.setMapIfDefined('height', imageMap, getAttributeValue('height', formatMonad))
-					mapKit.setMapIfDefined('width', imageMap, getAttributeValue('width', formatMonad))
+					MapKit.setMapIfDefined('height', imageMap, getAttributeValue('height', formatMonad))
+					MapKit.setMapIfDefined('width', imageMap, getAttributeValue('width', formatMonad))
 					var imageStatement = getStatementByParentTag(imageMap, 0, statement, 'image')
 					var idStart = getAttributeValue('id', formatMonad)
 					if (value != undefined) {
@@ -1186,7 +1187,7 @@ var gList = {
 			}
 		}
 
-		arrayKit.replaceAllKeys(attributeMap, '<', '&lt;')
+		Vector.replaceAllKeys(attributeMap, '<', '&lt;')
 	},
 	tag: 'list'
 }
@@ -1265,7 +1266,7 @@ tag: 'map'
 var gOutline = {
 	processStatement: function(registry, statement) {
 		var polylines = getChainPointListsHDRecursivelyDelete(registry, statement, 'polyline')
-		addPolygonsToPolylines(polylines, getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon'))
+		Polyline.addPolygonsToPolylines(polylines, getChainPointListsHDRecursivelyDelete(registry, statement, 'polygon'))
 		var baseLocation = getFloatsByStatement('baseLocation', registry, statement)
 		var checkIntersection = getBooleanByDefault('checkIntersection', registry, statement, this.tag, false)
 		var hole = getPointsByKey('hole', registry, statement)
@@ -1283,34 +1284,34 @@ var gOutline = {
 		}
 
 		var outlines = getOutlines(baseLocation, baseMarker, checkIntersection, markerAbsolute, outsets, polylines, tipMarker)
-		if (arrayKit.getIsEmpty(outlines)) {
-			noticeByList(['No outlines could be found for outline in generator2d.', statement])
+		if (Vector.isEmpty(outlines)) {
+			printCaller(['No outlines could be found for outline in generator2d.', statement])
 			return
 		}
 
 		convertToGroup(statement)
-		if (arrayKit.getIsEmpty(hole)) {
+		if (Vector.isEmpty(hole)) {
 			var holeRadius = getFloatByDefault('holeRadius', registry, statement, this.tag, 0.0)
 			if (holeRadius > 0.0) {
 				var sides = getIntByDefault('sides', registry, statement, this.tag, 24)
-				hole = getRegularPolygon([0.0, 0.0], 1.0, false, holeRadius, 0.0, sides, 0.0)
+				hole = getRegularPolygon([0.0, 0.0], false, 1.0, holeRadius, 0.0, sides, 0.0)
 			}
 		}
 
-		if (!arrayKit.getIsEmpty(hole)) {
-			var hole = getDirectedPolygon(!getIsCounterclockwise(outlines[0]), hole)
+		if (!Vector.isEmpty(hole)) {
+			var hole = getDirectedPolygon(!Polygon.isCounterclockwise(outlines[0]), hole)
 			var holes = []
 			var pointStringSet = new Set()
 			for (var polyline of polylines) {
 				for (var point of polyline) {
 					var pointString = point.slice(0, 2).toString()
 					if (!pointStringSet.has(pointString)) {
-						holes.push(Vector.getAddition2Ds(hole, point))
+						holes.push(Polyline.getAddition2D(hole, point))
 						pointStringSet.add(pointString)
 					}
 				}
 			}
-			outlines = getDifferencePolygonsByPolygons(holes, outlines)
+			outlines = getDifferencePolygonsByPolygons(outlines, holes)
 		}
 
 		var polygonGroups = getPolygonGroups(outlines)
@@ -1328,8 +1329,8 @@ var gScreen = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'polygon'
 		var box = getBox(registry, statement)
-		if (arrayKit.getIsEmpty(box)) {
-			noticeByList(['No box could be generated for screen in generator2d.', statement])
+		if (Vector.isEmpty(box)) {
+			printCaller(['No box could be generated for screen in generator2d.', statement])
 			return
 		}
 		var overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
@@ -1358,7 +1359,7 @@ var gTable = {
 
 		var table = getSpreadsheetTable(registry, spreadsheetID, tableID)
 		if (table == undefined) {
-			noticeByList(['No table for table in generator2D.', statement, attributeMap])
+			printCaller(['No table for table in generator2D.', statement, attributeMap])
 			return
 		}
 		var caption = getAttributeValue('caption', statement)
@@ -1423,7 +1424,7 @@ var gTextFormat = {
 			var key = entry[0]
 			var value = entry[1]
 			if (floatSet.has(key)) {
-				value = getFloatByStatementValue(key, registry, statement, value).toString()
+				value = getFloatByKeyStatementValue(key, registry, statement, value).toString()
 			}
 			textFormatMap.set(key, value)
 		}
