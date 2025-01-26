@@ -115,8 +115,8 @@ function exportClippedCanvasAsPNG() {
 		}
 	}
 
-	boundingBox[1] = Vector.getAddition2D(boundingBox[0], upperPoint)
-	boundingBox[0] = Vector.getAddition2D(boundingBox[0], lowerPoint)
+	boundingBox[1] = VectorFast.getAddition2D(boundingBox[0], upperPoint)
+	boundingBox[0] = VectorFast.getAddition2D(boundingBox[0], lowerPoint)
 	exportImageData(getImageDataByBoundingBox(boundingBox))
 }
 
@@ -150,7 +150,7 @@ function getImageDataByBoundingBox(boundingBox) {
 		view.draw(viewBroker.context)
 	}
 
-	var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
+	var size = VectorFast.getSubtraction2D(boundingBox[1], boundingBox[0])
 	var imageData = viewBroker.context.getImageData(boundingBox[0][0], boundingBox[0][1], size[0], size[1])
 	viewBroker.canvas = oldCanvas
 	viewBroker.context = oldContext
@@ -246,7 +246,7 @@ function removeByGeneratorName(elements, generatorName) {
 		}
 	}
 
-	arrayKit.removeUndefineds(elements)
+	Vector.removeUndefineds(elements)
 }
 
 function removeStatementsByGeneratorName(generatorName, registry, statements) {
@@ -258,7 +258,7 @@ function removeStatementsByGeneratorName(generatorName, registry, statements) {
 		}
 	}
 
-	arrayKit.removeUndefineds(statements)
+	Vector.removeUndefineds(statements)
 }
 
 function setDisplayFunctionControls(controls, displayFunction) {
@@ -302,7 +302,7 @@ var svgContext = {
 	},
 	getCenteredText: function() {
 		var boundingBox = this.getBoundingBox()
-		var center = Vector.multiply2DScalar(Vector.getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
+		var center = VectorFast.multiply2DScalar(VectorFast.getAddition2D(boundingBox[0], boundingBox[1]), 0.5)
 		subtract2Ds(boundingBox, center)
 		for (var shape of this.shapes) {
 			subtract2Ds(shape.points, center)
@@ -315,7 +315,7 @@ var svgContext = {
 	},
 	getTextByBoundingBox: function(boundingBox) {
 		var svgLines = new Array(this.shapes.length + 2)
-		var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
+		var size = VectorFast.getSubtraction2D(boundingBox[1], boundingBox[0])
 		pointsToFixed(boundingBox)
 		svgLines[0] = '<g boundingBox="' + boundingBox.join(' ') + '" size="' + getFixedStrings(size).join(',') + '">'
 		for (var shapeIndex = 0; shapeIndex < this.shapes.length; shapeIndex++) {
@@ -373,7 +373,7 @@ var viewBroker = {
 	center:{text:'Center', point:[0.0, 0.0]},
 	direction:{text:'Direction', lower:-180.0, upper:180.0, value:90.0},
 	getOffsetNormal: function(event) {
-		return normalize2D([event.offsetX - this.halfWidth, this.halfHeight - event.offsetY])
+		return Vector.normalize2D([event.offsetX - this.halfWidth, this.halfHeight - event.offsetY])
 	},
 	minimumHeight:256,
 	numberOfBigSides:{text:'Sides', lower:3, upper:60, value:36},
@@ -414,7 +414,7 @@ var viewBroker = {
 		this.rotationMultiplier = 720.0 / (2.0 + Math.PI) / this.modelDiameter
 		var viewKeys = ['', 'Export Canvas As PNG', 'Export Clipped Canvas As PNG', 'Output Canvas As SVG', 'Output Centered Canvas As SVG']
 		setSelectToKeysIndexTitle(document.getElementById('viewMenuSelectID'), viewKeys, 0, 'View')
-		views.sort(arrayKit.compareIDAscending)
+		views.sort(Vector.compareIDAscending)
 		var ids = new Array(views.length)
 		for (var viewIndex = 0; viewIndex < views.length; viewIndex++) {
 			ids[viewIndex] = views[viewIndex].id
