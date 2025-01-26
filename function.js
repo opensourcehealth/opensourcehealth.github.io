@@ -4,6 +4,7 @@ const gByID = 'attributeByIDKey floatByIDKey pointsByID rightByID setAttributesA
 const gByIDNames = gByID.split(' ')
 var gPolylineDefinitionsMap = undefined
 
+//deprecated25
 function additionInterpolation(x, polyline, arrayLength) {
 	var interpolationAlong = getFlatInterpolationAlongBeginEnd(x, polyline)
 	var along = interpolationAlong[0]
@@ -28,12 +29,12 @@ function additionInterpolation3D(x, polyline) {
 
 function alongsFromToDistance(from = [0.0, 0.0], to = [10.0, 0.0], fromDistances = [], toDistances = []) {
 console.log('deprecated')
-	fromDistances = arrayKit.getArrayByValue(fromDistances)
-	toDistances = arrayKit.getArrayByValue(toDistances)
+	fromDistances = Vector.getArrayByValue(fromDistances)
+	toDistances = Vector.getArrayByValue(toDistances)
 	var alongs = new Array(fromDistances.length + toDistances.length)
-	from = arrayKit.getArrayByValue(from)
-	to = arrayKit.getArrayByValue(to)
-	var oneOverDistance = 1.0 / Vector.distanceArray(from, to)
+	from = Vector.getArrayByValue(from)
+	to = Vector.getArrayByValue(to)
+	var oneOverDistance = 1.0 / VectorFast.distanceArray(from, to)
 	var arrayIndex = 0
 	for (var fromIndex = 0; fromIndex < fromDistances.length; fromIndex++) {
 		alongs[arrayIndex++] = oneOverDistance * fromDistances[fromIndex]
@@ -102,7 +103,7 @@ console.log('deprecated')
 	var wavelength = to - from
 	var chordLength = 0.5 * wavelength
 	var radius = 0.5 * height + 0.125 * chordLength * chordLength / height
-	var wavePortion = getPositiveModulo(phase / 360.0 + (x -from) / wavelength)
+	var wavePortion = Value.getPositiveModulo(phase / 360.0 + (x -from) / wavelength)
 	var y = radius - height
 	if (wavePortion < 0.5) {
 		var absoluteAway = (wavePortion - 0.25) * wavelength
@@ -271,27 +272,27 @@ topByID: function(registry, statement, id) {
 
 function ellipseFromToRadius(registry, statement, fromPoint, toPoint, radius, numberOfSides, includeFrom, includeTo) {
 console.log('deprecated')
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	fromPoint.length = Math.max(2, fromPoint.length, toPoint.length)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
-	var center = getMidpoint2D(fromPoint, toPoint)
-	var centerFrom = Vector.getSubtraction2D(fromPoint, center)
-	var centerFromLength = Vector.length2D(centerFrom)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
+	var center = Vector.interpolationFromToAlong2D(fromPoint, toPoint)
+	var centerFrom = VectorFast.getSubtraction2D(fromPoint, center)
+	var centerFromLength = VectorFast.length2D(centerFrom)
 	var numberOfSides = Value.getValueDefault(numberOfSides, 24)
 	var radius = Value.getValueDefault(radius, 1.0)
-	includeFrom = Value.getValueTrue(includeFrom)
-	includeTo = Value.getValueTrue(includeTo)
+	includeFrom = Value.getValueDefault(includeFrom, true)
+	includeTo = Value.getValueDefault(includeTo, true)
 	var arc = []
 	if (includeFrom) {
 		arc.push(fromPoint)
@@ -301,7 +302,7 @@ console.log('deprecated')
 		return removeUnincluded(arc, includeFrom, includeTo)
 	}
 
-	var right = Vector.divide2DScalar([centerFrom[1], -centerFrom[0]], centerFromLength * Math.sqrt(centerFromLength))
+	var right = VectorFast.divide2DScalar([centerFrom[1], -centerFrom[0]], centerFromLength * Math.sqrt(centerFromLength))
 	var numberOfArcSides = Math.ceil(numberOfSides * 0.5 - gClose)
 	var zAddition = undefined
 	if (fromPoint.length > 2) {
@@ -313,12 +314,12 @@ console.log('deprecated')
 	var rotator = Vector.polarCounterclockwise(Math.PI / numberOfArcSides)
 	arc.length = numberOfArcSides
 	for (var vertexIndex = 1; vertexIndex < numberOfArcSides; vertexIndex++) {
-		Vector.rotate2DVector(centerFrom, rotator)
+		VectorFast.rotate2DVector(centerFrom, rotator)
 		if (zAddition != undefined) {
 			centerFrom[2] += zAddition
 		}
-		var point = Vector.getAdditionArray(center, centerFrom, 3)
-		Vector.add2D(point, Vector.getMultiplication2DScalar(right, Vector.dotProduct2D(right, centerFrom) * (radius - centerFromLength)))
+		var point = VectorFast.getAdditionArray(center, centerFrom, 3)
+		VectorFast.add2D(point, VectorFast.getMultiplication2DScalar(right, VectorFast.dotProduct2D(right, centerFrom) * (radius - centerFromLength)))
 		arc[vertexIndex] = point
 	}
 
@@ -336,7 +337,7 @@ function ellipseToRadius(registry, statement, toPoint, radius, numberOfSides, in
 function floatByIDKey(registry, statement, id, key) {
 console.log('deprecated')
 	var statement = getStatementByID(registry, statement, id)
-	return getFloatByStatementValue(key, registry, statement, statement.attributeMap.get(key))
+	return getFloatByKeyStatementValue(key, registry, statement, statement.attributeMap.get(key))
 }
 
 function getSpreadsheetTable(registry, spreadsheetID, tableID) {
@@ -424,14 +425,14 @@ console.log('deprecated')
 
 function intervalsFromQuantityIncrement(from = 0.0, quantity = 11, increments = 1.0, includeFrom = true) {
 console.log('deprecated')
-	increments = arrayKit.getArrayByValue(increments)
+	increments = Vector.getArrayByValue(increments)
 	if (quantity == 0) {
-		noticeByList(['quantity is 0 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
+		printCaller(['quantity is 0 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
 		return []
 	}
 
 	if (increments.length == 0) {
-		noticeByList(['increments.length is 0 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
+		printCaller(['increments.length is 0 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
 		return [from]
 	}
 
@@ -442,7 +443,7 @@ console.log('deprecated')
 
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
+		printCaller(['quantityFloor is less than 1 in intervalsFromQuantityIncrement in function.', from, quantity, increments])
 		return []
 	}
 
@@ -475,7 +476,7 @@ console.log('deprecated')
 
 function intervalsFromToAlong(from = 0.0, toTen = 10.0, alongs = 0.5, includeFrom, includeTo) {
 console.log('deprecated')
-	alongs = arrayKit.getArrayByValue(alongs)
+	alongs = Vector.getArrayByValue(alongs)
 	var difference = toTen - from
 	var intervals = [from]
 	var arrayIndex = intervals.length
@@ -497,7 +498,7 @@ function intervalsFromToIncrement(from, toTen, increments, includeFrom, includeT
 console.log('deprecated')
 	from = Value.getValueDefault(from, 0.0)
 	increments = Value.getValueDefault(increments, 1.0)
-	increments = arrayKit.getArrayByValue(increments)
+	increments = Vector.getArrayByValue(increments)
 	var totalLength = 0.0
 	for (var increment of increments) {
 		totalLength += increment
@@ -507,12 +508,12 @@ console.log('deprecated')
 	var difference = toTen - from
 	var numberUntilEnd = Math.floor((Math.abs(difference) + gClose) / Math.abs(totalLength))
 	if (numberUntilEnd == 0) {
-		noticeByList(['numberUntilEnd is 0 in intervalsFromToIncrement in function.', from, toTen, increments])
+		printCaller(['numberUntilEnd is 0 in intervalsFromToIncrement in function.', from, toTen, increments])
 		return [from]
 	}
 
 	if (totalLength == 0.0) {
-		noticeByList(['totalLength is 0 in intervalsFromToIncrement in function.', from, toTen, increments])
+		printCaller(['totalLength is 0 in intervalsFromToIncrement in function.', from, toTen, increments])
 		return [from]
 	}
 
@@ -550,7 +551,7 @@ console.log('deprecated')
 	quantity += 1 * (includeFrom == false) + 1 * (includeTo == false)
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', from, quantity, increments])
+		printCaller(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', from, quantity, increments])
 		return []
 	}
 
@@ -583,11 +584,11 @@ function joinPoints(registry, statement, sourcePoints, numberOfJoins, from, unti
 	if (numberOfJoins < 1) {
 		return []
 	}
-	if (arrayKit.getIsEmpty(sourcePoints)) {
+	if (Vector.isEmpty(sourcePoints)) {
 		return []
 	}
 	until = Value.getValueDefault(until, 3)
-	from = arrayKit.getArrayByValue(from)
+	from = Vector.getArrayByValue(from)
 	from.length = until
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
@@ -595,13 +596,13 @@ function joinPoints(registry, statement, sourcePoints, numberOfJoins, from, unti
 		if (points.length > 0) {
 			var lastPoint = points[points.length - 1]
 			from.length = lastPoint.length
-			arrayKit.setUndefinedElementsToArray(from, lastPoint)
+			Vector.setUndefinedElementsToArray(from, lastPoint)
 		}
 	}
-	arrayKit.setUndefinedElementsToValue(from, 0.0)
+	Vector.setUndefinedElementsToValue(from, 0.0)
 	var joinedPoints = []
 	for (var joinCount = 0; joinCount < numberOfJoins; joinCount++) {
-		arrayKit.pushArray(joinedPoints, addArrays(arrayKit.getArraysCopy(sourcePoints), from, until))
+		Vector.pushArray(joinedPoints, Polyline.addArray(Polyline.copy(sourcePoints), from, until))
 		from = joinedPoints[joinedPoints.length - 1]
 	}
 	return joinedPoints
@@ -641,9 +642,9 @@ console.log('deprecated')
 
 	var halfCellHeight = cellHeight * 0.5
 	var halfCellWidth = cellWidth * 0.5
-	polygon = arrayKit.getArraysCopy(polygon)
+	polygon = Polyline.copy(polygon)
 	multiplyArraysByIndex(polygon, 1.0 / cellHeight, 1)
-	addArraysByIndex(polygon, -0.5, 1)
+	Polyline.addByIndex(polygon, -0.5, 1)
 	var intersectionPairsMap = getIntersectionPairsMap([polygon])
 	var latticePoints = []
 	for (var intersectionPairsKey of intersectionPairsMap.keys()) {
@@ -668,21 +669,21 @@ function mirror(registry, statement, center, direction, isSegment) {
 console.log('deprecated')
 	var variableMap = getVariableMapByStatement(statement)
 	if (!variableMap.has('_points')) {
-		noticeByList(['In mirror in function the variableMap does not have _points:', statement])
+		printCaller(['In mirror in function the variableMap does not have _points:', statement])
 		return [[]]
 	}
 
 	var points = variableMap.get('_points')
 	if (points.length == 0) {
-		noticeByList(['In mirror in function _points length is 0:', points, toX, toY, statement])
+		printCaller(['In mirror in function _points length is 0:', points, toX, toY, statement])
 		return [[]]
 	}
 
 	var centerVector = {center:center, vector:Vector.polarCounterclockwise(Value.getValueDefault(direction, 90.0) * gRadiansPerDegree)}
 	var mirrorStart = points.length
-	if (Value.getValueFalse(isSegment)) {
+	if (Value.getValueDefault(isSegment, false)) {
 		if (points.length < 3) {
-			noticeByList(['In mirror in function _points length is shorter than 3:', points, toX, toY, statement])
+			printCaller(['In mirror in function _points length is shorter than 3:', points, toX, toY, statement])
 			return [[]]
 		}
 		centerVector = getCenterVectorMirrorStart(mirrorStart, points)
@@ -693,7 +694,7 @@ console.log('deprecated')
 }
 
 function operation(registry, statement, symbol, elements, otherElements) {
-	if (arrayKit.getIsEmpty(elements)) {
+	if (Vector.isEmpty(elements)) {
 		return []
 	}
 
@@ -701,7 +702,7 @@ function operation(registry, statement, symbol, elements, otherElements) {
 		return []
 	}
 
-	otherElements = arrayKit.getArrayByValue(otherElements)
+	otherElements = Vector.getArrayByValue(otherElements)
 	if (otherElements.length == 0) {
 		return []
 	}
@@ -720,14 +721,14 @@ function operation(registry, statement, symbol, elements, otherElements) {
 
 function parabolaFromToQuantity(registry, statement, fromPoint, toPoint, quantity, fromLevel, horizontal, includeFrom, includeTo) {
 console.log('deprecated')
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, [10.0, 10.0]))
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, [10.0, 10.0]))
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	fromPoint.length = Math.max(2, fromPoint.length, toPoint.length)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
@@ -736,11 +737,11 @@ console.log('deprecated')
 
 function parabolaFromToQuantityOnly(fromPoint, toPoint, quantity, fromLevel, horizontal, includeFrom, includeTo) {
 console.log('deprecated')
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
-	var fromLevel = Value.getValueTrue(fromLevel)
-	horizontal = Value.getValueTrue(horizontal)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
+	var fromLevel = Value.getValueDefault(fromLevel, true)
+	horizontal = Value.getValueDefault(horizontal, true)
 	fromPoint = fromPoint.slice(0)
 	if (!horizontal) {
 		swap2DPoint(fromPoint)
@@ -748,9 +749,9 @@ console.log('deprecated')
 		swap2DPoint(toPoint)
 	}
 
-	var fromTo = Vector.getSubtractionArray(toPoint, fromPoint, 3)
+	var fromTo = VectorFast.getSubtractionArray(toPoint, fromPoint, 3)
 	if (fromTo[0] == 0.0) {
-		noticeByList(['fromTo[0] is 0 in parabolaFromTo in function.', fromPoint, toPoint, quantity])
+		printCaller(['fromTo[0] is 0 in parabolaFromTo in function.', fromPoint, toPoint, quantity])
 		return []
 	}
 
@@ -763,7 +764,7 @@ console.log('deprecated')
 	quantity += 1 * (includeFrom == false) + 1 * (includeTo == false)
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in parabolaFromTo in function.', fromPoint, toPoint, quantity])
+		printCaller(['quantityFloor is less than 1 in parabolaFromTo in function.', fromPoint, toPoint, quantity])
 		return []
 	}
 
@@ -823,10 +824,10 @@ console.log('deprecated')
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(point, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(point, points[points.length - 1])
 		}
 	}
-	arrayKit.setUndefinedElementsToValue(point, 0.0)
+	Vector.setUndefinedElementsToValue(point, 0.0)
 	variableMap.set(name, point.toString())
 	return point
 }
@@ -839,7 +840,7 @@ console.log('deprecated')
 		for (var argumentIndex = 0; argumentIndex < pointArgumentsLength; argumentIndex++) {
 			if (point.length < pointArgumentsLength) {
 				point.length = pointArgumentsLength
-				arrayKit.setUndefinedElementsToValue(point)
+				Vector.setUndefinedElementsToValue(point)
 			}
 			point[argumentIndex] += arguments[argumentIndex + 3]
 		}
@@ -929,7 +930,7 @@ function setAttributesTableByID(registry, statement, id, rowIndex, tableID) {
 	}
 
 	for (var columnIndex = 0; columnIndex < row.length; columnIndex++) {
-		if (arrayKit.getIsEmpty(headers[columnIndex])) {
+		if (Vector.isEmpty(headers[columnIndex])) {
 			headers[columnIndex] = 'Column_' + getBaseAlphabet(columnIndex)
 		}
 		statement.attributeMap.set(headers[columnIndex], row[columnIndex])
@@ -966,34 +967,34 @@ console.log('deprecated')
 
 function spiralBeforeFromTo(registry, statement, before, fromPoint, toPoint, numberOfSides, includeBefore, includeFrom, includeTo) {
 console.log('deprecated')
-	before = arrayKit.getArrayByValue(before)
+	before = Vector.getArrayByValue(before)
 	before.length = 2
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	fromPoint.length = Math.max(2, fromPoint.length, toPoint.length)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 1) {
-			arrayKit.setUndefinedElementsToArray(before, points[points.length - 2])
+			Vector.setUndefinedElementsToArray(before, points[points.length - 2])
 		}
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
 	before = [Value.getValueDefault(before[0], -10.0), Value.getValueDefault(before[1], 0.0)]
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
 	toPoint.length = fromPoint.length
 	toPoint[0] = Value.getValueDefault(toPoint[0], 10.0)
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
-	includeBefore = Value.getValueTrue(includeBefore)
-	includeFrom = Value.getValueTrue(includeFrom)
-	includeTo = Value.getValueTrue(includeTo)
-	var beforeFrom = Vector.subtract2D(fromPoint.slice(0), before)
-	var beforeFromLength = Vector.length2D(beforeFrom)
-	var fromTo = Vector.subtract2D(toPoint.slice(0), fromPoint)
-	var fromToLength = Vector.length2D(fromTo)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
+	includeBefore = Value.getValueDefault(includeBefore, true)
+	includeFrom = Value.getValueDefault(includeFrom, true)
+	includeTo = Value.getValueDefault(includeTo, true)
+	var beforeFrom = VectorFast.subtract2D(fromPoint.slice(0), before)
+	var beforeFromLength = VectorFast.length2D(beforeFrom)
+	var fromTo = VectorFast.subtract2D(toPoint.slice(0), fromPoint)
+	var fromToLength = VectorFast.length2D(fromTo)
 	var arc = []
 	if (includeBefore) {
 		arc.push(before)
@@ -1003,20 +1004,20 @@ console.log('deprecated')
 		return arc
 	}
 
-	Vector.divide2DScalar(beforeFrom, beforeFromLength)
-	Vector.divide2DScalar(fromTo, fromToLength)
-	var angle = 4.0 * Math.asin(0.5 * Vector.distance2D(beforeFrom, fromTo)) * gDegreesPerRadian
-	if (Vector.crossProduct2D(beforeFrom, fromTo) < 0.0) {
+	VectorFast.divide2DScalar(beforeFrom, beforeFromLength)
+	VectorFast.divide2DScalar(fromTo, fromToLength)
+	var angle = 4.0 * Math.asin(0.5 * VectorFast.distance2D(beforeFrom, fromTo)) * gDegreesPerRadian
+	if (VectorFast.crossProduct2D(beforeFrom, fromTo) < 0.0) {
 		angle = -angle
 	}
 
-	arrayKit.pushArray(arc, spiralFromToAngle(registry, statement, fromPoint, toPoint, angle, numberOfSides, includeFrom, includeTo))
+	Vector.pushArray(arc, spiralFromToAngle(registry, statement, fromPoint, toPoint, angle, numberOfSides, includeFrom, includeTo))
 	return arc
 }
 
 function spiralCenterRadius(center, radius, fromAngle, toAngle, numberOfSides, toZ, includeFrom, includeTo) {
 console.log('deprecated')
-	center = arrayKit.getArrayByElements(center, 2)
+	center = Vector.getArrayByElements(center, 2)
 	radius = Value.getValueDefault(radius, 10.0)
 	fromAngle = Value.getValueDefault(fromAngle, 0.0) * gRadiansPerDegree
 	toAngle = Value.getValueDefault(toAngle, 360.0) * gRadiansPerDegree
@@ -1025,49 +1026,49 @@ console.log('deprecated')
 
 function spiralFromToAngle(registry, statement, fromPoint, toPoint, angle, numberOfSides, includeFrom, includeTo) {
 console.log('deprecated')
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	fromPoint.length = Math.max(2, fromPoint.length, toPoint.length)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
 	return spiralFromToAngleOnly(fromPoint, toPoint, angle, numberOfSides, includeFrom, includeTo)
 }
 
 function spiralFromToRadius(
 registry, statement, fromPoint, toPoint = 10.0, radius, counterclockwise = true, numberOfSides = 24, includeFrom = true, includeTo = true) {
 console.log('deprecated')
-	toPoint = arrayKit.getArrayByValue(toPoint)
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	toPoint = Vector.getArrayByValue(toPoint)
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	fromPoint.length = Math.max(2, fromPoint.length, toPoint.length)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
-	var fromTo = Vector.subtract2D(toPoint.slice(0), fromPoint)
-	var fromToLength = Vector.length2D(fromTo)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
+	var fromTo = VectorFast.subtract2D(toPoint.slice(0), fromPoint)
+	var fromToLength = VectorFast.length2D(fromTo)
 	var arc = [fromPoint]
 	if (fromToLength == 0.0) {
-		noticeByList(['fromToLength is 0 in spiralFromToRadius in function.', fromPoint, toPoint, radius])
+		printCaller(['fromToLength is 0 in spiralFromToRadius in function.', fromPoint, toPoint, radius])
 		return arc
 	}
 
-	var center = getMidpoint2D(fromPoint.slice(0), toPoint)
+	var center = Vector.interpolationFromToAlong2D(fromPoint.slice(0), toPoint)
 	var halfFromToLength = 0.5 * fromToLength
 	radius = Value.getValueDefault(radius, halfFromToLength)
 	if (Math.abs(radius) < halfFromToLength) {
@@ -1079,10 +1080,10 @@ console.log('deprecated')
 	}
 
 	var midpointCenterDistance = Math.sqrt(radius * radius - halfFromToLength * halfFromToLength) / fromToLength
-	Vector.add2D(center, Vector.multiply2DScalar([fromTo[1], -fromTo[0]], midpointCenterDistance))
-	var centerFrom = normalize2D(Vector.getSubtraction2D(fromPoint, center))
-	var centerTo = normalize2D(Vector.getSubtraction2D(toPoint, center))
-	var angle = 2.0 * Math.asin(0.5 * Vector.distance2D(centerFrom, centerTo))
+	VectorFast.add2D(center, VectorFast.multiply2DScalar([fromTo[1], -fromTo[0]], midpointCenterDistance))
+	var centerFrom = Vector.normalize2D(VectorFast.getSubtraction2D(fromPoint, center))
+	var centerTo = Vector.normalize2D(VectorFast.getSubtraction2D(toPoint, center))
+	var angle = 2.0 * Math.asin(0.5 * VectorFast.distance2D(centerFrom, centerTo))
 	if (radius < 0.0) {
 		angle = gPI2 - angle
 	}
@@ -1100,13 +1101,13 @@ console.log('deprecated')
 	}
 
 	var rotator = Vector.polarCounterclockwise(angle / numberOfArcSides)
-	Vector.multiply2DScalar(centerFrom, Math.abs(radius))
+	VectorFast.multiply2DScalar(centerFrom, Math.abs(radius))
 	for (var pointIndex = 1; pointIndex < numberOfArcSides; pointIndex++) {
-		Vector.rotate2DVector(centerFrom, rotator)
+		VectorFast.rotate2DVector(centerFrom, rotator)
 		if (zAddition != undefined) {
 			centerFrom[2] += zAddition
 		}
-		arc[pointIndex] = Vector.getAdditionArray(center, centerFrom)
+		arc[pointIndex] = VectorFast.getAdditionArray(center, centerFrom)
 	}
 
 	arc.push(toPoint)
@@ -1148,52 +1149,52 @@ function stepFromToBetween(registry, statement, fromPoint, toPoint, along) {
 
 function stepFromToDistance(registry, statement, fromPoint, toPoint, distance) {
 console.log('deprecated')
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
 	var distance = Value.getValueDefault(distance, 1.0)
-	var fromTo = Vector.getSubtractionArray(toPoint, fromPoint)
-	var fromToLength = Vector.length2D(fromTo)
+	var fromTo = VectorFast.getSubtractionArray(toPoint, fromPoint)
+	var fromToLength = VectorFast.length2D(fromTo)
 	if (fromToLength == 0.0) {
 		return fromPoint
 	}
 
-	return Vector.getAddition2D(fromPoint, Vector.multiply2DScalar(fromTo, distance / fromToLength))
+	return VectorFast.getAddition2D(fromPoint, VectorFast.multiply2DScalar(fromTo, distance / fromToLength))
 }
 
 function stepsFromQuantityIncrement(registry, statement, fromPoint, quantity, increments, includeFrom) {
 console.log('deprecated')
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
-	includeFrom = Value.getValueTrue(includeFrom)
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
+	includeFrom = Value.getValueDefault(includeFrom, true)
 	increments = Value.getValueDefault(increments, [1.0, 0.0])
-	increments = arrayKit.getArrayByValue(increments)
+	increments = Vector.getArrayByValue(increments)
 	quantity = Value.getValueDefault(quantity, 11)
 	if (increments.length == 0) {
-		noticeByList(['increments.length is 0 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
+		printCaller(['increments.length is 0 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
 		return [fromPoint]
 	}
 
-	if (arrayKit.getIsEmpty(increments[0])) {
-		noticeByList(['increments zero is empty in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
+	if (Vector.isEmpty(increments[0])) {
+		printCaller(['increments zero is empty in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
 		return [fromPoint]
 	}
 
@@ -1210,7 +1211,7 @@ console.log('deprecated')
 
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
+		printCaller(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
 		return []
 	}
 
@@ -1231,12 +1232,12 @@ console.log('deprecated')
 	var increment = []
 	for (var count = 0; count < quantityFloor; count++) {
 		increment = increments[count % increments.length]
-		Vector.addArray(fromPoint, increment)
+		VectorFast.addArray(fromPoint, increment)
 		steps[arrayIndex++] = fromPoint.slice(0)
 	}
 
 	if (properFraction > gClose) {
-		steps[steps.length - 1] = Vector.addArray(steps[steps.length - 2].slice(0), Vector.multiplyArrayScalar(increment, properFraction))
+		steps[steps.length - 1] = VectorFast.addArray(steps[steps.length - 2].slice(0), VectorFast.multiplyArrayScalar(increment, properFraction))
 	}
 
 	return steps
@@ -1245,26 +1246,26 @@ console.log('deprecated')
 function stepsFromToAlong(registry, statement, fromPoint, toPoint, alongs, includeFrom, includeTo) {
 console.log('deprecated')
 	alongs = Value.getValueDefault(alongs, 0.5)
-	alongs = arrayKit.getArrayByValue(alongs)
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	alongs = Vector.getArrayByValue(alongs)
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
-	var fromTo = Vector.getSubtractionArray(toPoint, fromPoint)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
+	var fromTo = VectorFast.getSubtractionArray(toPoint, fromPoint)
 	var steps = [fromPoint]
 	var arrayIndex = steps.length
 	steps.length = steps.length + alongs.length
 	for (var stepIndex = 0; stepIndex < alongs.length; stepIndex++) {
-		steps[arrayIndex++] = Vector.addArray(Vector.multiplyArrayScalar(fromTo.slice(0), alongs[stepIndex]), fromPoint)
+		steps[arrayIndex++] = VectorFast.addArray(VectorFast.multiplyArrayScalar(fromTo.slice(0), alongs[stepIndex]), fromPoint)
 	}
 
 	steps.push(toPoint)
@@ -1277,19 +1278,19 @@ function stepsFromToBetween(registry, statement, fromPoint, toPoint, alongs) {
 
 function stepsFromToQuantity(registry, statement, fromPoint, toPoint, quantity, includeFrom, includeTo) {
 console.log('deprecated')
-	fromPoint = arrayKit.getArrayByValue(fromPoint)
+	fromPoint = Vector.getArrayByValue(fromPoint)
 	var variableMap = getVariableMapByStatement(statement)
 	if (variableMap.has('_points')) {
 		var points = variableMap.get('_points')
 		if (points.length > 0) {
-			arrayKit.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
+			Vector.setUndefinedElementsToArray(fromPoint, points[points.length - 1])
 		}
 	}
 
-	arrayKit.setUndefinedElementsToValue(fromPoint, 0.0)
-	toPoint = arrayKit.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
+	Vector.setUndefinedElementsToValue(fromPoint, 0.0)
+	toPoint = Vector.getArrayByValue(Value.getValueDefault(toPoint, 10.0))
 	toPoint.length = fromPoint.length
-	arrayKit.setUndefinedElementsToValue(toPoint, 0.0)
+	Vector.setUndefinedElementsToValue(toPoint, 0.0)
 	quantity = Value.getValueDefault(quantity, 11)
 	var one = 1.0
 	if (quantity < 0.0) {
@@ -1300,7 +1301,7 @@ console.log('deprecated')
 	quantity += 1 * (includeFrom == false) + 1 * (includeTo == false)
 	var quantityFloor = Math.floor(quantity + gClose)
 	if (quantityFloor < 1) {
-		noticeByList(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
+		printCaller(['quantityFloor is less than 1 in stepsFromQuantityIncrement in function.', fromPoint, quantity, increments])
 		return []
 	}
 
@@ -1314,16 +1315,16 @@ console.log('deprecated')
 		quantity += properFraction
 	}
 
-	var increment = Vector.multiplyArrayScalar(Vector.getSubtractionArray(toPoint, fromPoint), one / quantity)
+	var increment = VectorFast.multiplyArrayScalar(VectorFast.getSubtractionArray(toPoint, fromPoint), one / quantity)
 	var arrayIndex = steps.length
 	steps.length = steps.length + quantityFloor
 	for (var count = 0; count < quantityFloor; count++) {
-		Vector.addArray(fromPoint, increment)
+		VectorFast.addArray(fromPoint, increment)
 		steps[arrayIndex++] = fromPoint.slice(0)
 	}
 
 	if (properFraction > gClose) {
-		steps[steps.length - 1] = Vector.addArray(steps[steps.length - 2].slice(0), Vector.multiplyArrayScalar(increment, properFraction))
+		steps[steps.length - 1] = VectorFast.addArray(steps[steps.length - 2].slice(0), VectorFast.multiplyArrayScalar(increment, properFraction))
 	}
 
 	return removeUnincluded(steps, includeFrom, includeTo)
@@ -1332,14 +1333,14 @@ console.log('deprecated')
 function stepsQuantityIncrement(registry, statement, quantity, increments) {
 console.log('deprecated')
 	increments = Value.getValueDefault(increments, [1.0, 0.0])
-	increments = arrayKit.getArrayByValue(increments)
+	increments = Vector.getArrayByValue(increments)
 	if (increments.length == 0) {
-		noticeByList(['increments.length is 0 in stepsQuantityIncrement in function.', fromPoint, quantity, increments])
+		printCaller(['increments.length is 0 in stepsQuantityIncrement in function.', fromPoint, quantity, increments])
 		return []
 	}
 
-	if (arrayKit.getIsEmpty(increments[0])) {
-		noticeByList(['increments zero is empty in stepsQuantityIncrement in function.', fromPoint, quantity, increments])
+	if (Vector.isEmpty(increments[0])) {
+		printCaller(['increments zero is empty in stepsQuantityIncrement in function.', fromPoint, quantity, increments])
 		return []
 	}
 
@@ -1411,15 +1412,15 @@ console.log('deprecated')
 	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
 		var beginPoint = polyline[vertexIndex - 1]
 		var centerPoint = polyline[vertexIndex]
-		var centerBegin = Vector.getSubtraction2D(beginPoint, centerPoint)
-		var centerBeginLength = Vector.length2D(centerBegin)
+		var centerBegin = VectorFast.getSubtraction2D(beginPoint, centerPoint)
+		var centerBeginLength = VectorFast.length2D(centerBegin)
 		var endPoint = polyline[vertexIndex + 1]
-		var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-		var centerEndLength = Vector.length2D(centerEnd)
-		var intersection = Vector.getMultiplication2DScalar(centerBegin, 0.5)
-		Vector.add2D(intersection, centerPoint)
-		Vector.divide2DScalar(centerBegin, centerBeginLength)
-		Vector.divide2DScalar(centerEnd, centerEndLength)
+		var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+		var centerEndLength = VectorFast.length2D(centerEnd)
+		var intersection = VectorFast.getMultiplication2DScalar(centerBegin, 0.5)
+		VectorFast.add2D(intersection, centerPoint)
+		VectorFast.divide2DScalar(centerBegin, centerBeginLength)
+		VectorFast.divide2DScalar(centerEnd, centerEndLength)
 		centerIntersections[vertexIndex] = {
 		centerBegin:centerBegin, centerBeginLength:centerBeginLength,
 		centerEnd:centerEnd, centerEndLength:centerEndLength, centerPoint:centerPoint, intersection:intersection}
@@ -1427,36 +1428,36 @@ console.log('deprecated')
 	for (var vertexIndex = 1; vertexIndex < polyline.length - 1; vertexIndex++) {
 		var centerIntersection = centerIntersections[vertexIndex]
 		var centerPoint = centerIntersection.centerPoint
-		var middleBegin = Vector.getAddition2D(centerIntersection.centerBegin, centerIntersection.centerEnd)
-		normalize2D(middleBegin)
-		var beginEndDistance = Math.min(1.0, Vector.distance2D(centerIntersection.centerBegin, centerIntersection.centerEnd))
+		var middleBegin = VectorFast.getAddition2D(centerIntersection.centerBegin, centerIntersection.centerEnd)
+		Vector.normalize2D(middleBegin)
+		var beginEndDistance = Math.min(1.0, VectorFast.distance2D(centerIntersection.centerBegin, centerIntersection.centerEnd))
 		beginEndDistance *= radiusMultiplier
 		var right = [middleBegin[1], -middleBegin[0]]
-		var dotProduct = Vector.dotProduct2D(right, centerIntersection.centerBegin)
+		var dotProduct = VectorFast.dotProduct2D(right, centerIntersection.centerBegin)
 		if (dotProduct < 0.0) {
-			Vector.multiply2DScalar(right, -1)
+			VectorFast.multiply2DScalar(right, -1)
 		}
-		var left = Vector.getMultiplication2DScalar(right, -1.0)
-		Vector.multiply2DScalar(left, centerIntersection.centerEndLength * beginEndDistance)
-		Vector.multiply2DScalar(right, centerIntersection.centerBeginLength * beginEndDistance)
-		var rightPoint = Vector.getAddition2D(centerPoint, right)
-		var rightBefore = Vector.getSubtraction2D(centerIntersection.intersection, rightPoint)
-		var leftPoint = Vector.getAddition2D(centerPoint, left)
-		var leftAfter = Vector.getSubtraction2D(centerIntersections[vertexIndex + 1].intersection, leftPoint)
+		var left = VectorFast.getMultiplication2DScalar(right, -1.0)
+		VectorFast.multiply2DScalar(left, centerIntersection.centerEndLength * beginEndDistance)
+		VectorFast.multiply2DScalar(right, centerIntersection.centerBeginLength * beginEndDistance)
+		var rightPoint = VectorFast.getAddition2D(centerPoint, right)
+		var rightBefore = VectorFast.getSubtraction2D(centerIntersection.intersection, rightPoint)
+		var leftPoint = VectorFast.getAddition2D(centerPoint, left)
+		var leftAfter = VectorFast.getSubtraction2D(centerIntersections[vertexIndex + 1].intersection, leftPoint)
 		var quarterNumberOfSides = Math.ceil(numberOfSides * 0.25)
 		for (var pointIndex = quarterNumberOfSides - 1; pointIndex > 0; pointIndex--) {
 			var along = pointIndex / quarterNumberOfSides
-			var combinedPoint = Vector.getAddition2D(rightPoint, Vector.getMultiplication2DScalar(rightBefore, along))
-			var alongRight = Vector.getAddition2D(centerPoint, Vector.getMultiplication2DScalar(right, along))
-			Vector.add2D(Vector.multiply2DScalar(combinedPoint, along), Vector.multiply2DScalar(alongRight, 1.0 - along))
+			var combinedPoint = VectorFast.getAddition2D(rightPoint, VectorFast.getMultiplication2DScalar(rightBefore, along))
+			var alongRight = VectorFast.getAddition2D(centerPoint, VectorFast.getMultiplication2DScalar(right, along))
+			VectorFast.add2D(VectorFast.multiply2DScalar(combinedPoint, along), VectorFast.multiply2DScalar(alongRight, 1.0 - along))
 			zigzagPolyline.push(combinedPoint)
 		}
 		zigzagPolyline.push(centerPoint)
 		for (var pointIndex = 1; pointIndex < quarterNumberOfSides; pointIndex++) {
 			var along = pointIndex / quarterNumberOfSides
-			var combinedPoint = Vector.getAddition2D(leftPoint, Vector.getMultiplication2DScalar(leftAfter, along))
-			var alongLeft = Vector.getAddition2D(centerPoint, Vector.getMultiplication2DScalar(left, along))
-			Vector.add2D(Vector.multiply2DScalar(combinedPoint, along), Vector.multiply2DScalar(alongLeft, 1.0 - along))
+			var combinedPoint = VectorFast.getAddition2D(leftPoint, VectorFast.getMultiplication2DScalar(leftAfter, along))
+			var alongLeft = VectorFast.getAddition2D(centerPoint, VectorFast.getMultiplication2DScalar(left, along))
+			VectorFast.add2D(VectorFast.multiply2DScalar(combinedPoint, along), VectorFast.multiply2DScalar(alongLeft, 1.0 - along))
 			zigzagPolyline.push(combinedPoint)
 		}
 	}
@@ -1466,9 +1467,9 @@ console.log('deprecated')
 
 function zoomInterpolation(x, polyline, point, center, arrayLength) {
 console.log('deprecated')
-	center = arrayKit.getArrayByElements(center, arrayLength)
-	point = arrayKit.getArrayByElements(point, arrayLength)
-	var centerPoint = Vector.getSubtractionArray(point, center, arrayLength)
+	center = Vector.getArrayByElements(center, arrayLength)
+	point = Vector.getArrayByElements(point, arrayLength)
+	var centerPoint = VectorFast.getSubtractionArray(point, center, arrayLength)
 	var interpolationAlong = getFlatInterpolationAlongBeginEnd(x, polyline)
 	var along = interpolationAlong[0]
 	var oneMinus = 1.0 - along
