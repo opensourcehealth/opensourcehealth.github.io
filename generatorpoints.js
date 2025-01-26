@@ -17,130 +17,134 @@ function addPolygonStatements(generatorName, idStart, polygons, registry, statem
 }
 
 var around = {
-	add: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
-		var centerPoint = points[vertexIndex]
-		var radiusAngles = this.getRadiusAngles(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
-		if (radiusAngles == undefined) {
-			return
-		}
+add: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
+	var centerPoint = points[vertexIndex]
+	var radiusAngles = this.getRadiusAngles(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
+	this.addAround(aroundPolygon, centerPoint, radiusAngles, sides)
+},
 
-		centerPoint = centerPoint.slice(0, 2)
-		var around = spiralCenterRadiusOnly(centerPoint, radiusAngles.radius, radiusAngles.beginAngle, radiusAngles.endAngle, sides)
-		arrayKit.pushArray(aroundPolygon, around)
-	},
-	addArcs: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
-		var centerPoint = points[vertexIndex]
-		var radiusAngles = this.getRadiusAngles(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
-		centerPoint.push(radiusAngles)
-		if (radiusAngles == undefined) {
-			return
-		}
+addArcs: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
+	var centerPoint = points[vertexIndex]
+	var radiusAngles = this.getRadiusAngles(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
+	centerPoint.push(radiusAngles)
+	this.addAround(aroundPolygon, centerPoint, radiusAngles, sides)
+},
 
-		centerPoint = centerPoint.slice(0, 2)
-		var around = spiralCenterRadiusOnly(centerPoint, radiusAngles.radius, radiusAngles.beginAngle, radiusAngles.endAngle, sides)
-		arrayKit.pushArray(aroundPolygon, around)
-	},
-	addRadiusToPoints: function(maximumLength, maximumLengthMinus, points) {
-		var oldRadius = undefined
-		for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
-			var point = points[vertexIndex]
-			if (point[maximumLengthMinus] == undefined && oldRadius != undefined) {
-				point.length = maximumLength
-				point[maximumLengthMinus] = oldRadius
-			}
-			oldRadius = point[maximumLengthMinus]
-		}
-	},
-	getArcLength: function(point) {
-		var radiusAngles = point[point.length - 1]
-		return (radiusAngles.endAngle - radiusAngles.beginAngle) * radiusAngles.radius
-	},
-	getExtraAngle: function(betweenLength, centerRadius, otherRadius) {
-		var radiusDifference = Value.getValueDefault(otherRadius, 0.0) - centerRadius
-		if (Math.abs(radiusDifference / betweenLength) < gClose) {
-			return 0.0
-		}
-
-		return Math.asin(radiusDifference / betweenLength)
-	},
-	getPointAngle: function(along, point) {
-		var radiusAngles = point[point.length - 1]
-		var angle = radiusAngles.beginAngle * (1.0 - along) + radiusAngles.endAngle * along + Math.PI
-		return {angle:angle, point:Vector.add2D(Vector.polarRadius(angle, -radiusAngles.radius), point)}
-	},
-	getPolygon: function(points, sides) {
-		var maximumLength = 0
-		for (var point of points) {
-			maximumLength = Math.max(maximumLength, point.length)
-		}
-
-		if (maximumLength < 3) {
-			return points
-		}
-
-		var maximumLengthMinus = maximumLength - 1
-		this.addRadiusToPoints(maximumLength, maximumLengthMinus, points)
-		var aroundPolygon = []
-		var sides = Math.max(Value.getValueDefault(sides, 24), 3)
-		for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
-			this.add(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
-		}
-
-		return aroundPolygon
-	},
-	getPolygonArcs: function(points, sides) {
-		var maximumLength = 0
-		for (var point of points) {
-			maximumLength = Math.max(maximumLength, point.length)
-		}
-
-		if (maximumLength < 3) {
-			return points
-		}
-
-		var maximumLengthMinus = maximumLength - 1
-		this.addRadiusToPoints(maximumLength, maximumLengthMinus, points)
-		var aroundPolygon = []
-		var sides = Math.max(Value.getValueDefault(sides, 24), 3)
-		for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
-			this.addArcs(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
-		}
-
-		return aroundPolygon
-	},
-	getRadiusAngles: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
-		var centerPoint = points[vertexIndex]
-		var centerRadius = centerPoint[maximumLengthMinus]
-		if (centerRadius == undefined) {
-			return undefined
-		}
-
-		var beginPoint = points[(vertexIndex - 1 + points.length) % points.length]
-		var centerBegin = Vector.getSubtraction2D(beginPoint, centerPoint)
-		var centerBeginLength = Vector.length2D(centerBegin)
-		if (centerBeginLength == 0.0) {
-			return undefined
-		}
-
-		Vector.divide2DScalar(centerBegin, centerBeginLength)
-		var endPoint = points[(vertexIndex + 1) % points.length]
-		var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-		var centerEndLength = Vector.length2D(centerEnd)
-		if (centerEndLength == 0.0) {
-			return undefined
-		}
-
-		Vector.divide2DScalar(centerEnd, centerEndLength)
-		var beginAngle = Math.atan2(centerBegin[1], centerBegin[0]) + Math.PI * 0.5
-		var endAngle = Math.atan2(centerEnd[1], centerEnd[0]) - Math.PI * 0.5
-		beginAngle += this.getExtraAngle(centerBeginLength, centerRadius, beginPoint[maximumLengthMinus])
-		endAngle -= this.getExtraAngle(centerEndLength, centerRadius, endPoint[maximumLengthMinus])
-		if (endAngle < beginAngle) {
-			endAngle += gPI2
-		}
-
-		return {beginAngle:beginAngle, endAngle:endAngle, radius:centerRadius}
+addAround: function(aroundPolygon, centerPoint, radiusAngles, sides) {
+	if (radiusAngles == undefined) {
+		return
 	}
+
+	centerPoint = centerPoint.slice(0, 2)
+	var around = spiralCenterRadiusOnly(centerPoint, radiusAngles.radius, radiusAngles.beginAngle, radiusAngles.endAngle, sides)
+	Vector.pushArray(aroundPolygon, around)
+},
+
+addRadiusToPoints: function(maximumLength, maximumLengthMinus, points) {
+	var oldRadius = undefined
+	for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
+		var point = points[vertexIndex]
+		if (point[maximumLengthMinus] == undefined && oldRadius != undefined) {
+			point.length = maximumLength
+			point[maximumLengthMinus] = oldRadius
+		}
+		oldRadius = point[maximumLengthMinus]
+	}
+},
+
+getArcLength: function(point) {
+	var radiusAngles = point[point.length - 1]
+	return (radiusAngles.endAngle - radiusAngles.beginAngle) * radiusAngles.radius
+},
+
+getExtraAngle: function(betweenLength, centerRadius, otherRadius) {
+	var radiusDifference = Value.getValueDefault(otherRadius, 0.0) - centerRadius
+	if (Math.abs(radiusDifference / betweenLength) < gClose) {
+		return 0.0
+	}
+
+	return Math.asin(radiusDifference / betweenLength)
+},
+
+getPointAngle: function(along, point) {
+	var radiusAngles = point[point.length - 1]
+	var angle = radiusAngles.beginAngle * (1.0 - along) + radiusAngles.endAngle * along + Math.PI
+	return {angle:angle, point:VectorFast.add2D(Vector.polarRadius(angle, -radiusAngles.radius), point)}
+},
+
+getPolygon: function(points, sides = 24) {
+	var maximumLength = 0
+	for (var point of points) {
+		maximumLength = Math.max(maximumLength, point.length)
+	}
+
+	if (maximumLength < 3) {
+		return points
+	}
+
+	var maximumLengthMinus = maximumLength - 1
+	this.addRadiusToPoints(maximumLength, maximumLengthMinus, points)
+	var aroundPolygon = []
+	for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
+		this.add(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
+	}
+
+	return aroundPolygon
+},
+
+getPolygonArcs: function(points, sides = 24) {
+	var maximumLength = 0
+	for (var point of points) {
+		maximumLength = Math.max(maximumLength, point.length)
+	}
+
+	if (maximumLength < 3) {
+		return points
+	}
+
+	var maximumLengthMinus = maximumLength - 1
+	this.addRadiusToPoints(maximumLength, maximumLengthMinus, points)
+	var aroundPolygon = []
+	for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
+		this.addArcs(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex)
+	}
+
+	return aroundPolygon
+},
+
+getRadiusAngles: function(aroundPolygon, maximumLengthMinus, points, sides, vertexIndex) {
+	var centerPoint = points[vertexIndex]
+	var centerRadius = centerPoint[maximumLengthMinus]
+	if (centerRadius == undefined) {
+		return undefined
+	}
+
+	var beginPoint = points[(vertexIndex - 1 + points.length) % points.length]
+	var centerBegin = VectorFast.getSubtraction2D(beginPoint, centerPoint)
+	var centerBeginLength = VectorFast.length2D(centerBegin)
+	if (centerBeginLength == 0.0) {
+		return undefined
+	}
+
+	VectorFast.divide2DScalar(centerBegin, centerBeginLength)
+	var endPoint = points[(vertexIndex + 1) % points.length]
+	var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+	var centerEndLength = VectorFast.length2D(centerEnd)
+	if (centerEndLength == 0.0) {
+		return undefined
+	}
+
+	VectorFast.divide2DScalar(centerEnd, centerEndLength)
+	var beginAngle = Math.atan2(centerBegin[1], centerBegin[0]) + Math.PI * 0.5
+	var endAngle = Math.atan2(centerEnd[1], centerEnd[0]) - Math.PI * 0.5
+	beginAngle += this.getExtraAngle(centerBeginLength, centerRadius, beginPoint[maximumLengthMinus])
+	endAngle -= this.getExtraAngle(centerEndLength, centerRadius, endPoint[maximumLengthMinus])
+	if (endAngle < beginAngle) {
+		endAngle += gPI2
+	}
+
+	return {beginAngle:beginAngle, endAngle:endAngle, radius:centerRadius}
+}
 }
 
 var gAround = {
@@ -158,43 +162,43 @@ var gArrow = {
 			return
 		}
 
-		var barbEnd = Vector.getSubtraction2D(end, barb)
-		var barbEndLength = Vector.length2D(barbEnd)
+		var barbEnd = VectorFast.getSubtraction2D(end, barb)
+		var barbEndLength = VectorFast.length2D(barbEnd)
 		if (barbEndLength == 0.0) {
 			return
 		}
 
-		Vector.divide2DScalar(barbEnd, barbEndLength)
-		var dotProduct = Vector.dotProduct2D(beginEnd, barbEnd)
+		VectorFast.divide2DScalar(barbEnd, barbEndLength)
+		var dotProduct = VectorFast.dotProduct2D(beginEnd, barbEnd)
 		var angleDifference = (angleMultiplier - 1.0) * Math.acos(dotProduct) * gDegreesPerRadian
-		arrayKit.pushArray(arrowPoints, spiralFromToAngleOnly(barb, end, angleDifference * 2.0, numberOfSides, false, false))
+		Vector.pushArray(arrowPoints, spiralFromToAngleOnly(barb, end, angleDifference * 2.0, numberOfSides, false, false))
 	},
 	addTip: function(
 	angleMultiplier, arrowPoints, barbSlope, beginEnd, beginEndLeft, beginEndRight, end, halfThickness, numberOfSides, tip) {
 		if (tip.length <= 0.0) {
-			arrowPoints.push(Vector.add2D(Vector.getMultiplication2DScalar(beginEndRight, halfThickness), end))
-			arrowPoints.push(Vector.add2D(Vector.getMultiplication2DScalar(beginEndLeft, halfThickness), end))
+			arrowPoints.push(VectorFast.add2D(VectorFast.getMultiplication2DScalar(beginEndRight, halfThickness), end))
+			arrowPoints.push(VectorFast.add2D(VectorFast.getMultiplication2DScalar(beginEndLeft, halfThickness), end))
 			return
 		}
 
 		var halfHeadWidth = tip.width * 0.5
-		var endStemCenter = Vector.add2D(Vector.getMultiplication2DScalar(beginEnd, -tip.length), end)
+		var endStemCenter = VectorFast.add2D(VectorFast.getMultiplication2DScalar(beginEnd, -tip.length), end)
 		if (tip.rightMultiplier > 0.0) {
-			var endStemRight = Vector.add2D(Vector.getMultiplication2DScalar(beginEndRight, halfThickness), endStemCenter)
+			var endStemRight = VectorFast.add2D(VectorFast.getMultiplication2DScalar(beginEndRight, halfThickness), endStemCenter)
 			arrowPoints.push(endStemRight)
 			var rightExtra = halfHeadWidth * tip.rightMultiplier - halfThickness
-			var barb = Vector.getMultiplication2DScalar(beginEndRight, rightExtra)
-			barb = Vector.add2D(Vector.add2D(barb, endStemRight), Vector.getMultiplication2DScalar(beginEnd, rightExtra * barbSlope))
+			var barb = VectorFast.getMultiplication2DScalar(beginEndRight, rightExtra)
+			barb = VectorFast.add2D(VectorFast.add2D(barb, endStemRight), VectorFast.getMultiplication2DScalar(beginEnd, rightExtra * barbSlope))
 			arrowPoints.push(barb)
 			this.addCurve(angleMultiplier, arrowPoints, barb, beginEnd, end, numberOfSides)
 		}
 
 		arrowPoints.push(end)
 		if (tip.leftMultiplier > 0.0) {
-			var endStemLeft = Vector.add2D(Vector.getMultiplication2DScalar(beginEndLeft, halfThickness), endStemCenter)
+			var endStemLeft = VectorFast.add2D(VectorFast.getMultiplication2DScalar(beginEndLeft, halfThickness), endStemCenter)
 			var leftExtra = halfHeadWidth * tip.leftMultiplier - halfThickness
-			var barb = Vector.getMultiplication2DScalar(beginEndLeft, leftExtra)
-			barb = Vector.add2D(Vector.add2D(barb, endStemLeft), Vector.getMultiplication2DScalar(beginEnd, leftExtra * barbSlope))
+			var barb = VectorFast.getMultiplication2DScalar(beginEndLeft, leftExtra)
+			barb = VectorFast.add2D(VectorFast.add2D(barb, endStemLeft), VectorFast.getMultiplication2DScalar(beginEnd, leftExtra * barbSlope))
 			this.addCurve(angleMultiplier, arrowPoints, end, [-beginEnd[0], -beginEnd[1]], barb, numberOfSides)
 			arrowPoints.push(barb)
 			arrowPoints.push(endStemLeft)
@@ -226,7 +230,7 @@ var gArrow = {
 		statement.tag = 'polygon'
 		var points = getPointsHD(registry, statement)
 		if (points.length < 2) {
-			noticeByList(['points.length < 2 in arrow in generatorpoints.', points, statement])
+			printCaller(['points.length < 2 in arrow in generatorpoints.', points, statement])
 			setPointsExcept(points, registry, statement)
 			return
 		}
@@ -245,16 +249,16 @@ var gArrow = {
 		tail.width = getFloatByDefault('tailWidth', registry, statement, this.tag, this.defaultHeadWidth)
 		var begin = points[0]
 		var end = points[1]
-		var beginEnd = Vector.getSubtraction2D(end, begin)
-		var beginEndLength = Vector.length2D(beginEnd)
+		var beginEnd = VectorFast.getSubtraction2D(end, begin)
+		var beginEndLength = VectorFast.length2D(beginEnd)
 		if (beginEndLength == 0.0) {
-			noticeByList(['beginEndLength == 0.0 in arrow in generatorpoints.', points, statement])
+			printCaller(['beginEndLength == 0.0 in arrow in generatorpoints.', points, statement])
 			setPointsExcept(points, registry, statement)
 			return
 		}
 
 		statement.attributeMap.set('placerPoints', begin.toString() + ' ' + end.toString())
-		Vector.divide2DScalar(beginEnd, beginEndLength)
+		VectorFast.divide2DScalar(beginEnd, beginEndLength)
 		var beginEndLeft = [-beginEnd[1], beginEnd[0]]
 		var beginEndRight = [beginEnd[1], -beginEnd[0]]
 		var endBegin = [-beginEnd[0], -beginEnd[1]]
@@ -293,7 +297,7 @@ var gBeltDrive = {
 	addPulley: function(pointIndex, points, registry, statement) {
 		var center = points[pointIndex]
 		var pulleyMap = new Map()
-		mapKit.copyKeysExcept(pulleyMap, statement.attributeMap, gIDTransformSet)
+		MapKit.copyKeysExcept(pulleyMap, statement.attributeMap, gIDTransformSet)
 		if (this.pulleyColors.length > 0) {
 			var styleJoined = 'fill:' + this.pulleyColors[this.pulleyCount % this.pulleyColors.length]
 			if (pulleyMap.has('style')) {
@@ -318,9 +322,9 @@ var gBeltDrive = {
 		if (this.oldRadius == undefined) {
 			if (pointIndex < points.length - 1) {
 				var endPoint = points[pointIndex + 1]
-				var centerEnd = Vector.getSubtraction2D(endPoint, center)
-				var centerEndLength = Vector.length2D(centerEnd)
-				Vector.divide2DScalar(centerEnd, centerEndLength)
+				var centerEnd = VectorFast.getSubtraction2D(endPoint, center)
+				var centerEndLength = VectorFast.length2D(centerEnd)
+				VectorFast.divide2DScalar(centerEnd, centerEndLength)
 				var centerEndAngle = Math.atan2(centerEnd[1], centerEnd[0])
 				var nextRadius = this.radiuses[(this.pulleyCount + 1) % this.radiuses.length]
 				var extraAngle = around.getExtraAngle(centerEndLength, radius, nextRadius)
@@ -345,7 +349,7 @@ var gBeltDrive = {
 				}
 				pulleyFromAngle = this.toAngle
 				pulleyToAngle = this.fromAngle
-				arrayKit.pushArray(rope, spiralCenterRadiusOnly(center, radius, pulleyFromAngle, pulleyToAngle, this.sides))
+				Vector.pushArray(rope, spiralCenterRadiusOnly(center, radius, pulleyFromAngle, pulleyToAngle, this.sides))
 				rope.push(rope[0])
 				var ropeMap = new Map([['style', 'fill:none;stroke:' + this.ropeColor], ['stroke-width', this.ropeWidth.toString()]])
 				var ropeStatement = getStatementByParentTag(ropeMap, 0, statement, 'polyline')
@@ -358,9 +362,9 @@ var gBeltDrive = {
 
 		var pulleyPolygon = getPolygonCenterRadiusFromTo(center, radius - this.averageWidth, pulleyFromAngle, pulleyToAngle, this.sides)
 		if (this.holeRadius > 0.0) {
-			var hole = getRegularPolygon(center, 1.0, false, this.holeRadius, 0.0, this.sides, 0.0)
-			hole = getDirectedPolygon(!getIsCounterclockwise(pulleyPolygon), hole)
-			pulleyPolygon = getDifferencePolygons(hole, pulleyPolygon)[0]
+			var hole = getRegularPolygon(center, false, 1.0, this.holeRadius, 0.0, this.sides, 0.0)
+			hole = getDirectedPolygon(!Polygon.isCounterclockwise(pulleyPolygon), hole)
+			pulleyPolygon = Polygon.getDifferencePolygon(pulleyPolygon, hole)
 		}
 
 		setPointsHD(pulleyPolygon, pulleyStatement)
@@ -377,7 +381,7 @@ var gBeltDrive = {
 		removeIdentical2DPoints(points)
 		setPointsExcept(points, registry, statement)
 		if (points.length < 1) {
-			noticeByList(['points.length < 1 in beltDrive in generatorpoints.', points, statement])
+			printCaller(['points.length < 1 in beltDrive in generatorpoints.', points, statement])
 			return
 		}
 
@@ -401,7 +405,7 @@ var gBeltDrive = {
 			}
 		}
 
-		mapKit.deleteKeysExcept(statement.attributeMap, gIDTransformSet)
+		MapKit.deleteKeysExcept(statement.attributeMap, gIDTransformSet)
 	},
 	tag: 'beltDrive'
 }
@@ -453,7 +457,7 @@ var gBuckle = {
 		var top = topRight[1]
 		var barbOuterY = top - barbLength
 		var barbInnerY = barbOuterY - barbSlope * Math.abs(barbRight)
-		var size = Vector.getSubtraction2D(topRight, bottomLeft)
+		var size = VectorFast.getSubtraction2D(topRight, bottomLeft)
 		var midX = left + size[0] * 0.5
 		var innerRight = right - thickness
 		var bucklePoints = [[midX, bottom], [right, bottom]]
@@ -470,12 +474,12 @@ var gBuckle = {
 		var tipLeft = [innerRight + tipInset, top]
 		var tipRight = [right - tipInset, top]
 		if (barbRight > 0.0) {
-			arrayKit.pushArray(bucklePoints, [[right, barbInnerY], [right + barbRight, barbOuterY], tipRight, tipLeft])
-			arrayKit.pushArray(buckleRadiuses, [0.0, barbRadius, tipRadius, tipRadius])
+			Vector.pushArray(bucklePoints, [[right, barbInnerY], [right + barbRight, barbOuterY], tipRight, tipLeft])
+			Vector.pushArray(buckleRadiuses, [0.0, barbRadius, tipRadius, tipRadius])
 		}
 		else {
-			arrayKit.pushArray(bucklePoints, [[right, barbOuterY], tipRight, tipLeft, [innerRight + barbRight, barbOuterY]])
-			arrayKit.pushArray(buckleRadiuses, [barbRadius, tipRadius, tipRadius, barbRadius])
+			Vector.pushArray(bucklePoints, [[right, barbOuterY], tipRight, tipLeft, [innerRight + barbRight, barbOuterY]])
+			Vector.pushArray(buckleRadiuses, [barbRadius, tipRadius, tipRadius, barbRadius])
 		}
 
 		var barbInner = [innerRight, barbInnerY]
@@ -488,10 +492,10 @@ var gBuckle = {
 		else {
 			var to = [innerRight - extraBottomThickness, innerBottom]
 			var parabola = parabolaFromToQuantityOnly(barbInner, to, numberOfIntervals, true, false)
-			arrayKit.pushArray(bucklePoints, parabola)
+			Vector.pushArray(bucklePoints, parabola)
 			var endRadiuses = new Array(parabola.length).fill(0.0)
 			endRadiuses[endRadiuses.length - 1] = innerCornerRadius
-			arrayKit.pushArray(buckleRadiuses, endRadiuses)
+			Vector.pushArray(buckleRadiuses, endRadiuses)
 		}
 
 		bucklePoints.push([midX, innerBottom])
@@ -517,7 +521,7 @@ var gCart = {
 		var wheelStatement = getStatementByParentTag(wheelMap, 0, statement, 'polygon')
 		getUniqueID(this.idStart + name, registry, wheelStatement)
 		wheelStatement.generatorName = 'Cart'
-		setPointsHD(getRegularPolygon([x, this.wheelRadius], 1.0, true, radius, 0.0, this.sides, 0.0), wheelStatement)
+		setPointsHD(getRegularPolygon([x, this.wheelRadius], true, 1.0, radius, 0.0, this.sides, 0.0), wheelStatement)
 	},
 	getDefinitions: function() {
 		return [
@@ -548,16 +552,16 @@ var gCart = {
 		var insetPlusRadius = wheelInset + this.wheelRadius
 		var beginPoint = points[0]
 		var endPoint = points[1]
-		var pointsDistance = Vector.distance2D(beginPoint, endPoint)
+		var pointsDistance = VectorFast.distance2D(beginPoint, endPoint)
 		var left = fromOffset
 		var right = pointsDistance - toOffset
 		var rectangle = [[left, bottom], [right, bottom], [right, top], [left, top]]
 		setPointsExcept(rectangle, registry, statement)
 		var translationString = ''
-		var beginEnd = Vector.getSubtraction2D(endPoint, beginPoint)
-		var beginEndLength = Vector.length2D(beginEnd)
+		var beginEnd = VectorFast.getSubtraction2D(endPoint, beginPoint)
+		var beginEndLength = VectorFast.length2D(beginEnd)
 		if (beginEndLength != 0.0) {
-			Vector.divide2DScalar(beginEnd, beginEndLength)
+			VectorFast.divide2DScalar(beginEnd, beginEndLength)
 			var rotationMatrix = [beginEnd[0], beginEnd[1], -beginEnd[1], beginEnd[0], 0.0, 0.0]
 			translationString = 'matrix(' + rotationMatrix.toString() + ') ' + translationString
 		}
@@ -571,7 +575,7 @@ var gCart = {
 		removeByGeneratorName(statement.children, 'Cart')
 		var cartMap = new Map()
 		this.idStart = statement.attributeMap.get('id') + '_generated_'
-		mapKit.copyKeysExcept(cartMap, statement.attributeMap, gIDTransformSet)
+		MapKit.copyKeysExcept(cartMap, statement.attributeMap, gIDTransformSet)
 		var cartStatement = getStatementByParentTag(cartMap, 0, statement, 'polygon')
 		getUniqueID(this.idStart + 'cart', registry, cartStatement)
 		cartStatement.generatorName = 'Cart'
@@ -595,9 +599,9 @@ var gCart = {
 			}
 		}
 
-		arrayKit.removeUndefineds(statement.children)
-		arrayKit.pushArray(statement.children, fronts)
-		mapKit.deleteKeysExcept(statement.attributeMap, gIDTransformSet)
+		Vector.removeUndefineds(statement.children)
+		Vector.pushArray(statement.children, fronts)
+		MapKit.deleteKeysExcept(statement.attributeMap, gIDTransformSet)
 	},
 	tag: 'cart'
 }
@@ -626,26 +630,26 @@ function getClosestPointAngle(point, polygon) {
 	var closestIndex = getClosestPointIndex(point, polygon)
 	var centerPoint = polygon[closestIndex]
 	var secondIndex = (closestIndex + 1) % polygon.length
-	var secondDistanceSquared = Vector.distanceSquared2D(point, polygon[secondIndex])
+	var secondDistanceSquared = VectorFast.distanceSquared2D(point, polygon[secondIndex])
 	var thirdIndex = (closestIndex - 1 + polygon.length) % polygon.length
-	if (Vector.distanceSquared2D(point, polygon[thirdIndex]) < secondDistanceSquared) {
+	if (VectorFast.distanceSquared2D(point, polygon[thirdIndex]) < secondDistanceSquared) {
 		secondIndex = thirdIndex
 	}
 
 	var pointCenterAngle = Math.atan2(centerPoint[1] - point[1], centerPoint[0] - point[0])
 	var endPoint = polygon[secondIndex]
-	var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-	var centerEndLength = Vector.length2D(centerEnd)
+	var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+	var centerEndLength = VectorFast.length2D(centerEnd)
 	if (centerEndLength == 0.0) {
 		return {angle:pointCenterAngle, point:centerPoint}
 	}
 
-	Vector.divide2DScalar(centerEnd, centerEndLength)
+	VectorFast.divide2DScalar(centerEnd, centerEndLength)
 	var pointEndAngle = Math.atan2(endPoint[1] - point[1], endPoint[0] - point[0])
 	var reverseRotation = [centerEnd[0], -centerEnd[1]]
-	var centerPointRotated = Vector.getRotation2DVector(centerPoint, reverseRotation)
-	var endPointRotated = Vector.getRotation2DVector(endPoint, reverseRotation)
-	var pointRotated = Vector.getRotation2DVector(point, reverseRotation)
+	var centerPointRotated = VectorFast.getRotation2DVector(centerPoint, reverseRotation)
+	var endPointRotated = VectorFast.getRotation2DVector(endPoint, reverseRotation)
+	var pointRotated = VectorFast.getRotation2DVector(point, reverseRotation)
 	var centerPointRotatedX = centerPointRotated[0]
 	var endPointRotatedX = endPointRotated[0]
 	var pointRotatedX = pointRotated[0]
@@ -659,14 +663,14 @@ function getClosestPointAngle(point, polygon) {
 
 	var along = (pointRotatedX - centerPointRotatedX) / (endPointRotatedX - centerPointRotatedX)
 	var oneMinusAlong = 1.0 - along
-	var closestPoint = Vector.getMultiplication2DScalar(centerPoint, oneMinusAlong)
-	Vector.add2D(closestPoint, Vector.getMultiplication2DScalar(endPoint, along))
+	var closestPoint = VectorFast.getMultiplication2DScalar(centerPoint, oneMinusAlong)
+	VectorFast.add2D(closestPoint, VectorFast.getMultiplication2DScalar(endPoint, along))
 	return {angle:pointCenterAngle * oneMinusAlong + pointEndAngle * along, point:closestPoint}
 }
 
 function getRectangularPoints(registry, statement, valueDefault) {
 	var points = getPointsHD(registry, statement)
-	if (arrayKit.getIsEmpty(points)) {
+	if (Vector.isEmpty(points)) {
 		points = [valueDefault]
 	}
 
@@ -701,30 +705,30 @@ function bevelHeightPolygon(cornerWidth, polygon) {
 		if (centerPoint[2] > 0.0) {
 			var beginPoint = polygon[vertexIndex - 1]
 			var endPoint = polygon[vertexIndex + 1]
-			var centerBegin = normalize2D(Vector.getSubtraction2D(beginPoint, centerPoint))
-			var centerEnd = normalize2D(Vector.getSubtraction2D(endPoint, centerPoint))
-			var beginEnd = Vector.add2D([-centerBegin[0], -centerBegin[1]], centerEnd)
-			var beginEndLength = Vector.length2D(beginEnd)
+			var centerBegin = Vector.normalize2D(VectorFast.getSubtraction2D(beginPoint, centerPoint))
+			var centerEnd = Vector.normalize2D(VectorFast.getSubtraction2D(endPoint, centerPoint))
+			var beginEnd = VectorFast.add2D([-centerBegin[0], -centerBegin[1]], centerEnd)
+			var beginEndLength = VectorFast.length2D(beginEnd)
 			var lengthMultiplier = cornerWidth / beginEndLength
 			var beginEndLeft = [-beginEnd[1] / beginEndLength, beginEnd[0] / beginEndLength]
-			var halfDistance = Vector.distance2D(beginEndLeft, [-centerEnd[1], centerEnd[0]]) * 0.5
+			var halfDistance = VectorFast.distance2D(beginEndLeft, [-centerEnd[1], centerEnd[0]]) * 0.5
 			var yDown = halfDistance * halfDistance
 			var topDistance = Math.sqrt(halfDistance * halfDistance - yDown * yDown) / (0.5 - yDown) * centerPoint[2]
 			centerPoint.length = 2
 			centerPoint.push(topDistance)
-			centerPoint.push(Vector.multiply2DScalar(centerBegin, lengthMultiplier))
-			centerPoint.push(Vector.multiply2DScalar(centerEnd, lengthMultiplier))
-			centerPoint.push(Vector.multiply2DScalar(beginEndLeft, topDistance))
+			centerPoint.push(VectorFast.multiply2DScalar(centerBegin, lengthMultiplier))
+			centerPoint.push(VectorFast.multiply2DScalar(centerEnd, lengthMultiplier))
+			centerPoint.push(VectorFast.multiply2DScalar(beginEndLeft, topDistance))
 		}
 	}
 
 	for (var vertexIndex = polygon.length - 1; vertexIndex > -1; vertexIndex--) {
 		var endPoint = polygon[vertexIndex]
 		if (endPoint.length > 3) {
-			var beginPoint = Vector.add2D(endPoint.slice(0), endPoint[3])
+			var beginPoint = VectorFast.add2D(endPoint.slice(0), endPoint[3])
 			beginPoint.push(1)
 			polygon.splice(vertexIndex, 0, beginPoint)
-			Vector.add2D(endPoint, endPoint[4])
+			VectorFast.add2D(endPoint, endPoint[4])
 		}
 	}
 }
@@ -748,12 +752,12 @@ var gPontoon = {
 		{text:'Tip Length', lower:0.0, decimalPlaces:0, upper:50.0, value:20.0}]
 	},
 	getInsetPolygon: function(multiplier, polygon) {
-		var insetPolygon = arrayKit.getArraysCopy(polygon)
+		var insetPolygon = Polyline.copy(polygon)
 		for (var vertexIndex = insetPolygon.length - 1; vertexIndex > -1; vertexIndex--) {
 			var point = insetPolygon[vertexIndex]
 			if (point.length > 4) {
 				var addition = 1 * (point.length > 6)
-				insetPolygon.splice(vertexIndex + addition, 0, Vector.add2D(point.slice(0), Vector.getMultiplication2DScalar(point[5], multiplier)))
+				insetPolygon.splice(vertexIndex + addition, 0, VectorFast.add2D(point.slice(0), VectorFast.getMultiplication2DScalar(point[5], multiplier)))
 			}
 		}
 
@@ -777,7 +781,7 @@ var gPontoon = {
 		}
 
 		modulePolygon.push([halfTipCornerWidth, top - tipLength, 0.0])
-		if (!arrayKit.getIsEmpty(this.corners)) {
+		if (!Vector.isEmpty(this.corners)) {
 			var cornerEnd = this.corners[0]
 			for (var cornerIndex = 1; cornerIndex < this.corners.length; cornerIndex++) {
 				cornerEnd = Math.max(cornerEnd, this.corners[cornerIndex])
@@ -792,10 +796,10 @@ var gPontoon = {
 		if (tipLength != 0.0) {
 			var centerPoint = modulePolygon[1]
 			var endPoint = modulePolygon[2]
-			var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-			var centerEndLength = Vector.length2D(centerEnd)
+			var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+			var centerEndLength = VectorFast.length2D(centerEnd)
 			if (centerEndLength > 0.0) {
-				Vector.multiply2DScalar(centerEnd, tipHeight / centerEndLength)
+				VectorFast.multiply2DScalar(centerEnd, tipHeight / centerEndLength)
 				var deltaX = Math.sqrt(tipHeight * tipHeight + tipLength * tipLength) - centerEnd[0]
 				modulePolygon[0][0] += deltaX * centerEnd[0] / centerEnd[1] - centerEnd[1]
 				this.tipWidths.push(modulePolygon[0][0] * 2.0)
@@ -814,7 +818,7 @@ var gPontoon = {
 		addMirrorPoints(centerVector, modulePolygon.length, modulePolygon)
 		var addition = this.points[0].slice(0)
 		addition[0] += right
-		Vector.add2Ds(modulePolygon, addition)
+		Polyline.add2D(modulePolygon, addition)
 		bevelHeightPolygon(this.cornerWidth, modulePolygon)
 		return modulePolygon
 	},
@@ -827,6 +831,7 @@ var gPontoon = {
 		var backTipHeight = getFloatByDefault('backTipHeight', registry, statement, this.tag, -1)
 		backTipHeight = Value.getValueNegativeDefault(backTipHeight, this.pontoonHeight)
 		var backTipLength = getFloatByDefault('backTipLength', registry, statement, this.tag, 20.0)
+		var betweenExtraLength = getFloatByDefault('betweenExtraLength', registry, statement, this.tag, -0.2)
 		this.betweenLength = getFloatByDefault('betweenLength', registry, statement, this.tag, -1)
 		var bottomArealDensity = getFloatByDefault('bottomArealDensity', registry, statement, this.tag, 0.24) * 0.0001
 		this.corners = getFloatsByDefault('corners', registry, statement, statement.tag, [50.0])
@@ -845,27 +850,27 @@ var gPontoon = {
 		var panelWidth = getFloatByDefault('panelWidth', registry, statement, this.tag, 60.0)
 		this.pontoonHeight = getFloatByDefault('pontoonHeight', registry, statement, this.tag, 10.0)
 		var topArealDensity = getFloatByDefault('topArealDensity', registry, statement, this.tag, 0.77) * 0.0001
+		var topThickness = getFloatByDefault('topThickness', registry, statement, this.tag, 0.6)
 		this.mapEntries = []
 		var displayString = attributeMap.get('display')
 		if (displayString != undefined) {
 			this.mapEntries.push(['display', displayString])
 		}
 
-		this.moduleSize = Vector.getSubtraction2D(this.points[1], this.points[0])
-		var interiorHeight = (this.pontoonHeight + lidThickness) * 1.05
+		this.moduleSize = VectorFast.getSubtraction2D(this.points[1], this.points[0])
+		var interiorHeight = this.pontoonHeight + lidThickness
 		this.idStart = attributeMap.get('id') + '_'
 		this.registry = registry
 		this.statement = statement
 		this.tipWidths = []
-		this.betweenLength = Value.getValueNegativeDefault(this.betweenLength, interiorHeight * 3 + lidThickness * 2)
+		this.betweenLength = Value.getValueNegativeDefault(this.betweenLength, interiorHeight * 3 + topThickness * 2 + betweenExtraLength)
 		removeByGeneratorName(statement.children, 'Pontoon')
 		var frontBottomPolygon = this.getModulePolygon('front', frontRoundTip, frontTipCornerWidth, frontTipHeight, frontTipLength)
 		var backBottomPolygon = this.getModulePolygon('back', backRoundTip, backTipCornerWidth, backTipHeight, backTipLength)
-//		this.bottomSculpturePolygon = this.getInsetPolygon(0.001, frontBottomPolygon)
 		var frontTopPolygon = this.getInsetPolygon(1.0, frontBottomPolygon)
 		var backTopPolygon = this.getInsetPolygon(1.0, backBottomPolygon)
-		arrayKit.setArraysLength(frontBottomPolygon, 2)
-		arrayKit.setArraysLength(backBottomPolygon, 2)
+		Vector.setArraysLength(frontBottomPolygon, 2)
+		Vector.setArraysLength(backBottomPolygon, 2)
 		setPointsExcept([], registry, statement)
 		convertToGroup(statement)
 		this.addPontoonStatements(frontBottomPolygon, backBottomPolygon, 'bottom')
@@ -918,6 +923,7 @@ var gPontoon = {
 		attributeMap.set('totalArea', getRoundedFloatString(totalArea))
 		attributeMap.set('totalMass', getRoundedFloatString(totalMass))
 		attributeMap.set('totalVolume', getRoundedFloatString(totalVolume))
+		statement.attributeMap = MapKit.getSorted(attributeMap)
 	},
 	tag: 'pontoon'
 }
@@ -959,7 +965,7 @@ var gRack = {
 			return polygon
 		}
 
-		var advance = getIsCounterclockwise(polygon) * 2 - 1
+		var advance = Polygon.isCounterclockwise(polygon) * 2 - 1
 		var betweenVerticals = []
 		var leftIndex = 0
 		var lowX = Number.MAX_VALUE
@@ -985,7 +991,7 @@ var gRack = {
 		var rightPoint = polygon[rightIndex]
 		var before = []
 		this.addBetweenUntil(-advance, before, -1, rightPoint[1], polygon, rightIndex)
-		arrayKit.pushArray(betweenVerticals, before.reverse())
+		Vector.pushArray(betweenVerticals, before.reverse())
 		betweenVerticals.push(rightPoint)
 		this.addBetweenUntil(advance, betweenVerticals, 1, rightPoint[1], polygon, rightIndex)
 		return removeIdentical2DPoints(betweenVerticals)
@@ -993,8 +999,8 @@ var gRack = {
 	getRackMesh: function(bottomLeft, bottomTooth, height, matrix3D, rackPolygon, topRight, topTooth) {
 		var halfDowelHeight = this.dowelHeight * 0.5
 		var outerRackPolygon = rackPolygon
-		var countergon = getRegularPolygon([0.0, 0.0], 1.0, true, 1.0, 0.5, this.interiorSides, -0.5 * Math.PI)
-		var clockgon = arrayKit.getArraysCopy(countergon).reverse()
+		var countergon = getRegularPolygon([0.0, 0.0], true, 1.0, 1.0, 0.5, this.interiorSides, -0.5 * Math.PI)
+		var clockgon = Polyline.copy(countergon).reverse()
 		var middlePolygons = [rackPolygon]
 		var highPolygons = [rackPolygon]
 		var sculptureObject = {polygonMap:new Map(), statementMap:new Map()}
@@ -1014,8 +1020,8 @@ var gRack = {
 
 		if (this.bottomTopBevel > 0.0) {
 			heightInset = this.bottomTopBevel * Math.tan(0.5 * Math.PI - this.overhangAngle)
-			bottomLeft = Vector.getAddition2D(bottomLeft, [this.bottomTopBevel, this.bottomTopBevel])
-			topRight = Vector.getAddition2D(topRight, [-this.bottomTopBevel, -this.bottomTopBevel])
+			bottomLeft = VectorFast.getAddition2D(bottomLeft, [this.bottomTopBevel, this.bottomTopBevel])
+			topRight = VectorFast.getAddition2D(topRight, [-this.bottomTopBevel, -this.bottomTopBevel])
 			var bottomInsetTooth = getWidenedPolygon(bottomTooth, -this.bottomTopBevel)
 			outerRackPolygon = this.getRackPolygon(bottomLeft, bottomInsetTooth, topRight, getWidenedPolygon(topTooth, -this.bottomTopBevel))
 		}
@@ -1031,17 +1037,17 @@ var gRack = {
 			var socketMiddlePolygons = []
 			var socketTipPolygons = []
 			for (var center of centers) {
-				bottomPolygons.push(Vector.add2Ds(Vector.getMultiplication2DsScalar(clockgon, socketBaseRadius), center))
-				socketMiddlePolygons.push(Vector.add2Ds(Vector.getMultiplication2DsScalar(clockgon, socketMiddleRadius), center))
-				socketTipPolygons.push(Vector.add2Ds(Vector.getMultiplication2DsScalar(clockgon, socketTipRadius), center))
+				bottomPolygons.push(Polyline.add2D(Polyline.getMultiplication2DScalar(clockgon, socketBaseRadius), center))
+				socketMiddlePolygons.push(Polyline.add2D(Polyline.getMultiplication2DScalar(clockgon, socketMiddleRadius), center))
+				socketTipPolygons.push(Polyline.add2D(Polyline.getMultiplication2DScalar(clockgon, socketTipRadius), center))
 			}
 			if (this.socketHeight > heightInset) {
-				arrayKit.pushArray(middlePolygons, socketMiddlePolygons)
-				arrayKit.pushArray(highPolygons, socketTipPolygons)
+				Vector.pushArray(middlePolygons, socketMiddlePolygons)
+				Vector.pushArray(highPolygons, socketTipPolygons)
 				z -= heightMinus
 			}
 			else {
-				arrayKit.pushArray(middlePolygons, socketTipPolygons)
+				Vector.pushArray(middlePolygons, socketTipPolygons)
 				z -= heightInset
 			}
 			for (var socketTipPolygon of socketTipPolygons) {
@@ -1064,11 +1070,11 @@ var gRack = {
 		var dowelBaseIDs = []
 		if (this.dowelHeight != 0.0) {
 			var dowelBaseRadius = this.dowelRadius + this.fastenerSlope * halfDowelHeight
-			var dowelBaseRadiusCountergon = Vector.getMultiplication2DsScalar(countergon, dowelBaseRadius)
+			var dowelBaseRadiusCountergon = Polyline.getMultiplication2DScalar(countergon, dowelBaseRadius)
 			for (var centerIndex = 0; centerIndex < centers.length; centerIndex++) {
 				var dowelBaseID = 'dowelBase' + centerIndex
 				dowelBaseIDs.push(dowelBaseID)
-				sculptureObject.polygonMap.set(dowelBaseID, Vector.getAddition2Ds(dowelBaseRadiusCountergon, centers[centerIndex]))
+				sculptureObject.polygonMap.set(dowelBaseID, Polyline.getAddition2D(dowelBaseRadiusCountergon, centers[centerIndex]))
 				sculptureObject.statementMap.set(dowelBaseID, {attributeMap:new Map([['connectionID', '']])})
 			}
 		}
@@ -1077,19 +1083,19 @@ var gRack = {
 		if (this.dowelHeight != 0.0) {
 			var midHeight = this.dowelHeight - this.dowelBevel * 2.0
 			var dowelMidRadius = this.dowelRadius - this.fastenerSlope * (midHeight - halfDowelHeight)
-			var dowelMidRadiusCountergon = Vector.getMultiplication2DsScalar(countergon, dowelMidRadius)
+			var dowelMidRadiusCountergon = Polyline.getMultiplication2DScalar(countergon, dowelMidRadius)
 			var layerHeight = height + midHeight
 			var middleDowelPolygons = new Array(centers.length)
 			for (var centerIndex = 0; centerIndex < centers.length; centerIndex++) {
-				middleDowelPolygons[centerIndex] = Vector.getAddition2Ds(dowelMidRadiusCountergon, centers[centerIndex])
+				middleDowelPolygons[centerIndex] = Polyline.getAddition2D(dowelMidRadiusCountergon, centers[centerIndex])
 			}
 			layers.push({matrix3D:layerHeight, polygons:middleDowelPolygons, vertical:false})
 			if (this.dowelBevel > 0.0) {
 				var dowelTipRadius = this.dowelRadius - this.fastenerSlope * halfDowelHeight - this.dowelBevel
-				var dowelTipRadiusCountergon = Vector.getMultiplication2DsScalar(countergon, dowelTipRadius)
+				var dowelTipRadiusCountergon = Polyline.getMultiplication2DScalar(countergon, dowelTipRadius)
 				var dowelTipPolygons = new Array(centers.length)
 				for (var centerIndex = 0; centerIndex < centers.length; centerIndex++) {
-					dowelTipPolygons[centerIndex] = Vector.getAddition2Ds(dowelTipRadiusCountergon, centers[centerIndex])
+					dowelTipPolygons[centerIndex] = Polyline.getAddition2D(dowelTipRadiusCountergon, centers[centerIndex])
 				}
 				layers.push({matrix3D:height + this.dowelHeight, polygons:dowelTipPolygons, vertical:false})
 			}
@@ -1108,21 +1114,21 @@ var gRack = {
 		var topMinus = top - this.leftRightBevel
 		var rackPolygon = []
 		if (this.leftRightBevel > 0.0) {
-			arrayKit.pushArray(rackPolygon, [[rightBevel, bottom], [right, bottomPlus], [right, topMinus], [rightBevel, topMinus]])
+			Vector.pushArray(rackPolygon, [[rightBevel, bottom], [right, bottomPlus], [right, topMinus], [rightBevel, topMinus]])
 		}
 		else {
-			arrayKit.pushArray(rackPolygon, [[right, bottom], [right, top]])
+			Vector.pushArray(rackPolygon, [[right, bottom], [right, top]])
 		}
 
-		arrayKit.pushArray(rackPolygon, this.getTeeth(top, leftBevel, rightBevel, topTooth).reverse())
+		Vector.pushArray(rackPolygon, this.getTeeth(top, leftBevel, rightBevel, topTooth).reverse())
 		if (this.leftRightBevel > 0.0) {
-			arrayKit.pushArray(rackPolygon, [[leftBevel, top], [left, topMinus], [left, bottomPlus], [leftBevel, bottom]])
+			Vector.pushArray(rackPolygon, [[leftBevel, top], [left, topMinus], [left, bottomPlus], [leftBevel, bottom]])
 		}
 		else {
-			arrayKit.pushArray(rackPolygon, [[left, top], [left, bottom]])
+			Vector.pushArray(rackPolygon, [[left, top], [left, bottom]])
 		}
 
-		arrayKit.pushArray(rackPolygon, this.getTeeth(bottom, leftBevel, rightBevel, bottomTooth))
+		Vector.pushArray(rackPolygon, this.getTeeth(bottom, leftBevel, rightBevel, bottomTooth))
 		return rackPolygon
 	},
 	getTeeth: function(height, leftBevel, rightBevel, tooth) {
@@ -1133,9 +1139,9 @@ var gRack = {
 		var endIndex = Math.ceil((rightBevel - tooth[tooth.length - 1][0]) / this.toothSeparation)
 		var teeth = []
 		for (var toothIndex = Math.ceil((leftBevel - tooth[0][0]) / this.toothSeparation); toothIndex < endIndex; toothIndex++) {
-			var toothCopy = arrayKit.getArraysCopy(tooth)
-			Vector.add2Ds(toothCopy, [toothIndex * this.toothSeparation, height])
-			arrayKit.pushArray(teeth, toothCopy)
+			var toothCopy = Polyline.copy(tooth)
+			Polyline.add2D(toothCopy, [toothIndex * this.toothSeparation, height])
+			Vector.pushArray(teeth, toothCopy)
 		}
 
 		return teeth
@@ -1162,7 +1168,7 @@ var gRack = {
 		var toothTipLeft = toothLeft + toothInset
 		var toothTipRight = toothRight - toothInset
 		if (this.baseBevel > 0.0) {
-			arrayKit.pushArray(tooth, [[toothBaseLeft - this.baseBevel, 0.0], [toothBaseLeft + baseBevelSlope, doubleBaseBevel]])
+			Vector.pushArray(tooth, [[toothBaseLeft - this.baseBevel, 0.0], [toothBaseLeft + baseBevelSlope, doubleBaseBevel]])
 		}
 		else {
 			tooth.push([toothBaseLeft, 0.0])
@@ -1171,15 +1177,15 @@ var gRack = {
 		if (this.tipBevel > 0.0) {
 			var lengthMinusDouble = toothHeight - doubleTipBevel
 			var tipBevelSlope = this.tipBevel * this.toothSlope
-			arrayKit.pushArray(tooth, [[toothTipLeft - tipBevelSlope, lengthMinusDouble], [toothTipLeft + this.tipBevel, toothHeight]])
-			arrayKit.pushArray(tooth, [[toothTipRight - this.tipBevel, toothHeight], [toothTipRight + tipBevelSlope, lengthMinusDouble]])
+			Vector.pushArray(tooth, [[toothTipLeft - tipBevelSlope, lengthMinusDouble], [toothTipLeft + this.tipBevel, toothHeight]])
+			Vector.pushArray(tooth, [[toothTipRight - this.tipBevel, toothHeight], [toothTipRight + tipBevelSlope, lengthMinusDouble]])
 		}
 		else {
-			arrayKit.pushArray(tooth, [[toothTipLeft, toothHeight], [toothTipRight, toothHeight]])
+			Vector.pushArray(tooth, [[toothTipLeft, toothHeight], [toothTipRight, toothHeight]])
 		}
 
 		if (this.baseBevel > 0.0) {
-			arrayKit.pushArray(tooth, [[toothBaseRight - baseBevelSlope, doubleBaseBevel], [toothBaseRight + this.baseBevel, 0.0]])
+			Vector.pushArray(tooth, [[toothBaseRight - baseBevelSlope, doubleBaseBevel], [toothBaseRight + this.baseBevel, 0.0]])
 		}
 		else {
 			tooth.push([toothBaseRight, 0.0])
@@ -1231,7 +1237,7 @@ var gRack = {
 		var maximumSlopeInset = Math.max(bottomToothHeight, topToothHeight) * this.toothSlope
 		var insetTipWidth = this.toothSeparation * 0.5 - (this.tipBevel + this.bottomTopBevel) * 2.0 - maximumSlopeInset
 		if (insetTipWidth <= 0.0) {
-			noticeByList(['Inset tooth width is not positive in rack in generatorpoints, rack will not be made.', insetTipWidth, statement])
+			printCaller(['Inset tooth width is not positive in rack in generatorpoints, rack will not be made.', insetTipWidth, statement])
 			return
 		}
 
@@ -1242,37 +1248,61 @@ var gRack = {
 }
 
 var gRectangle = {
-	processStatement: function(registry, statement) {
-		statement.tag = 'polygon'
-		var points = getBox(registry, statement)
-		setPointsHD(points, statement)
-		setPointsExcept(points, registry, statement)
-	},
-	tag: 'rectangle'
+processStatement: function(registry, statement) {
+	statement.tag = 'polygon'
+	var points = getBox(registry, statement)
+	setPointsHD(points, statement)
+	setPointsExcept(points, registry, statement)
+},
+
+tag: 'rectangle'
 }
 
 var gSandal = {
+addArchBottom: function(sandalMesh, springBottomHeight, springPolygons) {
+	for (var springPolygon of springPolygons) {
+		var layers = [{matrix3D:-springBottomHeight, polygons:Polygon.getIntersectionPolygons(this.insetBevelPolygon, springPolygon)}]
+		layers.push({matrix3D:this.bottomBevel - springBottomHeight, polygons:[springPolygon], vertical:false})
+		layers.push({matrix3D:0, polygons:[springPolygon], vertical:false})
+		embossMesh(false, [undefined], sculpture.getMesh(layers), sandalMesh)
+	}
+},
+
+addArchTop: function(height, layers, springPolygons) {
+	for (var archPolygonIndex = 0; archPolygonIndex < springPolygons.length; archPolygonIndex++) {
+		var archPolygonID = 'archPolygon' + archPolygonIndex
+		var springPolygon = springPolygons[archPolygonIndex]
+		var archPolygon = this.getArchPolygon(springPolygon)
+		this.sculptureObject.polygonMap.set(archPolygonID, archPolygon)
+		this.sculptureObject.statementMap.set(archPolygonID, {attributeMap:new Map([['connectionID', 'soleTop']])})
+		layers.push({matrix3D:height, ids:[archPolygonID], vertical:true})
+
+		var archTopPolygon = this.getArchPolygon(getOutsetPolygon(springPolygon, -this.topBevel))
+		layers.push({matrix3D:height, polygons:[Polyline.addByIndex(archTopPolygon, this.topBevel, 2)], vertical:false})
+	}
+},
+
 addHeelClasp: function(id, layers, outerSign) {
-	var rectangle = getRectangleCornerParameters(this.midX, this.heelStubFront, this.midX + this.right, this.heelStubBack + 1.0)
+	var rectangle = getRectangleCornerParameters(this.midX, this.springsFront, this.midX + this.right, this.heelStubBack + 1.0)
 	if (outerSign < 0.0) {
-		addArraysByIndex(rectangle, this.farLeft, 0)
+		Polyline.addByIndex(rectangle, this.farLeft, 0)
 	}
 
-	var heelOuterBase = getIntersectionPolygons(rectangle, this.heelCupMiddle)[0]
+	var heelOuterBase = Polygon.getIntersectionPolygon(this.heelCupMiddle, rectangle)
 	var closestPointIndex = getClosestPointIndex([this.doubleRight, -this.outset], heelOuterBase)
 	heelOuterBase = getPolygonRotatedToIndex(heelOuterBase, closestPointIndex)
-	var midpoint = getMidpoint2D(heelOuterBase[1], heelOuterBase[heelOuterBase.length - 2])
+	var midpoint = Vector.interpolationFromToAlong2D(heelOuterBase[1], heelOuterBase[heelOuterBase.length - 2])
 	var arc = spiralFromToAngleOnly(heelOuterBase[heelOuterBase.length - 1], heelOuterBase[0], 150, gFillet.sides, false, false)
-	arrayKit.pushArray(heelOuterBase, arc)
+	Vector.pushArray(heelOuterBase, arc)
 
 	this.sculptureObject.polygonMap.set(id, heelOuterBase)
 	this.sculptureObject.statementMap.set(id, {attributeMap:new Map([['connectionID', 'heelCup']])})
 	layers.push({matrix3D:this.heelStubHeight, ids:[id], vertical:true})
 
 	var scaleTranslate2D = getMatrix2DByScale([1.0, this.cosHeelStrapX])
-	scaleTranslate2D = getMultiplied2DMatrix(getMatrix2DByTranslate([midpoint[0], this.heelStubFront]), scaleTranslate2D)
+	scaleTranslate2D = getMultiplied2DMatrix(getMatrix2DByTranslate([midpoint[0], this.springsFront]), scaleTranslate2D)
 	var beginPillarFront = 0.02
-	var endPillarFront = this.heelClaspInsideLength + this.wallThickness
+	var endPillarFront = this.claspInsideLength + this.wallThickness
 	var endPillarBack = endPillarFront + this.wallThickness
 	var pillarPolygons = this.getPillarPolygons(beginPillarFront, this.wallThickness, endPillarFront, endPillarBack)
 	transform2DPolylines(scaleTranslate2D, pillarPolygons)
@@ -1280,46 +1310,102 @@ addHeelClasp: function(id, layers, outerSign) {
 	layers.push({matrix3D:pillarTop, polygons:pillarPolygons, vertical:true})
 
 	var bar = getRectangleCornerParameters(-this.halfClaspThickness, beginPillarFront, this.halfClaspThickness, endPillarBack)
-	bar = getFilletedPolygonByIndexes(bar, this.pillarRadius, gFillet.sides)
-	transform2DPoints(scaleTranslate2D, bar)
-	layers.push({matrix3D:pillarTop + this.wallThickness, polygons:[bar], vertical:true})
+	bar = getFilletedPolygonByIndexes(bar, this.pillarFilletRadius, gFillet.sides)
+	layers.push({matrix3D:pillarTop + this.wallThickness, polygons:[transform2DPoints(scaleTranslate2D, bar)], vertical:true})
 },
 
-addMetatarsalClasp: function(base, baseID, baseZ, connectionID, layers, offsetRatio, rotation3D) {
-	var baseMatrix3D = getMatrix3DByTranslateZ([baseZ])
-	baseMatrix3D = getMultiplied3DMatrix(rotation3D, baseMatrix3D)
-
+addMetatarsalClasp: function(base, offsetRatio, rotation3D, sandalMesh) {
 	var boundingBox = getBoundingBox(base)
-	var center = getMidpoint2D(boundingBox[0], boundingBox[1])
+	var center = Vector.interpolationFromToAlong2D(boundingBox[0], boundingBox[1])
 	center[0] += (boundingBox[1][0] - boundingBox[0][0] - this.stemWidth) * offsetRatio
-	var stemPolygon = getRegularPolygon(center, 0.0, true, this.stemRadius, 0.0, this.sides, 0.0)
+	var stemPolygon = getRegularPolygon(center, true, 0.0, this.stemRadius, 0.0, this.sides, 0.0)
 
-	var stemZ = baseZ + this.strapClearance
-	var stemMatrix3D = getMatrix3DByTranslateZ([stemZ])
-	stemMatrix3D = getMultiplied3DMatrix(rotation3D, stemMatrix3D)
-
-	var heelClaspHalfLength = this.heelClaspInsideLength * 0.5
+	var heelClaspHalfLength = this.claspInsideLength * 0.5
 	var beginPillarFront = -heelClaspHalfLength - this.wallThickness
 	var endPillarFront = heelClaspHalfLength
 	var endPillarBack = endPillarFront + this.wallThickness
 	var pillarPolygons = this.getPillarPolygons(beginPillarFront, -heelClaspHalfLength, endPillarFront, endPillarBack)
 	for (var pillarPolygon of pillarPolygons) {
-		Vector.add2Ds(pillarPolygon, center)
+		Polyline.add2D(pillarPolygon, center)
 	}
 
 	var bar = getRectangleCornerParameters(-this.halfClaspThickness, beginPillarFront, this.halfClaspThickness, endPillarBack)
-	bar = getFilletedPolygonByIndexes(bar, this.pillarRadius, gFillet.sides)
-	Vector.add2Ds(bar, center)
+	bar = getFilletedPolygonByIndexes(bar, this.pillarFilletRadius, gFillet.sides)
+	Polyline.add2D(bar, center)
 
-	var capZ = stemZ + this.wallThickness
-	var capMatrix3D = getMatrix3DByTranslateZ([capZ])
-	capMatrix3D = getMultiplied3DMatrix(rotation3D, capMatrix3D)
+	var layers = [{polygons:pillarPolygons}]
+	layers.push({matrix3D:this.strapClearance, polygons:pillarPolygons, vertical:true})
+	layers.push({matrix3D:this.strapClearance + this.wallThickness, polygons:[bar], vertical:true})
+	embossMeshes(rotation3D, true, [undefined], [sculpture.getMesh(layers)], sandalMesh)
+},
 
+addMetatarsalPillar: function(base, baseID, connectionID, height, layers, skew3D) {
+	skew3D = getMultiplied3DMatrix(skew3D, getMatrix3DByTranslateZ([height]))
 	this.sculptureObject.polygonMap.set(baseID, base)
 	this.sculptureObject.statementMap.set(baseID, {attributeMap:new Map([['connectionID', connectionID]])})
-	layers.push({matrix3D:baseMatrix3D, ids:[baseID], vertical:true})
-	layers.push({matrix3D:stemMatrix3D, polygons:pillarPolygons, vertical:true})
-	layers.push({matrix3D:capMatrix3D, polygons:[bar], vertical:true})
+	layers.push({matrix3D:skew3D, ids:[baseID], vertical:true})
+},
+
+addRidge: function(height, layers) {
+	var ridgeSections = []
+	var numberOfSides = 3
+	var angle = Math.PI * 0.25
+	var angleDifference = (Math.PI * 0.5 - angle) / (numberOfSides - 0.5)
+	for (var sideCount = 0; sideCount < numberOfSides; sideCount++) {
+		ridgeSections.push(Vector.polarCounterclockwise(angle))
+		angle += angleDifference
+	}
+
+	var ridgeSectionZero = ridgeSections[0]
+	var ridgeSectionLast = ridgeSections[ridgeSections.length - 1]
+	Polyline.addByIndex(ridgeSections, -ridgeSectionZero[1], 1)
+	var ridgeMultiplier = [this.halfRidgeWidth / ridgeSectionZero[0], this.ridgeThickness / ridgeSectionLast[1]]
+	Polyline.multiply2Ds(ridgeSections, ridgeMultiplier)
+	layers.push({matrix3D:height, polygons:this.getRidgeBase(ridgeSectionZero[0]), vertical:true})
+	for (var sideCount = 1; sideCount < numberOfSides - 1; sideCount++) {
+		var ridgeSection = ridgeSections[sideCount]
+		layers.push({matrix3D:height + ridgeSection[1], polygons:this.getRidgeBase(ridgeSection[0]), vertical:false})
+	}
+
+	this.sculptureObject.polygonMap.set('ridgeBase', this.getRidgeBase(ridgeSectionLast[0])[0])
+	layers.push({matrix3D:height + ridgeSectionLast[1], ids:['ridgeBase'], vertical:false})
+},
+
+addTreadBase: function(layers) {
+	if (this.bottomBevel < this.treadHeight) {
+		var bevelPolygons = getDifferencePolygonsByPolygons(this.sandalEnds, this.treadDifferencePolygons)
+		layers.push({connectionMultiplier:100, matrix3D:this.bottomBevel, polygons:bevelPolygons, vertical:false})
+		layers.push({matrix3D:this.treadHeight, polygons:bevelPolygons, vertical:true})
+
+		var treadBottomCutouts = this.getRemovedDifferencesByWorks(this.treadDifferencePolygons, this.insetDoubleTreadPolygon)
+		var treadBottomPolygons = getDifferencePolygonsByPolygons(this.sandalEnds, treadBottomCutouts)
+		layers.push({matrix3D:this.treadHeight, polygons:treadBottomPolygons, vertical:true})
+
+		var treadPlusCutouts = this.getRemovedDifferencesByWorks(this.treadDifferencePolygons, this.insetTreadPolygon)
+		var treadPlusPolygons = getDifferencePolygonsByPolygons(this.sandalEnds, treadPlusCutouts)
+		var treadBevelHeight = this.treadHeight + Math.tan(this.overhangAngle) * this.treadHeight
+		layers.push({connectionMultiplier:100, matrix3D:treadBevelHeight, polygons:treadPlusPolygons, vertical:false})
+		layers.push({matrix3D:this.belowSpringHeight, polygons:treadPlusPolygons, vertical:true})
+
+		return
+	}
+
+	var tanBevelMinusHeight = Math.tan(this.overhangAngle) * (this.bottomBevel - this.treadHeight)
+	var insetBevelMinusPolygon = getOutsetPolygon(this.shortSandalPolygon, -tanBevelMinusHeight)
+	var insetBevelMinusEnds = Polygon.getDifferencePolygons(insetBevelMinusPolygon, this.intersectionRectangle)
+	var insetBevelMinusPolygons = getDifferencePolygonsByPolygons(insetBevelMinusEnds, this.treadDifferencePolygons)
+	layers.push({connectionMultiplier:100, matrix3D:this.treadHeight, polygons:insetBevelMinusPolygons, vertical:false})
+
+	var tanBevelPlusTread = tanBevelMinusHeight + this.treadHeight
+	var insetPlusTreadPolygon = getOutsetPolygon(this.shortSandalPolygon, -tanBevelPlusTread)
+	var insetPlusTreadCutouts = this.getRemovedDifferencesByWorks(this.treadDifferencePolygons, insetPlusTreadPolygon)
+	var insetPlusTreadPolygons = getDifferencePolygonsByPolygons(insetBevelMinusEnds, insetPlusTreadCutouts)
+	layers.push({matrix3D:this.treadHeight, polygons:insetPlusTreadPolygons, vertical:true})
+
+	var treadPlusCutouts = this.getRemovedDifferencesByWorks(this.treadDifferencePolygons, this.insetTreadPolygon)
+	var treadPlusPolygons = getDifferencePolygonsByPolygons(this.sandalEnds, treadPlusCutouts)
+	layers.push({matrix3D:this.bottomBevel, polygons:treadPlusPolygons, vertical:false})
+	layers.push({matrix3D:this.belowSpringHeight, polygons:treadPlusPolygons, vertical:true})
 },
 
 addTreads: function(treadFront, treadBack) {
@@ -1338,9 +1424,16 @@ addTreads: function(treadFront, treadBack) {
 	for (var rectangleIndex = -1; rectangleIndex < numberOfExtraTreads; rectangleIndex++) {
 		treadBack = treadFront + this.treadWidth
 		var rectangle = getRectangleCornerParameters(this.farLeft, treadFront, this.doubleRight, treadBack)
-		this.rectangleDifferencePolygons.push(rectangle)
+		this.treadDifferencePolygons.push(rectangle)
 		treadFront += treadAdvance
 	}
+},
+
+getAddArcTread: function(arc, outsets) {
+	Polyline.extend(arc, this.toeExtraLength)
+	var arcs = getOutlinesQuickly(undefined, undefined, undefined, outsets, [arc], undefined)
+	Vector.pushArray(this.treadDifferencePolygons, arcs)
+	return arcs
 },
 
 getArchPolygon: function(intersectionPolygon) {
@@ -1362,36 +1455,29 @@ getArchPolygon: function(intersectionPolygon) {
 
 	var edgeX = getBoundingSegment(archPolygon)[1]
 	swap2DPolyline(archPolygon)
-	addSplitPointsToPolygon(archPolygon, this.archBeginX) 
-	var betweenXMap = new Map()
 	var between = this.archBeginX
 	var numberOfBetweens = 2
 	var numberOfBetweensPlus = numberOfBetweens + 1
-	betweenAdvance = (edgeX - this.archBeginX) / numberOfBetweensPlus
-	for (var betweenIndex = 1; betweenIndex < numberOfBetweensPlus; betweenIndex++) {
-		between += betweenAdvance
-		var betweenRatio = betweenIndex / numberOfBetweensPlus
-		betweenXMap.set(between, 1.0 - betweenRatio * betweenRatio)
+	var edgeMinusBegin = edgeX - this.archBeginX
+	betweenAdvance = edgeMinusBegin / numberOfBetweensPlus
+	for (var betweenIndex = 0; betweenIndex < numberOfBetweensPlus; betweenIndex++) {
 		addSplitPointsToPolygon(archPolygon, between) 
+		between += betweenAdvance
 	}
 
 	swap2DPolyline(archPolygon)
 	for (var point of archPolygon) {
 		var x = point[0]
-		if (betweenXMap.has(x)) {
-			point[2] *= betweenXMap.get(x)
-		}
-		else {
-			if (x > between) {
-				point[2] = 0.0
-			}
+		if (x > this.archBeginX) {
+			var along = (x - this.archBeginX) / edgeMinusBegin
+			point[2] *= 1.0 - along * along * 0.25
 		}
 	}
 
 	return archPolygon
 },
 
-getBigMetatarsalX: function(along) {
+getBigMetatarsalY: function(along) {
 	return this.bigMetatarsalBaseFront * (1.0 - along) + this.bigMetatarsalBaseBack * along
 },
 
@@ -1413,62 +1499,124 @@ getDefinitions: function() {
 	{text:'Tooth Slope', lower:0, decimalPlaces:2, upper:0.1, value:0.02}]
 },
 
-getHeelClipMesh: function(matrix3D) {
-	return extrusion.getMesh([0.0, this.footInset - this.footGap], matrix3D, [this.heelClipPolygon])
+getDistance: function(point, sandalPolygon) {
+	return polygonKit.distanceToPolygon(sandalPolygon, polygonKit.pointOnPolygon(this.shortSandalPolygon, point))
 },
 
-getHeelPoints: function(bigMetatarsalY, littleMetatarsalY, outset) {
-	var heelBig = [this.bigMetatarsalRadius - this.midX, this.bigMetatarsalY - this.heelRadius]
-	var heelBigLength = Vector.length2D(heelBig)
-	if (heelBigLength == 0.0) {
-		return
-	}
-
-	Vector.multiply2DScalar(heelBig, this.heelRadius / heelBigLength)
-	heelBig = [-heelBig[1], heelBig[0]]
-	Vector.rotate2DVector(heelBig, Vector.polarCounterclockwise(around.getExtraAngle(heelBigLength, this.heelRadius, this.bigMetatarsalRadius)))
-	var bigIntersection = Vector.add2D([this.midX, this.heelRadius], heelBig)
-	var bigIntersectionX = bigIntersection[0] + bigIntersection[1] * heelBig[1] / heelBig[0]
-	var heelLittle = [this.right - this.littleMetatarsalRadius - this.midX, this.littleMetatarsalY - this.heelRadius]
-	var heelLittleLength = Vector.length2D(heelLittle)
-	if (heelLittleLength == 0.0) {
-		return
-	}
-
-	Vector.multiply2DScalar(heelLittle, this.heelRadius / heelLittleLength)
-	heelLittle = [heelLittle[1], -heelLittle[0]]
-	Vector.rotate2DVector(heelLittle, Vector.polarCounterclockwise(around.getExtraAngle(heelLittleLength, this.littleMetatarsalRadius, this.heelRadius)))
-	var littleIntersection = Vector.add2D([this.midX, this.heelRadius], heelLittle)
-	var littleIntersectionX = littleIntersection[0] + littleIntersection[1] * heelLittle[1] / heelLittle[0]
-	var halfHeelRadius = this.heelRadius * 0.5
-
-	var bigHeelPoint = [(bigIntersectionX + this.midX) * 0.5, halfHeelRadius, halfHeelRadius + outset]
-	var littleHeelPoint = [(littleIntersectionX + this.midX) * 0.5, halfHeelRadius]
-	return [bigHeelPoint, littleHeelPoint]
+getFilletedHeel: function(polygon) {
+	var pointIndexSet = getPointIndexSetByRegionIDs(this.cornerRegion, polygon, undefined)
+	return getFilletedPolygonByIndexes(polygon, this.hellCupFilletRadius, gFillet.sides, pointIndexSet)
 },
 
-getLittleMetatarsalX: function(along) {
+//getHeelClipMesh: function(matrix3D) {
+//	return extrusion.getMesh([0.0, this.footInset - this.footGap], matrix3D, [this.heelClipPolygon])
+//},
+
+getHeelPoints: function(sandalPolygon, outset) {
+	var sandalOutside = Polyline.copy(sandalPolygon)
+	sandalOutside.push([this.midX, this.heelRadius, this.heelRadius + outset])
+	sandalOutside = around.getPolygon(sandalOutside, this.sides / 3.0)
+	var betweenY = (this.heelRadius + this.littleMetatarsalY) * 0.5
+	var bigs = undefined
+	var littles = undefined
+	for (var vertexIndex = 0; vertexIndex < sandalOutside.length; vertexIndex++) {
+		var point = sandalOutside[vertexIndex]
+		var nextPoint = sandalOutside[(vertexIndex + 1) % sandalOutside.length]
+		var pointY = point[1]
+		var nextPointY = nextPoint[1]
+		if (pointY > betweenY && nextPointY < betweenY) {
+			bigs = [nextPoint, point]
+		}
+		else {
+			if (pointY < betweenY && nextPointY > betweenY) {
+				littles = [point, nextPoint]
+			}
+		}
+	}
+
+	var littlePoint = [littles[0][0] + (littles[0][0] - littles[1][0]) * littles[0][1] / (littles[1][1] - littles[0][1]), -outset]
+	var bigPoint = [bigs[0][0] + (bigs[0][0] - bigs[1][0]) * bigs[0][1] / (bigs[1][1] - bigs[0][1]), -outset]
+	var outsetHalfHeelRadius = this.heelRadius * 0.5 + outset
+	var outset = [outsetHalfHeelRadius, outsetHalfHeelRadius]
+	var bigHeelPoint = getOutsetBeginCenterEnd(littlePoint, bigPoint, bigs[0], outset)
+	bigHeelPoint.push(outsetHalfHeelRadius)
+	return [bigHeelPoint, getOutsetBeginCenterEnd(littles[0], littlePoint, bigPoint, outset)]
+},
+
+getLittleMetatarsalY: function(along) {
 	return this.littleMetatarsalBaseFront * (1.0 - along) + this.littleMetatarsalBaseBack * along
+},
+
+getMetatarsalClipMesh: function(angle, base, height, innerBase, skew3D) {
+	angle *= gRadiansPerDegree
+	var angleVector = Vector.polarCounterclockwise(angle - Math.PI * 0.5)
+	var cutMultiplier = -this.halfWallThickness - 1
+	var negativeVector = [angleVector[0], -angleVector[1]]
+	var topPoint = polygonKit.pointOnPolygonByAngle(base, angle)
+	var bottomPoint = polygonKit.pointOnPolygonByAngle(base, Math.PI - angle)
+
+	var cutout = [VectorFast.add2D(VectorFast.getMultiplication2DScalar(angleVector, cutMultiplier), topPoint)]
+	cutout.push(VectorFast.add2D(VectorFast.getMultiplication2DScalar(angleVector, this.top), topPoint))
+	cutout.push(VectorFast.add2D(VectorFast.getMultiplication2DScalar(negativeVector, this.top), bottomPoint))
+	cutout.push(VectorFast.add2D(VectorFast.getMultiplication2DScalar(negativeVector, cutMultiplier), bottomPoint))
+
+	var outsetInnerBase = getOutsetPolygon(innerBase, this.ribbonThickness)
+	var baseDifference = Polygon.getDifferencePolygon(Polygon.getDifferencePolygon(base, cutout), outsetInnerBase)
+	baseDifference = getFilletedPolygonByIndexes(baseDifference, this.pillarFilletRadius, gFillet.sides)
+
+	skew3D = getMultiplied3DMatrix(skew3D, getMatrix3DByTranslateZ([height]))
+	var layers = [{polygons:[baseDifference]}]
+	layers.push({matrix3D:skew3D, polygons:[baseDifference], vertical:true})
+
+	return sculpture.getMesh(layers)
+},
+
+getMetatarsalInner: function(base, offset) {
+	var negativeAbsoluteOffset = -Math.abs(offset)
+	var metatarsalInner = getOutsetPolygon(base, [0.5 * negativeAbsoluteOffset, 1.5 * negativeAbsoluteOffset])
+	return getFilletedPolygonByIndexes(Polyline.addByIndex(metatarsalInner, 0.5 * offset, 0), this.pillarFilletRadius, gFillet.sides)
+},
+
+getOuterHeelClipMesh: function(matrix3D) {
+	return extrusion.getMesh([0.0, this.heelCupHeight], matrix3D, [this.outerHeelClipPolygon])
 },
 
 getPillarPolygons: function(beginPillarFront, beginPillarBack, endPillarFront, endPillarBack) {
 	var pillarPolygons = []
 	var pillar = getRectangleCornerParameters(-this.halfClaspThickness, beginPillarFront, this.halfClaspThickness, beginPillarBack)
-	pillar = getFilletedPolygonByIndexes(pillar, this.pillarRadius, gFillet.sides)
+	pillar = getFilletedPolygonByIndexes(pillar, this.pillarFilletRadius, gFillet.sides)
 	pillarPolygons.push(pillar)
 	var pillar = getRectangleCornerParameters(-this.halfClaspThickness, endPillarFront, this.halfClaspThickness, endPillarBack)
-	pillar = getFilletedPolygonByIndexes(pillar, this.pillarRadius, gFillet.sides)
+	pillar = getFilletedPolygonByIndexes(pillar, this.pillarFilletRadius, gFillet.sides)
 	pillarPolygons.push(pillar)
 	return pillarPolygons
 },
 
 getRectangleCouple: function(endHalfLength, endHalfWidth, middleHalfLength, middleHalfWidth) {
 	var rectangleCouple = [[-middleHalfLength, -middleHalfWidth], [, -endHalfWidth], [-endHalfLength, undefined]]
-	arrayKit.setUndefinedArraysToPrevious(rectangleCouple)
+	Vector.setUndefinedArraysToPrevious(rectangleCouple)
 	var center = [0.0, 0.0]
 	addMirrorPoints({center:center, vector:[1.0, 0.0]}, rectangleCouple.length, rectangleCouple)
 	addMirrorPoints({center:center, vector:[0.0, 1.0]}, rectangleCouple.length, rectangleCouple)
 	return rectangleCouple
+},
+
+getRemovedDifferences: function(workPolygon, toolPolygon) {
+	var differences = Polygon.getDifferencePolygons(workPolygon, toolPolygon)
+	for (var difference of differences) {
+		Polyline.removeClose(difference, toolPolygon)
+	}
+
+	return differences
+},
+
+getRemovedDifferencesByWorks: function(workPolygons, toolPolygon) {
+	var differences = []
+	for (var workPolygon of workPolygons) {
+		Vector.pushArray(differences, this.getRemovedDifferences(workPolygon, toolPolygon))
+	}
+
+	return differences
 },
 
 getRidgeBase: function(halfRidgeWidth) {
@@ -1477,17 +1625,11 @@ getRidgeBase: function(halfRidgeWidth) {
 	var ridgeRight = [this.littleFrontMidX, this.ridgeCenterY - this.littleRidgeDown]
 	var ridgeline = [ridgeLeft, ridgeCenter, ridgeRight]
 	var ridge = getOutlinesQuickly(undefined, undefined, undefined, [[halfRidgeWidth, halfRidgeWidth]], [ridgeline], undefined)[0]
-	swap2DPolyline(ridge)
-	var bigSplitPolygons = []
-	addSplitPolygonByHeight(ridge, this.bigFrontMidX, bigSplitPolygons)
-	var littleSplitPolygons = []
-	addSplitPolygonByHeight(bigSplitPolygons[1], this.littleFrontMidX, littleSplitPolygons)
-	ridge = littleSplitPolygons[0]
-	swap2DPolyline(ridge)
-	return getUnionPolygonsByPolygons([ridge, this.bigMetatarsalBase, this.littleMetatarsalBase])
+	var intersectionRectangle = getRectangleCornerParameters(1 - this.footInset, 0, this.littleMetatarsalBaseX - 1, this.top) 
+	return Polygon.getIntersectionPolygons(ridge, intersectionRectangle)
 },
 
-getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon, size) {
+getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon) {
 	var leftPolygon = []
 	var rightPolygon = []
 	for (var point of sandalPolygon) {
@@ -1499,12 +1641,15 @@ getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon, size) {
 		}
 	}
 
+	var bevelLower = -this.topBevel * Math.tan(Math.PI / 6.0)
+	var deltaBevel = -this.topBevel * Math.tan(Math.PI / 3.0)
+	var bevelUpper = bevelLower + deltaBevel
 	var doubleBevel = this.bottomBevel * 2.0
 	this.farLeft = -this.right
+	var metatarsalFilletRadius = this.wallThickness * 2.0
+	var metatarsalOutset = this.wallThickness * 0.75
 	this.stemRadius = this.stemWidth * 0.5
-	this.halfWallThickness = this.wallThickness * 0.5
 
-	this.bigMetatarsalBaseBack = this.bigMetatarsalY + this.bigMetatarsalRadiusPlus
 	leftPolygon.reverse()
 	leftPolygon = getPolygonRotatedToLower(leftPolygon, 1)
 	var leftPolyline = getPolylineSlice(this.bigMetatarsalBaseFront, this.bigMetatarsalBaseBack, leftPolygon, 1)
@@ -1514,41 +1659,47 @@ getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon, size) {
 	var bigBackMidX = (leftPolylineLastX - this.footInset) * 0.5
 	this.bigFrontMidX = (leftPolylineZeroX - this.footInset) * 0.5
 	this.bigMetatarsalBase = [[bigBackMidX, this.bigMetatarsalBaseFront]]
-	this.bigMetatarsalBase.push([-this.footInset * 0.75 + bigBackMidX * 0.25, this.getBigMetatarsalX(0.12)])
-	this.bigMetatarsalBase.push([-this.footInset, this.getBigMetatarsalX(0.24)])
-	this.bigMetatarsalBase.push([-this.footInset, this.getBigMetatarsalX(0.76)])
-	this.bigMetatarsalBase.push([-this.footInset * 0.75 + this.bigFrontMidX * 0.25, this.getBigMetatarsalX(0.88)])
-	this.bigMetatarsalBase.push([this.bigFrontMidX, this.bigMetatarsalBaseBack])
-	arrayKit.pushArray(this.bigMetatarsalBase, leftPolyline)
-	var bigFilletRadius = (-this.footInset - leftPolylineZeroX) * 0.4
-	this.bigMetatarsalBase = getFilletedPolygonByIndexes(this.bigMetatarsalBase, bigFilletRadius, gFillet.sides)
-	var bigMetatarsalZ = height + this.bigMetatarsalBaseHeight
-	var leftRotation3D = getMatrix3DRotateY([this.strapYAngle, -this.footInset, 0.0, bigMetatarsalZ])
-	var bigRotation3D = getMatrix3DRotateX([-this.strapXAngle, 0.0, this.bigMetatarsalY, bigMetatarsalZ])
-	bigRotation3D = getMultiplied3DMatrix(bigRotation3D, leftRotation3D)
+	this.bigMetatarsalBase.push([bigBackMidX * 0.25 - this.footInset * 0.75, this.getBigMetatarsalY(0.12)])
+	this.bigMetatarsalBase.push([-this.footInset, this.getBigMetatarsalY(0.24)])
+	this.bigMetatarsalBase.push([-this.footInset, this.getBigMetatarsalY(0.76)])
+	this.bigMetatarsalBase.push([this.bigFrontMidX * 0.25 - this.footInset * 0.75, this.getBigMetatarsalY(0.88)])
+	this.bigMetatarsalBase.push([this.footInset * 0.25 + this.bigFrontMidX * 1.25, this.bigMetatarsalBaseBack])
+	Vector.pushArray(this.bigMetatarsalBase, leftPolyline)
+	this.bigMetatarsalBase = getFilletedPolygonByIndexes(this.bigMetatarsalBase, metatarsalFilletRadius, gFillet.sides)
+	this.bigMetatarsalInner = this.getMetatarsalInner(this.bigMetatarsalBase, metatarsalOutset)
 
-	this.littleMetatarsalBaseBack = this.littleMetatarsalY + this.halfLittleBaseLength
+	this.bigMetatarsalZ = height + this.bigMetatarsalBaseHeight
+	var leftRotation3D = getMatrix3DRotateY([-this.strapYAngle, -this.footInset, 0.0, this.bigMetatarsalZ])
+	var leftSkew3D = getMatrix3DBySkewZX([this.strapYAngle, -this.footInset, 0.0, this.bigMetatarsalZ])
+	var bigRotation3D = getMatrix3DRotateX([this.strapXAngle, 0.0, this.bigMetatarsalY, this.bigMetatarsalZ])
+	this.bigSkew3D = getMatrix3DBySkewZY([-this.strapXAngle, 0.0, this.bigMetatarsalY, this.bigMetatarsalZ])
+	bigRotation3D = getMultiplied3DMatrix(leftRotation3D, bigRotation3D)
+	this.bigSkew3D = getMultiplied3DMatrix(this.bigSkew3D, leftSkew3D)
+
 	rightPolygon = getPolygonRotatedToLower(rightPolygon, 1)
 	var rightPolyline = getPolylineSlice(this.littleMetatarsalBaseFront, this.littleMetatarsalBaseBack, rightPolygon, 1)
 	var rightPolylineZeroX = rightPolyline[0][0]
 	var rightPolylineLastX = rightPolyline[rightPolyline.length - 1][0]
-	var littleMetatarsalBaseX = this.right + this.footInset
-	var littleBackMidX = (rightPolylineZeroX + littleMetatarsalBaseX) * 0.5
-	this.littleFrontMidX = (rightPolylineLastX + littleMetatarsalBaseX) * 0.5
-	this.littleMetatarsalBase = [[this.littleFrontMidX, this.littleMetatarsalBaseBack]]
-	this.littleMetatarsalBase.push([littleMetatarsalBaseX * 0.75 + this.littleFrontMidX * 0.25, this.getLittleMetatarsalX(0.92)])
-	this.littleMetatarsalBase.push([littleMetatarsalBaseX, this.getLittleMetatarsalX(0.84)])
-	this.littleMetatarsalBase.push([littleMetatarsalBaseX, this.getLittleMetatarsalX(0.16)])
-	this.littleMetatarsalBase.push([littleMetatarsalBaseX * 0.75 + littleBackMidX * 0.25, this.getLittleMetatarsalX(0.08)])
+	this.littleMetatarsalBaseX = this.right + this.footInset
+	var littleBackMidX = (rightPolylineLastX + this.littleMetatarsalBaseX) * 0.5
+	this.littleFrontMidX = (rightPolylineZeroX + this.littleMetatarsalBaseX) * 0.5
+	this.littleMetatarsalBase = [[this.littleFrontMidX * 1.1 - this.littleMetatarsalBaseX * 0.1, this.littleMetatarsalBaseBack]]
+	this.littleMetatarsalBase.push([this.littleMetatarsalBaseX * 0.75 + this.littleFrontMidX * 0.25, this.getLittleMetatarsalY(0.92)])
+	this.littleMetatarsalBase.push([this.littleMetatarsalBaseX, this.getLittleMetatarsalY(0.84)])
+	this.littleMetatarsalBase.push([this.littleMetatarsalBaseX, this.getLittleMetatarsalY(0.16)])
+	this.littleMetatarsalBase.push([this.littleMetatarsalBaseX * 0.75 + littleBackMidX * 0.25, this.getLittleMetatarsalY(0.08)])
 	this.littleMetatarsalBase.push([littleBackMidX, this.littleMetatarsalBaseFront])
-	arrayKit.pushArray(this.littleMetatarsalBase, rightPolyline)
-	var littleFilletRadius = (rightPolylineLastX - littleMetatarsalBaseX) * 0.4
-	this.littleMetatarsalBase = getFilletedPolygonByIndexes(this.littleMetatarsalBase, littleFilletRadius, gFillet.sides)
+	Vector.pushArray(this.littleMetatarsalBase, rightPolyline)
+	this.littleMetatarsalBase = getFilletedPolygonByIndexes(this.littleMetatarsalBase, metatarsalFilletRadius, gFillet.sides)
+	this.littleMetatarsalInner = this.getMetatarsalInner(this.littleMetatarsalBase, -metatarsalOutset)
 
-	var littleMetatarsalZ = height + this.littleMetatarsalBaseHeight
-	var rightRotation3D = getMatrix3DRotateY([-this.strapYAngle, littleMetatarsalBaseX, 0.0, littleMetatarsalZ])
-	var littleRotation3D = getMatrix3DRotateX([-this.strapXAngle, 0.0, this.littleMetatarsalY, littleMetatarsalZ])
-	littleRotation3D = getMultiplied3DMatrix(littleRotation3D, rightRotation3D)
+	this.littleMetatarsalZ = height + this.littleMetatarsalBaseHeight
+	var rightRotation3D = getMatrix3DRotateY([this.strapYAngle, this.littleMetatarsalBaseX, 0.0, this.littleMetatarsalZ])
+	var rightSkew3D = getMatrix3DBySkewZX([-this.strapYAngle, this.littleMetatarsalBaseX, 0.0, this.littleMetatarsalZ])
+	var littleRotation3D = getMatrix3DRotateX([this.strapXAngle, 0.0, this.littleMetatarsalY, this.littleMetatarsalZ])
+	this.littleSkew3D = getMatrix3DBySkewZY([-this.strapXAngle, 0.0, this.littleMetatarsalY, this.littleMetatarsalZ])
+	littleRotation3D = getMultiplied3DMatrix(rightRotation3D, littleRotation3D)
+	this.littleSkew3D = getMultiplied3DMatrix(this.littleSkew3D, rightSkew3D)
 
 	this.halfRidgeWidth = 0.5 * Value.getValueRatio(this.ridgeWidth, this.top, this.ridgeWidthRatio)
 	this.ridgeCenterX = Value.getValueRatio(this.ridgeCenterX, this.right, this.ridgeCenterXRatio)
@@ -1556,69 +1707,98 @@ getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon, size) {
 	this.bigRidgeDown = (this.ridgeCenterX - this.bigFrontMidX) * Math.tan(this.bigToeRidgeAngle)
 	this.littleRidgeDown = (this.littleFrontMidX - this.ridgeCenterX) * Math.tan(this.littleToeRidgeAngle)
 
-	this.heelRadiusPlus = this.heelRadius + this.footGap
-	var heelCutout = [[this.midX, this.heelRadiusPlus, this.heelRadiusPlus]]
+	var heelRadiusPlus = this.heelRadius + this.footGap
+	var heelCutout = [[this.midX, heelRadiusPlus, heelRadiusPlus]]
 	heelCutout.push([this.littleMetatarsalX, this.littleMetatarsalY, this.littleMetatarsalRadius])
 	heelCutout.push([this.bigMetatarsalX, this.bigMetatarsalY, this.bigMetatarsalRadius])
 	heelCutout = around.getPolygon(heelCutout, this.sides)
-	var halfFootGap = this.footGap * 0.5
-	var heelCutoutOutset = getOutsetPolygon([halfFootGap, halfFootGap], heelCutout)
-	var xIntersections = []
-	var heelInsetSplitY = this.heelOutsetSplitY - this.outset * 0.2
-	polygonKit.addXIntersectionsByPolygonSegment(sandalPolygon, -this.right, this.doubleRight, xIntersections, heelInsetSplitY)
-	xIntersections.sort(arrayKit.compareNumberAscending)
-	var segmentBegin = xIntersections[0] - 1.0
-	var segmentEnd = xIntersections[1] + 1.0
-	polygonKit.splitPolygonBySegment(heelCutout, segmentBegin, segmentEnd, heelInsetSplitY + 0.01)
-	polygonKit.splitPolygonBySegment(heelCutout, segmentBegin, segmentEnd, heelInsetSplitY - 0.01)
-	var vertexIndexes = []
-	for (var vertexIndex = 0; vertexIndex < heelCutout.length; vertexIndex++) {
-		if (heelCutout[vertexIndex][1] < heelInsetSplitY) {
-			vertexIndexes.push(vertexIndex)
+	var heelIntersectionY = this.springsFront - this.outset * 0.35 + bevelUpper
+	var xFrontIntersections = []
+	polygonKit.addXIntersectionsByPolygonSegment(heelCutout, -this.right, this.doubleRight, xFrontIntersections, heelIntersectionY)
+	xFrontIntersections.sort(Vector.compareNumberAscending)
+	var xBackIntersections = []
+	polygonKit.addXIntersectionsByPolygonSegment(heelCutout, -this.right, this.doubleRight, xBackIntersections, heelIntersectionY + 1.0)
+	xBackIntersections.sort(Vector.compareNumberAscending)
+	var leftDeltaX = xBackIntersections[0] - xFrontIntersections[0]
+	var rightDeltaX = xBackIntersections[1] - xFrontIntersections[1]
+	var centerDeltaX = (xFrontIntersections[1] - xFrontIntersections[0]) * rightDeltaX / (rightDeltaX - leftDeltaX)
+	var centerDeltaY = centerDeltaX * -leftDeltaX
+	var center = [centerDeltaX + xFrontIntersections[0], centerDeltaY + heelIntersectionY]
+	var heelCutoutPaddingOutset = getOutsetPolygon(heelCutout, this.footInset)
+	var triangleBottom = center[1] - this.top
+	var heelCutoutTriangle = [center]
+	heelCutoutTriangle.push([center[0] + this.top / rightDeltaX, triangleBottom])
+	heelCutoutTriangle.push([center[0] + this.top / leftDeltaX, triangleBottom])
+	var heelPaddingCutout = Polygon.getIntersectionPolygon(heelCutoutPaddingOutset, heelCutoutTriangle)
+	heelPaddingCutout = Polygon.getUnionPolygon(heelPaddingCutout, heelCutout)
+	var heelClipCutout = Polygon.getDifferencePolygon(heelCutoutTriangle, getOutsetPolygon(sandalPolygon, -this.halfWallThickness))
+
+	this.heelFilletRadius = this.right * 0.05
+	var heelCupTop = height + this.heelCupHeight
+//	var heelBackZ = height + this.heelBackHeight
+//	var heelArcHeight = heelCupTopMinus - heelBackZ
+//	var heelArcRadius = heelArcHeight / Math.sin(this.heelCupAngle)
+
+	this.hellCupFilletRadius = this.heelFilletRadius * 0.7
+	var cornerOutset = this.footInset * 0.3
+	var leftHypoteneuseMultiplier = this.footInset / Math.sqrt(leftDeltaX * leftDeltaX + 1.0)
+	var innerCornerLeft = [xFrontIntersections[0], heelIntersectionY]
+	Vector.add2D(innerCornerLeft, Vector.multiply2DScalar([-1.0, leftDeltaX], leftHypoteneuseMultiplier))
+	var rectangleLeft = getRectangleCenterOutset(innerCornerLeft, cornerOutset)
+	var rightHypoteneuseMultiplier = this.footInset / Math.sqrt(rightDeltaX * rightDeltaX + 1.0)
+	var innerCornerRight = [xFrontIntersections[1], heelIntersectionY]
+	Vector.add2D(innerCornerRight, Vector.multiply2DScalar([1.0, -rightDeltaX], rightHypoteneuseMultiplier))
+	var rectangleRight = getRectangleCenterOutset(innerCornerRight, cornerOutset)
+	var splitPolygons = []
+	addSplitPolygonByHeight(sandalPolygon, this.springsFront, splitPolygons)
+	this.heelCup = Polygon.getDifferencePolygon(splitPolygons[0], heelPaddingCutout)
+	this.heelCup = Polygon.getDifferencePolygon(this.heelCup, heelClipCutout)
+	var coarseBottom = heelIntersectionY - this.outset
+	var coarseRectangleLeft = getRectangleCornerParameters(this.farLeft, coarseBottom, innerCornerLeft[0] - 1.0, heelIntersectionY)
+	var pointIndexSet = getPointIndexSetByRegionIDs(undefined, this.heelCup, {polygonStratas:[{polygons:[coarseRectangleLeft]}]})
+	var outerCornerLeft = this.heelCup[polygonKit.closestIndexByAngle(this.heelCup, Math.PI * 0.1, pointIndexSet) + 1]
+	var outerRectangleLeft = getRectangleCenterOutset(outerCornerLeft, cornerOutset)
+	var coarseRectangleRight = getRectangleCornerParameters(innerCornerRight[0] + 1.0, coarseBottom, this.doubleRight, heelIntersectionY)
+	var pointIndexSet = getPointIndexSetByRegionIDs(undefined, this.heelCup, {polygonStratas:[{polygons:[coarseRectangleRight]}]})
+	var outerCornerRight = this.heelCup[polygonKit.closestIndexByAngle(this.heelCup, Math.PI * -0.1, pointIndexSet)]
+	var outerRectangleRight = getRectangleCenterOutset(outerCornerRight, cornerOutset)
+	this.cornerRegion = {polygonStratas:[{polygons:[outerRectangleLeft, outerRectangleRight, rectangleLeft, rectangleRight]}]}
+	this.heelCup = this.getFilletedHeel(this.heelCup, heelClipCutout)
+
+	this.outerHeelClipPolygon = Polygon.getIntersectionPolygon(sandalPolygon, heelCutoutTriangle)
+	var insetSandalPolygon = getOutsetPolygon(sandalPolygon, -this.halfWallThickness - this.ribbonThickness)
+	this.outerHeelClipPolygon = Polygon.getDifferencePolygon(this.outerHeelClipPolygon, insetSandalPolygon)
+	this.outerHeelClipPolygon = getFilletedPolygonByIndexes(this.outerHeelClipPolygon, this.pillarFilletRadius, gFillet.sides)
+
+	splitPolygons = []
+	addSplitPolygonByHeight(sandalPolygon, this.heelStubBack, splitPolygons)
+	this.heelCupMiddle = Polygon.getDifferencePolygon(splitPolygons[0], heelPaddingCutout)
+	this.heelCupMiddle = this.getFilletedHeel(Polygon.getDifferencePolygon(this.heelCupMiddle, heelClipCutout))
+
+	var sinHeelStrapX = Math.sin(this.heelStrapXAngle * gRadiansPerDegree)
+	this.heelStubHeight = heelCupTop + 1.0
+	var heelCornerHeight = this.heelStubHeight - this.claspLengthPlus * sinHeelStrapX - this.halfWallThickness
+
+	var heelSplitY = this.springsFront - 1.0
+	addSplitPointsToPolygon(this.heelCupMiddle, heelSplitY)
+	this.heelCupBevelLower = Polyline.copy(this.heelCupMiddle)
+	this.heelCupBevelUpper = Polyline.copy(this.heelCupMiddle)
+	var bevelLowY = heelIntersectionY - this.outset * 0.5
+	var outsetLower = [bevelLower, bevelLower]
+	var outsetUpper = [deltaBevel, deltaBevel]
+	for (var vertexIndex = 0; vertexIndex < this.heelCupMiddle.length; vertexIndex++) {
+		if (this.heelCupMiddle[vertexIndex][1] < bevelLowY) {
+			this.heelCupBevelLower[vertexIndex] = getOutsetPoint(this.heelCupMiddle, outsetLower, vertexIndex)
 		}
 	}
 
-	heelCutout = getOutsetPolygonByIndexes(heelCutout, [this.footInset, this.footInset], vertexIndexes)
-	this.heelClipPolygon = getOutsetPolygon([-halfFootGap, -halfFootGap], heelCutout)
-	this.heelClipPolygon = getDifferencePolygons(heelCutoutOutset, this.heelClipPolygon)[0]
-	this.heelFilletRadius = this.right * 0.05
-	this.heelCupTop = height + this.heelCupHeight
-
-	var splitPolygons = []
-	addSplitPolygonByHeight(sandalPolygon, this.springsFront, splitPolygons)
-	this.heelCup = getDifferencePolygons(heelCutout, splitPolygons[0])[0]
-	this.heelCup = getFilletedPolygonByIndexes(this.heelCup, this.heelFilletRadius, gFillet.sides)
-
-	var heelCornerHeight = height + this.heelCornerThickness
-	splitPolygons = []
-	addSplitPolygonByHeight(sandalPolygon, this.heelStubBack, splitPolygons)
-	this.heelCupMiddle = getDifferencePolygons(heelCutout, splitPolygons[0])[0]
-	var closeOutset = this.outset * 0.2
-	var regionRectangle = getRectangleCornerParameters(-this.right, this.heelStubBack - closeOutset, this.doubleRight, this.top)
-	var region = {polygonStratas:[{polygons:[regionRectangle]}]}
-	var pointIndexSet = getPointIndexSetByRegionIDs(undefined, this.heelCupMiddle, region)
-	this.heelCupMiddle = getFilletedPolygonBySet(this.heelCupMiddle, this.heelFilletRadius * 2.0, gFillet.sides, pointIndexSet)
-	var regionLeft = xIntersections[0] + this.outset
-	var regionRight = xIntersections[1] - this.outset
-	var regionRectangle = getRectangleCornerParameters(regionLeft, heelInsetSplitY - closeOutset, regionRight, heelInsetSplitY + closeOutset)
-	var region = {polygonStratas:[{polygons:[regionRectangle]}]}
-	var pointIndexSet = getPointIndexSetByRegionIDs(undefined, this.heelCupMiddle, region)
-	this.heelCupMiddle = getFilletedPolygonBySet(this.heelCupMiddle, this.heelFilletRadius * 0.8, gFillet.sides, pointIndexSet)
-
-	var sinHeelStrapX = Math.sin(this.heelStrapXAngle * gRadiansPerDegree)
-	this.heelStubHeight = heelCornerHeight + this.heelCupHeight * 0.1 + this.heelClaspLength * sinHeelStrapX
-	var heelSplitY = this.heelStubFront - 1.0
-	addSplitPointsToPolygon(this.heelCupMiddle, heelSplitY)
-	this.heelCupBevelLower = arrayKit.getArraysCopy(this.heelCupMiddle)
-	this.heelCupBevelUpper = arrayKit.getArraysCopy(this.heelCupMiddle)
-	var bevelLower = -this.topBevel * Math.tan(Math.PI / 6.0)
-	var bevelUpper = bevelLower - this.topBevel * Math.tan(Math.PI / 3.0)
-	var outsetLower = [bevelLower, bevelLower]
-	var outsetUpper = [bevelUpper, bevelUpper]
 	for (var vertexIndex = 0; vertexIndex < this.heelCupMiddle.length; vertexIndex++) {
-		if (this.heelCupMiddle[vertexIndex][1] < heelSplitY) {
-			this.heelCupBevelLower[vertexIndex] = getOutsetPoint(outsetLower, this.heelCupMiddle, vertexIndex)
-			this.heelCupBevelUpper[vertexIndex] = getOutsetPoint(outsetUpper, this.heelCupMiddle, vertexIndex)
+		if (this.heelCupBevelLower[vertexIndex][1] < heelSplitY) {
+			var outsetBevel = outsetLower
+			if (this.heelCupBevelLower[vertexIndex][1] < bevelLowY) {
+				outsetBevel = outsetUpper
+			}
+			this.heelCupBevelUpper[vertexIndex] = getOutsetPoint(this.heelCupBevelLower, outsetBevel, vertexIndex)
 		}
 	}
 
@@ -1626,248 +1806,227 @@ getSandalMesh: function(attributeMap, height, matrix3D, sandalPolygon, size) {
 	var springsBack = Math.min(this.bigMetatarsalBaseFront, this.littleMetatarsalBaseFront)
 	this.intersectionBack = springsBack - this.halfWallThickness
 	this.intersectionFront = this.springsFront + this.halfWallThickness
-	var springsDifference = this.intersectionBack - this.intersectionFront
-	var numberOfExtraSprings = Math.floor((springsDifference - this.springWidth) / (this.springWidth + this.wallThickness))
-	var rectangle = getRectangleCornerParameters(this.farLeft, this.intersectionFront, this.doubleRight, this.intersectionBack)
-	var springPolygons = getDifferencePolygons(rectangle, sandalPolygon)
-	var springBetween = (springsDifference - numberOfExtraSprings * this.wallThickness) / (numberOfExtraSprings + 1.0)
-	var springWavelength = springBetween + this.wallThickness
-	var rectangleFront = this.intersectionFront + springBetween
+	this.intersectionRectangle = getRectangleCornerParameters(this.farLeft, this.intersectionFront, this.doubleRight, this.intersectionBack)
+	this.sandalEnds = Polygon.getDifferencePolygons(sandalPolygon, this.intersectionRectangle)
 	this.archBackThickness = Value.getValueRatio(this.archBackThickness, this.right, this.archBackThicknessRatio)
 	this.archCenterThickness = Value.getValueRatio(this.archCenterThickness, this.right, this.archCenterThicknessRatio)
 	this.archFrontThickness = Value.getValueRatio(this.archFrontThickness, this.right, this.archFrontThicknessRatio)
 	this.archBeginX = Value.getValueRatio(this.archBeginX, this.right, this.archBeginXRatio)
 	this.archCenterY = Value.getValueRatio(this.archCenterY, this.top, this.archCenterYRatio)
-	for (var rectangleIndex = 0; rectangleIndex < numberOfExtraSprings; rectangleIndex++) {
-		var rectangle = getRectangleCornerParameters(this.farLeft, rectangleFront, this.doubleRight, rectangleFront + this.wallThickness)
-		var intersectionPolygon = getIntersectionPolygons(rectangle, sandalPolygon)[0]
-		springPolygons.push(intersectionPolygon)
-		rectangleFront += springWavelength
-	}
+	var springPolygons = this.getSpringPolygons(sandalPolygon)
 
-	var doubleInsetTreadPolygons = []
-	var insetTreadPolygons = []
-	var curvedDifferencePolygons = []
-	this.rectangleDifferencePolygons = []
-	var tanBevel = Math.tan(this.overhangAngle) * this.bottomBevel
-	var tanBevelTread = tanBevel + this.treadHeight
-	var treadBevelRectangleSize = [tanBevelTread * 2.0, this.treadWidth]
-	var treadRectangleSize = [this.treadHeight * 2.0, this.treadWidth]
-	var doubleTreadHeight = this.treadHeight * 2.0
-	var doubleTanBevelTread = tanBevelTread * 2.0
+	this.treadDifferencePolygons = []
+	var tanBevel = this.bottomBevel * Math.tan(this.overhangAngle)
+	this.shortSandalPolygon = this.getSandalPolygon(this.outset, this.sandalSkeleton)
+	this.shortSandalEnds = Polygon.getDifferencePolygons(this.shortSandalPolygon, this.intersectionRectangle)
+	this.insetBevelPolygon = getOutsetPolygon(this.shortSandalPolygon, -tanBevel)
+	this.insetDoubleTreadPolygon = getOutsetPolygon(this.shortSandalPolygon, -2.0 * this.treadHeight)
+	this.insetTreadPolygon = getOutsetPolygon(sandalPolygon, -this.treadHeight)
+	this.halfTreadWidth = this.treadWidth * 0.5
 	if (this.treadHeight < springBottom - gClose) {
-		var halfTreadWidth = this.treadWidth * 0.5
-		var outsets = [[halfTreadWidth, halfTreadWidth]]
+		var outsets = [[this.halfTreadWidth, this.halfTreadWidth]]
 		var angleWidening = Math.PI * 0.05
+		var angleWideningNegative = -Math.PI * 0.15
 		var halfPI = Math.PI * 0.5
+		var toeBevel = tanBevel + Math.tan(this.overhangAngle) * this.toeExtraLength
 
 		var littlePointAngle = around.getPointAngle(0.0, this.heelPoints[1])
 		var littlePoint = littlePointAngle.point
 		var bigPointAngle = around.getPointAngle(1.0, this.heelPoints[0])
 		var bigPoint = bigPointAngle.point
-		var littleFromAngle = littlePointAngle.angle - angleWidening
-		var bigToAngle = bigPointAngle.angle + angleWidening
-		var heelULower = getArcFromAngleToAngle(littlePoint, littleFromAngle, bigPoint, bigToAngle, this.sides)
-		addEndRectangles(doubleInsetTreadPolygons, heelULower, treadBevelRectangleSize)
-		addEndRectangles(insetTreadPolygons, heelULower, treadRectangleSize)
-		var heelULowers = getOutlinesQuickly(undefined, undefined, undefined, outsets, [heelULower], undefined)
-		arrayKit.pushArray(curvedDifferencePolygons, heelULowers)
+		var littleFromAngle = littlePointAngle.angle
+		var bigToAngle = bigPointAngle.angle
+		var heelULower = getArcFromAngleToAngle(littlePoint, littleFromAngle, bigPoint, bigToAngle, 18, tanBevel)
+		var heelULowers = this.getAddArcTread(heelULower, outsets)
 
-		var angleWideningMore = Math.PI * 0.06
+		var heelUpperWidening = Math.PI * 0.1
 		var littlePointAngle = around.getPointAngle(0.7, this.heelPoints[1])
 		var littlePoint = littlePointAngle.point
 		var bigPointAngle = around.getPointAngle(0.3, this.heelPoints[0])
 		var bigPoint = bigPointAngle.point
-		var littleFromAngle = littlePointAngle.angle - angleWideningMore
-		var bigToAngle = bigPointAngle.angle + angleWideningMore
-		var heelUUpper = getArcFromAngleToAngle(littlePoint, littleFromAngle, bigPoint, bigToAngle, this.sides)
-		addEndRectangles(doubleInsetTreadPolygons, heelUUpper, treadBevelRectangleSize)
-		addEndRectangles(insetTreadPolygons, heelUUpper, treadRectangleSize)
-		var heelUUppers = getOutlinesQuickly(undefined, undefined, undefined, outsets, [heelUUpper], undefined)
-		arrayKit.pushArray(curvedDifferencePolygons, heelUUppers)
+		var littleFromAngle = littlePointAngle.angle - heelUpperWidening
+		var bigToAngle = bigPointAngle.angle + heelUpperWidening
+		var heelUUpper = getArcFromAngleToAngle(littlePoint, littleFromAngle, bigPoint, bigToAngle, this.sides, tanBevel)
+		var heelUUppers = this.getAddArcTread(heelUUpper, outsets)
 
 		var littlePointAngle = around.getPointAngle(0.5, this.littleToePoint)
 		var littlePoint = littlePointAngle.point
 		var bigEnd = around.getPointAngle(1.0, this.bigToePoint).point
 		var metatarsalBegin = around.getPointAngle(0.0, this.bigMetatarsalPoint).point
-		var metatarsalBig = Vector.getSubtraction2D(bigEnd, metatarsalBegin)
+		var metatarsalBig = VectorFast.getSubtraction2D(bigEnd, metatarsalBegin)
 		var littleFromAngle = littlePointAngle.angle
-		var littleToPoint = Vector.getAlongFromTo2D(0.6, metatarsalBegin, bigEnd)
-		var littleToAngle = Math.atan2(metatarsalBig[1], metatarsalBig[0]) - halfPI - angleWidening
-		var toeULower = getArcFromAngleToAngle(littlePoint, littleFromAngle, littleToPoint, littleToAngle, this.sides)
-		addEndRectangles(doubleInsetTreadPolygons, toeULower, treadBevelRectangleSize)
-		addEndRectangles(insetTreadPolygons, toeULower, treadRectangleSize)
-		var toeULowers = getOutlinesQuickly(undefined, undefined, undefined, outsets, [toeULower], undefined)
-		arrayKit.pushArray(curvedDifferencePolygons, toeULowers)
+		var littleToPoint = Vector.interpolationFromToAlong2D(metatarsalBegin, bigEnd, 0.6)
+		var littleToAngle = Math.atan2(metatarsalBig[1], metatarsalBig[0]) - halfPI
+		var toeULower = getArcFromAngleToAngle(littlePoint, littleFromAngle, littleToPoint, littleToAngle, this.sides, toeBevel)
+		var toeUMinimumHeightMinus = Math.min(toeULower[0][1], toeULower[toeULower.length - 1][1]) - this.treadWidth * 0.5
+		var toeULowers = this.getAddArcTread(toeULower, outsets)
 
+		var toeUpperWideningNegative = -Math.PI * 0.05
 		var bigPointAngle = around.getPointAngle(0.65, this.bigToePoint)
 		var bigPoint = bigPointAngle.point
 		var littleEnd = around.getPointAngle(1.0, this.littleToePoint).point
 		var bigBegin = around.getPointAngle(0.0, this.bigToePoint).point
-		var littleBig = Vector.getSubtraction2D(bigBegin, littleEnd)
-		var bigFromPoint = Vector.getAlongFromTo2D(0.3, littleEnd, bigBegin)
-		var bigFromAngle = Math.atan2(littleBig[1], littleBig[0]) + halfPI
-		var bigToAngle = bigPointAngle.angle - Math.PI * 0.1
-		var toeUMiddle = getArcFromAngleToAngle(bigFromPoint, bigFromAngle, bigPoint, bigToAngle, this.sides)
-		addEndRectangles(doubleInsetTreadPolygons, toeUMiddle, treadBevelRectangleSize)
-		addEndRectangles(insetTreadPolygons, toeUMiddle, treadRectangleSize)
-		var toeUMiddles = getOutlinesQuickly(undefined, undefined, undefined, outsets, [toeUMiddle], undefined)
-		arrayKit.pushArray(curvedDifferencePolygons, toeUMiddles)
+		var littleBig = VectorFast.getSubtraction2D(bigBegin, littleEnd)
+		var bigFromPoint = Vector.interpolationFromToAlong2D(littleEnd, bigBegin, 0.3)
+		var bigFromAngle = Math.atan2(littleBig[1], littleBig[0]) + halfPI + toeUpperWideningNegative
+		var bigToAngle = bigPointAngle.angle - Math.PI * 0.05
+		var toeUMiddle = getArcFromAngleToAngle(bigFromPoint, bigFromAngle, bigPoint, bigToAngle, 18, toeBevel)
+		var toeUMiddles = this.getAddArcTread(toeUMiddle, outsets)
 
 		var bigPointAngle = around.getPointAngle(0.2, this.bigToePoint)
 		var bigPoint = bigPointAngle.point
 		var littleEnd = around.getPointAngle(1.0, this.littleToePoint).point
 		var bigBegin = around.getPointAngle(0.0, this.bigToePoint).point
-		var littleBig = Vector.getSubtraction2D(bigBegin, littleEnd)
-		var bigFromPoint = Vector.getAlongFromTo2D(0.6, littleEnd, bigBegin)
-		var bigFromAngle = Math.atan2(littleBig[1], littleBig[0]) + halfPI + angleWidening
-		var bigToAngle = bigPointAngle.angle - angleWidening
-		var toeUUpper = getArcFromAngleToAngle(bigFromPoint, bigFromAngle, bigPointAngle.point, bigToAngle, this.sides)
-		addEndRectangles(doubleInsetTreadPolygons, toeUUpper, treadBevelRectangleSize)
-		addEndRectangles(insetTreadPolygons, toeUUpper, treadRectangleSize)
-		var toeUUppers = getOutlinesQuickly(undefined, undefined, undefined, outsets, [toeUUpper], undefined)
-		arrayKit.pushArray(curvedDifferencePolygons, toeUUppers)
+		var littleBig = VectorFast.getSubtraction2D(bigBegin, littleEnd)
+		var bigFromPoint = Vector.interpolationFromToAlong2D(littleEnd, bigBegin, 0.6)
+		var bigFromAngle = Math.atan2(littleBig[1], littleBig[0]) + halfPI + toeUpperWideningNegative
+		var bigToAngle = bigPointAngle.angle - toeUpperWideningNegative
+		var toeUUpper = getArcFromAngleToAngle(bigFromPoint, bigFromAngle, bigPointAngle.point, bigToAngle, 18, (toeBevel + tanBevel) * 0.5)
+		var toeUUppers = this.getAddArcTread(toeUUpper, outsets)
 
 		this.addTreads(springsBack + this.halfWallThickness, getBoundingSegment(toeULowers[0], 1)[0] - this.treadWidth)
 		this.addTreads(getBoundingSegment(heelUUppers[0], 1)[1] + this.treadWidth, this.springsFront - this.halfWallThickness)
 	}
 
-	var treadDifferencePolygons = this.rectangleDifferencePolygons.concat(curvedDifferencePolygons)
-	var insetSandalPolygon = getOutsetPolygon(arrayKit.getFilledArray(-tanBevel), sandalPolygon)
+	var bottomTreadPolygons = getDifferencePolygonsByPolygons(this.shortSandalEnds, this.treadDifferencePolygons)
+	var layers = [{polygons:Polygon.getIntersectionPolygonsByTools(this.insetBevelPolygon, bottomTreadPolygons)}]
 
-	this.bottomCornerPolygons = getDifferencePolygonsByPolygons(treadDifferencePolygons, springPolygons)
-
-	var bottomBottomPolygons = []
-	for (var bottomCornerPolygon of this.bottomCornerPolygons) {
-		arrayKit.pushArray(bottomBottomPolygons, getIntersectionPolygons(bottomCornerPolygon, insetSandalPolygon))
-	}
-
-	var rectangle = getRectangleCornerParameters(this.farLeft, this.springsFront + doubleBevel, this.doubleRight, springsBack - doubleBevel)
-	var heelToePolygons = getDifferencePolygons(rectangle, sandalPolygon)
-	var doubleInsetHeelToePolygons = getOutsetPolygons(arrayKit.getFilledArray(-tanBevelTread), heelToePolygons)
-	arrayKit.pushArray(doubleInsetTreadPolygons, getDifferencePolygonsByPolygons(doubleInsetHeelToePolygons, this.rectangleDifferencePolygons))
-	var insetHeelToePolygons = getOutsetPolygons(arrayKit.getFilledArray(-this.treadHeight), heelToePolygons)
-	arrayKit.pushArray(insetTreadPolygons, getDifferencePolygonsByPolygons(insetHeelToePolygons, this.rectangleDifferencePolygons))
-	var insetPolygons = springPolygons.slice(0)
-	var layers = [{polygons:bottomBottomPolygons}]
+	var springBottomHeight = height - this.springThickness
+	this.belowSpringHeight = springBottomHeight - 1
 	if (this.treadHeight < springBottom - gClose) {
-		layers.push({matrix3D:this.bottomBevel, polygons:this.bottomCornerPolygons, vertical:false})
-		layers.push({matrix3D:this.treadHeight, polygons:this.bottomCornerPolygons, vertical:true})
-		var doubleInsetPolygons = getDifferencePolygonsByPolygons(doubleInsetTreadPolygons, springPolygons)
-		layers.push({matrix3D:this.treadHeight, polygons:doubleInsetPolygons, vertical:true})
-		insetPolygons = getDifferencePolygonsByPolygons(insetTreadPolygons, insetPolygons)
-		var treadHeightPlus = this.treadHeight + this.bottomBevel
-		layers.push({matrix3D:treadHeightPlus, polygons:insetPolygons, vertical:false})
+		this.addTreadBase(layers)
 	}
 
-	layers.push({matrix3D:height - this.springThickness, polygons:insetPolygons, vertical:true})
+	layers.push({matrix3D:springBottomHeight, polygons:this.sandalEnds, vertical:true})
 
 	this.sculptureObject = {polygonMap:new Map([['soleTop', sandalPolygon]]), statementMap:new Map()}
 	layers.push({matrix3D:height, ids:['soleTop'], vertical:true})
 
-	var ridgeSections = []
-	var numberOfSides = 3
-	var angle = Math.PI * 0.25
-	var angleDifference = (Math.PI * 0.5 - angle) / (numberOfSides - 0.5)
-	for (var sideCount = 0; sideCount < numberOfSides; sideCount++) {
-		ridgeSections.push(Vector.polarCounterclockwise(angle))
-		angle += angleDifference
+	var bigMetatarsalBackTread = this.bigMetatarsalBaseBack + this.halfTreadWidth
+	var littleMetatarsalBackTread = this.littleMetatarsalBaseBack + this.halfTreadWidth
+	var toeSubtractionPolygon = [[this.doubleRight, littleMetatarsalBackTread], [this.midX, littleMetatarsalBackTread]]
+	toeSubtractionPolygon.push([this.midX, bigMetatarsalBackTread])
+	toeSubtractionPolygon.push([-this.right, bigMetatarsalBackTread])
+	toeSubtractionPolygon.push([-this.right, -this.top])
+	toeSubtractionPolygon.push([this.doubleRight, -this.top])
+
+	var treadHeightPlus = this.treadHeight + 1.0
+	var warpedSandalPolygon = new Array(sandalPolygon.length)
+	for (var vertexIndex = 0; vertexIndex < sandalPolygon.length; vertexIndex++) {
+		var distance = -this.getDistance(sandalPolygon[vertexIndex], sandalPolygon) * 0.5
+		warpedSandalPolygon[vertexIndex] = getOutsetPoint(sandalPolygon, [distance, distance], vertexIndex)
 	}
 
-	var ridgeSectionZero = ridgeSections[0]
-	var ridgeSectionLast = ridgeSections[ridgeSections.length - 1]
-	addArraysByIndex(ridgeSections, -ridgeSectionZero[1], 1)
-	var ridgeMultiplier = [this.halfRidgeWidth / ridgeSectionZero[0], this.ridgeThickness / ridgeSectionLast[1]]
-	multiply2Ds(ridgeSections, ridgeMultiplier)
-	layers.push({matrix3D:height, polygons:this.getRidgeBase(ridgeSectionZero[0]), vertical:true})
-	for (var sideCount = 1; sideCount < numberOfSides - 1; sideCount++) {
-		var ridgeSection = ridgeSections[sideCount]
-		layers.push({matrix3D:height + ridgeSection[1], polygons:this.getRidgeBase(ridgeSection[0]), vertical:false})
+	warpedSandalPolygon = getOutsetPolygon(warpedSandalPolygon, -treadHeightPlus)
+	this.toeBottom = this.getToePolygon(sandalPolygon, warpedSandalPolygon, toeSubtractionPolygon, treadHeightPlus)
+
+	this.addRidge(height, layers)
+	this.addArchTop(height, layers, springPolygons)
+
+	var toeTop = this.getToePolygon(sandalPolygon, getOutsetPolygon(sandalPolygon, -treadHeightPlus), toeSubtractionPolygon, treadHeightPlus)
+	toeTop = Polyline.copy(toeTop)
+	for (var point of toeTop) {
+		var rise = this.getDistance(point, sandalPolygon) / Math.tan(this.overhangAngle)
+		point.push(Math.max(rise, this.paddingThickness + 1))
 	}
 
-	this.sculptureObject.polygonMap.set('ridgeBase', this.getRidgeBase(ridgeSectionLast[0])[0])
-	layers.push({matrix3D:height + ridgeSectionLast[1], ids:['ridgeBase'], vertical:false})
+	this.sculptureObject.polygonMap.set('toeBottom', this.toeBottom)
+	this.sculptureObject.statementMap.set('toeBottom', {attributeMap:new Map([['connectionID', 'soleTop']])})
+	layers.push({matrix3D:height + this.paddingThickness, ids:['toeBottom'], vertical:true})
+	layers.push({matrix3D:height, polygons:[toeTop], vertical:false})
 
-	for (var archPolygonIndex = 2; archPolygonIndex < springPolygons.length; archPolygonIndex++) {
-		var archPolygonID = 'archPolygon' + archPolygonIndex
-		var springPolygon = springPolygons[archPolygonIndex]
-		var archPolygon = this.getArchPolygon(springPolygon)
-		this.sculptureObject.polygonMap.set(archPolygonID, archPolygon)
-		this.sculptureObject.statementMap.set(archPolygonID, {attributeMap:new Map([['connectionID', 'soleTop']])})
-		layers.push({matrix3D:height, ids:[archPolygonID], vertical:true})
-
-		var archTopPolygon = this.getArchPolygon(getOutsetPolygon([-this.topBevel, -this.topBevel], springPolygon))
-		addArraysByIndex(archTopPolygon, this.topBevel, 2)
-		layers.push({matrix3D:height, polygons:[archTopPolygon], vertical:false})
-	}
-
-	this.addMetatarsalClasp(this.bigMetatarsalBase, 'bigMetatarsal', bigMetatarsalZ, 'ridgeBase', layers, 0.2, bigRotation3D)
-	this.addMetatarsalClasp(this.littleMetatarsalBase, 'littleMetatarsal', littleMetatarsalZ, 'ridgeBase', layers, -0.45, littleRotation3D)
+	this.addMetatarsalPillar(this.bigMetatarsalInner, 'bigMetatarsal', 'soleTop', this.bigMetatarsalZ, layers, this.bigSkew3D)
+	this.addMetatarsalPillar(this.littleMetatarsalInner, 'littleMetatarsal', 'soleTop', this.littleMetatarsalZ, layers, this.littleSkew3D)
 
 	this.sculptureObject.polygonMap.set('heelCupBottom', this.heelCup)
 	this.sculptureObject.statementMap.set('heelCupBottom', {attributeMap:new Map([['connectionID', 'soleTop']])})
 	layers.push({matrix3D:height, ids:['heelCupBottom'], vertical:true})
 	layers.push({matrix3D:heelCornerHeight, polygons:[this.heelCupMiddle], vertical:false})
-	layers.push({matrix3D:this.heelCupTop - this.topBevel * 2.0, polygons:[this.heelCupMiddle], vertical:false})
-	layers.push({matrix3D:this.heelCupTop - this.topBevel, polygons:[this.heelCupBevelLower], vertical:false})
+	layers.push({matrix3D:heelCupTop - this.topBevel * 2.0, polygons:[this.heelCupMiddle], vertical:false})
+	layers.push({matrix3D:heelCupTop - this.topBevel, polygons:[this.heelCupBevelLower], vertical:false})
 	this.sculptureObject.polygonMap.set('heelCup', this.heelCupBevelUpper)
-	layers.push({matrix3D:this.heelCupTop, ids:['heelCup'], vertical:false})
-
+	layers.push({matrix3D:heelCupTop, ids:['heelCup'], vertical:false})
 	this.addHeelClasp('heelInnerBase', layers, -1.0)
 	this.addHeelClasp('heelOuterBase', layers, 1.0)
 
 	var sandalMesh = polygonateMesh(sculpture.getMesh(layers, matrix3D, undefined, this.sculptureObject))
+	this.addArchBottom(sandalMesh, springBottomHeight, springPolygons)
+	this.addMetatarsalClasp(this.bigMetatarsalInner, 0.2, bigRotation3D, sandalMesh)
+	this.addMetatarsalClasp(this.littleMetatarsalInner, -0.45, littleRotation3D, sandalMesh)
+
 	var rotationXMatrix = getMatrix3DRotateX([90.0])
-	splitMesh(undefined, this.id, rotationXMatrix, sandalMesh, undefined, undefined, [this.heelStubFront], undefined)
+	splitMesh(undefined, this.id, rotationXMatrix, sandalMesh, undefined, undefined, [this.springsFront+.001], undefined)
 
 	var pointIndexSet = new Set()
-	var rectangle = getRectangleCornerParameters(this.farLeft, this.heelStubFront, this.doubleRight, this.heelStubBack + 1.0)
-	addPolygonsToPointIndexSet(pointIndexSet, sandalMesh.points, [rectangle], [[this.heelStubHeight - 1]])
-	var translationPoint = [0.0, -this.heelStubFront, -this.heelStubHeight]
+	var rectangle = getRectangleCornerParameters(this.farLeft, this.springsFront, this.doubleRight, this.heelStubBack + 1.0)
+	addPolygonsToPointIndexSet(pointIndexSet, sandalMesh.points, [rectangle], [[this.heelStubHeight - 0.5]])
+	var translationPoint = [0.0, -this.springsFront, -this.heelStubHeight]
 	var translationMatrix3D = getMatrix3DByTranslate(translationPoint)
-	var negativeTranslationMatrix3D = getMatrix3DByTranslate(Vector.multiply3DScalar(translationPoint, -1.0))
+	var negativeTranslationMatrix3D = getMatrix3DByTranslate(VectorFast.multiply3DScalar(translationPoint, -1.0))
 	var scaleRotation3D = getMultiplied3DMatrix(getMatrix3DByScaleY([1.0 / this.cosHeelStrapX]), translationMatrix3D)
 	scaleRotation3D = getMultiplied3DMatrix(getMatrix3DRotateX([-this.heelStrapXAngle]), scaleRotation3D)
 	scaleRotation3D = getMultiplied3DMatrix(negativeTranslationMatrix3D, scaleRotation3D)
 	transform3DPointsBySet(scaleRotation3D, pointIndexSet, sandalMesh.points)
 
-	pointIndexSet = new Set()
-	rectangle = getRectangleCornerParameters(this.farLeft, this.heelStubFront - this.outset, this.doubleRight, this.heelStubFront)
-	addPolygonsToPointIndexSet(pointIndexSet, sandalMesh.points, [rectangle], [[this.heelStubHeight - 1]])
-	var rotation3D = getMultiplied3DMatrix(getMatrix3DRotateX([15.0]), translationMatrix3D)
-	rotation3D = getMultiplied3DMatrix(negativeTranslationMatrix3D, rotation3D)
-	transform3DPointsBySet(rotation3D, pointIndexSet, sandalMesh.points)
-	return polygonateMesh(sandalMesh)
+	var sandalMesh = polygonateMesh(sandalMesh)
+	for (var point of sandalMesh.points) {
+		if (point[2] < height - 0.1) {
+			var edgeDistance = polygonKit.distanceToPolygon(sandalPolygon, point)
+			if (edgeDistance < 1 || point[2] > this.treadHeight + 0.1) {
+				point[2] += this.getDistance(point, sandalPolygon) / Math.tan(this.overhangAngle)
+			}
+		}
+	}
+
+	return sandalMesh
 },
 
-getSandalPolygon: function(outset, size) {
-	this.right = size[0]
-	this.top = size[1]
-	this.doubleRight = this.right * 2.0
-	this.midX = this.right * 0.5
-	var sandalPolygon = []
+getSandalPolygon: function(outset, sandalSkeleton, toeExtraLength = 0.0) {
+	for (var point of sandalSkeleton) {
+		if (point.length > 3) {
+			point.pop()
+		}
+	}
+
+	sandalSkeleton[0][1] += toeExtraLength
+	sandalSkeleton[1][1] += toeExtraLength
+	var sandalPolygon = around.getPolygonArcs(sandalSkeleton, this.sides / 3.0)
+	sandalSkeleton[0][1] -= toeExtraLength
+	sandalSkeleton[1][1] -= toeExtraLength
+
+	this.outsetHeelStub(sandalPolygon, -this.right, this.midX)
+	this.outsetHeelStub(sandalPolygon, this.midX, this.doubleRight)
+
+	var littleYBottom = this.heelStubBack * 0.66 + this.littleMetatarsalBaseFront * 0.33
+	var littleYMiddle = this.heelStubBack * 0.33 + this.littleMetatarsalBaseFront * 0.66
+	var offset = outset * 0.7
+	this.offsetArch(-offset, sandalPolygon, this.midX, this.doubleRight, littleYBottom, littleYMiddle, this.littleMetatarsalBaseFront - 1)
+
+	var bigYBottom = this.heelStubBack * 0.66 + this.bigMetatarsalBaseFront * 0.33
+	var bigYMiddle = this.heelStubBack * 0.33 + this.bigMetatarsalBaseFront * 0.66
+	this.offsetArch(offset, sandalPolygon, -this.right, this.midX, bigYBottom, bigYMiddle, this.bigMetatarsalBaseFront - 1)
+
+	return sandalPolygon
+},
+
+getSandalSkeleton: function(outset, outsetFront) {
+	var sandalSkeleton = []
 	var bigToeRadius = Value.getValueRatio(this.bigToeRadius, this.right, this.bigToeRadiusRatio)
 	var bigToeX = Value.getValueRatio(this.bigToeX, this.right, this.bigToeXRatio)
 	var littleToeRadius = Value.getValueRatio(this.littleToeRadius, this.right, this.littleToeRadiusRatio)
 	var littleToeX = Value.getValueRatio(this.littleToeX, this.right, this.littleToeXRatio)
-	var bigToeExtraOutset = outset * (this.bigMetatarsalBaseHeight / this.littleMetatarsalBaseHeight - 1.0)
 
-	var bigToeY = this.top - bigToeRadius
+	var bigToeY = this.top + outsetFront - outset - bigToeRadius
 	var bigToe = [bigToeX, bigToeY]
 	this.cosHeelStrapX = Math.cos(this.heelStrapXAngle * gRadiansPerDegree)
-	this.heelRadius = Value.getValueRatio(this.heelWidth, this.right, this.heelWidthRatio) * 0.5
-	this.heelCupHeight = Value.getValueRatio(this.heelCupHeight, this.right, this.heelCupHeightRatio)
-	this.heelCornerThickness = this.heelCupHeight * 0.45
-	this.springsFront = this.heelRadius * 1.5
-	this.heelClaspInsideLength = this.strapWidth + this.strapThicknessGap * 2.0
-	this.heelClaspLength = this.heelClaspInsideLength + this.strapThicknessGap * 2.0 + this.wallThickness * 2.0
-	this.heelStubBack = this.springsFront + this.heelCornerThickness * Math.tan(this.overhangAngle)
-	this.heelStubFront = this.heelStubBack - this.heelClaspLength * this.cosHeelStrapX
+	this.heelRadius = this.heelWidth * 0.5
+	this.heelStubBack = this.springsFront + this.claspLengthPlus * this.cosHeelStrapX
+	this.heelOutsetSplitY = this.springsFront - outset * 0.4
 	if (this.bigMetatarsalY < 0.0) {
 		this.bigMetatarsalY = this.metatarsalYRatio * (bigToeY - this.heelRadius) + this.heelRadius
 	}
 
-	var littleToe = Vector.add2D(Vector.polarRadius(this.toeAngle + Math.PI * 0.5, bigToeRadius), bigToe)
+	var littleToe = VectorFast.add2D(Vector.polarRadius(this.toeAngle + Math.PI * 0.5, bigToeRadius), bigToe)
 	littleToe[1] += (littleToeX - littleToe[0]) * Math.sin(this.toeAngle) - littleToeRadius / Math.cos(this.toeAngle)
 	if (this.littleMetatarsalY < 0.0) {
 		this.littleMetatarsalY = this.metatarsalYRatio * (littleToe[1] - this.heelRadius) + this.heelRadius
@@ -1875,44 +2034,65 @@ getSandalPolygon: function(outset, size) {
 
 	this.littleMetatarsalRadius = littleToeRadius * 2.0
 	this.bigMetatarsalRadius = bigToeRadius * 2.0
-
-	this.heelPoints = this.getHeelPoints(this.bigMetatarsalY, this.littleMetatarsalY, outset)
-	arrayKit.pushArray(sandalPolygon, this.heelPoints)
-
-	this.littleMetatarsalX = this.right - this.littleMetatarsalRadius + this.metatarsalWidening
-	this.littleMetatarsalPoint = [this.littleMetatarsalX, this.littleMetatarsalY, this.littleMetatarsalRadius + outset]
-	sandalPolygon.push(this.littleMetatarsalPoint)
+	var metatarsalRadius = this.bigMetatarsalRadius * 1.5
+	this.littleMetatarsalBaseFront = this.littleMetatarsalY - this.halfClaspLengthWall
+	this.littleMetatarsalBaseBack = this.littleMetatarsalY + this.halfClaspLengthWall
+	this.bigMetatarsalBaseFront = this.bigMetatarsalY - this.halfClaspLengthWall
+	this.bigMetatarsalBaseBack = this.bigMetatarsalY + this.halfClaspLengthWall
 
 	this.littleToePoint = [littleToeX, littleToe[1], littleToeRadius + outset]
-	sandalPolygon.push(this.littleToePoint)
+	sandalSkeleton.push(this.littleToePoint)
 
 	this.bigToePoint = [bigToeX, bigToeY, bigToeRadius + outset]
-	sandalPolygon.push(this.bigToePoint)
+	sandalSkeleton.push(this.bigToePoint)
 
-	this.bigMetatarsalX = this.bigMetatarsalRadius - this.metatarsalWidening
-	this.bigMetatarsalPoint = [this.bigMetatarsalX, this.bigMetatarsalY, this.bigMetatarsalRadius + outset + bigToeExtraOutset]
-	sandalPolygon.push(this.bigMetatarsalPoint)
+	var metatarsalOutset = outset + this.wallThickness
+	this.bigMetatarsalX = -this.metatarsalWidening
+	this.bigMetatarsalPoint = [this.bigMetatarsalX + metatarsalRadius - metatarsalOutset, this.bigMetatarsalY, metatarsalRadius]
+	sandalSkeleton.push(this.bigMetatarsalPoint)
 
-	var sandalPolygon = around.getPolygonArcs(sandalPolygon, this.sides / 3.0)
-	
-	this.heelOutsetSplitY = this.heelStubFront - this.outset * 0.4
-	this.outsetHeelStub(sandalPolygon, -this.right, this.midX)
-	this.outsetHeelStub(sandalPolygon, this.midX, this.doubleRight)
+	this.heelPoints = this.getHeelPoints(sandalSkeleton, outset)
+	Vector.pushArray(sandalSkeleton, this.heelPoints)
 
-	this.halfLittleBaseLength = this.littleMetatarsalRadius * 0.3 + this.bigMetatarsalRadius * 0.7
-	this.littleMetatarsalBaseFront = this.littleMetatarsalY - this.halfLittleBaseLength
-	var littleYBottom = this.heelStubBack * 0.66 + this.littleMetatarsalBaseFront * 0.33
-	var littleYMiddle = this.heelStubBack * 0.33 + this.littleMetatarsalBaseFront * 0.66
-	var offset = this.outset * 0.7
-	this.offsetArch(-offset, sandalPolygon, this.midX, this.doubleRight, littleYBottom, littleYMiddle, this.littleMetatarsalBaseFront - 1)
+	this.littleMetatarsalX = this.right + this.metatarsalWidening
+	sandalSkeleton.push([this.littleMetatarsalX - metatarsalRadius + metatarsalOutset, this.littleMetatarsalY, metatarsalRadius])
 
-	this.bigMetatarsalRadiusPlus = this.bigMetatarsalRadius * 1.1
-	this.bigMetatarsalBaseFront = this.bigMetatarsalY - this.bigMetatarsalRadiusPlus
-	var bigYBottom = this.heelStubBack * 0.66 + this.bigMetatarsalBaseFront * 0.33
-	var bigYMiddle = this.heelStubBack * 0.33 + this.bigMetatarsalBaseFront * 0.66
-	this.offsetArch(offset, sandalPolygon, -this.right, this.midX, bigYBottom, bigYMiddle, this.bigMetatarsalBaseFront - 1)
+	return sandalSkeleton
+},
 
-	return sandalPolygon
+getSpringPolygons: function(sandalPolygon) {
+	var springPolygons = []
+	var springsDifference = this.intersectionBack - this.intersectionFront
+	var archTreadLength = this.wallThickness * 2.0
+	var numberOfExtraSprings = Math.floor((springsDifference - this.springLength) / (this.springLength + archTreadLength))
+	var springBetween = (springsDifference - numberOfExtraSprings * archTreadLength) / (numberOfExtraSprings + 1.0)
+	var springWavelength = springBetween + archTreadLength
+	var rectangleFront = this.intersectionFront + springBetween
+	for (var rectangleIndex = 0; rectangleIndex < numberOfExtraSprings; rectangleIndex++) {
+		var rectangle = getRectangleCornerParameters(this.farLeft, rectangleFront, this.doubleRight, rectangleFront + archTreadLength)
+		var intersectionPolygon = Polygon.getIntersectionPolygon(sandalPolygon, rectangle)
+		springPolygons.push(intersectionPolygon)
+		rectangleFront += springWavelength
+	}
+
+	return springPolygons
+},
+
+getSuffixStatement: function(registry, statement, suffix) {
+	var suffixStatementMap = new Map()
+	if (statement.attributeMap.has('alteration')) {
+		suffixStatementMap.set('alteration', statement.attributeMap.get('alteration'))
+	}
+
+	var suffixStatement = getStatementByParentTag(suffixStatementMap, 0, statement, 'mesh')
+	getUniqueID(this.id + suffix, registry, suffixStatement)
+	return suffixStatement
+},
+
+getToePolygon: function(sandalPolygon, smallSandalPolygon, toeSubtractionPolygon, width) {
+	Polyline.addArrayByIndex(smallSandalPolygon, width, 2)
+	toePolygon = Polygon.getDifferencePolygon(Polygon.getDifferencePolygon(sandalPolygon, toeSubtractionPolygon), smallSandalPolygon)
+	return getFilletedPolygonByIndexes(toePolygon, this.halfTreadWidth)
 },
 
 offsetArch: function(offset, sandalPolygon, segmentBegin, segmentEnd, yBottom, yMiddle, yTop) {
@@ -1950,45 +2130,61 @@ processStatement: function(registry, statement) {
 //243 x 94
 	statement.tag = 'polygon'
 	var points = getRectangularPoints(registry, statement, [10.0, 10.0])
+	this.size = VectorFast.getSubtraction2D(points[1], points[0])
+	this.right = this.size[0]
+	this.top = this.size[1]
+	if (this.right <= 0.0 || this.top <= 0.0) {
+		printCaller(['Size not positive in sandal in generatorpoints.', this.size, statement])
+		return
+	}
+
 	this.archBackThickness = getFloatByDefault('archBackThickness', registry, statement, this.tag, -1.0)
 	this.archBackThicknessRatio = getFloatByDefault('archBackThicknessRatio', registry, statement, this.tag, 0.04)
 	this.archBeginX = getFloatByDefault('archBeginX', registry, statement, this.tag, -1.0)
 	this.archBeginXRatio = getFloatByDefault('archBeginXRatio', registry, statement, this.tag, 0.35)
-	this.bottomBevel = getFloatByDefault('bottomBevel', registry, statement, this.tag, 3.0)
 	this.archCenterThickness = getFloatByDefault('archCenterThickness', registry, statement, this.tag, -1.0)
 	this.archCenterThicknessRatio = getFloatByDefault('archCenterThicknessRatio', registry, statement, this.tag, 0.06)
 	this.archCenterY = getFloatByDefault('archCenterY', registry, statement, this.tag, -1.0)
 	this.archCenterYRatio = getFloatByDefault('archCenterYRatio', registry, statement, this.tag, 0.4)
 	this.archFrontThickness = getFloatByDefault('archFrontThickness', registry, statement, this.tag, -1.0)
 	this.archFrontThicknessRatio = getFloatByDefault('archFrontThicknessRatio', registry, statement, this.tag, 0.02)
-	this.bigMetatarsalBaseHeight = getFloatByDefault('bigMetatarsalBaseHeight', registry, statement, this.tag, 30.0)
+	this.bigMetatarsalBaseHeight = getFloatByDefault('bigMetatarsalBaseHeight', registry, statement, this.tag, 36.0)
 	this.bigMetatarsalY = getFloatByDefault('bigMetatarsalY', registry, statement, this.tag, -1.0)
 	this.bigToeX = getFloatByDefault('bigToeX', registry, statement, this.tag, -1.0)
 	this.bigToeXRatio = getFloatByDefault('bigToeXRatio', registry, statement, this.tag, 0.26)
 	this.bigToeRadius = getFloatByDefault('bigToeRadius', registry, statement, this.tag, -1.0)
 	this.bigToeRadiusRatio = getFloatByDefault('bigToeRadiusRatio', registry, statement, this.tag, 0.15)
 	this.bigToeRidgeAngle = getFloatByDefault('bigToeRidgeAngle', registry, statement, this.tag, 10.0) * gRadiansPerDegree
+	this.bottomBevel = getFloatByDefault('bottomBevel', registry, statement, this.tag, 12.0)
 	this.claspThickness = getFloatByDefault('claspThickness', registry, statement, this.tag, 7.0)
 	this.footGap = getFloatByDefault('footGap', registry, statement, this.tag, 2.0)
 	this.gap = getFloatByDefault('gap', registry, statement, this.tag, 0.3)
+//	this.heelBackHeight = getFloatByDefault('heelCupHeight', registry, statement, this.tag, -1.0)
+//	this.heelBackHeightRatio = getFloatByDefault('heelCupHeightRatio', registry, statement, this.tag, 0.32)
+//	this.heelCupAngle = getFloatByDefault('heelCupAngle', registry, statement, this.tag, 7.0) * gRadiansPerDegree
 	this.heelCupHeight = getFloatByDefault('heelCupHeight', registry, statement, this.tag, -1.0)
-	this.heelCupHeightRatio = getFloatByDefault('heelCupHeightRatio', registry, statement, this.tag, 0.4)
-	this.heelStemBaseHeight = getFloatByDefault('heelStemBaseHeight', registry, statement, this.tag, 2.0)
+	this.heelCupHeightRatio = getFloatByDefault('heelCupHeightRatio', registry, statement, this.tag, 0.62)
+	this.heelCupHeight = Value.getValueRatio(this.heelCupHeight, this.right, this.heelCupHeightRatio)
 	this.heelStrapXAngle = getFloatByDefault('heelStrapXAngle', registry, statement, this.tag, 45.0)
 	this.heelWidth = getFloatByDefault('heelWidth', registry, statement, this.tag, -1.0)
-	this.heelWidthRatio = getFloatByDefault('heelWidthRatio', registry, statement, this.tag, 0.7)
-	this.littleMetatarsalBaseHeight = getFloatByDefault('littleMetatarsalBaseHeight', registry, statement, this.tag, 20.0)
+	this.heelWidthRatio = getFloatByDefault('heelWidthRatio', registry, statement, this.tag, 0.63)
+	this.heelWidth = Value.getValueRatio(this.heelWidth, this.right, this.heelWidthRatio)
+	this.littleMetatarsalBaseHeight = getFloatByDefault('littleMetatarsalBaseHeight', registry, statement, this.tag, 26.0)
 	this.littleMetatarsalY = getFloatByDefault('littleMetatarsalY', registry, statement, this.tag, -1.0)
 	this.littleToeRidgeAngle = getFloatByDefault('littleToeRidgeAngle', registry, statement, this.tag, 36.0) * gRadiansPerDegree
 	this.littleToeRadius = getFloatByDefault('littleToeRadius', registry, statement, this.tag, -1.0)
 	this.littleToeRadiusRatio = getFloatByDefault('littleToeRadiusRatio', registry, statement, this.tag, 0.08)
 	this.littleToeX = getFloatByDefault('littleToeX', registry, statement, this.tag, -1.0)
 	this.littleToeXRatio = getFloatByDefault('littleToeXRatio', registry, statement, this.tag, 0.78)
-	this.metatarsalWidening = getFloatByDefault('metatarsalWidening', registry, statement, this.tag, 2.0+4)
+	this.metatarsalWidening = getFloatByDefault('metatarsalWidening', registry, statement, this.tag, 6.0)
 	this.metatarsalYRatio = getFloatByDefault('metatarsalYRatio', registry, statement, this.tag, 0.73)
 	this.outset = getFloatByDefault('outset', registry, statement, this.tag, 12.0)
+	var outsetFront = getFloatByDefault('outsetFront', registry, statement, this.tag, -1)
+	var outsetFrontRatio = getFloatByDefault('outsetFrontRatio', registry, statement, this.tag, 0.012)
+	outsetFront = Value.getValueRatio(outsetFront, this.top, outsetFrontRatio)
 	this.overhangAngle = getFloatByDefault('overhangAngle', registry, statement, this.tag, 40.0) * gRadiansPerDegree
-	this.paddingThickness = getFloatByDefault('heelInset', registry, statement, this.tag, 6.0)
+	this.paddingThickness = getFloatByDefault('paddingThickness', registry, statement, this.tag, 6.0)
+	this.ribbonThickness = getFloatByDefault('ribbonThickness', registry, statement, this.tag, 0.1)
 	this.ridgeCenterX = getFloatByDefault('ridgeCenterX', registry, statement, this.tag, -1.0)
 	this.ridgeCenterXRatio = getFloatByDefault('ridgeCenterXRatio', registry, statement, this.tag, 0.42)
 	this.ridgeCenterY = getFloatByDefault('ridgeCenterY', registry, statement, this.tag, -1.0)
@@ -1996,58 +2192,71 @@ processStatement: function(registry, statement) {
 	this.ridgeThickness = getFloatByDefault('ridgeThickness', registry, statement, this.tag, 1.0)
 	this.ridgeWidth = getFloatByDefault('ridgeWidth', registry, statement, this.tag, -1.0)
 	this.ridgeWidthRatio = getFloatByDefault('ridgeWidthRatio', registry, statement, this.tag, 0.04)
-	var sandalHeight = getFloatByDefault('sandalHeight', registry, statement, this.tag, 0.0)
+	var sandalHeight = getFloatByDefault('sandalHeight', registry, statement, this.tag, 15.0)
 	this.sides = getIntByDefault('sides', registry, statement, this.tag, viewBroker.numberOfBigSides.value)
+	this.springLength = getFloatByDefault('springLength', registry, statement, this.tag, 2.0)
+	this.springsFront = getFloatByDefault('springsFront', registry, statement, this.tag, -1)
+	this.springsFrontRatio = getFloatByDefault('springsFrontRatio', registry, statement, this.tag, 0.45)
+	this.springsFront = Value.getValueRatio(this.springsFront, this.right, this.springsFrontRatio)
 	this.springThickness = getFloatByDefault('springThickness', registry, statement, this.tag, 2.0)
-	this.springWidth = getFloatByDefault('springWidth', registry, statement, this.tag, 5.0)
 	this.stemExtraHeight = getFloatByDefault('stemExtraHeight', registry, statement, this.tag, 2.0)
 	this.stemWidth = getFloatByDefault('stemWidth', registry, statement, this.tag, 8.0)
 	this.strapXAngle = getFloatByDefault('strapXAngle', registry, statement, this.tag, 15.0)
 	this.strapYAngle = getFloatByDefault('strapYAngle', registry, statement, this.tag, 25.0)
-	this.strapThickness = getFloatByDefault('strapThickness', registry, statement, this.tag, 2.5)
+	this.strapThickness = getFloatByDefault('strapThickness', registry, statement, this.tag, 3.0)
 	this.strapThicknessGap = getFloatByDefault('strapThicknessGap', registry, statement, this.tag, 0.5)
 	this.strapWidth = getFloatByDefault('strapWidth', registry, statement, this.tag, 25.0)
 	this.toeAngle = getFloatByDefault('toeAngle', registry, statement, this.tag, -45.0) * gRadiansPerDegree
+	this.toeExtraLength = getFloatByDefault('toeExtraLength', registry, statement, this.tag, 15.0)
 	this.topBevel = getFloatByDefault('topBevel', registry, statement, this.tag, 1.0)
 	this.treadHeight = getFloatByDefault('treadHeight', registry, statement, this.tag, 4.5)
 	this.treadWidth = getFloatByDefault('treadWidth', registry, statement, this.tag, 6.0)
 	this.wallThickness = getFloatByDefault('wallThickness', registry, statement, this.tag, 4.0)
-	this.footInset = Math.max(this.footGap, this.paddingThickness)
-	this.halfClaspThickness = this.claspThickness * 0.5
-	this.pillarRadius = this.claspThickness * 0.25
-	var size = Vector.getSubtraction2D(points[1], points[0])
-	this.strapClearance = this.strapThickness + this.strapThicknessGap * 2.0
-	if (this.right <= 0.0 || this.top <= 0.0) {
-		noticeByList(['Size not positive in sandal in generatorpoints.', sandalPolygon, statement])
-		return
-	}
 
-	var sandalPolygon = this.getSandalPolygon(this.outset, size)
+	this.claspInsideLength = this.strapWidth + this.strapThicknessGap * 2.0
+	this.claspLength = this.claspInsideLength + this.strapThicknessGap * 2.0 + this.wallThickness * 2.0
+	this.compressedThickness = this.paddingThickness * 0.67
+	this.doubleRight = this.right * 2.0
+	this.footInset = Math.max(this.footGap, this.paddingThickness)
+	this.halfClaspLengthWall = this.claspLength * 0.5 + this.wallThickness * 2.0
+	this.halfClaspThickness = this.claspThickness * 0.5
+	this.halfWallThickness = this.wallThickness * 0.5
+//	this.heelBackHeight = Value.getValueRatio(this.heelBackHeight, this.right, this.heelBackHeightRatio) + this.compressedThickness
+	this.claspLengthPlus = this.claspLength + this.halfWallThickness
+	this.midX = this.right * 0.5
+	this.pillarFilletRadius = this.claspThickness * 0.25
+	this.strapClearance = this.strapThickness + this.strapThicknessGap * 2.0
+
+	this.sandalSkeleton = this.getSandalSkeleton(this.outset, outsetFront)
+	var sandalPolygon = this.getSandalPolygon(this.outset, this.sandalSkeleton, this.toeExtraLength)
 	if (sandalPolygon.length == 0) {
-		noticeByList(['No polygon in sandal in generatorpoints.', sandalPolygon, statement])
+		printCaller(['No polygon in sandal in generatorpoints.', sandalPolygon, statement])
 		return
 	}
 
 	if (sandalHeight == 0.0) {
-		setPointsExcept(Vector.add2Ds(around.getPolygon(sandalPolygon, this.sides), points[0]), registry, statement)
+		setPointsExcept(Polyline.add2D(around.getPolygon(sandalPolygon, this.sides), points[0]), registry, statement)
 		return
 	}
 
 	var matrix3D = getChainMatrix3D(registry, statement)
 	convertToGroup(statement)
+
 	this.id = statement.attributeMap.get('id')
-	var sandalMesh = this.getSandalMesh(statement.attributeMap, sandalHeight, matrix3D, sandalPolygon, size)
-	Vector.add2Ds(sandalMesh.points, points[0])
-	analyzeOutputMesh(sandalMesh, registry, statement)
+	var sandalMesh = this.getSandalMesh(statement.attributeMap, sandalHeight, matrix3D, sandalPolygon)
+	Polyline.add2D(sandalMesh.points, points[0])
 
-	var heelClipMap = new Map()
-	if (statement.attributeMap.has('alteration')) {
-		heelClipMap.set('alteration', statement.attributeMap.get('alteration'))
-	}
+	analyzeOutputMesh(sandalMesh, registry, this.getSuffixStatement(registry, statement, '_base'))
 
-	var heelClipStatement = getStatementByParentTag(heelClipMap, 0, statement, 'mesh')
-	getUniqueID(this.id + '_heel_clip', registry, heelClipStatement)
-	analyzeOutputMesh(this.getHeelClipMesh(matrix3D), registry, heelClipStatement)
+	var bigMetatarsalClipMesh = this.getMetatarsalClipMesh
+	(120.0, this.bigMetatarsalBase, this.bigMetatarsalBaseHeight, this.bigMetatarsalInner, this.bigSkew3D)
+	analyzeOutputMesh(bigMetatarsalClipMesh, registry, this.getSuffixStatement(registry, statement, '_big_metatarsal_clip'))
+	var littleMetatarsalClipMesh = this.getMetatarsalClipMesh
+	(-120.0, this.littleMetatarsalBase, this.littleMetatarsalBaseHeight, this.littleMetatarsalInner, this.littleSkew3D)
+	analyzeOutputMesh(littleMetatarsalClipMesh, registry, this.getSuffixStatement(registry, statement, '_little_metatarsal_clip'))
+
+//	analyzeOutputMesh(this.getHeelClipMesh(matrix3D), registry, this.getSuffixStatement(registry, statement, '_heel_clip'))
+	analyzeOutputMesh(this.getOuterHeelClipMesh(matrix3D), registry, this.getSuffixStatement(registry, statement, '_outer_heel_clip'))
 },
 
 tag: 'sandal'
@@ -2058,19 +2267,19 @@ var gTrapezoid = {
 		var begin = points[0]
 		var end = points[1]
 		var trapezoid = []
-		var beginEnd = Vector.getSubtraction2D(end, begin)
-		var beginEndLength = Vector.length2D(beginEnd)
+		var beginEnd = VectorFast.getSubtraction2D(end, begin)
+		var beginEndLength = VectorFast.length2D(beginEnd)
 		if (beginEndLength == 0.0) {
-			noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
+			printCaller(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
 			return []
 		}
 
-		Vector.divide2DScalar(beginEnd, beginEndLength)
+		VectorFast.divide2DScalar(beginEnd, beginEndLength)
 		var beginEndX = [beginEnd[1], -beginEnd[0]]
-		trapezoid = [Vector.getAddition2D(begin, Vector.getMultiplication2DScalar(beginEndX, beginX[1] + widening))]
-		trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endX[1] + widening)))
-		trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endX[0] - widening)))
-		trapezoid.push(Vector.getAddition2D(begin, Vector.getMultiplication2DScalar(beginEndX, beginX[0] - widening)))
+		trapezoid = [VectorFast.getAddition2D(begin, VectorFast.getMultiplication2DScalar(beginEndX, beginX[1] + widening))]
+		trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endX[1] + widening)))
+		trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endX[0] - widening)))
+		trapezoid.push(VectorFast.getAddition2D(begin, VectorFast.getMultiplication2DScalar(beginEndX, beginX[0] - widening)))
 		return trapezoid
 	},
 	processStatement: function(registry, statement) {
@@ -2079,7 +2288,7 @@ var gTrapezoid = {
 		var points = getRectangularPoints(registry, statement, [0.0, 10.0])
 		var endX = getFloatsByDefault('endX', registry, statement, this.tag, beginX)
 		addZeroToFloats(endX)
-		arrayKit.setUndefinedElementsToArray(endX, beginX)
+		Vector.setUndefinedElementsToArray(endX, beginX)
 		statement.attributeMap.set('endX', endX.toString())
 		var widening = getFloatByDefault('widening', registry, statement, this.tag, 0.0)
 		var points = this.getTrapezoid(beginX, endX, points, widening)
@@ -2094,37 +2303,37 @@ var gTrapezoidSocket = {
 		var end = points[1]
 		var extraUHeight = stopperGap + stopperThickness
 		var trapezoid = []
-		var beginEnd = Vector.getSubtraction2D(end, begin)
-		var beginEndLength = Vector.length2D(beginEnd)
+		var beginEnd = VectorFast.getSubtraction2D(end, begin)
+		var beginEndLength = VectorFast.length2D(beginEnd)
 		if (beginEndLength == 0.0) {
-			noticeByList(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
+			printCaller(['Distance between begin and end is zero in getTrapezoid in generator2d.', points])
 			return []
 		}
 
-		Vector.divide2DScalar(beginEnd, beginEndLength)
+		VectorFast.divide2DScalar(beginEnd, beginEndLength)
 		var beginEndX = [beginEnd[1], -beginEnd[0]]
 		var extraURatio = extraUHeight / beginEndLength
-		var extraPoint = Vector.getMultiplication2DScalar(beginEnd, extraUHeight)
+		var extraPoint = VectorFast.getMultiplication2DScalar(beginEnd, extraUHeight)
 		endX[0] += (endX[0] - beginX[0]) * extraURatio
 		endX[1] += (endX[1] - beginX[1]) * extraURatio
-		Vector.add2D(end, extraPoint)
-		trapezoid = [Vector.getAddition2D(begin, Vector.getMultiplication2DScalar(beginEndX, beginX[0] - widening))]
-		trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endX[0] - widening)))
+		VectorFast.add2D(end, extraPoint)
+		trapezoid = [VectorFast.getAddition2D(begin, VectorFast.getMultiplication2DScalar(beginEndX, beginX[0] - widening))]
+		trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endX[0] - widening)))
 		if (stopperThickness > 0.0) {
 			var endXPlusGapMinusWidening = endX[0] + selfGap - widening
 			var endXMinusGapPlusWidening = endX[1] - selfGap + widening
-			trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endXPlusGapMinusWidening)))
-			var stopperEnd = Vector.getSubtraction2D(end, Vector.getMultiplication2DScalar(beginEnd, stopperThickness))
+			trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endXPlusGapMinusWidening)))
+			var stopperEnd = VectorFast.getSubtraction2D(end, VectorFast.getMultiplication2DScalar(beginEnd, stopperThickness))
 			var extraStopperRatio = stopperThickness / (beginEndLength + extraUHeight)
 			var topMultiplier = endXPlusGapMinusWidening + (beginX[0] - endX[0]) * extraStopperRatio
-			trapezoid.push(Vector.getAddition2D(stopperEnd, Vector.getMultiplication2DScalar(beginEndX, topMultiplier)))
+			trapezoid.push(VectorFast.getAddition2D(stopperEnd, VectorFast.getMultiplication2DScalar(beginEndX, topMultiplier)))
 			var bottomMultiplier = endXMinusGapPlusWidening + (beginX[1] - endX[1]) * extraStopperRatio
-			trapezoid.push(Vector.getAddition2D(stopperEnd, Vector.getMultiplication2DScalar(beginEndX, bottomMultiplier)))
-			trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endXMinusGapPlusWidening)))
+			trapezoid.push(VectorFast.getAddition2D(stopperEnd, VectorFast.getMultiplication2DScalar(beginEndX, bottomMultiplier)))
+			trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endXMinusGapPlusWidening)))
 		}
 
-		trapezoid.push(Vector.getAddition2D(end, Vector.getMultiplication2DScalar(beginEndX, endX[1] + widening)))
-		trapezoid.push(Vector.getAddition2D(begin, Vector.getMultiplication2DScalar(beginEndX, beginX[1] + widening)))
+		trapezoid.push(VectorFast.getAddition2D(end, VectorFast.getMultiplication2DScalar(beginEndX, endX[1] + widening)))
+		trapezoid.push(VectorFast.getAddition2D(begin, VectorFast.getMultiplication2DScalar(beginEndX, beginX[1] + widening)))
 		return trapezoid
 	},
 	processStatement: function(registry, statement) {
@@ -2133,7 +2342,7 @@ var gTrapezoidSocket = {
 		var points = getRectangularPoints(registry, statement, [0.0, 10.0])
 		var endX = getFloatsByDefault('endX', registry, statement, this.tag, beginX)
 		addZeroToFloats(endX)
-		arrayKit.setUndefinedElementsToArray(endX, beginX)
+		Vector.setUndefinedElementsToArray(endX, beginX)
 		statement.attributeMap.set('endX', endX.toString())
 		var selfGap = getFloatByDefault('selfGap', registry, statement, this.tag, 1.4)
 		var stopperGap = getFloatByDefault('stopperGap', registry, statement, this.tag, 0.0)
