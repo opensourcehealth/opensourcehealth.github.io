@@ -6,14 +6,15 @@ function addArraysToSpreadsheetStrings(arrays, name, strings) {
 	for (var arrayIndex = 0; arrayIndex < arrays.length; arrayIndex++) {
 		arraysCopy[arrayIndex] = arrays[arrayIndex].join('\t')
 	}
-	arrayKit.pushArray(strings, arraysCopy)
+
+	Vector.pushArray(strings, arraysCopy)
 	strings.push('_end')
 }
 
 function addConnectedSegmentsToFacets(meetingMap, facet, facets, toolSegments, workSegments) {
 	var connectedSegmentArrays = getPolynodes(toolSegments, workSegments)
 	for (var extantFacet of connectedSegmentArrays) {
-		arrayKit.removeRepeats(extantFacet)
+		Vector.removeRepeats(extantFacet)
 		for (var nodeStringIndex = 0; nodeStringIndex < extantFacet.length; nodeStringIndex++) {
 			var nodeStrings = extantFacet[nodeStringIndex].split(' ')
 			var meetingKey = nodeStrings[1]
@@ -95,13 +96,13 @@ function addFacetsByFacetSplit(facets, facetSplit, meetingMap, points, splitHeig
 	var splitFacets = []
 	addConnectedSegmentsToFacets(meetingMap, facet, splitFacets, toolSegments, bottomSegments)
 	toolSegments.reverse()
-	arrayKit.reverseArrays(toolSegments)
+	Vector.reverseArrays(toolSegments)
 	addConnectedSegmentsToFacets(meetingMap, facet, splitFacets, toolSegments, topSegments)
-	arrayKit.removeShortArrays(splitFacets, 3)
+	Vector.removeShortArrays(splitFacets, 3)
 	if (splitFacets.length == 0) {
 		return
 	}
-	arrayKit.overwriteArray(facet, splitFacets[0])
+	Vector.overwriteArray(facet, splitFacets[0])
 	for (var splitFacetIndex = 1; splitFacetIndex < splitFacets.length; splitFacetIndex++) {
 		facets.push(splitFacets[splitFacetIndex])
 	}
@@ -121,7 +122,7 @@ function addFacetToCollinearities(collinearities, facet, points) {
 function addFirstTwoKeysToLinkMap(keysMap, linkMap) {
 	for (var keys of keysMap.values()) {
 		if (keys.length == 2) {
-			addToLinkMap(keys[0], keys[1], linkMap)
+			MapKit.addToLinkMap(keys[0], keys[1], linkMap)
 		}
 	}
 }
@@ -139,40 +140,40 @@ function addMeetingsToFacet(arrowAlongMap, facet, meetingMap) {
 					segment.push(meeting.pointIndex)
 				}
 			}
-			arrayKit.spliceArray(facet, endVertexIndex, segment)
+			Vector.spliceArray(facet, endVertexIndex, segment)
 		}
 	}
 }
 
 function addMeshToAssembledMesh(assembledMesh, meshCopy) {
 	var pointLength = assembledMesh.points.length
-	arrayKit.pushArray(assembledMesh.points, meshCopy.points)
+	Vector.pushArray(assembledMesh.points, meshCopy.points)
 	for (var facet of meshCopy.facets) {
-		addArrayScalar(facet, pointLength)
+		Vector.addArrayScalar(facet, pointLength)
 	}
 
-	arrayKit.pushArray(assembledMesh.facets, meshCopy.facets)
+	Vector.pushArray(assembledMesh.facets, meshCopy.facets)
 	if (meshCopy.intersectionIndexesMap != undefined) {
 		for (var intersectionIndexes of meshCopy.intersectionIndexesMap.values()) {
-			addArrayScalar(intersectionIndexes, pointLength)
+			Vector.addArrayScalar(intersectionIndexes, pointLength)
 		}
 		if (assembledMesh.intersectionIndexesMap == undefined) {
 			assembledMesh.intersectionIndexesMap = new Map(meshCopy.intersectionIndexesMap.entries())
 		}
 		else {
-			mapKit.addMapToMapArray(assembledMesh.intersectionIndexesMap, meshCopy.intersectionIndexesMap)
+			MapKit.addMapToMapArray(assembledMesh.intersectionIndexesMap, meshCopy.intersectionIndexesMap)
 		}
 	}
 
 	if (meshCopy.splitIndexesMap != undefined) {
 		for (var splitIndexes of meshCopy.splitIndexesMap.values()) {
-			addArrayScalar(splitIndexes, pointLength)
+			Vector.addArrayScalar(splitIndexes, pointLength)
 		}
 		if (assembledMesh.splitIndexesMap == undefined) {
 			assembledMesh.splitIndexesMap = new Map(meshCopy.splitIndexesMap.entries())
 		}
 		else {
-			mapKit.addMapToMapArray(assembledMesh.splitIndexesMap, meshCopy.splitIndexesMap)
+			MapKit.addMapToMapArray(assembledMesh.splitIndexesMap, meshCopy.splitIndexesMap)
 		}
 	}
 }
@@ -180,7 +181,7 @@ function addMeshToAssembledMesh(assembledMesh, meshCopy) {
 function addMeshToJoinedMesh(joinedMesh, otherMesh) {
 	var joinedCenters = getCenters(joinedMesh)
 	var joinedFacets = joinedMesh.facets
-	var otherMeshFacets = arrayKit.getArraysCopy(otherMesh.facets)
+	var otherMeshFacets = Polyline.copy(otherMesh.facets)
 	var otherCenters = getCenters(otherMesh)
 	var points = joinedMesh.points
 	var squaredDistances = new Array(joinedCenters.length)
@@ -192,7 +193,7 @@ function addMeshToJoinedMesh(joinedMesh, otherMesh) {
 		var closestFacetOtherIndex = null
 		var joinedCenter = joinedCenters[joinedIndex]
 		for (var otherIndex = 0; otherIndex < otherCenters.length; otherIndex++) {
-			var distanceSquared = Vector.distanceSquared3D(joinedCenter, otherCenters[otherIndex])
+			var distanceSquared = VectorFast.distanceSquared3D(joinedCenter, otherCenters[otherIndex])
 			if (distanceSquared < closestFacetDistanceSquared) {
 				closestFacetOtherIndex = otherIndex
 				closestFacetDistanceSquared = distanceSquared
@@ -200,12 +201,12 @@ function addMeshToJoinedMesh(joinedMesh, otherMesh) {
 		}
 		squaredDistances[joinedIndex] = [closestFacetDistanceSquared, joinedIndex, closestFacetOtherIndex]
 	}
-	squaredDistances.sort(arrayKit.compareElementZeroAscending)
+	squaredDistances.sort(Vector.compareElementZeroAscending)
 	var originalPointLength = points.length
 	for (var facet of otherMeshFacets) {
-		addArrayScalar(facet, originalPointLength)
+		Vector.addArrayScalar(facet, originalPointLength)
 	}
-	arrayKit.pushArray(points, otherMesh.points)
+	Vector.pushArray(points, otherMesh.points)
 	var squaredDistancesZero = squaredDistances[0]
 	var closestSquared = squaredDistancesZero[0]
 	var endIndex = 0
@@ -235,8 +236,8 @@ function addMeshToJoinedMesh(joinedMesh, otherMesh) {
 		var connectedOtherFacet = connectedOtherFacets[connectedFacetIndex]
 		joinFacets(joinedFacets, connectedJoinedFacet, otherMeshFacets, connectedOtherFacet, points)
 	}
-	arrayKit.pushArray(joinedFacets, otherMeshFacets)
-	arrayKit.removeShortArrays(joinedFacets, 3)
+	Vector.pushArray(joinedFacets, otherMeshFacets)
+	Vector.removeShortArrays(joinedFacets, 3)
 	removeUnfacetedPoints(joinedMesh)
 }
 
@@ -249,9 +250,9 @@ function addPointsToFacets(mesh, segmentMap) {
 		var minimumPoint = points[parseInt(pointIndexStrings[0])]
 		for (var pointIndexesIndex = 0; pointIndexesIndex <  pointIndexes.length; pointIndexesIndex++) {
 			var pointIndex = pointIndexes[pointIndexesIndex]
-			pointIndexes[pointIndexesIndex] = [Vector.distanceSquared3D(minimumPoint, points[pointIndex]), pointIndex]
+			pointIndexes[pointIndexesIndex] = [VectorFast.distanceSquared3D(minimumPoint, points[pointIndex]), pointIndex]
 		}
-		pointIndexes.sort(arrayKit.compareElementZeroAscending)
+		pointIndexes.sort(Vector.compareElementZeroAscending)
 		for (var pointIndexesIndex = 0; pointIndexesIndex <  pointIndexes.length; pointIndexesIndex++) {
 			pointIndexes[pointIndexesIndex] = pointIndexes[pointIndexesIndex][1]
 		}
@@ -264,7 +265,7 @@ function addPointsToFacets(mesh, segmentMap) {
 			var endIndex = (vertexIndex + 1) % facet.length
 			var forwardKey = facet[vertexIndex].toString() + ' ' + facet[endIndex].toString()
 			if (arrowMap.has(forwardKey)) {
-				arrayKit.spliceArray(facet, endIndex, arrowMap.get(forwardKey))
+				Vector.spliceArray(facet, endIndex, arrowMap.get(forwardKey))
 			}
 		}
 	}
@@ -334,7 +335,7 @@ function addSplitIndexesByFacetSet(facetIndexSet, id, splitHeight, workMesh) {
 }
 
 function addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh) {
-	if (arrayKit.getIsEmpty(splitHeights)) {
+	if (Vector.isEmpty(splitHeights)) {
 		return
 	}
 
@@ -370,7 +371,7 @@ function addSplitIndexesByIndexStart(facetIndexStart, id, splitHeights, workMesh
 
 function addSplitIndexesBySplits(facetSplits, id, outerFacetSplits, splitHeight, workMesh) {
 	var arrowAlongMap = new Map()
-	if (arrayKit.getIsEmpty(workMesh.points)) {
+	if (Vector.isEmpty(workMesh.points)) {
 		return
 	}
 
@@ -404,13 +405,13 @@ function addSplitIndexesBySplits(facetSplits, id, outerFacetSplits, splitHeight,
 		if (workMesh.splitIndexesMap == undefined) {
 			workMesh.splitIndexesMap = new Map()
 		}
-		mapKit.addElementsToMapArray(workMesh.splitIndexesMap, id, Array.from(pointIndexSet))
+		MapKit.addElementsToMapArray(workMesh.splitIndexesMap, id, Array.from(pointIndexSet))
 	}
 }
 
 function addToArrowsMap(arrowsMap, edges) {
-	mapKit.addElementToMapArray(arrowsMap, edges[0], edges[1])
-	mapKit.addElementToMapArray(arrowsMap, edges[1], edges[0])
+	MapKit.addElementToMapArray(arrowsMap, edges[0], edges[1])
+	MapKit.addElementToMapArray(arrowsMap, edges[1], edges[0])
 }
 
 function getToolMeshIndexByFacet(directedIndex, facetIntersection, facetVertexIndexes, toolPolygon, workMesh) {
@@ -433,33 +434,37 @@ function alterFacetsAddHorizontals(exclusion, facetIntersection, facetIntersecti
 	var facetVertexIndexes = getFacetVertexIndexes(toolPolygon)
 	facetVertexIndexes.pointIndexes = []
 	if (alongIndexesMap.size == 0) {
-		if (!getIsPointInsidePolygon(toolPolygon[0], workPolygon)) {
-			facets[facetIndex] = []
+		if (getIsPointInsidePolygon(toolPolygon[0], workPolygon)) {
+			var toolFacet = new Array(toolPolygon.length)
+			for (var vertexIndex = 0; vertexIndex < toolPolygon.length; vertexIndex++) {
+				toolFacet[vertexIndex] = getToolMeshIndexByFacet(vertexIndex, facetIntersection, facetVertexIndexes, toolPolygon, workMesh)
+			}
+			if (getIsFacetInStrata(toolFacet, points, strata)) {
+				if (facetIntersection.isToolReversed) {
+					toolFacet.reverse()
+				}
+				if (exclusion.workExclusion == -1) {
+					facets[facetIndex] = toolFacet
+				}
+				else {
+					facets[facetIndex] = getConnectedFacet([facets[facetIndex], toolFacet], points)
+				}
+			}
 			return
 		}
-		var toolFacet = new Array(toolPolygon.length)
-		for (var vertexIndex = 0; vertexIndex < toolPolygon.length; vertexIndex++) {
-			toolFacet[vertexIndex] = getToolMeshIndexByFacet(vertexIndex, facetIntersection, facetVertexIndexes, toolPolygon, workMesh)
-		}
-		if (getIsFacetInStrata(toolFacet, points, strata)) {
-			if (facetIntersection.isToolReversed) {
-				toolFacet.reverse()
-			}
-			if (exclusion.workExclusion == -1) {
-				facets[facetIndex] = toolFacet
-			}
-			else {
-				facets[facetIndex] = getConnectedFacet([facets[facetIndex], toolFacet], points)
-			}
+		if (exclusion.workExclusion != -1) {
+			facets[facetIndex] = []
 		}
 		return
 	}
+
 	if (facetIntersection.isVertical) {
 		sortVertically(alongIndexesMap, meetingMap, toolPolygon, workPolygon)
 	}
+
 	var extantPolygons = getExtantPolygons(alongIndexesMap, exclusion, facetIntersection.isVertical, meetingMap, toolPolygon, workPolygon)
 	for (var extantPolygon of extantPolygons) {
-		arrayKit.removeRepeats(extantPolygon)
+		Vector.removeRepeats(extantPolygon)
 		for (var nodeStringIndex = 0; nodeStringIndex < extantPolygon.length; nodeStringIndex++) {
 			var nodeKey = extantPolygon[nodeStringIndex]
 			var nodeStrings = nodeKey.split(' ')
@@ -470,7 +475,8 @@ function alterFacetsAddHorizontals(exclusion, facetIntersection, facetIntersecti
 			extantPolygon.reverse()
 		}
 	}
-	arrayKit.removeShortArrays(extantPolygons, 3)
+
+	Vector.removeShortArrays(extantPolygons, 3)
 	if (extantPolygons.length == 0) {
 		facets[facetIndex] = []
 		return
@@ -511,7 +517,7 @@ function getAllConvexFacets(mesh) {
 	var points = mesh.points
 	var allConvexFacets = []
 	var xyPoints = new Array(points.length)
-	arrayKit.removeShortArrays(facets, 3)
+	Vector.removeShortArrays(facets, 3)
 	for (var facet of facets) {
 		var originalFacet = facet.slice(0)
 		var convexFacets = getConvex3DFacets(facet, points, xyPoints)
@@ -520,7 +526,7 @@ function getAllConvexFacets(mesh) {
 				convexFacets.splice(convexFacetIndex, 1)
 			}
 		}
-		arrayKit.pushArray(allConvexFacets, convexFacets)
+		Vector.pushArray(allConvexFacets, convexFacets)
 	}
 
 	return allConvexFacets
@@ -531,7 +537,7 @@ function getAllTriangleFacets(mesh) {
 	var points = mesh.points
 	var allTriangleFacets = []
 	var xyPoints = new Array(points.length)
-	arrayKit.removeShortArrays(facets, 3)
+	Vector.removeShortArrays(facets, 3)
 	for (var facet of facets) {
 		var originalFacet = facet.slice(0)
 		var triangleFacets = getTriangle3DFacets(facet, points, xyPoints)
@@ -553,9 +559,9 @@ function getAllTriangleFacets(mesh) {
 			var original = getPolygonByFacet(originalFacet, points).join(' ')
 			var xyPolygon = getPolygonByFacet(originalFacet, xyPoints).join(' ')
 			var message = 'identical arrows in getAllTriangleFacets in polyhedron.'
-			noticeByList([message, multiples, xyMultiples, original, xyPolygon, triangleFacets.join(' ')])
+			printCaller([message, multiples, xyMultiples, original, xyPolygon, triangleFacets.join(' ')])
 		}
-		arrayKit.pushArray(allTriangleFacets, triangleFacets)
+		Vector.pushArray(allTriangleFacets, triangleFacets)
 	}
 
 	return allTriangleFacets
@@ -577,7 +583,7 @@ function getArrowsMap(facets) {
 	for (var facet of facets) {
 		for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 			var arrow = facet[vertexIndex] + ',' + facet[(vertexIndex + 1) % facet.length]
-			mapKit.addElementToMapArray(arrowMap, arrow, arrow)
+			MapKit.addElementToMapArray(arrowMap, arrow, arrow)
 		}
 	}
 	return arrowMap
@@ -586,9 +592,10 @@ function getArrowsMap(facets) {
 function getCenter(facet, points) {
 	var center = [0.0, 0.0, 0.0]
 	for (var pointIndex of facet) {
-		Vector.add3D(center, points[pointIndex])
+		VectorFast.add3D(center, points[pointIndex])
 	}
-	Vector.divide3DScalar(center, facet.length)
+
+	VectorFast.divide3DScalar(center, facet.length)
 	return center
 }
 
@@ -621,18 +628,18 @@ function getClosestConnectionByFacets(facets, points) {
 	var firstPolygon = polygons[0]
 	var firstCenter = [0.0, 0.0]
 	for (var point of firstPolygon) {
-		Vector.add2D(firstCenter, point)
+		VectorFast.add2D(firstCenter, point)
 	}
 
-	Vector.divide2DScalar(firstCenter, firstPolygon.length)
+	VectorFast.divide2DScalar(firstCenter, firstPolygon.length)
 	for (var otherFacetIndex = 1; otherFacetIndex < facets.length; otherFacetIndex++) {
 		var otherPolygon = polygons[otherFacetIndex]
 		for (var otherVertexIndex = 0; otherVertexIndex < otherPolygon.length; otherVertexIndex++) {
-			distanceConnections.push([Vector.distanceSquared2D(firstCenter, otherPolygon[otherVertexIndex]), otherFacetIndex, otherVertexIndex])
+			distanceConnections.push([VectorFast.distanceSquared2D(firstCenter, otherPolygon[otherVertexIndex]), otherFacetIndex, otherVertexIndex])
 		}
 	}
 
-	distanceConnections.sort(arrayKit.compareElementZeroAscending)
+	distanceConnections.sort(Vector.compareElementZeroAscending)
 	for (var distanceConnection of distanceConnections) {
 		var otherFacetIndex = distanceConnection[1]
 		var otherVertexIndex = distanceConnection[2]
@@ -640,8 +647,8 @@ function getClosestConnectionByFacets(facets, points) {
 		var otherPoint = otherPolygon[otherVertexIndex]
 		for (var firstVertexIndex = 0; firstVertexIndex < firstPolygon.length; firstVertexIndex++) {
 			var firstPoint = firstPolygon[firstVertexIndex]
-			var firstCheck = Vector.getSubtraction2D(firstPoint, otherPoint)
-			var distanceSquared = Vector.lengthSquared2D(firstCheck)
+			var firstCheck = VectorFast.getSubtraction2D(firstPoint, otherPoint)
+			var distanceSquared = VectorFast.lengthSquared2D(firstCheck)
 			if (distanceSquared < closestDistanceSquared && distanceSquared > 0.0) {
 				if (getIsConnectionClear
 				(distanceSquared, firstCheck, firstPoint, firstVertexIndex, polygons, otherPoint, otherFacetIndex, otherVertexIndex)) {
@@ -663,8 +670,8 @@ function getClosestConnectionByFacets(facets, points) {
 		var firstPoint = firstPolygon[firstVertexIndex]
 		for (var otherVertexIndex = 0; otherVertexIndex < otherPolygon.length; otherVertexIndex++) {
 			var otherPoint = otherPolygon[otherVertexIndex]
-			var firstCheck = Vector.getSubtraction2D(firstPoint, otherPoint)
-			var distanceSquared = Vector.lengthSquared2D(firstCheck)
+			var firstCheck = VectorFast.getSubtraction2D(firstPoint, otherPoint)
+			var distanceSquared = VectorFast.lengthSquared2D(firstCheck)
 			if (distanceSquared < closestDistanceSquared && distanceSquared > 0.0) {
 				if (getIsConnectionClear
 				(distanceSquared, firstCheck, firstPoint, firstVertexIndex, polygons, otherPoint, otherFacetIndex, otherVertexIndex)) {
@@ -697,18 +704,18 @@ function getConvexFacet(facet, isClockwise, xyPoints) {
 		var beginPoint = xyPoints[facet[(vertexIndex - 1 + facet.length) % facet.length]]
 		var centerPoint = xyPoints[facet[vertexIndex]]
 		var endPoint = xyPoints[facet[(vertexIndex + 1) % facet.length]]
-		var centerBegin = Vector.getSubtraction2D(beginPoint, centerPoint)
-		var centerBeginLength = Vector.length2D(centerBegin)
-		var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-		var centerEndLength = Vector.length2D(centerEnd)
+		var centerBegin = VectorFast.getSubtraction2D(beginPoint, centerPoint)
+		var centerBeginLength = VectorFast.length2D(centerBegin)
+		var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+		var centerEndLength = VectorFast.length2D(centerEnd)
 		if (centerBeginLength > 0.0 && centerEndLength > 0.0) {
-			Vector.divide2DScalar(centerBegin, centerBeginLength)
-			Vector.divide2DScalar(centerEnd, centerEndLength)
-			var bisector = Vector.getAddition2D(centerBegin, centerEnd)
-			var bisectorLength = Vector.length2D(bisector)
+			VectorFast.divide2DScalar(centerBegin, centerBeginLength)
+			VectorFast.divide2DScalar(centerEnd, centerEndLength)
+			var bisector = VectorFast.getAddition2D(centerBegin, centerEnd)
+			var bisectorLength = VectorFast.length2D(bisector)
 			if (bisectorLength > gClose) {
-				if (isClockwise == (Vector.crossProduct2D(centerBegin, centerEnd) < 0.0)) {
-					var splitFacet = getSplitFacet(Vector.divide2DScalar(bisector, bisectorLength), facet, vertexIndex, xyPoints)
+				if (isClockwise == (VectorFast.crossProduct2D(centerBegin, centerEnd) < 0.0)) {
+					var splitFacet = getSplitFacet(VectorFast.divide2DScalar(bisector, bisectorLength), facet, vertexIndex, xyPoints)
 					if (splitFacet != undefined) {
 						return splitFacet
 					}
@@ -730,11 +737,11 @@ function getConvexFacet(facet, isClockwise, xyPoints) {
 //		else {
 //			if (centerBeginLength == 0.0) {
 //				var polygon = getPolygonByFacet(facet, xyPoints)
-//				noticeByList(['Identical points, centerBeginLength = 0.0 in polyhedron/getConvexFacet', polygon, beginPoint, centerPoint])
+//				printCaller(['Identical points, centerBeginLength = 0.0 in polyhedron/getConvexFacet', polygon, beginPoint, centerPoint])
 //			}
 //			if (centerEndLength == 0.0) {
 //				var polygon = getPolygonByFacet(facet, xyPoints)
-//				noticeByList(['Identical points, centerEndLength = 0.0 in polyhedron/getConvexFacet', polygon, centerPoint, endPoint])
+//				printCaller(['Identical points, centerEndLength = 0.0 in polyhedron/getConvexFacet', polygon, centerPoint, endPoint])
 //			}
 //		}
 	}
@@ -743,7 +750,7 @@ function getConvexFacet(facet, isClockwise, xyPoints) {
 }
 
 function getConvexFacets(originalFacet, xyPoints) {
-	var isClockwise = getIsClockwise(getPolygonByFacet(originalFacet, xyPoints))
+	var isClockwise = Polygon.isClockwise(getPolygonByFacet(originalFacet, xyPoints))
 	var facetCount = 0
 	var convexFacets = [originalFacet.slice(0)]
 	var whileMaximum = convexFacets[0].length
@@ -857,8 +864,8 @@ function getEndMapByPolylines(polylines) {
 function getEndsBetween(mesh) {
 	var centers = getCenters(mesh)
 	var facets = mesh.facets
-	var otherFacets = arrayKit.getArraysCopy(mesh.facets)
-	var otherPoints = arrayKit.getArraysCopy(mesh.points)
+	var otherFacets = Polyline.copy(mesh.facets)
+	var otherPoints = Polyline.copy(mesh.points)
 	var points = mesh.points
 	var minimumX = Number.MAX_VALUE
 	var maximumX = -Number.MAX_VALUE
@@ -866,7 +873,7 @@ function getEndsBetween(mesh) {
 		minimumX = Math.min(minimumX, otherPoint[0])
 		maximumX = Math.max(maximumX, otherPoint[0])
 	}
-	addArraysByIndex(otherPoints, maximumX - minimumX, 0)
+	Polyline.addByIndex(otherPoints, maximumX - minimumX, 0)
 	var otherCenters = getCenters({facets:otherFacets, points:otherPoints})
 	var squaredDistances = new Array(centers.length)
 	if (centers.length == 0 || otherCenters.length == 0) {
@@ -877,7 +884,7 @@ function getEndsBetween(mesh) {
 		var closestFacetOtherIndex = undefined
 		var center = centers[centerIndex]
 		for (var otherIndex = 0; otherIndex < otherCenters.length; otherIndex++) {
-			var distanceSquared = Vector.distanceSquared3D(center, otherCenters[otherIndex])
+			var distanceSquared = VectorFast.distanceSquared3D(center, otherCenters[otherIndex])
 			if (distanceSquared < closestFacetDistanceSquared) {
 				closestFacetOtherIndex = otherIndex
 				closestFacetDistanceSquared = distanceSquared
@@ -885,7 +892,7 @@ function getEndsBetween(mesh) {
 		}
 		squaredDistances[centerIndex] = [closestFacetDistanceSquared, centerIndex, closestFacetOtherIndex]
 	}
-	squaredDistances.sort(arrayKit.compareElementZeroAscending)
+	squaredDistances.sort(Vector.compareElementZeroAscending)
 	var squaredDistancesZero = squaredDistances[0]
 	var closestSquared = squaredDistancesZero[0]
 	var endIndex = 0
@@ -904,7 +911,7 @@ function getEndsBetween(mesh) {
 	var betweenSet = new Set()
 	var endsBetween = {leftAll:[], leftX:Number.MAX_VALUE, endVertexFacets:[], rightAll:[], rightX:-Number.MAX_VALUE}
 	for (var facet of facets) {
-		setKit.addElementsToSet(betweenSet, facet)
+		SetKit.addElementsToSet(betweenSet, facet)
 	}
 	for (var squaredDistanceIndex = 0; squaredDistanceIndex < endIndex; squaredDistanceIndex++) {
 		var squaredDistance = squaredDistances[squaredDistanceIndex]
@@ -918,13 +925,13 @@ function getEndsBetween(mesh) {
 	for (var connectedIndex = 0; connectedIndex < rightFacets.length; connectedIndex++) {
 		var rightFacet = rightFacets[connectedIndex]
 		var leftFacet = leftFacets[connectedIndex]
-		setKit.deleteElementsFromSet(betweenSet, leftFacet)
-		setKit.deleteElementsFromSet(betweenSet, rightFacet)
+		SetKit.deleteElementsFromSet(betweenSet, leftFacet)
+		SetKit.deleteElementsFromSet(betweenSet, rightFacet)
 		var point = points[rightFacet[0]]
 		var closestDistanceSquared = Number.MAX_VALUE
 		var closestOtherVertexIndex = undefined
 		for (var vertexIndex = 0; vertexIndex < leftFacet.length; vertexIndex++) {
-			var distanceSquared = Vector.distanceSquared3D(point, otherPoints[leftFacet[vertexIndex]])
+			var distanceSquared = VectorFast.distanceSquared3D(point, otherPoints[leftFacet[vertexIndex]])
 			if (distanceSquared < closestDistanceSquared) {
 				closestOtherVertexIndex = vertexIndex
 				closestDistanceSquared = distanceSquared
@@ -932,8 +939,8 @@ function getEndsBetween(mesh) {
 		}
 		var endVertexFacet = {closestOtherVertexIndex:closestOtherVertexIndex, leftFacet:leftFacet, rightFacet:rightFacet}
 		endsBetween.endVertexFacets.push(endVertexFacet)
-		arrayKit.pushArray(endsBetween.leftAll, leftFacet)
-		arrayKit.pushArray(endsBetween.rightAll, rightFacet)
+		Vector.pushArray(endsBetween.leftAll, leftFacet)
+		Vector.pushArray(endsBetween.rightAll, rightFacet)
 	}
 	for (var pointIndex of endsBetween.leftAll) {
 		var x = points[pointIndex][0]
@@ -947,12 +954,12 @@ function getEndsBetween(mesh) {
 			endsBetween.rightX = x
 		}
 	}
-	arrayKit.removeShortArrays(facets, 3)
+	Vector.removeShortArrays(facets, 3)
 	endsBetween.betweens = Array.from(betweenSet)
 	endsBetween.leftFacetStart = facets.length
-	arrayKit.pushArray(facets, leftFacets)
+	Vector.pushArray(facets, leftFacets)
 	endsBetween.rightFacetStart = facets.length
-	arrayKit.pushArray(facets, rightFacets)
+	Vector.pushArray(facets, rightFacets)
 	return endsBetween
 }
 
@@ -985,7 +992,7 @@ function getFacetByWorkMap(facet, workMap) {
 			for (var whileIndex = 0; whileIndex < gLengthLimit; whileIndex++) {
 				beginIndex = workMap.get(beginIndex)
 				if (beginIndex == endIndex) {
-					arrayKit.spliceArray(facet, endIndexIndex, between)
+					Vector.spliceArray(facet, endIndexIndex, between)
 					return facet
 				}
 				between.push(beginIndex)
@@ -1060,7 +1067,7 @@ function getIsAFacetInStrata(facets, points, strata) {
 }
 
 function getIsFacetInStrata(facet, points, strata) {
-	if (arrayKit.getIsEmpty(facet)) {
+	if (Vector.isEmpty(facet)) {
 		return false
 	}
 
@@ -1074,44 +1081,53 @@ function getIsFacetInStrata(facet, points, strata) {
 }
 
 function getIsFacetPointingOutside(mesh) {
-//	in future, improvement would be to take largest of the few top xFacets
 	var facets = mesh.facets
 	if (mesh.facets.length == 0) {
 		return undefined
 	}
+
 	var points = mesh.points
-	var xFacets = new Array(facets.length)
-	var xNormal = [1.0, 0.0, 0.0]
-	for (var facetIndex = 0; facetIndex < xFacets.length; facetIndex++) {
-		var normal = getNormalByFacet(facets[facetIndex], points)
-		var xCloseness = -2
-		if (normal != undefined) {
-			xCloseness = Vector.dotProduct3D(normal, xNormal)
+	var highest = -Number.MAX_VALUE
+	var highPolygons = undefined
+	for (var facet of facets) {
+		var highPolygon = getPolygonByFacet(facet, points)
+		var high = Polyline.highestByIndex(highPolygon, 2)
+		if (high > highest) {
+			highest = high
+			highPolygons = [highPolygon]
 		}
-		xFacets[facetIndex] = [xCloseness, facetIndex]
+		else {
+			if (high == highest) {
+				highPolygons.push(highPolygon)
+			}
+		}
 	}
-	xFacets.sort(arrayKit.compareElementZeroDescending)
-	var facet = facets[xFacets[0][1]]
-	var polygon = getPolygonByFacet(facet, points)
-	var xzPolygon = new Array(polygon.length)
-	var yzPolygon = new Array(polygon.length)
-	for (var pointIndex = 0; pointIndex < polygon.length; pointIndex++) {
-		var point = polygon[pointIndex]
-		xzPolygon[pointIndex] = [point[0], point[2]]
-		yzPolygon[pointIndex] = [point[1], point[2]]
+
+	var greatestCloseness = -Number.MAX_VALUE
+	var closestPolygon = undefined
+	var xNormal = [0.0, 0.0, 1.0]
+	for (var highPolygon of highPolygons) {
+		var normal = getNormalByPolygon(highPolygon)
+		if (normal != undefined) {
+			closeness = VectorFast.dotProduct3D(normal, xNormal)
+			if (closeness > greatestCloseness) {
+				greatestCloseness = closeness
+				closestPolygon = highPolygon
+			}
+		}
 	}
-	var yzPoint = getPointInsidePolygon(yzPolygon)
-	var xIntersections = getXIntersectionsByMesh(mesh, yzPoint[0], yzPoint[1] + gClose)
-	var numberOfIntersectionsToLeft = getNumberOfIntersectionsToLeft(getPointInsidePolygon(xzPolygon)[0] + gClose, xIntersections)
-	if (numberOfIntersectionsToLeft == 0) {
+
+	if (closestPolygon == undefined) {
 		return undefined
 	}
 
-	return numberOfIntersectionsToLeft % 2 == 0
+	var point = getPointInsidePolygon(closestPolygon)
+	point.push(getZByPointPolygon(point, closestPolygon))
+	return Polyhedron.isPointInsideMesh(mesh, point)
 }
 
 function getIsInStrata(strata, z) {
-	if (arrayKit.getIsEmpty(strata)) {
+	if (Vector.isEmpty(strata)) {
 		return true
 	}
 
@@ -1135,7 +1151,7 @@ function getIsInStrata(strata, z) {
 }
 
 function getIsInStratas(stratas, z) {
-	if (arrayKit.getIsEmpty(stratas)) {
+	if (Vector.isEmpty(stratas)) {
 		return true
 	}
 
@@ -1149,7 +1165,7 @@ function getIsInStratas(stratas, z) {
 }
 
 function getIsPolygonInStratas(polygon, stratas) {
-	if (arrayKit.getIsEmpty(stratas)) {
+	if (Vector.isEmpty(stratas)) {
 		return true
 	}
 
@@ -1177,7 +1193,7 @@ function getJoinedFacetArrays(facets, points) {
 			for (var vertexIndex = 0; vertexIndex < facet.length; vertexIndex++) {
 				var nextIndex = (vertexIndex + 1) % facet.length
 				var edgeKey = getEdgeKey(facet[vertexIndex].toString(), facet[nextIndex].toString())
-				mapKit.addElementToMapArray(facetsMap, edgeKey, facetIndex)
+				MapKit.addElementToMapArray(facetsMap, edgeKey, facetIndex)
 			}
 		}
 	}
@@ -1186,8 +1202,8 @@ function getJoinedFacetArrays(facets, points) {
 		if (facetIndexes.length == 2) {
 			var facetIndex0 = facetIndexes[0]
 			var facetIndex1 = facetIndexes[1]
-			if (Vector.distanceSquared3D(normals[facetIndex0], normals[facetIndex1]) < gCloseSquared) {
-				addToLinkMap(facetIndex0, facetIndex1, linkMap)
+			if (VectorFast.distanceSquared3D(normals[facetIndex0], normals[facetIndex1]) < gCloseSquared) {
+				MapKit.addToLinkMap(facetIndex0, facetIndex1, linkMap)
 			}
 		}
 	}
@@ -1245,23 +1261,23 @@ function getMeetingMap(facetIntersections, toolPolygon, workMesh) {
 				facetLength:facet.length,
 				workDirection:pointBeginIndex < pointEndIndex,
 				workVertexIndex:workVertexIndex}
-			mapKit.addElementToMapArray(arrowsMap, getSemicolonEdgeKey(pointBeginIndex, pointEndIndex), arrow)
+			MapKit.addElementToMapArray(arrowsMap, getSemicolonEdgeKey(pointBeginIndex, pointEndIndex), arrow)
 		}
 	}
 	for (var toolBeginIndex = 0; toolBeginIndex < toolPolygon.length; toolBeginIndex++) {
 		var toolEndIndex = (toolBeginIndex + 1) % toolPolygon.length
 		var toolBegin = toolPolygon[toolBeginIndex]
 		var toolEnd = toolPolygon[toolEndIndex]
-		var delta = Vector.getSubtraction2D(toolEnd, toolBegin)
-		var deltaLength = Vector.length2D(delta)
+		var delta = VectorFast.getSubtraction2D(toolEnd, toolBegin)
+		var deltaLength = VectorFast.length2D(delta)
 		if (deltaLength != 0.0) {
-			Vector.divide2DScalar(delta, deltaLength)
+			VectorFast.divide2DScalar(delta, deltaLength)
 			var reverseRotation = [delta[0], -delta[1]]
-			var toolBeginRotated = Vector.getRotation2DVector(toolBegin, reverseRotation)
-			var toolEndRotated = Vector.getRotation2DVector(toolEnd, reverseRotation)
+			var toolBeginRotated = VectorFast.getRotation2DVector(toolBegin, reverseRotation)
+			var toolEndRotated = VectorFast.getRotation2DVector(toolEnd, reverseRotation)
 			var y = toolBeginRotated[1]
 			for (var rotatedPointKey of rotatedPointMap.keys()) {
-				rotatedPointMap.set(rotatedPointKey, Vector.getRotation2DVector(points[rotatedPointKey], reverseRotation))
+				rotatedPointMap.set(rotatedPointKey, VectorFast.getRotation2DVector(points[rotatedPointKey], reverseRotation))
 			}
 			for (var arrowsKey of arrowsMap.keys()) {
 				var arrowsKeyStrings = arrowsKey.split(';')
@@ -1311,8 +1327,8 @@ function getMeetingMap(facetIntersections, toolPolygon, workMesh) {
 							}
 						}
 						else {
-							meeting.point = Vector.getMultiplicationArrayScalar(points[workBeginIndex], (1.0 - meeting.workAlong))
-							Vector.addArray(meeting.point, Vector.getMultiplicationArrayScalar(points[workEndIndex], meeting.workAlong))
+							meeting.point = VectorFast.getMultiplicationArrayScalar(points[workBeginIndex], (1.0 - meeting.workAlong))
+							VectorFast.addArray(meeting.point, VectorFast.getMultiplicationArrayScalar(points[workEndIndex], meeting.workAlong))
 							meeting.pointIndex = points.length
 							points.push(meeting.point)
 						}
@@ -1357,7 +1373,7 @@ function getMeetingMapByHeight(facetSplits, splitHeight, workMesh) {
 				facetSplit:facetSplit,
 				workDirection:pointBeginIndex < pointEndIndex,
 				workVertexIndex:workVertexIndex}
-			mapKit.addElementToMapArray(arrowsMap, getSemicolonEdgeKey(pointBeginIndex, pointEndIndex), arrow)
+			MapKit.addElementToMapArray(arrowsMap, getSemicolonEdgeKey(pointBeginIndex, pointEndIndex), arrow)
 		}
 	}
 	for (var arrowsKey of arrowsMap.keys()) {
@@ -1383,8 +1399,8 @@ function getMeetingMapByHeight(facetSplits, splitHeight, workMesh) {
 				}
 			}
 			else {
-				meeting.point = Vector.getMultiplication3DScalar(points[workBeginIndex], 1.0 - meeting.workAlong)
-				Vector.add3D(meeting.point, Vector.getMultiplication3DScalar(points[workEndIndex], meeting.workAlong))
+				meeting.point = VectorFast.getMultiplication3DScalar(points[workBeginIndex], 1.0 - meeting.workAlong)
+				VectorFast.add3D(meeting.point, VectorFast.getMultiplication3DScalar(points[workEndIndex], meeting.workAlong))
 				meeting.pointIndex = points.length
 			}
 			points.push(meeting.point)
@@ -1394,7 +1410,7 @@ function getMeetingMapByHeight(facetSplits, splitHeight, workMesh) {
 				if (arrow.workDirection == false) {
 					workAlong = 1.0 - workAlong
 				}
-				var toolAlong = Vector.dotProduct2D(arrow.facetSplit.rightNormal, meeting.point)
+				var toolAlong = VectorFast.dotProduct2D(arrow.facetSplit.rightNormal, meeting.point)
 				arrow.facetSplit.toolAlongIndexes.push([toolAlong, meetingKey])
 				if (meeting.isWorkNode) {
 					workAlong = 1.0 * (arrow.facetSplit.facet[arrow.workVertexIndex] != meeting.pointIndex)
@@ -1406,7 +1422,7 @@ function getMeetingMapByHeight(facetSplits, splitHeight, workMesh) {
 		}
 	}
 	for (var facetSplit of facetSplits) {
-		facetSplit.toolAlongIndexes.sort(arrayKit.compareElementZeroAscending)
+		facetSplit.toolAlongIndexes.sort(Vector.compareElementZeroAscending)
 	}
 	return meetingMap
 }
@@ -1447,8 +1463,8 @@ function getMeshAnalysis(mesh, normal) {
 			}
 			var edgeKey = getEdgeKey(vertex.toString(), nextVertex.toString())
 			var arrow = vertex.toString() + ',' + nextVertex.toString()
-			mapKit.addElementToMapArray(arrowsMap, edgeKey, arrow)
-			mapKit.addElementToMapArray(facetsMap, edgeKey, facetIndex)
+			MapKit.addElementToMapArray(arrowsMap, edgeKey, arrow)
+			MapKit.addElementToMapArray(facetsMap, edgeKey, facetIndex)
 		}
 	}
 	addFirstTwoKeysToLinkMap(facetsMap, linkMap)
@@ -1519,7 +1535,7 @@ function getMeshAnalysis(mesh, normal) {
 		loneEdgesString = loneEdges.join(' ')
 		var loneIndexStringSet = new Set()
 		for (var loneEdge of loneEdges) {
-			setKit.addElementsToSet(loneIndexStringSet, loneEdge.split(','))
+			SetKit.addElementsToSet(loneIndexStringSet, loneEdge.split(','))
 		}
 		var loneIndexStrings = Array.from(loneIndexStringSet)
 		loneIndexStrings.sort()
@@ -1543,17 +1559,17 @@ function getMeshAnalysis(mesh, normal) {
 	}
 
 
-	if (!arrayKit.getIsEmpty(normal)) {
+	if (!Vector.isEmpty(normal)) {
 		var dotPolygons = []
 		for (var facet of mesh.facets) {
 			var polygon = getPolygonByFacet(facet, points)
 			var polygonNormal = getNormalByPolygon(polygon)
 			if (polygonNormal != undefined) {
-				var dotProduct = Vector.dotProduct3D(polygonNormal, normal)
+				var dotProduct = VectorFast.dotProduct3D(polygonNormal, normal)
 				dotPolygons.push([dotProduct, facet, polygon])
 			}
 		}
-		dotPolygons.sort(arrayKit.compareElementZeroDescending)
+		dotPolygons.sort(Vector.compareElementZeroDescending)
 		var dotPolygonIndex = 1
 		for (; dotPolygonIndex < dotPolygons.length; dotPolygonIndex++) {
 			if (dotPolygons[dotPolygonIndex][0] < 0.5) {
@@ -1708,13 +1724,13 @@ function getMeshByTSV(tsvInputString) {
 }
 
 function getMeshCopy(mesh) {
-	var meshCopy = {facets:arrayKit.getArraysCopy(mesh.facets), points:arrayKit.getArraysCopy(mesh.points)}
+	var meshCopy = {facets:Polyline.copy(mesh.facets), points:Polyline.copy(mesh.points)}
 	if (mesh.intersectionIndexesMap != undefined) {
-		meshCopy.intersectionIndexesMap = mapKit.getMapArraysCopy(mesh.intersectionIndexesMap)
+		meshCopy.intersectionIndexesMap = MapKit.getMapArraysCopy(mesh.intersectionIndexesMap)
 	}
 
 	if (mesh.splitIndexesMap != undefined) {
-		meshCopy.splitIndexesMap = mapKit.getMapArraysCopy(mesh.splitIndexesMap)
+		meshCopy.splitIndexesMap = MapKit.getMapArraysCopy(mesh.splitIndexesMap)
 	}
 
 	return meshCopy
@@ -1737,18 +1753,18 @@ function getNormalByFacet(facet, points) {
 function getOutsidestVertexIndex(facet, identicalVertexIndexes, otherPoint, points) {
 	var centerPoint = points[facet[identicalVertexIndexes[0]]]
 	var outsidestVertexIndex = undefined
-	var centerOther = Vector.getSubtraction2D(otherPoint, centerPoint)
+	var centerOther = VectorFast.getSubtraction2D(otherPoint, centerPoint)
 	var maximumDotProduct = -Number.MAX_VALUE
 	for (var vertexIndex of identicalVertexIndexes) {
 		var beginPoint = points[facet[(vertexIndex - 1 + facet.length) % facet.length]]
-		var centerBegin = normalize2D(Vector.getSubtraction2D(beginPoint, centerPoint))
+		var centerBegin = Vector.normalize2D(VectorFast.getSubtraction2D(beginPoint, centerPoint))
 		var endPoint = points[facet[(vertexIndex + 1) % facet.length]]
-		var centerEnd = normalize2D(Vector.getSubtraction2D(endPoint, centerPoint))
-		var beginProximity = getDirectionalProximity(centerOther, centerBegin)
-		var endProximity = getDirectionalProximity(centerOther, centerEnd)
+		var centerEnd = Vector.normalize2D(VectorFast.getSubtraction2D(endPoint, centerPoint))
+		var beginProximity = Vector.getDirectionalProximity(centerOther, centerBegin)
+		var endProximity = Vector.getDirectionalProximity(centerOther, centerEnd)
 		var maxMinusMin = Math.max(beginProximity, endProximity) - Math.min(beginProximity, endProximity)
-//		var dotProduct = Vector.dotProduct2D(centerOther, centerBegin) + Vector.dotProduct2D(centerOther, centerEnd)
-//maxMinusMin = Vector.dotProduct2D(centerOther, centerBegin) + Vector.dotProduct2D(centerOther, centerEnd)
+//		var dotProduct = VectorFast.dotProduct2D(centerOther, centerBegin) + VectorFast.dotProduct2D(centerOther, centerEnd)
+//maxMinusMin = VectorFast.dotProduct2D(centerOther, centerBegin) + VectorFast.dotProduct2D(centerOther, centerEnd)
 		if (maxMinusMin > maximumDotProduct) {
 //		if (dotProduct > maximumDotProduct) {
 			maximumDotProduct = maxMinusMin
@@ -1765,9 +1781,10 @@ function getPointAlongEdge(edge, points, z) {
 	if (nodes.length == 1) {
 		return begin.slice(0, 2)
 	}
+
 	var end = points[nodes[1]]
 	var endZ = end[2]
-	return get2DByPortion((endZ - z) / (endZ - begin[2]), begin, end)
+	return Vector.interpolationFromToAlong2D(end, begin, (endZ - z) / (endZ - begin[2]))
 }
 
 //deprecated23 uses should be replaced with polygonateMesh
@@ -1838,7 +1855,7 @@ function getSeparatedPolygons(polygon) {
 			endMap.delete(polyline[0])
 		}
 		else {
-			arrayKit.pushArray(polyline, polylines[endPolylineIndex])
+			Vector.pushArray(polyline, polylines[endPolylineIndex])
 			polylines[endPolylineIndex] = polyline
 			endMap.set(polyline[0], endPolylineIndex)
 		}
@@ -1927,29 +1944,29 @@ function getSplitFacet(bisector, facet, vertexIndex, xyPoints) {
 	for (var extraIndex = 2; extraIndex < facet.length - 1; extraIndex++) {
 		var checkIndex = (vertexIndex + extraIndex) % facet.length
 		var checkPoint = polygon[checkIndex]
-		var distanceSquared = Vector.distanceSquared2D(point, checkPoint)
-		if (Vector.dotProduct2D(bisector, Vector.getSubtraction2D(point, checkPoint)) > gClose) {
+		var distanceSquared = VectorFast.distanceSquared2D(point, checkPoint)
+		if (VectorFast.dotProduct2D(bisector, VectorFast.getSubtraction2D(point, checkPoint)) > gClose) {
 			distanceExtras.push([distanceSquared, checkIndex])
 		}
 	}
 
-	distanceExtras.sort(arrayKit.compareElementZeroAscending)
+	distanceExtras.sort(Vector.compareElementZeroAscending)
 	for (var distanceExtra of distanceExtras) {
 		var checkIndex = distanceExtra[1]
 		var checkPoint = polygon[checkIndex]
-		var pointCheck = Vector.getSubtraction2D(point, checkPoint)
+		var pointCheck = VectorFast.getSubtraction2D(point, checkPoint)
 		var reverseRotation = [pointCheck[0], -pointCheck[1]]
-		var polygonRotated = getRotation2DsVector(polygon, reverseRotation)
+		var polygonRotated = Polyline.getRotation2DVector(polygon, reverseRotation)
 		var polygonSliceRotated = getPolygonSlice(polygonRotated, (vertexIndex + 1) % polygon.length, checkIndex)
 		var xIntersections = []
 		var pointRotated = polygonRotated[vertexIndex]
 		var y = pointRotated[1]
-		addXIntersectionsByPolylineClose(xIntersections, polygonSliceRotated, y)
+		Polyline.addXIntersectionsByPolylineClose(xIntersections, polygonSliceRotated, y)
 		polygonSliceRotated = getPolygonSlice(polygonRotated, (checkIndex + 1) % polygon.length, vertexIndex)
-		addXIntersectionsByPolylineClose(xIntersections, polygonSliceRotated, y)
+		Polyline.addXIntersectionsByPolylineClose(xIntersections, polygonSliceRotated, y)
 		if (getIsClear(pointRotated[0], polygonRotated[checkIndex][0], xIntersections)) {
 			var splitFacet = getPolygonSlice(facet, vertexIndex, (checkIndex + 1) % facet.length)
-			arrayKit.overwriteArray(facet, getPolygonSlice(facet, checkIndex, (vertexIndex + 1) % facet.length))
+			Vector.overwriteArray(facet, getPolygonSlice(facet, checkIndex, (vertexIndex + 1) % facet.length))
 			return splitFacet
 		}
 	}
@@ -2030,7 +2047,7 @@ function getToolMap(facetIntersections, points, toolPolygon) {
 				zFacets.push([points[pointIndex][2], pointIndex, facetIntersection])
 			}
 		}
-		zFacets.sort(arrayKit.compareElementZeroAscending)
+		zFacets.sort(Vector.compareElementZeroAscending)
 		for (var zFacetIndex = 1; zFacetIndex < zFacets.length; zFacetIndex++) {
 			var bottomZFacet = zFacets[zFacetIndex - 1]
 			var topZFacet = zFacets[zFacetIndex]
@@ -2068,14 +2085,14 @@ function getTriangle3DFacets(facet, points, xyPoints) {
 				var beginPoint = xyPoints[facet[(vertexIndex - 1 + facet.length) % facet.length]]
 				var centerPoint = xyPoints[facet[vertexIndex]]
 				var endPoint = xyPoints[facet[(vertexIndex + 1) % facet.length]]
-				var centerBegin = Vector.getSubtraction2D(beginPoint, centerPoint)
-				var centerBeginLength = Vector.length2D(centerBegin)
-				var centerEnd = Vector.getSubtraction2D(endPoint, centerPoint)
-				var centerEndLength = Vector.length2D(centerEnd)
+				var centerBegin = VectorFast.getSubtraction2D(beginPoint, centerPoint)
+				var centerBeginLength = VectorFast.length2D(centerBegin)
+				var centerEnd = VectorFast.getSubtraction2D(endPoint, centerPoint)
+				var centerEndLength = VectorFast.length2D(centerEnd)
 				if (centerBeginLength > 0.0 && centerEndLength > 0.0) {
-					Vector.divide2DScalar(centerBegin, centerBeginLength)
-					Vector.divide2DScalar(centerEnd, centerEndLength)
-					dotProducts[vertexIndex] = Vector.dotProduct2D(centerBegin, centerEnd)
+					VectorFast.divide2DScalar(centerBegin, centerBeginLength)
+					VectorFast.divide2DScalar(centerEnd, centerEndLength)
+					dotProducts[vertexIndex] = VectorFast.dotProduct2D(centerBegin, centerEnd)
 				}
 				else {
 					dotProducts[vertexIndex] = -2
@@ -2098,7 +2115,7 @@ function getTriangle3DFacets(facet, points, xyPoints) {
 			}
 			var secondIndex = (farthestIndex + 1) % facet.length
 			var thirdIndex = (farthestIndex + 2) % facet.length
-			arrayKit.overwriteArray(facet, [facet[farthestIndex], facet[secondIndex], facet[thirdIndex]])
+			Vector.overwriteArray(facet, [facet[farthestIndex], facet[secondIndex], facet[thirdIndex]])
 		}
 	}
 
@@ -2111,11 +2128,11 @@ function getTriangleMesh(mesh) {
 
 function getTSVMeshString(date, id, mesh, project) {
 	var meshStrings = ['_format\tsolid']
-	if (!arrayKit.getIsEmpty(date)) {
+	if (!Vector.isEmpty(date)) {
 		meshStrings.push('date\t' + date)
 	}
 	meshStrings.push('name\t' + id)
-	if (!arrayKit.getIsEmpty(project)) {
+	if (!Vector.isEmpty(project)) {
 		meshStrings.push('project\t' + project)
 	}
 	addArraysToSpreadsheetStrings(mesh.points, 'points', meshStrings)
@@ -2133,21 +2150,12 @@ function getVertexIndex(facet, pointIndex) {
 	return undefined
 }
 
-function getXIntersectionsByMesh(mesh, y, z) {
-	var xIntersections = []
-	var xyPolygons = getSlicePolygonsByZ(mesh, z)
-	for (var xyPolygon of xyPolygons) {
-		addXIntersectionsByPolygon(xIntersections, xyPolygon, y)
-	}
-	return xIntersections
-}
-
 function joinFacets(joinedFacets, closestJoinedFacet, otherMeshFacets, closestOtherFacet, points) {
 	var point = points[closestJoinedFacet[0]]
 	var closestDistanceSquared = Number.MAX_VALUE
 	var closestOtherVertexIndex = undefined
 	for (var vertexIndex = 0; vertexIndex < closestOtherFacet.length; vertexIndex++) {
-		var distanceSquared = Vector.distanceSquared3D(point, points[closestOtherFacet[vertexIndex]])
+		var distanceSquared = VectorFast.distanceSquared3D(point, points[closestOtherFacet[vertexIndex]])
 		if (distanceSquared < closestDistanceSquared) {
 			closestOtherVertexIndex = vertexIndex
 			closestDistanceSquared = distanceSquared
@@ -2193,16 +2201,16 @@ function joinFacets(joinedFacets, closestJoinedFacet, otherMeshFacets, closestOt
 }
 
 function joinMeshes(matrices, matrix3D, meshes) {
-	if (arrayKit.getIsEmpty(meshes)) {
+	if (Vector.isEmpty(meshes)) {
 		return undefined
 	}
 	var joinedMesh = meshes[0]
-	if (!arrayKit.getIsEmpty(matrices)) {
+	if (!Vector.isEmpty(matrices)) {
 		joinedMesh.points = get3DsByMatrix3D(joinedMesh.points, matrix3D)
 	}
 	for (var meshesIndex = 1; meshesIndex < meshes.length; meshesIndex++) {
 		var otherMesh = meshes[meshesIndex]
-		if (arrayKit.getIsEmpty(matrices)) {
+		if (Vector.isEmpty(matrices)) {
 			addMeshToJoinedMesh(joinedMesh, getMeshCopy(otherMesh))
 		}
 		else {
@@ -2216,7 +2224,7 @@ function joinMeshes(matrices, matrix3D, meshes) {
 			}
 		}
 	}
-	if (!arrayKit.getIsEmpty(matrices)) {
+	if (!Vector.isEmpty(matrices)) {
 		joinedMesh.points = get3DsByMatrix3D(joinedMesh.points, getInverseRotationTranslation3D(matrix3D))
 	}
 }
@@ -2231,10 +2239,10 @@ function polygonateFacets(facets, points) {
 	var joinedFacetArrays = getJoinedFacetArrays(facets, points)
 	for (var joinedFacets of joinedFacetArrays) {
 		if (joinedFacets.length > 0) {
-			arrayKit.overwriteArray(joinedFacets, joinedFacets[0])
+			Vector.overwriteArray(joinedFacets, joinedFacets[0])
 		}
 	}
-	arrayKit.overwriteArray(facets, joinedFacetArrays)
+	Vector.overwriteArray(facets, joinedFacetArrays)
 }
 
 function polygonateMesh(mesh) {
@@ -2265,12 +2273,12 @@ function polygonateMesh(mesh) {
 					}
 				}
 			}
-			arrayKit.overwriteArray(joinedFacets, getConnectedFacet(joinedFacets, points2D))
+			Vector.overwriteArray(joinedFacets, getConnectedFacet(joinedFacets, points2D))
 		}
 	}
 
-	arrayKit.removeShortArrays(joinedFacetArrays, 3)
-	arrayKit.overwriteArray(mesh.facets, joinedFacetArrays)
+	Vector.removeShortArrays(joinedFacetArrays, 3)
+	Vector.overwriteArray(mesh.facets, joinedFacetArrays)
 	removeUnfacetedPoints(mesh)
 	return mesh
 }
@@ -2287,7 +2295,7 @@ function removeArrowFromMap(arrows, arrowsMap, key) {
 function removeUnfacetedPoints(mesh) {
 	var facets = mesh.facets
 	var points = mesh.points
-	arrayKit.removeUndefineds(facets)
+	Vector.removeUndefineds(facets)
 	var pointIndexes = new Array(points.length)
 	for (var facet of facets) {
 		for (var pointIndex of facet) {
@@ -2327,12 +2335,12 @@ function sortVertically(alongIndexesMap, meetingMap, toolPolygon, workPolygon) {
 		if (alongIndexesKeyStrings[0] == 't') {
 			var alongIndexes = alongIndexesEntry[1]
 			var toolIndex = parseInt(alongIndexesKeyStrings[1])
-			var toolNormal = Vector.getSubtraction2D(toolPolygon[(toolIndex + 1) % toolPolygon.length], toolPolygon[toolIndex])
-			var heightMultiplier = 1.0 - 2.0 * (Vector.dotProduct2D(workNormal, toolNormal) < 0.0)
+			var toolNormal = VectorFast.getSubtraction2D(toolPolygon[(toolIndex + 1) % toolPolygon.length], toolPolygon[toolIndex])
+			var heightMultiplier = 1.0 - 2.0 * (VectorFast.dotProduct2D(workNormal, toolNormal) < 0.0)
 			for (var alongIndex of alongIndexes) {
 				alongIndex.push(heightMultiplier * meetingMap.get(alongIndex[1]).point[2])
 			}
-			alongIndexes.sort(arrayKit.compareElementZeroTwoAscending)
+			alongIndexes.sort(Vector.compareElementZeroTwoAscending)
 		}
 	}
 }
@@ -2371,4 +2379,38 @@ function updateMeshByPointMap(mesh, pointIndexMap) {
 	if (mesh.splitIndexesMap != undefined) {
 		updateFacetsByPointMap(mesh.splitIndexesMap.values(), pointIndexMap)
 	}
+}
+
+var Polyhedron = {
+getZIntersectionsByMesh: function(mesh, point) {
+	var zIntersections = []
+	for (var facet of mesh.facets) {
+		var workPolygon = getPolygonByFacet(facet, mesh.points)
+		if (getIsPointInsidePolygonOrClose(point, workPolygon)) {
+			zIntersections.push(getZByPointPolygon(point, workPolygon))
+		}
+	}
+
+	return zIntersections
+},
+
+isPointInsideMesh: function(mesh, point) {
+	var zIntersections = Polyhedron.getZIntersectionsByMesh(mesh, point)
+	zIntersections.sort(Vector.compareNumberAscending)
+	Vector.removeClose(zIntersections)
+	var below = 0
+	var above = 0
+	var z = point[2]
+	for (var zIntersection of zIntersections) {
+		if (z > zIntersection) {
+			below++
+		}
+		else {
+			above++
+		}
+	}
+
+	return below % 2 == 1 || above % 2 == 1
+}
+
 }
