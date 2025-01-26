@@ -2,20 +2,15 @@
 
 var gAlertSet = new Set()
 
-function noticeByList(notices) {
-	if (notices.length == 0) {
-		return
-	}
-
+function printArray(notices) {
 	for (var notice of notices) {
 		console.log(notice)
 	}
+}
 
-	if (noticeByList.caller == null) {
-		return
-	}
-
-	console.log('Caller:\n' + noticeByList.caller.toString().split('\n').slice(0,10).join('\n'))
+function printCaller(notices) {
+	printArray(notices)
+	console.log('Caller:\n' + printCaller.caller.toString().split('\n').slice(0,10).join('\n'))
 	console.log((new Error()).stack)
 }
 
