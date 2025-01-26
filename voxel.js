@@ -60,7 +60,7 @@ function addVoxelLine(crossDimension, key, lines, voxelMap, planar, pointMap, ro
 				return
 			}
 		}
-		Vector.add3D(next, gDirections[tipIndex])
+		VectorFast.add3D(next, gDirections[tipIndex])
 		key = next.join(',')
 		if (voxelMap.has(key)) {
 			tips = voxelMap.get(key)
@@ -109,7 +109,7 @@ function addVoxelRow(directionIndex, entry, signedIntersectionsMap, voxelMap) {
 		}
 		signedIntersections = signedIntersections.concat(signedIntersectionsInverted)
 	}
-	signedIntersections.sort(arrayKit.compareSignedIntersectionAscending)
+	signedIntersections.sort(Vector.compareSignedIntersectionAscending)
 	var existence = 0
 	var voxelStart = null
 	for (signedIntersectionIndex = 0; signedIntersectionIndex < signedIntersections.length; signedIntersectionIndex++) {
@@ -183,18 +183,18 @@ function getMeshAddition(layerThickness, offsetMultiplier, meshA, meshB) {
 function getMeshBoolean(existenceCondition, layerThickness, offsetMultiplier, meshA, meshB, signB) {
 	var offsetZ = offsetMultiplier * layerThickness
 	var oneOverLayerThickness = 1.0 / layerThickness
-	var pointsATransformed = arrayKit.getArraysCopy(meshA.points)
-	var pointsBTransformed = arrayKit.getArraysCopy(meshB.points)
-	addArraysByIndex(pointsATransformed, -offsetZ, 2)
-	addArraysByIndex(pointsBTransformed, -offsetZ, 2)
-	multiply3DsScalar(pointsATransformed, oneOverLayerThickness)
-	multiply3DsScalar(pointsBTransformed, oneOverLayerThickness)
+	var pointsATransformed = Polyline.copy(meshA.points)
+	var pointsBTransformed = Polyline.copy(meshB.points)
+	Polyline.addByIndex(pointsATransformed, -offsetZ, 2)
+	Polyline.addByIndex(pointsBTransformed, -offsetZ, 2)
+	Polyline.multiply3DsScalar(pointsATransformed, oneOverLayerThickness)
+	Polyline.multiply3DsScalar(pointsBTransformed, oneOverLayerThickness)
 	var latticeA = getXYZLatticeByMesh({facets:meshA.facets, points:pointsATransformed})
 	var latticeB = getXYZLatticeByMesh({facets:meshB.facets, points:pointsBTransformed})
 	var latticeBoolean = getXYZLatticeBoolean(existenceCondition, signB, latticeA, latticeB)
 	var mesh = getMeshByXYZLattice(latticeBoolean)
-	mesh.points = arrayKit.getArraysCopy(mesh.points)
-	addArraysByIndex(multiply3DsScalar(mesh.points, layerThickness, 2), offsetZ)
+	mesh.points = Polyline.copy(mesh.points)
+	Polyline.addByIndex(Polyline.multiply3DsScalar(mesh.points, layerThickness, 2), offsetZ)
 	return mesh
 }
 
@@ -485,8 +485,8 @@ function getXYZLatticeBoolean(existenceCondition, signB, xyzLatticeA, xyzLattice
 		var intersectionPairsMapMapB = xyzLatticeB[mapIndex]
 		var intersectionPairsMapMapC = new Map()
 		var keySet = new Set()
-		setKit.addElementsToSet(keySet, intersectionPairsMapMapA.keys())
-		setKit.addElementsToSet(keySet, intersectionPairsMapMapB.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapMapA.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapMapB.keys())
 		for (var key of keySet) {
 			var intersectionPairsMapA = null
 			if (intersectionPairsMapMapA.has(key)) {
@@ -512,8 +512,8 @@ function getXYZLatticeBoolean(existenceCondition, signB, xyzLatticeA, xyzLattice
 		var intersectionPairsMapC = new Map()
 		xyzLatticeC[intersectionPairsMapIndex] = intersectionPairsMapC
 		var keySet = new Set()
-		setKit.addElementsToSet(keySet, intersectionPairsMapA.keys())
-		setKit.addElementsToSet(keySet, intersectionPairsMapB.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapA.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapB.keys())
 		for (var key of keySet) {
 			var intersectionPairsA = null
 			if (intersectionPairsMapA.has(key)) {
