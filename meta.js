@@ -8,6 +8,7 @@ const gIDTransformWork = ['id', 'transform', 'transform3D', 'work']
 const gIDPointsTransformWorkSet = new Set(gIDTransformWork.concat(['points', 'pointsHD']))
 const gDisplayIDTransformWorkSet = new Set(['display', 'process'].concat(gIDTransformWork))
 var gCopyIDKeySet = new Set(['work'])
+var gLongWordSet = undefined
 const gMapR = new Map([['r', true]])
 const gMapRS = new Map([['r', true], ['s', '1']])
 const gMapRS2 = new Map([['r', true], ['s', '11']])
@@ -32,13 +33,12 @@ function addEntriesToStatementLine(entries, registry, statement) {
 	registry.lineUpdated = true
 }
 
-function addFunctionToMap(functionToAdd, optionMap, map) {
-	var functionName = getNameWithoutCheck(functionToAdd.name)
+function addFunctionToMap(functionToAdd, optionMap, map = gFunctionMap) {
 	if (optionMap != undefined) {
 		functionToAdd.optionMap = optionMap
 	}
 
-	Value.getValueDefault(map, gFunctionMap).set(functionName, functionToAdd)
+	map.set(functionToAdd.name, functionToAdd)
 }
 
 function addFunctionsToMap(functionsToAdd, optionMap, map) {
@@ -60,9 +60,7 @@ function addMeshesRecursively(depth, meshes, registry, statement) {
 
 	var mesh = getMeshByID(statement.attributeMap.get('id'), registry)
 	if (mesh != undefined) {
-		var meshCopy = getMeshCopy(mesh)
-		transform3DPoints(getChainMatrix3D(registry, statement), meshCopy.points)
-		meshes.push(meshCopy)
+		meshes.push(getMeshCopy(mesh))
 	}
 
 	depth += 1
@@ -76,12 +74,12 @@ function addMeshesRecursively(depth, meshes, registry, statement) {
 function addMeshesToGroupStatement(idStart, meshes, registry, statement) {
 	for (var mesh of meshes) {
 		var meshStatement = getStatementByParentTag(new Map(), 0, statement, 'mesh')
-		mapKit.copyKeysExcept(meshStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+		MapKit.copyKeysExcept(meshStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 		getUniqueID(idStart, registry, meshStatement)
 		analyzeOutputMesh(getMeshCopy(mesh), registry, meshStatement)
 	}
 
-	mapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
+	MapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 }
 
 function addMeshToStatement(inputArea, mesh, registry, statement) {
@@ -94,8 +92,8 @@ function addMeshToStatement(inputArea, mesh, registry, statement) {
 	}
 	else {
 		if (getBooleanByDefault('updateStatement', registry, statement, statement.tag, false)) {
-			var pointsString = arrayKit.getStringByArrays(mesh.points)
-			addEntriesToStatementLine([['points', pointsString], ['facets', arrayKit.getStringByArrays(mesh.facets)]], registry, statement)
+			var pointsString = Polyline.getString(mesh.points)
+			addEntriesToStatementLine([['points', pointsString], ['facets', Polyline.getString(mesh.facets)]], registry, statement)
 			inputArea.value = ''
 		}
 	}
@@ -111,7 +109,7 @@ function addOptionMapToObject(functionNames, object, optionMap) {
 }
 
 function addOutputArea(text, title) {
-	if (arrayKit.getIsEmpty(text)) {
+	if (Vector.isEmpty(text)) {
 		return
 	}
 
@@ -130,12 +128,12 @@ function addOutputArea(text, title) {
 function addPointsToGroupStatement(idStart, pointsStatements, registry, statement) {
 	for (var pointsStatement of pointsStatements) {
 		var tagStatement = getStatementByParentTag(new Map(), 0, statement, pointsStatement.statement.tag)
-		mapKit.copyKeysExcept(tagStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+		MapKit.copyKeysExcept(tagStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 		getUniqueID(idStart, registry, tagStatement)
-		setPointsExcept(arrayKit.getArraysCopy(pointsStatement.points), registry, tagStatement)
+		setPointsExcept(Polyline.copy(pointsStatement.points), registry, tagStatement)
 	}
 
-	mapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
+	MapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 }
 
 function addStatementRecursively(depth, parent, registry, workStatement) {
@@ -146,7 +144,7 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	}
 
 	if (gCopyTypeSet.has(workStatement.tag) && depth > 10) {
-		noticeByList(['Will not add a copy type statement with depth > 10 in addStatementRecursively in meta.', statement, workStatement])
+		printCaller(['Will not add a copy type statement with depth > 10 in addStatementRecursively in meta.', statement, workStatement])
 		return
 	}
 
@@ -154,7 +152,7 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	var attributeMap = statement.attributeMap
 	var workID = workStatement.attributeMap.get('id')
 	gCopyIDMap.set(workID, getUniqueID(parent.attributeMap.get('id') + '_' + workID, registry, statement))
-	mapKit.copyMissingKeysExcept(attributeMap, workStatement.attributeMap, gIDSet)
+	MapKit.copyMissingKeysExcept(attributeMap, workStatement.attributeMap, gIDSet)
 	for (var attributeKey of attributeMap.keys()) {
 		if (gCopyIDKeySet.has(attributeKey)) {
 			var copyIDs = attributeMap.get(attributeKey).split(' ').filter(lengthCheck)
@@ -205,6 +203,177 @@ function addStatementRecursively(depth, parent, registry, workStatement) {
 	}
 }
 
+function alterStatementRecursively(depth, registry, statement) {
+	if (depth > gRecursionLimit) {
+		var warningText = 'Recursion limit of 1,000 in alterStatementRecursively reached, no further statements will be altered.'
+		warningByList([warningText, statement, gRecursionLimit])
+		return
+	}
+
+	depth += 1
+	for (var child of statement.children) {
+		alterStatementRecursively(depth, registry, child)
+	}
+
+	alterStatementPoints(registry, statement)
+}
+
+function collectArticles(click) {
+	var button = click.explicitOriginalTarget
+	var inputArea = button.inputArea
+	var text = inputArea.value
+	if (text.trim().length == 0) {
+		return
+	}
+
+	collectArticlesProcessor.addressTitles = []
+	collectArticlesProcessor.isTag = false
+	collectArticlesProcessor.potentialSections = []
+	collectArticlesProcessor.statementObject = inputArea.statementObject
+	button.outputArea.value = collectArticlesProcessor.getOutput(text)
+}
+
+var collectArticlesProcessor = {
+convertElement: function(endOfLine) {
+	var healthSections = []
+	var healthStrings = new Set(['__bibliography', '__biology', '__treatment'])
+	var id = undefined
+	var sectionSet = new Set()
+	for (var potentialSection of this.potentialSections) {
+		id = this.getLineID(endOfLine, id, potentialSection)
+		if (id != undefined) {
+			if (maximumIndexOf(id, healthStrings) > -1) {
+				var concatenated = ''
+				var ids = id.split('__')
+				for (var sectionID of ids) {
+					concatenated += sectionID
+					sectionSet.add(concatenated)
+					concatenated += '__'
+				}
+			}
+		}
+	}
+
+	id = undefined
+	var numberOfTopParagraphs = 0
+	for (var potentialSection of this.potentialSections) {
+		id = this.getLineID(endOfLine, id, potentialSection)
+		if (sectionSet.has(id)) {
+			if (id.split('__').length == 1) {
+				numberOfTopParagraphs++
+				if (numberOfTopParagraphs < 3) {
+					healthSections.push(potentialSection)
+				}
+			}
+			else {
+				if (id.endsWith('__bibliography')) {
+					var lines = potentialSection.split(endOfLine)
+					for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+						if (lines[lineIndex].trim().startsWith('<li>')) {
+							lines[lineIndex] = undefined
+						}
+					}
+					Vector.removeUndefineds(lines)
+					potentialSection = lines.join(endOfLine)
+				}
+				healthSections.push(potentialSection)
+			}
+		}
+	}
+
+	this.potentialSections = healthSections
+},
+
+getLineID: function(endOfLine, id, text) {
+	var line = text.trim().split(endOfLine)[0]
+	var indexOfHeadingEnd = line.indexOf('</h')
+	var indexOfID = line.indexOf('id="')
+	if (indexOfHeadingEnd == -1 || indexOfID == -1) {
+		return id
+	}
+
+	line = line.slice(indexOfID + 'id="'.length)
+	var indexOfIDEnd = line.indexOf('"')
+	if (indexOfIDEnd == -1) {
+		return id
+	}
+
+	return line.slice(0, indexOfIDEnd)
+},
+
+getOutput: function(text) {
+	var endOfLine = getEndOfLine(text)
+	var sections = getSplitFilterLength(text, endOfLine + endOfLine)
+	this.sections = []
+	for (var section of sections) {
+		this.processHTMLSection(endOfLine, section.split(endOfLine), section)
+	}
+
+	var endOfSection = endOfLine + endOfLine
+	var collectionText = this.sections.join(endOfSection)
+	var contentsString = '<h1>Table of Contents</h1>'
+	var indexOfContents = text.indexOf(contentsString)
+	if (indexOfContents < 0) {
+		return collectionText
+	}
+
+	indexOfContents += contentsString.length
+	var outputSections = [text.slice(0, indexOfContents)]
+	Vector.pushArray(outputSections , addTableOfContentsProcessor.getAddressLines(this.addressTitles, endOfLine))
+	return outputSections.join(endOfLine) + '\n<h1>Articles</h1>' + endOfSection + collectionText + endOfSection + '</body>\n</html>'
+},
+
+processHTMLSection: function(endOfLine, lines, text) {
+	var line = lines[0].trim()
+	if (line.startsWith('<h2>')) {
+		this.potentialSections = [text]
+		this.addressTitle = addTableOfContentsProcessor.getAddressTitle(text)
+		return
+	}
+
+	if (line.startsWith('<h3>') && line.indexOf('Tags</') > 0) {
+		this.isTag = true
+		return
+	}
+
+	if (this.isTag) {
+		this.isTag = false
+		var indexOfEndTag = text.indexOf('</')
+		if (indexOfEndTag < 1) {
+			return
+		}
+		text = text.slice(0, indexOfEndTag)
+		var beginTag = '<p>'
+		var indexOfBeginTag = text.indexOf(beginTag)
+		if (indexOfBeginTag < 0) {
+			return
+		}
+		var tags = text.slice(indexOfBeginTag + beginTag.length).split(',')
+		for (var tag of tags) {
+			if (tag.trim().toLowerCase() == this.statementObject.collectionName) {
+				for (var searchTag of tags) {
+					if (searchTag.trim().toLowerCase() == 'element' && this.statementObject.shouldConvertElement) {
+						this.convertElement(endOfLine)
+					}
+				}
+				Vector.pushArray(this.sections, this.potentialSections)
+				this.isTag = false
+				this.potentialSections = undefined
+				if (this.addressTitle != undefined) {
+					this.addressTitles.push(this.addressTitle)
+				}
+				return
+			}
+		}
+		return
+	}
+
+	if (!Vector.isEmpty(this.potentialSections)) {
+		this.potentialSections.push(text)
+	}
+}
+}
+
 function addTableOfContents(click) {
 	var button = click.explicitOriginalTarget
 	var text = button.inputArea.value
@@ -212,70 +381,310 @@ function addTableOfContents(click) {
 		return
 	}
 
-	var endOfLine = getEndOfLine(text)
-	var lines = text.split(endOfLine)
 	addTableOfContentsProcessor.addressTitles = []
-	var sections = getSections(endOfLine, lines, addTableOfContentsProcessor)
-	var output = sections.join(endOfLine + endOfLine)
-	var indexOfTableOfContents = output.indexOf('<h1>Table of Contents</h1>')
-	if (indexOfTableOfContents > -1) {
-		indexOfTableOfContents += '<h1>Table of Contents</h1>'.length
+	addTableOfContentsProcessor.bibliographyAddressMap = new Map()
+	addTableOfContentsProcessor.superscriptMap = new Map()
+	button.outputArea.value = addTableOfContentsProcessor.getOutput(text)
+}
+
+var addTableOfContentsProcessor = {
+beforeAddress: '<sup><small><a href="#',
+
+endQuote: '">',
+
+getAddressLines: function(addressTitles, endOfLine) {
+	var addressLines = []
+	addressLines.push(endOfLine + '<ul>')
+	for (var addressTitle of addressTitles) {
+		addressLines.push('  <li><a href="#' + addressTitle.address + '">' + addressTitle.title + '</a></li>')
+	}
+
+	addressLines.push('</ul>' + endOfLine)
+	return addressLines
+},
+
+getAddressTitle: function(title) {
+	var indexOfID = title.indexOf('id="')
+	if (indexOfID < 0) {
+		return undefined
+	}
+
+	title = title.slice(indexOfID + 'id="'.length)
+	var indexOfIDEnd = title.indexOf('"')
+	if (indexOfIDEnd < 0) {
+		return undefined
+	}
+
+	var address = title.slice(0, indexOfIDEnd)
+	var indexOfTagEnd = title.indexOf('>')
+	if (indexOfTagEnd < 0) {
+		return undefined
+	}
+
+	title = title.slice(indexOfTagEnd + 1)
+	var indexOfAddressEnd = title.indexOf('<')
+	if (indexOfAddressEnd < 0) {
+		return undefined
+	}
+
+	return this.getAddressTitleByAddress(address, title.slice(0, indexOfAddressEnd))
+},
+
+getAddressTitleByAddress: function(address, title) {
+	titleLower = title.toLowerCase()
+	shortTitle = titleLower
+	var indexOfBracket = title.indexOf('(')
+	if (indexOfBracket > -1) {
+		shortTitle = shortTitle.slice(0, indexOfBracket).trim()
+	}
+
+	return {address:address, shortTitle:shortTitle, title:title, titleLower:titleLower}
+},
+
+getHTMLHeading: function(headingLevel, line) {
+	var headingTagBracket = 'h' + headingLevel.toString() + '>'
+	var prefix = '<' + headingTagBracket
+	var indexOfHeading = line.indexOf(prefix)
+	if (indexOfHeading != 0) {
+		return undefined
+	}
+
+	var suffix = '</' + headingTagBracket
+	indexOfHeading += prefix.length
+	var indexOfEndHeading = line.indexOf(suffix)
+	if (indexOfEndHeading < indexOfHeading) {
+		return line
+	}
+
+	var title = line.slice(indexOfHeading, indexOfEndHeading).trim()
+	if (this.addressTitles.length == 0) {
+		return line
+	}
+
+	if (title.startsWith('<a ')) {
+		this.subaddress = this.getAddressTitle(title).address
+		return line
+	}
+
+	if (this.subaddress == undefined || headingLevel == 3) {
+		this.subaddress = this.addressTitles[this.addressTitles.length - 1].address
+	}
+
+	if (headingLevel > 3) {
+		this.subaddress = this.subaddress.split('__').slice(0, headingLevel - 2).join('__')
+	}
+
+	this.subaddress += '__' + title.toLowerCase().replaceAll(' ', '_')
+	return prefix + '<a id="' + this.subaddress + '">' + title + '</a>' + suffix
+},
+
+getOutput: function(text) {
+	var endOfLine = getEndOfLine(text)
+	var sections = getSplitFilterLength(text, endOfLine + endOfLine)
+	this.sections = []
+	for (var section of sections) {
+		this.processHTMLSection(endOfLine, section.split(endOfLine), section)
+	}
+
+	var output = this.sections.join(endOfLine + endOfLine)
+	var contentsString = '<h1>Table of Contents</h1>'
+	var indexOfContents = output.indexOf(contentsString)
+	if (indexOfContents > -1) {
+		indexOfContents += contentsString.length
 		var indexOfArticles = output.indexOf('<h1>Articles</h1>')
-		if (indexOfArticles > indexOfTableOfContents) {
-			var outputSections = [output.slice(0, indexOfTableOfContents)]
-			outputSections.push(endOfLine + '<ul>')
-			for (var addressTitle of addTableOfContentsProcessor.addressTitles) {
-				outputSections.push('  <li><a href="#' + addressTitle.address + '">' + addressTitle.title + '</a></li>')
-			}
-			outputSections.push('</ul>' + endOfLine)
+		if (indexOfArticles > indexOfContents) {
+			var outputSections = [output.slice(0, indexOfContents)]
+			Vector.pushArray(outputSections , this.getAddressLines(this.addressTitles, endOfLine))
 			outputSections.push(output.slice(indexOfArticles))
 			output = outputSections.join(endOfLine)
 		}
 	}
 
-	button.outputArea.value = output
-}
-
-var addTableOfContentsProcessor = {
-getHTMLSection: function(endOfLine, lines, text) {
-	var line = lines[0].trim()
-	var indexOfHeading2 = line.indexOf('<h2>')
-	if (indexOfHeading2 != 0) {
-		return text
+	var lines = output.split(endOfLine)
+	for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		var line = lines[lineIndex]
+		var phrases = line.split(this.beforeAddress)
+		if (phrases.length > 1) {
+			for (var phraseIndex = 1; phraseIndex < phrases.length; phraseIndex++) {
+				var phrase = phrases[phraseIndex]
+				var indexOfEndQuote = phrase.indexOf(this.endQuote)
+				if (indexOfEndQuote > 0) {
+					var address = phrase.slice(0, indexOfEndQuote)
+					if (this.bibliographyAddressMap.has(address)) {
+						var indexOfEndAddress = phrase.indexOf('</a>')
+						if (indexOfEndAddress > 0) {
+							var beginLine = phrase.slice(0, indexOfEndQuote + this.endQuote.length)
+							phrases[phraseIndex] = beginLine + this.bibliographyAddressMap.get(address) + phrase.slice(indexOfEndAddress)
+						}
+					}
+				}
+			}
+			lines[lineIndex] = phrases.join(this.beforeAddress)
+		}
 	}
 
-	indexOfHeading2 += '<h2>'.length
-	var indexOfEndHeading2 = line.indexOf('</h2>')
-	if (indexOfEndHeading2 < indexOfHeading2) {
-		return text
+	var isParagraph = false
+	var titleSet = new Set()
+	var longAddressTitles = []
+	for (var addressTitle of this.addressTitles) {
+		if (addressTitle.shortTitle.split(' ').length > 1) {
+			longAddressTitles.push(addressTitle)
+		}
 	}
 
-	var title = line.slice(indexOfHeading2, indexOfEndHeading2)
-	if (title.startsWith('<a ')) {
-		var indexOfID = title.indexOf('id="')
-		if (indexOfID > -1) {
-			title = title.slice(indexOfID + 'id="'.length)
-			indexOfIDEnd = title.indexOf('"')
-			if (indexOfIDEnd > -1) {
-				address = title.slice(0, indexOfIDEnd)
-				indexOfTagEnd = title.indexOf('>')
-				if (indexOfTagEnd > -1) {
-					title = title.slice(indexOfTagEnd + 1)
-					indexOfAddressEnd = title.indexOf('<')
-					if (indexOfAddressEnd > -1) {
-						this.addressTitles.push({address:address, title:title.slice(0, indexOfAddressEnd)})
+	for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		var line = lines[lineIndex]
+		var lineTrim = line.trim()
+		if (lineTrim.startsWith('<h2>')) {
+			titleSet.clear()
+			titleSet.add(addTableOfContentsProcessor.getAddressTitle(line).shortTitle)
+		}
+		else {
+			if (lineTrim.startsWith('<p>')) {
+				isParagraph = true
+			}
+			if (isParagraph) {
+				var lineLower = line.toLowerCase()
+				for (var addressTitle of longAddressTitles) {
+					var shortTitle = addressTitle.shortTitle
+					var indexOfTitle = lineLower.indexOf(shortTitle)
+					if (indexOfTitle > -1) {
+						if (this.isReplaceable(indexOfTitle, lineLower, shortTitle, titleSet)) {
+							var referenceLine = line.slice(0, indexOfTitle) + '<a href="#' + addressTitle.address + '">'
+							var titleEnd = indexOfTitle + shortTitle.length
+							if (indexOfTitle == lineLower.indexOf(addressTitle.titleLower)) {
+								titleEnd = indexOfTitle + addressTitle.titleLower.length
+							}
+							referenceLine += line.slice(indexOfTitle, titleEnd) + '</a>' + line.slice(titleEnd)
+							lines[lineIndex] = referenceLine
+							var lineLower = referenceLine.toLowerCase()
+						}
+						titleSet.add(shortTitle)
+					}
+				}
+			}
+			if (lineTrim.endsWith('</p>')) {
+				isParagraph = false
+			}
+		}
+	}
+
+	return lines.join(endOfLine)
+},
+
+isReplaceable: function(indexOfTitle, lineLower, shortTitle, titleSet) {
+	var lineUntil = lineLower.slice(0, indexOfTitle)
+	if (getCharacterCount(lineUntil, '<') != getCharacterCount(lineUntil, '>') || titleSet.has(shortTitle)) {
+		return false
+	}
+
+	var indexOfEnd = indexOfTitle + shortTitle.length
+	if (lineLower.length > indexOfEnd) {
+		if (!this.punctuationSet.has(lineLower[indexOfEnd])) {
+			return false
+		}
+	}
+
+	if (indexOfTitle == 0) {
+		return true
+	}
+
+	return lineLower[indexOfTitle - 1] == ' '
+},
+
+processHTMLSection: function(endOfLine, lines, text) {
+	var lineZero = lines[0].trim()
+	if (lineZero == '<ol>') {
+		var bibliographyArrays = []
+		var bibliographyLineIndexes = []
+		for (var bibliographyLineIndex = 1; bibliographyLineIndex < lines.length; bibliographyLineIndex++) {
+			var bibliographyLine = lines[bibliographyLineIndex]
+			if (bibliographyLine.trim().startsWith('<li id="')) {
+				var indexOfQuote = bibliographyLine.indexOf('"')
+				var bibliographyLineAfter = bibliographyLine.slice(indexOfQuote + 1)
+				var indexOfEndQuote = bibliographyLineAfter.indexOf(this.endQuote)
+				if (indexOfEndQuote > 0) {
+					var addressIndex = -1
+					var address = bibliographyLineAfter.slice(0, indexOfEndQuote)
+					if (this.superscriptMap.has(address)) {
+						addressIndex = this.superscriptMap.get(address)
+					}
+					else {
+						console.log('superscriptMap does not have: ' + address)
+					}
+					bibliographyArrays.push([addressIndex, address, bibliographyLine])
+					bibliographyLineIndexes.push(bibliographyLineIndex)
+				}
+			}
+		}
+		bibliographyArrays.sort(Vector.compareElementZeroAscending)
+		for (var bibliographyArrayIndex = 0; bibliographyArrayIndex < bibliographyArrays.length; bibliographyArrayIndex++) {
+			var bibliographyArray = bibliographyArrays[bibliographyArrayIndex]
+			lines[bibliographyLineIndexes[bibliographyArrayIndex]] = bibliographyArray[2]
+			this.bibliographyAddressMap.set(bibliographyArray[1], (bibliographyArrayIndex + 1).toString())
+		}
+		this.sections.push(lines.join(endOfLine))
+		return
+	}
+
+	for (var line of lines) {
+		var phrases = line.split(this.beforeAddress)
+		if (phrases.length > 1) {
+			for (var phraseIndex = 1; phraseIndex < phrases.length; phraseIndex++) {
+				var phrase = phrases[phraseIndex]
+				var indexOfEndQuote = phrase.indexOf(this.endQuote)
+				if (indexOfEndQuote > 0) {
+					var address = phrase.slice(0, indexOfEndQuote)
+					if (!this.superscriptMap.has(address)) {
+						this.superscriptMap.set(address, this.superscriptMap.size)
 					}
 				}
 			}
 		}
-		return text
 	}
 
-	var address = title.toLowerCase().replaceAll(' ', '_')
-	this.addressTitles.push({address:address, title:title})
-	lines[0] = '<h2><a id="' + address + '">' + title + '</a></h2>'
-	return lines.join(endOfLine)
-}
+	var indexOfHeading2 = lineZero.indexOf('<h2>')
+	if (indexOfHeading2 != 0) {
+		for (var headingLevel = 3; headingLevel < 7; headingLevel++) {
+			var heading = this.getHTMLHeading(headingLevel, lineZero)
+			if (heading != undefined) {
+				this.sections.push(heading)
+				return
+			}
+		}
+		this.sections.push(text)
+		return
+	}
+
+	indexOfHeading2 += '<h2>'.length
+	var indexOfEndHeading2 = lineZero.indexOf('</h2>')
+	if (indexOfEndHeading2 < indexOfHeading2) {
+		this.sections.push(text)
+		return
+	}
+
+	var title = lineZero.slice(indexOfHeading2, indexOfEndHeading2).trim()
+	if (title.startsWith('<a ')) {
+		var addressTitle = this.getAddressTitle(title)
+		if (addressTitle != undefined) {
+			this.addressTitles.push(addressTitle)
+		}
+		this.sections.push(text)
+		return
+	}
+
+	var address = title
+	var indexOfBracket = address.indexOf('(')
+	if (indexOfBracket > -1) {
+		address = address.slice(0, indexOfBracket)
+	}
+
+	address = address.trim().toLowerCase().replaceAll(' ', '_')
+	this.addressTitles.push(this.getAddressTitleByAddress(address, title))
+	this.sections.push('<h2><a id="' + address + '">' + title + '</a></h2>')
+},
+
+punctuationSet: new Set([' ', ',', '.', ';', ':', "'"])
 }
 
 function addViewMesh(id, registry, statement) {
@@ -295,6 +704,7 @@ function alterStatementPoints(registry, statement) {
 		alterMeshExcept(mesh, registry, statement)
 		return
 	}
+
 	var points = getPointsHD(registry, statement)
 	if (points != undefined) {
 		setPointsHD(getPointsExcept(points, registry, statement), statement)
@@ -308,14 +718,18 @@ function convertToHTML(click) {
 		return
 	}
 
-	var endOfLine = getEndOfLine(text)
-	var lines = text.split(endOfLine)
-	var sections = getSections(endOfLine, lines, convertToHTMLProcessor)
-	button.outputArea.value = sections.join(endOfLine + endOfLine)
+	button.outputArea.value = convertToHTMLProcessor.getOutput(text)
 }
 
 var convertToHTMLProcessor = {
+afterUnderscoreSet: new Set([' ', ')', ',', '\r', '\n']),
+
+beforeUnderscoreSet: new Set([' ', '(', '\r', '\n']),
+
 bibliographySynonyms: ['Authorities', 'AUTHORITIES', 'BIBLIOGRAPHY', 'LITERATURE', 'REFERENCES'],
+
+colorSet: new Set
+('black blackish blue bluish brown cherry green greenish grey indigo orange orangish red reddish violet white yellow yellowish'.split(' ')),
 
 getClosedText: function(tag, text) {
 	var textWithoutSpaces = text.replaceAll(' ', '')
@@ -345,15 +759,15 @@ getClosedText: function(tag, text) {
 },
 
 getDegreeText: function(text) {
-	return text.trim().replaceAll(' deg. ', '&deg;').replaceAll('°', '&deg;')
+	return text.trim().replaceAll(' deg.', ' &deg;').replaceAll('deg.C', '&deg;C').replaceAll('°', '&deg;')
 },
 
-getHTMLApostropheTable: function(endOfLine, lines, text) {
+getHTMLTabTable: function(endOfLine, lines, text) {
 	var tableLines = []
 	for (var line of lines) {
-		var line = line.trim()
+		var line = line.trimEnd()
 		if (line.length > 0) {
-			var words = line.split('`')
+			var words = line.split('\t')
 			for (var wordIndex = 0; wordIndex < words.length; wordIndex++) {
 				var word = words[wordIndex].trim()
 				var atIndex = word.indexOf('@')
@@ -365,6 +779,22 @@ getHTMLApostropheTable: function(endOfLine, lines, text) {
 						if (Number.isNaN(Number.parseInt(attribute))) {
 							if (attribute.startsWith('c')) {
 								attributeString += ' align="center"'
+							}
+							else {
+								var parameters = attribute.trim().split('=')
+								if (parameters.length == 2) {
+									var value = parameters[1]
+									var trimmedValue = value.trim()
+									if (trimmedValue.length > 0) {
+										if (!gQuoteSet.has(trimmedValue[0])) {
+											value = '"' + value + '"'
+										}
+									}
+									attributeString += ' ' + parameters[0] + '=' + value
+								}
+								else {
+									attributeString += ' ' + attribute
+								}
 							}
 						}
 						else {
@@ -447,6 +877,7 @@ getHTMLHeading: function(endOfLine, level, words) {
 },
 
 getHTMLParagraph: function(endOfLine, lines, text) {
+	var endOfSection = endOfLine + endOfLine
 	text = this.getDegreeText(text)
 	if (text.endsWith('--')) {
 		text = text.slice(0, text.length - 2)
@@ -464,14 +895,14 @@ getHTMLParagraph: function(endOfLine, lines, text) {
 		else {
 			text = title + text.slice(secondUnderscore + 1)
 		}
-		return this.getHTMLHeading(endOfLine, 3, words) + endOfLine + endOfLine + this.getParagraphWithoutMultipleSpaces(endOfLine, text)
+		return this.getHTMLHeading(endOfLine, 3, words) + endOfSection + this.getParagraphWithoutMultipleSpaces(endOfLine, text)
 	}
 
 	var firstPeriod = lineZero.indexOf('.')
 	if (firstPeriod > 0) {
 		var afterPeriod = lineZero.slice(firstPeriod + 1).trim()
 		var words = lineZero.slice(0, firstPeriod).split(' ').filter(lengthCheck)
-		var heading = this.getHTMLHeading(endOfLine, 3, words) + endOfLine + endOfLine
+		var heading = this.getHTMLHeading(endOfLine, 3, words) + endOfSection
 		var lastText = endOfLine + lines.slice(1).join(endOfLine)
 		if (afterPeriod.startsWith('--')) {
 			return heading + this.getParagraphWithoutMultipleSpaces(endOfLine, afterPeriod.slice(2).trim() + lastText)
@@ -494,40 +925,10 @@ getHTMLParagraph: function(endOfLine, lines, text) {
 
 	if (allCaps.length > 0) {
 		text = this.getDegreeText(words.join(' ') + endOfLine + lines.slice(1).join(endOfLine))
-		return this.getHTMLHeading(endOfLine, 2, allCaps) + endOfLine + endOfLine + this.getParagraphWithoutMultipleSpaces(endOfLine, text)
+		return this.getHTMLHeading(endOfLine, 2, allCaps) + endOfSection + this.getParagraphWithoutMultipleSpaces(endOfLine, text)
 	}
 
 	return this.getParagraphWithoutMultipleSpaces(endOfLine, text)
-},
-
-getHTMLSection: function(endOfLine, lines, text) {
-	for (var bibliographySynonym of this.bibliographySynonyms) {
-		if (text.indexOf(bibliographySynonym) != -1) {
-			return this.getHTMLBibliography(bibliographySynonym, endOfLine, text)
-		}
-	}
-
-	if (lines.length == 1) {
-		var words = lines[0].split(' ').filter(lengthCheck)
-		if (words.length < 7) {
-			return this.getHTMLHeading(endOfLine, 3, words)
-		}
-	}
-
-	if (getCharacterCount(text, '|') * 2 > lines.length) {
-		return this.getHTMLVerticalLineTable(endOfLine, lines, text)
-	}
-
-	if (getCharacterCount(text, '`') > lines.length) {
-		return this.getHTMLApostropheTable(endOfLine, lines, text)
-	}
-
-	if (getCharacterVariance(text, ' ') > 2.0) {
-		text = text.replaceAll('  ', '|')
-		return this.getHTMLVerticalLineTable(endOfLine, text.split(endOfLine), text)
-	}
-
-	return this.getHTMLParagraph(endOfLine, lines, text)
 },
 
 getHTMLVerticalLineTable: function(endOfLine, lines, text) {
@@ -585,14 +986,43 @@ getHTMLVerticalLineTable: function(endOfLine, lines, text) {
 	return outputLines.join(endOfLine)
 },
 
+
+getOutput: function(text) {
+	var endOfLine = getEndOfLine(text)
+	var sections = getSplitFilterLength(text, endOfLine + endOfLine)
+	this.sections = []
+	for (var section of sections) {
+		this.processHTMLSection(endOfLine, section.split(endOfLine), section)
+	}
+
+	return this.sections.join(endOfLine + endOfLine)
+},
+
 getParagraphWithoutMultipleSpaces: function(endOfLine, text) {
 	if (text.startsWith('<p>') && text.endsWith('</p>')) {
 		return text
 	}
 
 	var body = removeExtraSpaces(text).trim()
-	var quoteModulo = 0
 	var characters = body.split('')
+	if (body.startsWith('<')) {
+		for (var characterIndex = 1; characterIndex < characters.length; characterIndex++) {
+			if (characters[characterIndex] == 'p') {
+				characters = characters.slice(characterIndex + 1)
+				if (characters.length > 0) {
+					if (characters[0] == '>') {
+						characters = characters.slice(1)
+					}
+				}
+				break
+			}
+			if (characters[characterIndex] != ' ') {
+				return text
+			}
+		}
+	}
+
+	var quoteModulo = 0
 	for (var characterIndex = 0; characterIndex < characters.length; characterIndex++) {
 		if (characters[characterIndex] == '"') {
 			if (quoteModulo == 0) {
@@ -612,34 +1042,76 @@ getParagraphWithoutMultipleSpaces: function(endOfLine, text) {
 		}
 	}
 
-	arrayKit.removeUndefineds(characters)
+	Vector.removeUndefineds(characters)
+	for (var characterIndex = 0; characterIndex < characters.length; characterIndex++) {
+		if (characters[characterIndex] == '_') {
+			var beforeCharacter = undefined
+			var afterCharacter = undefined
+			var beforeCharacterIndex = characterIndex - 1
+			if (beforeCharacterIndex >= 0) {
+				beforeCharacter = characters[beforeCharacterIndex]
+			}
+			var afterIndex = characterIndex + 1
+			if (afterIndex < characters.length) {
+				afterCharacter = characters[afterIndex]
+			}
+			if (this.beforeUnderscoreSet.has(beforeCharacter) || this.afterUnderscoreSet.has(afterCharacter)) {
+				characters[characterIndex] = undefined
+			}
+		}
+	}
+	
+	Vector.removeUndefineds(characters)
 	var lines = characters.join('').split(endOfLine)
-	var beganWithUnderscore = false
 	for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-		var words = lines[lineIndex].split(' ')
+		var line = lines[lineIndex]
+		var words = line.split(' ').filter(lengthCheck)
 		for (var wordIndex = 0; wordIndex < words.length; wordIndex++) {
 			var word = words[wordIndex]
-			if (word.length > 0) {
-				if (word[0] == '_') {
-					words[wordIndex] = word.slice(1)
-					beganWithUnderscore = true
-				}
-				if (beganWithUnderscore) {
-					word = words[wordIndex]
-					var lastIndexOfUnderscore = word.lastIndexOf('_')
-					if (lastIndexOfUnderscore > 0) {
-						if (gAlphabetSet.has(word[lastIndexOfUnderscore - 1])) {
-							words[wordIndex] = word.slice(0, lastIndexOfUnderscore) + word.slice(lastIndexOfUnderscore + 1)
-							beganWithUnderscore = false
-						}
-					}
+			var hyphenSplits = word.split('-').filter(lengthCheck)
+			if (hyphenSplits.length > 1) {
+				if ((this.colorSet.has(hyphenSplits[0]) && this.colorSet.has(hyphenSplits[1])) || this.separateWordSet.has(word)) {
+					words[wordIndex] = word.replace('-', ' ')
 				}
 			}
 		}
 		lines[lineIndex] = words.join(' ')
 	}
 
-	return this.getClosedText('p', lines.join(endOfLine))
+	var oldWord = ''
+	for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+		var line = lines[lineIndex]
+		var words = line.split(' ').filter(lengthCheck)
+		if (oldWord.endsWith('-') && words.length > 0) {
+			var wordZero = words[0]
+			var suffix = ''
+			var lastLetter = wordZero[wordZero.length - 1]
+			if (this.lastLetterSet.has(lastLetter)) {
+				wordZero = wordZero.slice(0, wordZero.length - 1)
+				suffix = lastLetter
+			}
+			var wrapWord = oldWord.slice(0, oldWord.length - 1) + wordZero
+			var isWrap = gLongWordSet.has(wrapWord)
+			if (!isWrap && wrapWord.endsWith('s')) {
+				isWrap = gLongWordSet.has(wrapWord.slice(0, wrapWord.length - 1))
+			}
+			if (isWrap) {
+				words[0] = wrapWord + suffix
+				lines[lineIndex] = words.join(' ')
+				var previousIndex = lineIndex - 1
+				var oldWords = lines[previousIndex].split(' ').filter(lengthCheck)
+				lines[previousIndex] = oldWords.slice(0, oldWords.length - 1).join(' ')
+			}
+		}
+		if (words.length > 0) {
+			oldWord = words[words.length - 1]
+		}
+		else {
+			oldWord = ''
+		}
+	}
+
+	return this.getClosedText('p', lines.join(endOfLine).replaceAll(' (q.v.)', ''))
 },
 
 getWithPrefixTag: function(tag, text, textWithoutSpaces) {
@@ -651,18 +1123,59 @@ getWithPrefixTag: function(tag, text, textWithoutSpaces) {
 	return prefix + text
 },
 
+joinedWords: 'di-iodide gastro-intestinal tri-iodide wall-paper wall-papers',
+
+lastLetterSet: new Set(', . ; :'.split(' ')),
+
 lowerCaseSet: new Set('a an and at but for if in nor of on or so the to yet'.split(' ')),
+
+processHTMLSection: function(endOfLine, lines, text) {
+	for (var bibliographySynonym of this.bibliographySynonyms) {
+		if (text.indexOf(bibliographySynonym) != -1) {
+			this.sections.push(this.getHTMLBibliography(bibliographySynonym, endOfLine, text))
+			return
+		}
+	}
+
+	if (lines.length == 1) {
+		var words = lines[0].split(' ').filter(lengthCheck)
+		if (words.length < 7) {
+			this.sections.push(this.getHTMLHeading(endOfLine, 3, words))
+			return
+		}
+	}
+
+	if (getCharacterCount(text, '|') * 2 > lines.length) {
+		this.sections.push(this.getHTMLVerticalLineTable(endOfLine, lines, text))
+		return
+	}
+
+	if (getCharacterCount(text, '\t') > lines.length) {
+		this.sections.push(this.getHTMLTabTable(endOfLine, lines, text))
+		return
+	}
+
+	if (getCharacterVariance(text, ' ') > 2.0) {
+		text = text.replaceAll('  ', '|')
+		this.sections.push(this.getHTMLVerticalLineTable(endOfLine, text.split(endOfLine), text))
+		return
+	}
+
+	this.sections.push(this.getHTMLParagraph(endOfLine, lines, text))
+},
+
+separateWordSet: new Set('brick-red easily-fusible furnace-smoke penta-valent sheep-dipping steel-grey tin-white twenty-four'.split(' ')),
 
 tableString: '<table style="border:1px solid black;border-spacing:20px 0px;margin:20px 10px;padding-bottom:10px;padding-top:10px">'
 }
 
 function copyStatementRecursively(registry, statement, workStatement) {
 	if (gCopyTypeSet.has(workStatement.tag)) {
-		noticeByList(['Will not copy a copy type statement in copyStatementRecursively in meta.', statement, workStatement])
+		printCaller(['Will not copy a copy type statement in copyStatementRecursively in meta.', statement, workStatement])
 		return
 	}
 
-	mapKit.copyMissingKeysExcept(statement.attributeMap, workStatement.attributeMap, gDisplayIDTransformWorkSet)
+	MapKit.copyMissingKeysExcept(statement.attributeMap, workStatement.attributeMap, gDisplayIDTransformWorkSet)
 	var work2DMatrix = getChainSkipMatrix2D(registry, workStatement)
 	if (work2DMatrix != undefined) {
 		var statement2DMatrix = getMatrix2D(registry, statement)
@@ -683,6 +1196,10 @@ function copyStatementRecursively(registry, statement, workStatement) {
 
 	for (var child of workStatement.children) {
 		addStatementRecursively(0, statement, registry, child)
+	}
+
+	if (getBooleanByDefault('alter', registry, statement, statement.tag, false)) {
+		alterStatementRecursively(0, registry, statement)
 	}
 }
 
@@ -706,12 +1223,12 @@ function getDistanceSquaredToStatement(location, registry, statement) {
 	if (workMesh != undefined) {
 		points = workMesh.points
 	}
-	if (arrayKit.getIsEmpty(points)) {
+	if (Vector.isEmpty(points)) {
 		return Number.MAX_VALUE
 	}
 	var closestDistanceSquared = Number.MAX_VALUE
 	for (var point of points) {
-		var distanceSquared = Vector.distanceSquaredArray(location, point, 3)
+		var distanceSquared = VectorFast.distanceSquaredArray(location, point, 3)
 		if (distanceSquared < closestDistanceSquared) {
 			closestDistanceSquared = distanceSquared
 		}
@@ -735,7 +1252,7 @@ function getGroupBoundingBoxByArguments(id, registry, statement) {
 	if (statement != groupStatement) {
 		for (var whileCount = 0; whileCount < gLengthLimitRoot; whileCount++) {
 			if (statement.attributeMap.get('id') == id) {
-				noticeByList(['Infinitely nested bounding box in getGroupBoundingBoxByArguments in function.', id, statement])
+				printCaller(['Infinitely nested bounding box in getGroupBoundingBoxByArguments in function.', id, statement])
 				return [[0.0, 0.0], [0.0, 0.0]]
 			}
 			statement = statement.parent
@@ -771,7 +1288,7 @@ function getMapByVariableObject(variableObject) {
 				}
 			}
 			else {
-				map.set(getNameWithoutCheck(propertyName), variableObject[propertyName])
+				map.set(propertyName, variableObject[propertyName])
 			}
 		}
 	}
@@ -817,18 +1334,18 @@ function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
 	var polyline = getPointsByKey(getSuffixedString('polyline', suffix), registry, statement)
 	if (workPoints != undefined) {
 		if (workStatement.tag == 'polygon') {
-			polygon = arrayKit.getPushArray(polygon, workPoints)
+			polygon = Vector.getPushArray(polygon, workPoints)
 		}
 		else {
 			if (workStatement.tag == 'polyline') {
-				polyline = arrayKit.getPushArray(polygon, workPoints)
+				polyline = Vector.getPushArray(polygon, workPoints)
 			}
 		}
 	}
 
 	var suffixedScalePortion = getSuffixedString('scalePortion', suffix)
 	var scalePortion = getFloatsByStatement(suffixedScalePortion, registry, statement)
-	if (!arrayKit.getIsEmpty(scalePortion)) {
+	if (!Vector.isEmpty(scalePortion)) {
 		if (scalePortion.length == 1) {
 			scalePortion.push(scalePortion[0])
 		}
@@ -853,7 +1370,7 @@ function getMatrix2DsBySuffix(attributeMap, registry, statement, suffix) {
 	var suffixedScale = getSuffixedString('scale', suffix)
 	var scale = getFloatsByStatement(suffixedScale, registry, statement)
 	if (matrix2Ds.length > 0) {
-		if (!arrayKit.getIsEmpty(scale)) {
+		if (!Vector.isEmpty(scale)) {
 			if (scale.length == 1) {
 				scale.push(scale[0])
 			}
@@ -908,18 +1425,18 @@ function getMatrix3DsBySuffix(attributeMap, registry, statement, suffix) {
 	var polyline = getPointsByKey(getSuffixedString('polyline', suffix), registry, statement)
 	if (workPoints != undefined) {
 		if (workStatement.tag == 'polygon') {
-			polygon = arrayKit.getPushArray(polygon, workPoints)
+			polygon = Vector.getPushArray(polygon, workPoints)
 		}
 		else {
 			if (workStatement.tag == 'polyline') {
-				polyline= arrayKit.getPushArray(polygon, workPoints)
+				polyline= Vector.getPushArray(polygon, workPoints)
 			}
 		}
 	}
 
 	var suffixedScalePortion = getSuffixedString('scalePortion', suffix)
 	var scalePortion = getFloatsByStatement(suffixedScalePortion, registry, statement)
-	if (!arrayKit.getIsEmpty(scalePortion)) {
+	if (!Vector.isEmpty(scalePortion)) {
 		if (scalePortion.length == 1) {
 			scalePortion.push(scalePortion[0])
 		}
@@ -944,7 +1461,7 @@ function getMatrix3DsBySuffix(attributeMap, registry, statement, suffix) {
 	var suffixedScale = getSuffixedString('scale', suffix)
 	var scale = getFloatsByStatement(suffixedScale, registry, statement)
 	if (matrix3Ds.length > 0) {
-		if (!arrayKit.getIsEmpty(scale)) {
+		if (!Vector.isEmpty(scale)) {
 			if (scale.length == 1) {
 				scale.push(scale[0])
 			}
@@ -973,14 +1490,6 @@ function getMeshByID(id, registry) {
 	return registry.meshMap.get(id)
 }
 
-function getNameWithoutCheck(name) {
-	if (name.endsWith('_Check')) {
-		return name.slice(0, -6)
-	}
-
-	return name
-}
-
 function getNewButton(buttonFunction, textContent) {
 	var button = document.createElement('button')
 	button.onclick = buttonFunction
@@ -991,7 +1500,7 @@ function getNewButton(buttonFunction, textContent) {
 }
 
 function getNewTextArea(textAreaID) {
-	textArea = document.createElement('textarea')
+	var textArea = document.createElement('textarea')
 	textArea.cols = 120
 	textArea.id = textAreaID
 	textArea.rows = 4
@@ -1007,33 +1516,6 @@ function getOutputOrWorkOrID(attributeMap) {
 		return attributeMap.get('work')
 	}
 	return attributeMap.get('id')
-}
-
-function getSections(endOfLine, lines, processor) {
-	var sectionLines = undefined
-	var sections = []
-	for (var line of lines) {
-		if (line.trim().length == 0) {
-			if (sectionLines != undefined) {
-				sections.push(processor.getHTMLSection(endOfLine, sectionLines, sectionLines.join(endOfLine)))
-				sectionLines = undefined
-			}
-		}
-		else {
-			if (sectionLines == undefined) {
-				sectionLines = [line]
-			}
-			else {
-				sectionLines.push(line)
-			}
-		}
-	}
-
-	if (sectionLines != undefined) {
-		sections.push(processor.getHTMLSection(endOfLine, sectionLines, sectionLines.join(endOfLine)))
-	}
-
-	return sections
 }
 
 function getSpreadsheetDelimiter(statement) {
@@ -1115,11 +1597,19 @@ processStatement: function(registry, statement) {
 	statement.tag = 'g'
 	var id = statement.attributeMap.get('id')
 	if (getBooleanByDefault('addTableOfContents', registry, statement, statement.tag, false) == true) {
-		setButtonPair(addTableOfContents, 'Add Table of Contents', id, 'Hypertext Content Input - ')
+		setButtonPair(addTableOfContents, 'Add Table of Contents', id, 'Add Table of Contents')
+	}
+
+	var collectionName = statement.attributeMap.get('collectArticles')
+	if (collectionName != undefined) {
+		var inputArea = setButtonPair(collectArticles, 'Collect Articles', id, 'Collect Articles - ' + collectionName)
+		var shouldConvertElement = getBooleanByDefault('convertElement', registry, statement, statement.tag, false)
+		var statementObject = {collectionName: collectionName.toLowerCase(), shouldConvertElement:shouldConvertElement}
+		inputArea.statementObject = statementObject
 	}
 
 	if (getBooleanByDefault('convertToHTML', registry, statement, statement.tag, true) == true) {
-		setButtonPair(convertToHTML, 'Convert To HTML', id, 'Hypertext Text Input - ')
+		setButtonPair(convertToHTML, 'Convert To HTML', id, 'Convert To HTML')
 	}
 
 	var filenames = getSemicolonSeparatedStringsByValue(statement.attributeMap.get('filename'))
@@ -1178,23 +1668,32 @@ function replaceRows(lines, registry, statement) {
 	}
 
 	lines.splice(statement.lineIndex + 1, endMinusLine - 1)
-	arrayKit.spliceArray(lines, statement.lineIndex + 1, statement.rows)
+	Vector.spliceArray(lines, statement.lineIndex + 1, statement.rows)
 	registry.lineUpdated = true
 }
 
 function setButtonPair(buttonFunction, buttonTitle, id, titleStart) {
-	var inputAreaID = 'input_area_' + id
-	var inputArea = document.getElementById(inputAreaID)
-	if (inputArea != null) {
-		return
+	if (gLongWordSet == undefined) {
+		gLongWordSet = new Set()
+		var script = document.createElement('script')
+		script.src = 'longwords.js'
+		script.setAttribute('type', 'text/javascript')
+		document.body.appendChild(script)
 	}
 
-	addHeading(titleStart + id)
+	var inputAreaID = 'input_area_' + id + buttonTitle.replaceAll(' ', '_')
+	var inputArea = document.getElementById(inputAreaID)
+	if (inputArea != null) {
+		return inputArea
+	}
+
+	addHeading(titleStart)
 	inputArea = getNewTextArea(inputAreaID)
 	var button = getNewButton(buttonFunction, buttonTitle)
 	addHeading('')
 	button.inputArea = inputArea
 	button.outputArea = getNewTextArea('output_area_' + id)
+	return inputArea
 }
 
 function setClosestStatementRecursively(closestDistanceStatement, depth, location, registry, statement) {
@@ -1252,10 +1751,10 @@ var gAbstract = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
 		var attributeMap = statement.attributeMap
-		mapKit.setMapDefault('font-weight', attributeMap, 'normal')
-		mapKit.setMapDefault('skip2D', attributeMap, 'true')
-		mapKit.setMapDefault('skip3D', attributeMap, 'true')
-		mapKit.setMapDefault('style', attributeMap, 'fill:none;stroke:black;stroke-width:1')
+		MapKit.setMapDefault('font-weight', attributeMap, 'normal')
+		MapKit.setMapDefault('skip2D', attributeMap, 'true')
+		MapKit.setMapDefault('skip3D', attributeMap, 'true')
+		MapKit.setMapDefault('style', attributeMap, 'fill:none;stroke:black;stroke-width:1')
 		var flipY = getFloatByStatement('flipY', registry, statement)
 		if (flipY != undefined) {
 			scaleString = 'scale(' + flipY + ',' + (-flipY) + ')'
@@ -1295,13 +1794,13 @@ var gCopy = {
 	processStatement: function(registry, statement) {
 		var attributeMap = statement.attributeMap
 		if (!attributeMap.has('work')) {
-			noticeByList(['No work attribute in copy in meta.', statement])
+			printCaller(['No work attribute in copy in meta.', statement])
 			return
 		}
 
 		var workID = attributeMap.get('work')
 		if (!registry.idMap.has(workID)) {
-			noticeByList(['No work could be found for copy in meta.', workID, statement])
+			printCaller(['No work could be found for copy in meta.', workID, statement])
 			return
 		}
 
@@ -1314,7 +1813,7 @@ var gCopy = {
 			setClosestStatementRecursively(closestDistanceStatement, 0, location, registry, workStatement)
 			workStatement = closestDistanceStatement.statement
 			if (workStatement == undefined) {
-				noticeByList(['No objects to find closest to location in copy in meta.', workStatement, statement])
+				printCaller(['No objects to find closest to location in copy in meta.', workStatement, statement])
 				return
 			}
 		}
@@ -1328,8 +1827,8 @@ var gCopy = {
 
 		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
 		var matrix3Ds = getMatrix3DsByChildren(statement.children, registry)
-		if (arrayKit.getIsEmpty(matrix2Ds) && arrayKit.getIsEmpty(matrix3Ds)) {
-			noticeByList(['No matrix2D or matrix3D in gCopy', statement])
+		if (Vector.isEmpty(matrix2Ds) && Vector.isEmpty(matrix3Ds)) {
+			printCaller(['No matrix2D or matrix3D in gCopy', statement])
 			return
 		}
 
@@ -1352,62 +1851,63 @@ var gCopy = {
 }
 
 var gCopyMesh = {
-	processStatement: function(registry, statement) {
-		var workID = statement.attributeMap.get('work')
-		if (!registry.idMap.has(workID)) {
-			noticeByList(['No work could be found for copyMesh in meta.', statement])
+processStatement: function(registry, statement) {
+	var workID = statement.attributeMap.get('work')
+	if (!registry.idMap.has(workID)) {
+		printCaller(['No work could be found for copyMesh in meta.', statement])
+		return
+	}
+
+	var meshes = []
+	var searchDepth = getIntByDefault('searchDepth', registry, statement, this.tag, gRecursionLimit)
+	addMeshesRecursively(gRecursionLimit - searchDepth, meshes, registry, registry.idMap.get(workID))
+	if (meshes.length == 0) {
+		printCaller(['No meshes could be found for copyMesh in meta.', statement])
+		return
+	}
+
+	var matrix3D = getChainMatrix3D(registry, statement)
+	for (var mesh of meshes) {
+		transform3DPoints(matrix3D, mesh.points)
+	}
+
+	var idStart = statement.attributeMap.get('id') + '_' + workID
+	if (statement.nestingIncrement == 0) {
+		if (meshes.length == 1) {
+			statement.tag = 'mesh'
+			analyzeOutputMesh(getMeshCopy(meshes[0]), registry, statement)
 			return
 		}
+		convertToGroup(statement)
+		addMeshesToGroupStatement(idStart, meshes, registry, statement)
+		return
+	}
 
-		var meshes = []
-		var searchDepth = getIntByDefault('searchDepth', registry, statement, this.tag, gRecursionLimit)
-		addMeshesRecursively(gRecursionLimit - searchDepth, meshes, registry, registry.idMap.get(workID))
-		if (meshes.length == 0) {
-			noticeByList(['No meshes could be found for copyMesh in meta.', statement])
-			return
+	statement.tag = 'g'
+	var matrix3Ds = getMatrix3DsByChildren(statement.children, registry)
+	if (Vector.isEmpty(matrix3Ds)) {
+		printCaller(['No matrix3D in gCopyMesh in meta.', statement])
+		return
+	}
+
+	for (var matrix3D of matrix3Ds) {
+		var matrixAttributeMap = new Map([['transform3D', 'matrix(' + matrix3D.toString() + ')']])
+		MapKit.copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+		var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, 'mesh')
+		getUniqueID(idStart, registry, matrixStatement)
+		if (meshes.length == 1) {
+			analyzeOutputMesh(getMeshCopy(meshes[0]), registry, matrixStatement)
 		}
-
-		var matrix3D = getChainMatrix3D(registry, statement)
-		for (var mesh of meshes) {
-			transform3DPoints(matrix3D, mesh.points)
+		else {
+			convertToGroup(matrixStatement)
+			addMeshesToGroupStatement(matrixAttributeMap.get('id'), meshes, registry, matrixStatement)
 		}
+	}
 
-		var idStart = statement.attributeMap.get('id') + '_' + workID
-		if (statement.nestingIncrement == 0) {
-			if (meshes.length == 1) {
-				statement.tag = 'mesh'
-				analyzeOutputMesh(getMeshCopy(meshes[0]), registry, statement)
-				return
-			}
-			convertToGroup(statement)
-			addMeshesToGroupStatement(idStart, meshes, registry, statement)
-			return
-		}
+	MapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
+},
 
-		statement.tag = 'g'
-		var matrix3Ds = getMatrix3DsByChildren(statement.children, registry)
-		if (arrayKit.getIsEmpty(matrix3Ds)) {
-			noticeByList(['No matrix3D in gCopyMesh in meta.', statement])
-			return
-		}
-
-		for (var matrix3D of matrix3Ds) {
-			var matrixAttributeMap = new Map([['transform3D', 'matrix(' + matrix3D.toString() + ')']])
-			mapKit.copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
-			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, 'mesh')
-			getUniqueID(idStart, registry, matrixStatement)
-			if (meshes.length == 1) {
-				analyzeOutputMesh(getMeshCopy(meshes[0]), registry, matrixStatement)
-			}
-			else {
-				convertToGroup(matrixStatement)
-				addMeshesToGroupStatement(matrixAttributeMap.get('id'), meshes, registry, matrixStatement)
-			}
-		}
-
-		mapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
-	},
-	tag: 'copyMesh'
+tag: 'copyMesh'
 }
 
 var gCopyPoints = {
@@ -1421,8 +1921,8 @@ var gCopyPoints = {
 		var pointsStatements = []
 		addToTagStatementsRecursivelyByDepth(undefined, 0, 1, pointsStatements, registry, workStatement, 'polygon')
 		addToTagStatementsRecursivelyByDepth(undefined, 0, 1, pointsStatements, registry, workStatement, 'polyline')
-		if (arrayKit.getIsEmpty(pointsStatements)) {
-			noticeByList(['No points statements could be found for gCopyPoints in meta.', statement])
+		if (Vector.isEmpty(pointsStatements)) {
+			printCaller(['No points statements could be found for gCopyPoints in meta.', statement])
 			return
 		}
 
@@ -1430,7 +1930,7 @@ var gCopyPoints = {
 		if (statement.nestingIncrement == 0) {
 			if (pointsStatements.length == 1) {
 				statement.tag = pointsStatements[0].statement.tag
-				setPointsExcept(arrayKit.getArraysCopy(pointsStatements[0].points), registry, statement)
+				setPointsExcept(Polyline.copy(pointsStatements[0].points), registry, statement)
 				return
 			}
 			convertToGroup(statement)
@@ -1440,18 +1940,18 @@ var gCopyPoints = {
 
 		statement.tag = 'g'
 		var matrix2Ds = getMatrix2DsByChildren(statement.children, registry)
-		if (arrayKit.getIsEmpty(matrix2Ds)) {
-			noticeByList(['No matrix2D in gCopyPoints in meta.', statement])
+		if (Vector.isEmpty(matrix2Ds)) {
+			printCaller(['No matrix2D in gCopyPoints in meta.', statement])
 			return
 		}
 
 		for (var matrix2D of matrix2Ds) {
 			var matrixAttributeMap = new Map([['transform', 'matrix(' + matrix2D.toString() + ')']])
-			mapKit.copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+			MapKit.copyKeysExcept(matrixAttributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 			var matrixStatement = getStatementByParentTag(matrixAttributeMap, 0, statement, pointsStatements[0].statement.tag)
 			getUniqueID(idStart, registry, matrixStatement)
 			if (pointsStatements.length == 1) {
-				setPointsExcept(arrayKit.getArraysCopy(pointsStatements[0].points), registry, matrixStatement)
+				setPointsExcept(Polyline.copy(pointsStatements[0].points), registry, matrixStatement)
 			}
 			else {
 				convertToGroup(matrixStatement)
@@ -1459,7 +1959,7 @@ var gCopyPoints = {
 			}
 		}
 
-		mapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
+		MapKit.deleteKeysExcept(statement.attributeMap, gIDPointsTransformWorkSet)
 	},
 	tag: 'copyPoints'
 }
@@ -1491,6 +1991,7 @@ var gHelp = {
 	processStatement: function(registry, statement) {
 		console.log(getTagKeys())
 	},
+
 	tag: 'help'
 }
 
@@ -1564,10 +2065,10 @@ var gPolygonAnalysis = {
 	processStatement: function(registry, statement) {
 		var workMesh = getWorkMesh(registry, statement)
 		if (workMesh == undefined) {
-			noticeByList(['No workMesh could be found for polygonAnalysis in meta.', statement])
+			printCaller(['No workMesh could be found for polygonAnalysis in meta.', statement])
 			return
 		}
-		mapKit.copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
+		MapKit.copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
 	},
 	tag: 'polygonAnalysis'
 }
@@ -1577,13 +2078,13 @@ var gProcess = {
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length > 0) {
 			for (var workStatement of workStatements) {
-				mapKit.copyKeysExcept(workStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
+				MapKit.copyKeysExcept(workStatement.attributeMap, statement.attributeMap, gIDPointsTransformWorkSet)
 				processStatementsByTagMap(new Set(), registry, getProcessableDescendantsInsideFirst(workStatement), gTagCenterMap)
 			}
 			return
 		}
 
-		noticeByList(['No work attribute in process in meta.', statement])
+		printCaller(['No work attribute in process in meta.', statement])
 	},
 	tag: 'process'
 }
@@ -1635,9 +2136,9 @@ tag: 'spreadsheet'
 
 var gSTL = {
 alterMesh: function(mesh, registry, statement) {
-	var id = getOutputOrWorkOrID(statement.attributeMap)
-	addOutputArea(getSTLMeshString(id, mesh), 'STL - ' + id)
+	addOutputArea(getSTLMeshString(mesh.id, mesh), 'STL - ' + mesh.id)
 },
+
 processStatement: function(registry, statement) {
 	var workMeshes = getWorkMeshes(registry, statement)
 	if (workMeshes.length > 0) {
@@ -1648,8 +2149,9 @@ processStatement: function(registry, statement) {
 		return
 	}
 
-	noticeByList(['No workMesh could be found for stl in meta.', statement])
+	printCaller(['No workMesh could be found for stl in meta.', statement])
 },
+
 tag: 'stl'
 }
 
@@ -1685,11 +2187,11 @@ var gTriangleAnalysis = {
 		var workMesh = getWorkMesh(registry, statement)
 
 		if (workMesh == undefined) {
-			noticeByList(['No workMesh could be found for triangleAnalysis in meta.', statement])
+			printCaller(['No workMesh could be found for triangleAnalysis in meta.', statement])
 			return
 		}
 		workMesh = getTriangleMesh(workMesh)
-		mapKit.copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
+		MapKit.copyMissingKeys(statement.attributeMap, getMeshAnalysis(workMesh, getPoint3DByStatement('normal', registry, statement)))
 	},
 	tag: 'triangleAnalysis'
 }
@@ -1697,8 +2199,8 @@ var gTriangleAnalysis = {
 var gTSV = {
 	alterMesh: function(mesh, registry, statement) {
 		var id = getOutputOrWorkOrID(statement.attributeMap)
-		var date = mapKit.getUndefinedOrValue(registry.dataMap, 'date')
-		addOutputArea(getTSVMeshString(date, id, mesh, mapKit.getUndefinedOrValue(registry.dataMap, 'project')), 'TSV - ' + id)
+		var date = MapKit.getUndefinedOrValue(registry.dataMap, 'date')
+		addOutputArea(getTSVMeshString(date, id, mesh, MapKit.getUndefinedOrValue(registry.dataMap, 'project')), 'TSV - ' + id)
 	},
 	processStatement: function(registry, statement) {
 		var workMeshes = getWorkMeshes(registry, statement)
@@ -1710,7 +2212,7 @@ var gTSV = {
 			}
 			return
 		}
-		noticeByList(['No workMesh could be found for tsv in meta.', statement])
+		printCaller(['No workMesh could be found for tsv in meta.', statement])
 	},
 	tag: 'tsv'
 }
@@ -1824,7 +2326,7 @@ var gVarAnalysis = {
 
 		var descendantSet = new Set()
 		for (var workStatement of workStatements) {
-			setKit.addElementsToSet(descendantSet, getProcessableDescendantsInsideFirst(workStatement))
+			SetKit.addElementsToSet(descendantSet, getProcessableDescendantsInsideFirst(workStatement))
 		}
 
 		var variableMap = new Map()
@@ -1843,7 +2345,7 @@ var gVarAnalysis = {
 			for (var entry of variableMap.entries()) {
 				allVariables.push(entry)
 			}
-			allVariables.sort(arrayKit.compareStringZeroAscending)
+			allVariables.sort(Vector.compareStringZeroAscending)
 			statement.attributeMap.set('allVariables', allVariables.join(' ').toString())
 		}
 
@@ -1878,7 +2380,7 @@ var gView = {
 	processStatement: function(registry, statement) {
 		var workStatements = getWorkStatements(registry, statement)
 		if (workStatements.length == 0) {
-			noticeByList(['No workStatements could be found for view in meta.', statement])
+			printCaller(['No workStatements could be found for view in meta.', statement])
 		}
 
 		if (getBooleanByDefault('group', registry, statement, statement.tag, true)) {
@@ -1890,7 +2392,7 @@ var gView = {
 				}
 			}
 			if (analysisPointsArray.length == 0) {
-				noticeByList(['No analysisPoints could be found for view in meta.', statement])
+				printCaller(['No analysisPoints could be found for view in meta.', statement])
 				return
 			}
 			registry.views.push(new ViewGroup(analysisPointsArray, statement.attributeMap.get('id')))
@@ -1914,7 +2416,7 @@ var gView = {
 var gWindow = {
 	processStatement: function(registry, statement) {
 		statement.tag = 'g'
-		mapKit.setMapDefault('skip2D', statement.attributeMap, 'true')
+		MapKit.setMapDefault('skip2D', statement.attributeMap, 'true')
 		getMatrix2D(registry, statement)
 	},
 	tag: 'window'
