@@ -39,7 +39,7 @@ function addPixelLine(key, lines, pixelMap, pointMap, root, rotationIndex, tipMa
 				return
 			}
 		}
-		Vector.add2D(next, gXYDirections[tipIndex])
+		VectorFast.add2D(next, gXYDirections[tipIndex])
 		key = next.join(',')
 		if (pixelMap.has(key)) {
 			tips = pixelMap.get(key)
@@ -79,7 +79,7 @@ function addPixelRow(directionIndex, entry, pixelMap, signedIntersectionsMap) {
 			signedIntersectionsLength += 1
 		}
 	}
-	signedIntersections.sort(arrayKit.compareSignedIntersectionAscending)
+	signedIntersections.sort(Vector.compareSignedIntersectionAscending)
 	var existence = 0
 	var pixelStart = null
 	for (signedIntersectionIndex = 0; signedIntersectionIndex < signedIntersections.length; signedIntersectionIndex++) {
@@ -115,7 +115,7 @@ function addSpacel(key, signedIntersectionsMap) {
 	var parameters = key.split(',');
 	var intersectionKey = parameters.slice(1).join(',')
 	var x = parseInt(parameters[0])
-	mapKit.addElementToMapArray(signedIntersectionsMap, intersectionKey, x)
+	MapKit.addElementToMapArray(signedIntersectionsMap, intersectionKey, x)
 }
 
 function addTestPixels(pixelMap) {
@@ -134,8 +134,8 @@ function createPixelTips(pixelMap) {
 		pixel = entry[1]
 		for (rotationIndex = 0; rotationIndex < 4; rotationIndex++) {
 			direction = gXYDirections[rotationIndex]
-			if (!pixelMap.has(Vector.getAddition2D(root, direction).join(','))) {
-				pixel[rotationIndex] = Vector.getAddition2D(root, Vector.getMultiplication2D(distance, direction))
+			if (!pixelMap.has(VectorFast.getAddition2D(root, direction).join(','))) {
+				pixel[rotationIndex] = VectorFast.getAddition2D(root, VectorFast.getMultiplication2D(distance, direction))
 			}
 		}
 	}
@@ -216,10 +216,10 @@ function getIntersectionPairsMapBoolean(existenceCondition, signB, intersectionP
 	var intersectionPairsMapBoolean = new Map()
 	var keySet = new Set()
 	if (intersectionPairsMapA != null) {
-		setKit.addElementsToSet(keySet, intersectionPairsMapA.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapA.keys())
 	}
 	if (intersectionPairsMapB != null) {
-		setKit.addElementsToSet(keySet, intersectionPairsMapB.keys())
+		SetKit.addElementsToSet(keySet, intersectionPairsMapB.keys())
 	}
 	for (var key of keySet) {
 		var intersectionPairsA = null
@@ -276,17 +276,17 @@ function getPolygonsAddition(layerThickness, offsetMultiplier, polygonsA, polygo
 function getPolygonsBoolean(existenceCondition, layerThickness, offsetMultiplier, polygonsA, polygonsB, signB) {
 	var offsetY = offsetMultiplier * layerThickness
 	var oneOverLayerThickness = 1.0 / layerThickness
-	var polygonsATransformed = arrayKit.getArrayArraysCopy(polygonsA)
-	var polygonsBTransformed = arrayKit.getArrayArraysCopy(polygonsB)
-	addArrayArraysByY(polygonsATransformed, -offsetY)
-	addArrayArraysByY(polygonsBTransformed, -offsetY)
+	var polygonsATransformed = Polyline.copies(polygonsA)
+	var polygonsBTransformed = Polyline.copies(polygonsB)
+	Polyline.addByIndex(polygonsATransformed, -offsetY, 1)
+	Polyline.addByIndex(polygonsBTransformed, -offsetY, 1)
 	multiply2DArraysScalar(polygonsATransformed, oneOverLayerThickness)
 	multiply2DArraysScalar(polygonsBTransformed, oneOverLayerThickness)
 	var xyLatticeA = getXYLattice(polygonsATransformed)
 	var xyLatticeB = getXYLattice(polygonsBTransformed)
 	var xyLatticeBoolean = getXYLatticeBoolean(existenceCondition, signB, xyLatticeA, xyLatticeB)
 	var polygonsBoolean = getXYPolygonsByLattice(xyLatticeBoolean)
-	return addArrayArraysByY(multiply2DArraysScalar(polygonsBoolean, layerThickness), offsetY)
+	return Polyline.addByIndex(multiply2DArraysScalar(polygonsBoolean, layerThickness), offsetY, 1)
 }
 
 function getPolygonsExclusiveIntersection(layerThickness, offsetMultiplier, polygonsA, polygonsB) {
@@ -325,7 +325,7 @@ function getSignedIntersections(intersectionPairsA, intersectionPairsB, signB) {
 			signedIntersectionIndex += 2
 		}
 	}
-	signedIntersections.sort(arrayKit.compareSignedIntersectionAscending)
+	signedIntersections.sort(Vector.compareSignedIntersectionAscending)
 	return signedIntersections
 }
 
