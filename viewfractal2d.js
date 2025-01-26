@@ -34,17 +34,17 @@ class Fractal2DControl extends CanvasControl {
 				var escape = getEscapeCount(this.view.escapeRadius, iterations, point)
 				var red = escape * redFrequency + redPhase
 				if (this.view.redColorControl.getValue()) {
-					red += Math.acos(normalize2D(point)[0]) / Math.PI
+					red += Math.acos(Vector.normalize2D(point)[0]) / Math.PI
 				}
 				red = Math.floor(127.999 * Math.sin(red) + 128.0)
 				var green = escape * greenFrequency + greenPhase
 				if (this.view.greenColorControl.getValue()) {
-					green += Math.acos(Vector.dotProduct2D(greenVector, normalize2D(point))) / Math.PI
+					green += Math.acos(VectorFast.dotProduct2D(greenVector, Vector.normalize2D(point))) / Math.PI
 				}
 				green = Math.floor(127.999 * Math.sin(green) + 128.0)
 				var blue = escape * blueFrequency + bluePhase
 				if (this.view.blueColorControl.getValue()) {
-					blue += Math.acos(Vector.dotProduct2D(blueVector, normalize2D(point))) / Math.PI
+					blue += Math.acos(VectorFast.dotProduct2D(blueVector, Vector.normalize2D(point))) / Math.PI
 				}
 				blue = Math.floor(127.999 * Math.sin(blue) + 128.0)
 				context.fillStyle = 'rgb(' + red + ', ' + green + ', ' + blue + ')'
@@ -66,8 +66,8 @@ function getEscapeCount(escapeRadius, iterations, point) {
 	var escapeCount = 0
 	for (; escapeCount < iterations;) {
 		escapeCount++
-		Vector.add2D(Vector.rotate2DVector(point, point), originalPoint)
-		var lengthSquared = Vector.lengthSquared2D(point)
+		VectorFast.add2D(VectorFast.rotate2DVector(point, point), originalPoint)
+		var lengthSquared = VectorFast.lengthSquared2D(point)
 		if (lengthSquared > radiusSquared) {
 			var before = Math.log(Math.log2(Math.sqrt(lengthSquared)))
 			var escapeExtra = 1.0 - before
@@ -106,7 +106,7 @@ var moveXYManipulator = {
 			return
 		}
 		var mouseMovement = [event.offsetX - viewCanvas.mouseDown2D[0], event.offsetY - viewCanvas.mouseDown2D[1]]
-		var movementLength = Vector.length2D(mouseMovement)
+		var movementLength = VectorFast.length2D(mouseMovement)
 		if (movementLength == 0.0) {
 			return
 		}
@@ -212,7 +212,7 @@ function ViewFractal2D() {
 		var nextBottom = bottom - Checkbox.defaultHeightNew()
 		this.controls = controls
 		this.viewBoundingBox = [[0, 0], [viewBroker.heightMinus, height]]
-		this.viewBoundingBoxSize = Vector.getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0])
+		this.viewBoundingBoxSize = VectorFast.getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0])
 		this.viewControl = new Fractal2DControl(this.viewBoundingBox)
 		controls.push(this.viewControl)
 
