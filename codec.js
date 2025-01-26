@@ -7,45 +7,43 @@ var gBracketTable = {
 var gBracketExpression = new RegExp(Object.keys(gBracketTable).join("|"), "gi")
 var gCurrentKey = undefined
 //var gDate = undefined
-var gEscapeTable = {
-	'%09':'\t',
-	'%0A':'\n',
-	'%0D':'\r',
-	'%20':' ',
-	'%24':'$',
-	'%26':'&',
-	'%60':'`',
-	'%3A':':',
-	'%3C':'<',
-	'%3E':'>',
-	'%5B':'[',
-	'%5D':']',
-	'%7B':'{',
-	'%7D':'}',
-	'%22':'"',
-	'%2B':'+',
-	'%23':'#',
-	'%25':'%',
-	'%40':'@',
-	'%2F':'/',
-	'%3B':';',
-	'%3D':'=',
-	'%3F':'?',
-	'%5C':'\\',
-	'%5E':'^',
-	'%7C':'|',
-	'%7E':'~',
-	'%27':'\'',
-	'%2C':',',
-	'%E2%80%9C':'“',
-	'%E2%80%9D':'”'}
-var gEscapeExpression = new RegExp(Object.keys(gEscapeTable).join("|"), "gi")
+var gDecodeMap = new Map([
+['%09','\t'],
+['%0A','\n'],
+['%0D','\r'],
+['%20',' '],
+['%22','"'],
+['%23','#'],
+['%24','$'],
+['%25','%'],
+['%26','&'],
+['%27',"'"],
+['%2B','+'],
+['%2C',','],
+['%2F','/'],
+['%3A',':'],
+['%3B',';'],
+['%3C','<'],
+['%3D','='],
+['%3E','>'],
+['%3F','?'],
+['%40','@'],
+['%5B','['],
+['%5C','\\'],
+['%5D',']'],
+['%5E','^'],
+['%60','`'],
+['%7B','{'],
+['%7C','|'],
+['%7D','}'],
+['%7E','~'],
+['%E2%80%9C','“'],
+['%E2%80%9D','”']])
+var gDecodeExpression = new RegExp(Array.from(gDecodeMap.keys()).join("|"), "gi")
 var gGoMessage = undefined
 const gLZStringHeader = 'lz_'
-//var gProject = undefined
 var gTitle = undefined
 var gWordString = undefined
-//var gURLMaximumLength = 1900
 
 function addTextsToSelect(select, texts) {
 	for (var text of texts) {
@@ -164,7 +162,9 @@ getExpanded: function(text) {
 	}
 
 	return words.join('')
-}
+},
+
+header: 'AlphabeticRepeatQ_'
 }
 
 function browse(input) {
@@ -184,7 +184,7 @@ function deleteSession() {
 	var selectedIndex = deleteSessionSelect.selectedIndex
 	var key = deleteSessionSelect.options[selectedIndex].text
 	deleteSessionSelect.selectedIndex = 0
-	if (arrayKit.getIsEmpty(key) || selectedIndex < 2) {
+	if (Vector.isEmpty(key) || selectedIndex < 2) {
 		return
 	}
 
@@ -244,32 +244,18 @@ function getBracketReplacedLinesByText(wordString) {
 }
 
 function getCompressToEncodedURI(text) {
-//	if (text.length < gURLMaximumLength) {
-		return text.replaceAll('\n', '%0A').replaceAll(',', '%2C').replaceAll('\t', '%09').replaceAll('"', '%22')
-//	}
-/*
-	var compressedText = gLZStringHeader + LZString.compressToEncodedURIComponent(text)
-	if (compressedText.length < gURLMaximumLength) {
-		return compressedText
-	}
-	var text = 'abstract'
-	if (gProject != undefined) {
-		text += ' project=' + gProject
-	}
-	if (gAbstractID != undefined) {
-		text += ' part=' + gAbstractID
-	}
-	if (gDate != undefined) {
-		text += ' date=' + gDate
-	}
-	text += ' note=The text is too long to fit into a url.'
-	return text + ' So click on Load Last Session in the File menu to recover the text.'
-*/
+//	text = AlphabeticRepeatQ.header + AlphabeticRepeatQ.getCompressed(text)
+//	text = gLZStringHeader + LZString.compressToEncodedURIComponent(text)
+	return text.replaceAll('\n', '%0A').replaceAll(',', '%2C').replaceAll('\t', '%09').replaceAll('"', '%22').replaceAll("'", '%27')
 }
 
 function getDecompressFromEncodedURI(text) {
-	if (text.indexOf('=') == -1 && text.length > 99) {
-		return LZString.decompressFromEncodedURIComponent(text.slice(text.lastIndexOf('_') + 1))
+	if (text.startsWith(AlphabeticRepeatQ.header)) {
+		return AlphabeticRepeatQ.getExpanded(text.slice(AlphabeticRepeatQ.header.length))
+	}
+
+	if (text.startsWith(gLZStringHeader)) {
+		return LZString.decompressFromEncodedURIComponent(text.slice(gLZStringHeader.length))
 	}
 
 	return text
@@ -280,7 +266,7 @@ function getDraftTitle(title) {
 }
 
 function getIsWordStringNew(wordString) {
-	if (arrayKit.getIsEmpty(wordString) || arrayKit.getIsEmpty(gTitle)) {
+	if (Vector.isEmpty(wordString) || Vector.isEmpty(gTitle)) {
 		return false
 	}
 
@@ -302,7 +288,7 @@ function getSessionBoolean(booleanKey) {
 function getSessionKey() {
 	var item = sessionStorage.getItem('goCount@')
 	var goCount = 0
-	if (!arrayKit.getIsEmpty(item)) {
+	if (!Vector.isEmpty(item)) {
 		goCount = parseInt(item) + 1
 	}
 
@@ -353,7 +339,7 @@ function redo() {
 
 function saveToArchive() {
 	var wordString = document.getElementById('wordAreaID').value
-	if (wordString == undefined || arrayKit.getIsEmpty(gTitle)) {
+	if (wordString == undefined || Vector.isEmpty(gTitle)) {
 		return
 	}
 
@@ -429,7 +415,7 @@ function setTextArea(textAreaID) {
 	}
 	else {
 		query = query.slice(indexOfQuestionMark + 1)
-		query = query.replace(gEscapeExpression, function(find) {return gEscapeTable[find]})
+		query = query.replace(gDecodeExpression, function(find) {return gDecodeMap.get(find)})
 		query = getDecompressFromEncodedURI(query)
 		if (query == undefined) {
 			query = ''
@@ -647,7 +633,7 @@ function updateSelect(select) {
 
 function updateStorageTextLink() {
 	var wordString = sessionStorage.getItem(gCurrentKey)
-	if (arrayKit.getIsEmpty(wordString)) {
+	if (Vector.isEmpty(wordString)) {
 		wordString = ''
 	}
 
