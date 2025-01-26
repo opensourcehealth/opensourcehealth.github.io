@@ -195,9 +195,8 @@ function getEndOfLine(text) {
 	return '\n'
 }
 
-function getIndexOfUnbracketed(text, searchCharacter, searchBracketDepth) {
+function getIndexOfUnbracketed(text, searchCharacter, searchBracketDepth = 0) {
 	var bracketDepth = 0
-	searchBracketDepth = Value.getValueDefault(searchBracketDepth, 0)
 	for (var characterIndex = 0; characterIndex < text.length; characterIndex++) {
 		var character = text[characterIndex]
 		bracketDepth += 1 * (character == '(' || character == '[') - 1 * (character == ')' || character == ']')
@@ -306,6 +305,10 @@ function getSplicedString(originalString, spliceIndex, spliceRemoved, spliceRepl
 	return originalString.slice(0, spliceIndex) + spliceReplacement + originalString.slice(spliceIndex + spliceRemoved)
 }
 
+function getSplitFilterLength(text, splitWord) {
+	return text.split(splitWord).filter(lengthCheck)
+}
+
 function getSplitsAroundBracketed(text, searchCharacter) {
 	var bracketDepth = 0
 	var characterIndex = 0
@@ -403,6 +406,15 @@ function lengthCheck(word) {
 	return word.length > 0
 }
 
+function maximumIndexOf(text, searchStrings) {
+	var maximumIndex = -1
+	for (var searchString of searchStrings) {
+		maximumIndex = Math.max(maximumIndex, text.indexOf(searchString))
+	}
+
+	return maximumIndex
+}
+
 function removeExtraSpaces(text) {
 	var remove = false
 	var characters = text.split('')
@@ -422,7 +434,7 @@ function removeExtraSpaces(text) {
 		}
 	}
 
-	arrayKit.removeUndefineds(characters)
+	Vector.removeUndefineds(characters)
 	for (var characterIndex = 0; characterIndex < characters.length - 2; characterIndex++) {
 		if (characters[characterIndex] == '.' && characters[characterIndex + 1] == ' ' && gUpperCaseSet.has(characters[characterIndex + 2])) {
 			for (var innerIndex = characterIndex + 2; innerIndex < characters.length; innerIndex++) {
