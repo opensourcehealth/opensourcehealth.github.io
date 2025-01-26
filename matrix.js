@@ -1,57 +1,15 @@
 //License = GNU Affero General Public License http://www.gnu.org/licenses/agpl.html
 
-gRGBIndex = 0
 const gXYRotationBasis = [0, 1]
 const gYZRotationBasis = [1, 2]
 const gXZRotationBasis = [0, 2]
-
-function addArrayArraysByIndex(arrayArrays, addition, index) {
-	for (var arrays of arrayArrays) {
-		addArraysByIndex(arrays, addition, index)
-	}
-
-	return arrayArrays
-}
-
-//deprecated26 to be replace by addArraysByIndex(arrays, addition, 1)
-function addArrayArraysByY(arrays, y) {
-	for (var array of arrays) {
-		addArraysByIndex(array, y, 1)
-	}
-
-	return arrays
-}
-
-function addArrays(elements, adders, until) {
-	for (var element of elements) {
-		Vector.addArray(element, adders, until)
-	}
-
-	return elements
-}
-
-function addArraysByIndex(arrays, addition, index) {
-	for (var array of arrays) {
-		array[index] += addition
-	}
-
-	return arrays
-}
-
-function addArrayScalar(elements, adderScalar) {
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		elements[elementIndex] += adderScalar
-	}
-
-	return elements
-}
 
 function addPointToMatrix3D(matrix, point) {
 //	0 4 8  12
 //	1 5 9  13
 //	2 6 10 14
 //	3 7 11 15
-	if (arrayKit.getIsEmpty(point)) {
+	if (Vector.isEmpty(point)) {
 		return matrix
 	}
 
@@ -76,11 +34,6 @@ function get2DByMatrix3D(point, matrix) {
 	return [x, y]
 }
 
-function get2DByPortion(portionA, a2D, b2D) {
-	var portionB = 1.0 - portionA
-	return [portionA * a2D[0] + portionB * b2D[0], portionA * a2D[1] + portionB * b2D[1]]
-}
-
 function get3DByHeightMatrix3D(point, matrix3D) {
 	if (Array.isArray(matrix3D)) {
 		return get3DByMatrix3D(point, matrix3D)
@@ -100,13 +53,8 @@ function get3DByMatrix3D(point, matrix3D) {
 	return [x, y, z]
 }
 
-function get3DByKey(key) {
-	parameters = key.split(',')
-	return [parseFloat(parameters[0]), parseFloat(parameters[1]), parseFloat(parameters[2])]
-}
-
 function get3DsByMatrix3D(points, matrix3D) {
-	if (arrayKit.getIsEmpty(matrix3D)) {
+	if (Vector.isEmpty(matrix3D)) {
 		return points
 	}
 
@@ -118,40 +66,8 @@ function get3DsByMatrix3D(points, matrix3D) {
 	return xyzs
 }
 
-function getArraysMultiplicationByScalar(elementLists, scalarMultiplier) {
-	var arraysMultiplication = new Array(elementLists.length)
-	for (var elementListIndex = 0; elementListIndex < elementLists.length; elementListIndex++) {
-		arraysMultiplication[elementListIndex] = Vector.getMultiplicationArrayScalar(elementLists[elementListIndex], scalarMultiplier)
-	}
-
-	return arraysMultiplication
-}
-
-function getBrightness256(brightness) {
-	return Math.floor(255.0 * ((brightness) % 1.0))
-}
-
-//use getRelativeDirection for ordering because getDirectionalProximity loses accuracy close to the x axis
-function getDirectionalProximity(a2D, b2D) {
-	var dotProduct = Vector.dotProduct2D(a2D, b2D)
-	if (a2D[0] * b2D[1] <= a2D[1] * b2D[0]) {
-		return dotProduct
-	}
-
-	return -3.0 - dotProduct
-}
-
 function getFloats(floats) {
 	return floats
-}
-
-function getInteriorAngle(begin, end, radius) {
-	var halfDistance = 0.5 * Vector.distance2D(begin, end)
-	if (halfDistance > radius) {
-		noticeByList(['halfDistance is greater than radius in getInteriorAngle in matrix.', begin, end, radius])
-	}
-
-	return 2.0 * Math.asin(halfDistance / radius)
 }
 
 function getInverseRotation3D(matrix3D) {
@@ -245,7 +161,7 @@ function getMatrices3DByPath(points) {
 	}
 
 	for (var vertexIndex = points.length - 2; vertexIndex > -1; vertexIndex--) {
-		if (Vector.equal3D(points[vertexIndex], points[vertexIndex + 1])) {
+		if (VectorFast.equal3D(points[vertexIndex], points[vertexIndex + 1])) {
 			points.splice(vertexIndex, 1)
 		}
 	}
@@ -256,14 +172,14 @@ function getMatrices3DByPath(points) {
 
 	var vectors = new Array(points.length - 1)
 	for (var pointIndex = 0; pointIndex < points.length - 1; pointIndex++) {
-		vectors[pointIndex] = normalize3D(Vector.getSubtraction3D(points[pointIndex + 1], points[pointIndex]))
+		vectors[pointIndex] = Vector.normalize3D(VectorFast.getSubtraction3D(points[pointIndex + 1], points[pointIndex]))
 	}
 
 	var matrices = new Array(points.length)
 	var oldVector = vectors[0]
 	matrices[0] = getMatrix3DByPair([0,0,1], oldVector)
 	for (var vectorIndex = 1; vectorIndex < vectors.length; vectorIndex++) {
-		var midpoint = getUnitMidpoint3D(oldVector, vectors[vectorIndex])
+		var midpoint = Vector.normalizedFromToAlong3D(oldVector, vectors[vectorIndex])
 		matrices[vectorIndex] = getMultiplied3DMatrix(getMatrix3DByPair(oldVector, midpoint), matrices[vectorIndex - 1])
 		oldVector = midpoint
 	}
@@ -424,7 +340,7 @@ function getMatrix2DBySegment(beginPoint, endPoint) {
 //	b d f		1 3 5
 	latestMatrix[4] = beginPoint[0]
 	latestMatrix[5] = beginPoint[1]
-	var subtraction = Vector.getSubtraction2D(endPoint, beginPoint)
+	var subtraction = VectorFast.getSubtraction2D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 	latestMatrix[2] = -subtraction[1]
@@ -436,7 +352,7 @@ function getMatrix2DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 	var latestMatrix = getMatrix2DBySegment(beginPoint, endPoint)
 //	a c e		0 2 4
 //	b d f		1 3 5
-	if (arrayKit.getIsEmpty(scalePortion)) {
+	if (Vector.isEmpty(scalePortion)) {
 		return latestMatrix
 	}
 
@@ -466,14 +382,13 @@ function getMatrix2DBySkewX(floats) {
 		return getUnitMatrix2D()
 	}
 
-	var rotation = floats[0] * gRadiansPerDegree
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
 //
 //	1 tan
 //	0 1
-	return [1.0, 0.0, Math.tan(rotation), 1.0, 0.0, 0.0]
+	return [1.0, 0.0, Math.tan(floats[0] * gRadiansPerDegree), 1.0, 0.0, 0.0]
 }
 
 function getMatrix2DBySkewY(floats) {
@@ -481,14 +396,13 @@ function getMatrix2DBySkewY(floats) {
 		return getUnitMatrix2D()
 	}
 
-	var rotation = floats[0] * gRadiansPerDegree
 //	a c e		0 2 4
 //	b d f		1 3 5
 //	0 0 1		    +
 //
 //	1 0
 //	tan 1
-	return [1.0, Math.tan(rotation), 0.0, 1.0, 0.0, 0.0]
+	return [1.0, Math.tan(floats[0] * gRadiansPerDegree), 0.0, 1.0, 0.0, 0.0]
 }
 
 function getMatrix2DByTranslate(floats) {
@@ -545,7 +459,7 @@ function getMatrix3DByBasis(points) {
 	latestMatrix[4] = y[0]
 	latestMatrix[5] = y[1]
 	latestMatrix[6] = y[2]
-	var product = Vector.crossProduct(x, y)
+	var product = VectorFast.crossProduct(x, y)
 	latestMatrix[8] = product[0]
 	latestMatrix[9] = product[1]
 	latestMatrix[10] = product[2]
@@ -567,14 +481,14 @@ function getMatrix3DByBasis(points) {
 }
 
 function getMatrix3DByPair(a, b) {
-	var cos = Vector.dotProduct3D(a, b)
-	var product = Vector.crossProduct(a, b)
-	var sin = Vector.length3D(product)
+	var cos = VectorFast.dotProduct3D(a, b)
+	var product = VectorFast.crossProduct(a, b)
+	var sin = VectorFast.length3D(product)
 	if (sin == 0.0) {
 		return getUnitMatrix3D()
 	}
 
-	Vector.divide3DScalar(product, sin)
+	VectorFast.divide3DScalar(product, sin)
 	return getMatrix3DByVectorCosSin([product[0], product[1], product[2], cos, sin])
 }
 
@@ -775,7 +689,7 @@ function getMatrix3DBySegment(beginPoint, endPoint) {
 	latestMatrix[12] = beginPoint[0]
 	latestMatrix[13] = beginPoint[1]
 	latestMatrix[14] = beginPoint[2]
-	var subtraction = Vector.getSubtraction3D(endPoint, beginPoint)
+	var subtraction = VectorFast.getSubtraction3D(endPoint, beginPoint)
 	latestMatrix[0] = subtraction[0]
 	latestMatrix[1] = subtraction[1]
 //	latestMatrix[2] = subtraction[2]
@@ -791,7 +705,7 @@ function getMatrix3DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 //	1 5 9  13
 //	2 6 10 14
 //	3 7 11 15
-	if (arrayKit.getIsEmpty(scalePortion)) {
+	if (Vector.isEmpty(scalePortion)) {
 		return latestMatrix
 	}
 
@@ -823,6 +737,44 @@ function getMatrix3DBySegmentPortion(beginPoint, endPoint, scalePortion) {
 	latestMatrix[9] *= zMultiplier
 	latestMatrix[10] *= zMultiplier
 	return latestMatrix
+}
+
+function getMatrix3DByIndexSkew(index, floats) {
+	var latestMatrix = getUnitMatrix3D()
+	if (floats.length == 0) {
+		return latestMatrix
+	}
+
+//	0 4 8  12
+//	1 5 9  13
+//	2 6 10 14
+//	3 7 11 15
+	latestMatrix[index] = Math.tan(floats[0] * gRadiansPerDegree)
+	return getTranslateMultiplyTranslate(floats, latestMatrix)
+}
+
+function getMatrix3DBySkewXY(floats) {
+	return getMatrix3DByIndexSkew(4, floats)
+}
+
+function getMatrix3DBySkewXZ(floats) {
+	return getMatrix3DByIndexSkew(8, floats)
+}
+
+function getMatrix3DBySkewYX(floats) {
+	return getMatrix3DByIndexSkew(1, floats)
+}
+
+function getMatrix3DBySkewYZ(floats) {
+	return getMatrix3DByIndexSkew(9, floats)
+}
+
+function getMatrix3DBySkewZX(floats) {
+	return getMatrix3DByIndexSkew(2, floats)
+}
+
+function getMatrix3DBySkewZY(floats) {
+	return getMatrix3DByIndexSkew(6, floats)
 }
 
 function getMatrix3DByTranslate(floats) {
@@ -968,31 +920,6 @@ function getMatrix3DZByCosSin(cos, sin) {
 	return matrix3D
 }
 
-function getMeldedArray(elements, otherElements) {
-	var meldedArray = arrayKit.getArraysCopy(elements)
-	var weightIncrement = 1.0 / (elements.length - 1)
-	var elementWeight = 1.0
-	for (var elementIndex = 0; elementIndex < elements.length; elementIndex++) {
-		Vector.multiplyArrayScalar(meldedArray[elementIndex], elementWeight)
-		Vector.addArray(meldedArray[elementIndex], Vector.getMultiplicationArrayScalar(otherElements[elementIndex], (1.0 - elementWeight)))
-		elementWeight -= weightIncrement
-	}
-
-	return meldedArray
-}
-
-function getMidpoint2D(a2D, b2D) {
-	return Vector.multiply2DScalar(Vector.getAddition2D(a2D, b2D), 0.5)
-}
-
-function getMidpoint3D(a3D, b3D) {
-	return Vector.multiply3DScalar(Vector.getAddition3D(a3D, b3D), 0.5)
-}
-
-function getMidpointArray(elements, others, until) {
-	return Vector.multiplyArrayScalar(Vector.getAdditionArray(elements, others, until), 0.5)
-}
-
 function getMultiplied2DMatrix(matrixA, matrixB) {
 //	a c e		0 2 4
 //	b d f		1 3 5
@@ -1057,46 +984,6 @@ function getNewlineMatrixString(matrix, numberOfRows) {
 	return rowStrings.join('\n')
 }
 
-function getPositiveModulo(x) {
-	return x - Math.floor(x)
-}
-
-function getRelativeDirection(vector) {
-	var absoluteX = Math.abs(vector[0])
-	if (vector[1] > absoluteX) {
-		return 6.06 + vector[0] / vector[1]
-	}
-
-	if (vector[1] < -absoluteX) {
-		return 2.02 + vector[0] / vector[1]
-	}
-
-	var absoluteY = Math.abs(vector[1])
-	if (vector[0] > absoluteY) {
-		return -vector[1] / vector[0]
-	}
-
-	return 4.04 -vector[1] / vector[0]
-}
-
-function getRGB() {
-	gRGBIndex += 1
-	return getRGBByIndex(gRGBIndex)
-}
-
-function getRGBByIndex(rgbIndex) {
-	return [getBrightness256(rgbIndex * 0.617), getBrightness256(rgbIndex * 0.733), getBrightness256(rgbIndex * 0.317)]
-}
-
-function getRotation2DsVector(points, vector) {
-	var rotations2D = new Array(points.length)
-	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		rotations2D[pointIndex] = Vector.getRotation2DVector(points[pointIndex], vector)
-	}
-
-	return rotations2D
-}
-
 function getTranslateMultiplyTranslate(floats, matrix3D) {
 	if (floats.length == 1) {
 		return matrix3D
@@ -1139,10 +1026,6 @@ function getUnitMatrix3D() {
 	return [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 }
 
-function getUnitMidpoint3D(a3D, b3D) {
-	return normalize3D(getMidpoint3D(a3D, b3D))
-}
-
 function invert3D(xyz) {
 	xyz[0] = -xyz[0]
 	xyz[1] = -xyz[1]
@@ -1163,70 +1046,35 @@ function isUnitMatrix(matrix) {
 }
 
 function isUnitMatrix2D(matrix2D) {
-	return arrayKit.arrayIsClose(matrix3D, gUnitMatrix2D)
+	return Vector.arrayIsClose(matrix3D, gUnitMatrix2D)
 }
 
 function isUnitMatrix3D(matrix3D) {
-	return arrayKit.arrayIsClose(matrix3D, gUnitMatrix3D)
+	return Vector.arrayIsClose(matrix3D, gUnitMatrix3D)
 }
 
-function multiply2DArrays(xyArrays, b2D) {
-	for (var elements of xyArrays) {
-		multiply2Ds(elements, b2D)
+function multiply2DArrays(arrayArrays, b2D) {
+	for (var arrays of arrayArrays) {
+		Polyline.multiply2Ds(arrays, b2D)
 	}
 
-	return xyArrays
+	return arrayArrays
 }
 
-function multiply2DArraysScalar(xyArrays, multiplier) {
-	for (var elements of xyArrays) {
-		multiply2DsScalar(elements, multiplier)
+function multiply2DArraysScalar(arrayArrays, multiplier) {
+	for (var arrays of arrayArrays) {
+		Polyline.multiply2DsScalar(arrays, multiplier)
 	}
 
-	return xyArrays
+	return arrayArrays
 }
 
-function multiply2Ds(elements, b2D) {
-	for (var xy of elements) {
-		Vector.multiply2D(xy, b2D)
+function multiply3DArraysScalar(arrayArrays, multiplier) {
+	for (var arrays of arrayArrays) {
+		Polyline.multiply3DsScalar(arrays, multiplier)
 	}
 
-	return elements
-}
-
-function multiply2DsScalar(elements, multiplier) {
-	for (var xy of elements) {
-		xy[0] *= multiplier
-		xy[1] *= multiplier
-	}
-
-	return elements
-}
-
-function multiply3DArraysScalar(xyzArrays, multiplier) {
-	for (var xyzs of xyzArrays) {
-		multiply3DsScalar(xyzs, multiplier)
-	}
-
-	return xyzArrays
-}
-
-function multiply3Ds(elementArrays, multiplier3D) {
-	for (var elements of elementArrays) {
-		Vector.multiply3D(elements, multiplier3D)
-	}
-
-	return elementArrays
-}
-
-function multiply3DsScalar(xyzs, multiplier) {
-	for (var xyz of xyzs) {
-		xyz[0] *= multiplier
-		xyz[1] *= multiplier
-		xyz[2] *= multiplier
-	}
-
-	return xyzs
+	return arrayArrays
 }
 
 function multiplyArrayArraysByIndex(arrayArrays, multiplier, index) {
@@ -1245,27 +1093,9 @@ function multiplyArraysByIndex(arrays, multiplier, index) {
 	return arrays
 }
 
-function normalize2D(xy) {
-	var xyLength = Vector.length2D(xy)
-	if (xyLength > 0.0) {
-		Vector.divide2DScalar(xy, xyLength)
-	}
-
-	return xy
-}
-
-function normalize3D(xyz) {
-	var xyzLength = Vector.length3D(xyz)
-	if (xyzLength > 0.0) {
-		Vector.divide3DScalar(xyz, xyzLength)
-	}
-
-	return xyz
-}
-
 function rotate2DsVector(points, vector) {
 	for (var point of points) {
-		Vector.rotate2DVector(point, vector)
+		VectorFast.rotate2DVector(point, vector)
 	}
 
 	return points
@@ -1285,12 +1115,12 @@ function rotate3DsByBasis(rotationBasis, xyzs, xyRotator) {
 	}
 }
 
-function subtract2Ds(elements, point) {
-	for (var element of elements) {
-		Vector.subtract2D(element, point)
+function subtract2Ds(arrays, point) {
+	for (var array of arrays) {
+		VectorFast.subtract2D(array, point)
 	}
 
-	return elements
+	return arrays
 }
 
 
@@ -1337,9 +1167,13 @@ function transform2DPolylines(matrix2D, polylines) {
 	return polylines
 }
 
+function transform3DPoint(point, matrix3D) {
+	Vector.overwriteArrayUntil(point, get3DByMatrix3D(point, matrix3D), 3)
+}
+
 function transform3DPoints(matrix3D, points) {
 	for (var pointIndex = 0; pointIndex < points.length; pointIndex++) {
-		points[pointIndex] = get3DByMatrix3D(points[pointIndex], matrix3D)
+		transform3DPoint(points[pointIndex], matrix3D)
 	}
 }
 
@@ -1386,6 +1220,12 @@ var g3DTransformMap = new Map([
 	['scaleX', getMatrix3DByScaleX],
 	['scaleY', getMatrix3DByScaleY],
 	['scaleZ', getMatrix3DByScaleZ],
+	['skewXY', getMatrix3DBySkewXY],
+	['skewXZ', getMatrix3DBySkewXZ],
+	['skewYX', getMatrix3DBySkewYX],
+	['skewYZ', getMatrix3DBySkewYZ],
+	['skewZX', getMatrix3DBySkewZX],
+	['skewZY', getMatrix3DBySkewZY],
 	['translate', getMatrix3DByTranslate],
 	['translateX', getMatrix3DByTranslateX],
 	['translateY', getMatrix3DByTranslateY],
