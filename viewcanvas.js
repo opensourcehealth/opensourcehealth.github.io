@@ -10,7 +10,7 @@ class CanvasControl {
 				var clipBox = this.clipBox
 				context.save()
 				var region = new Path2D()
-				var size = Vector.getSubtraction2D(clipBox[1], clipBox[0])
+				var size = VectorFast.getSubtraction2D(clipBox[1], clipBox[0])
 				region.rect(clipBox[0][0], clipBox[0][1], size[0], size[1])
 				context.clip(region)
 			}
@@ -101,7 +101,7 @@ class Checkbox extends CanvasControl {
 			return
 		}
 
-		this.value = Value.getValueTrue(value)
+		this.value = Value.getValueDefault(value, true)
 	}
 	drawPrivate(context) {
 		var boundingBox = this.boundingBox
@@ -173,7 +173,7 @@ class Choice extends CanvasControl {
 }
 
 function clearBoundingBox(boundingBox, context) {
-	var size = Vector.getSubtraction2D(boundingBox[1], boundingBox[0])
+	var size = VectorFast.getSubtraction2D(boundingBox[1], boundingBox[0])
 	context.clearRect(boundingBox[0][0], boundingBox[0][1], size[0], size[1])
 }
 
