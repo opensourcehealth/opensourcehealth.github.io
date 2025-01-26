@@ -80,7 +80,7 @@ class GroupControl extends CanvasControl {
 		if (name == 'Move Shape') {
 			if (analysis.points.length > 0) {
 				viewCanvas.mouseMoveManipulator = movePointManipulator
-				movePointManipulator.oldPoints = arrayKit.getArraysCopy(analysis.points)
+				movePointManipulator.oldPoints = Polyline.copy(analysis.points)
 				movePointManipulator.oldValues = getValues(pointString)
 				analysis.closestPointIndex = getClosestPointIndex(point, analysis.points)
 			}
@@ -116,8 +116,8 @@ function mouseDownGroupInspect(context, control, event) {
 	inspectControl.mousePoint = points[analysis.closestPointIndex]
 	inspectControl.change = undefined
 	if (inspectControl.last != undefined) {
-		inspectControl.change = Vector.getSubtraction2D(inspectControl.mousePoint, inspectControl.last)
-		inspectControl.change.push(Vector.length2D(inspectControl.change))
+		inspectControl.change = VectorFast.getSubtraction2D(inspectControl.mousePoint, inspectControl.last)
+		inspectControl.change.push(VectorFast.length2D(inspectControl.change))
 		inspectControl.lastDisplay = inspectControl.last
 		if (inspectControl.change[2] < gClose) {
 			inspectControl.change = undefined
@@ -154,7 +154,7 @@ class ViewGroup {
 				for (var analysis of this.analysisPointsArray) {
 					var points = analysis.points
 					for (var vertexIndex = 0; vertexIndex < points.length; vertexIndex++) {
-						var distanceSquared = Vector.distanceSquared2D(point, points[vertexIndex])
+						var distanceSquared = VectorFast.distanceSquared2D(point, points[vertexIndex])
 						if (distanceSquared < closestDistanceSquared) {
 							this.analysis = analysis
 							closestDistanceSquared = distanceSquared
@@ -204,7 +204,7 @@ class ViewGroup {
 		intervals.forEach(Math.round)
 
 		this.viewBoundingBox = [[controlWidth, controlWidth], [viewBroker.heightMinus, viewBroker.heightMinus]]
-		var halfSize = Vector.multiply2DScalar(Vector.getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0]), 0.5)
+		var halfSize = VectorFast.multiply2DScalar(VectorFast.getSubtraction2D(this.viewBoundingBox[1], this.viewBoundingBox[0]), 0.5)
 		this.viewControl = new GroupControl(this.viewBoundingBox, halfSize)
 		controls.push(this.viewControl)
 		var zoomBoundingBox = [[viewBroker.heightMinus, controlWidth], [height, viewBroker.heightMinus]]
